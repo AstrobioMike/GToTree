@@ -1,0 +1,4 @@
+GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H ../hmm_sets/Hug_et_al.hmm
+
+## clear out example-run files:
+bash clean_after_test.sh
