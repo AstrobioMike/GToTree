@@ -12,10 +12,13 @@ NC='\033[0m'
 ## called by program name with no arguments or with -h as only positional argument ##
 if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
 
-  printf "\n ############################################################################## \n\n"
+
+  printf "\n ############################################################################## \n"
+  printf "                     GToTree - still under initial development\n\n"
+
   printf "  This program takes input genomes from various sources and ultimately produces\n"
   printf "  a phylogenomic tree. You can find detailed usage information at:\n"
-  printf "                                      github.com/AstrobioMike/GToTree/UserGuide\n"
+  printf "                                  github.com/AstrobioMike/GToTree/UserGuide\n"
 
   printf "\n    Required inputs include:\n\n"
   printf "      1) Input genomes in one or any combination of the following formats:\n"
@@ -27,10 +30,10 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
 
   printf "    Optional arguments include:\n\n"
 
-  printf "        - [-m <file>] specify desired genome IDs of input genomes"
+  printf "        - [-m <file>] specify desired genome IDs of input genomes\n"
   printf "                  A two-column tab-delimited file where column 1 holds either the\n"
-  printf "                  file name or the NCBI accession of the genome to name, and\n"
-  printf "                  column 2 holds the desired new genome ID.\n"
+  printf "                  file name or the NCBI accession of the genome to name (depending\n"
+  printf "                  on the input source), and column 2 holds the desired new genome ID.\n"
   printf "                  (does not need to specify all input genomes)\n\n"
 
   printf "        - [-t ] default: false\n"
