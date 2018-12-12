@@ -271,7 +271,7 @@ sleep 3
 #############################################################################
 ###############  CREATE A TEMP DIRECTORY AND EXITING IF FAILS  ##############
 #############################################################################
-tmp_dir=$(date -j -f "%a %b %d %T %Z %Y" "`date`" "+%s")
+tmp_dir=$(date +%s)
 tmp_dir=${tmp_dir}.tmpdir
 
 mkdir $tmp_dir 2> /dev/null
