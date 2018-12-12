@@ -15,5 +15,5 @@ Dependencies include - if you use GToTree, please cite these folks :)
 - **NCBI E-Direct** (*if providing input genomes as NCBI assembly accessions*) - [https://www.ncbi.nlm.nih.gov/books/NBK179288/](https://www.ncbi.nlm.nih.gov/books/NBK179288/) (citation: cite that page)
 - **TaxonKit** (*if changing genome labels based on lineage information for input genomes with associated NCBI taxids*) - [https://bioinf.shenwei.me/taxonkit/](https://bioinf.shenwei.me/taxonkit/) (citation: I'm not sure how to cite them yet)
 
-Testing instructions 
+Testing instructions  
 Clone the repo, and in the "test\_data" directory there are example files and an "example\_run\_log" code that works if the "bin" is in your PATH
