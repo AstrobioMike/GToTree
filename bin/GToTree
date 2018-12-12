@@ -18,7 +18,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
 
   printf "  This program takes input genomes from various sources and ultimately produces\n"
   printf "  a phylogenomic tree. You can find detailed usage information at:\n"
-  printf "                                  github.com/AstrobioMike/GToTree/UserGuide\n"
+  printf "                                  github.com/AstrobioMike/GToTree/wiki\n"
 
   printf "\n    Required inputs include:\n\n"
   printf "      1) Input genomes in one or any combination of the following formats:\n"
