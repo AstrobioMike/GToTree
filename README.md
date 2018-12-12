@@ -9,8 +9,9 @@ GToTree utilizes helper scripts written in python and R, but is primarily implem
 Dependencies include - if you use GToTree, please cite these folks :)  
 
 - **HMMER3** - [http://hmmer.org/download.html](http://hmmer.org/download.html) (citation: they note to cite the website)  
-- **FastTree** - [http://www.microbesonline.org/fasttree/](citation: http://www.microbesonline.org/fasttree/) (https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490)  
-- **prodigal** (*if providing input genomes in fasta format, or GenBank format with no CDS annotations*) - [https://github.com/hyattpd/Prodigal](https://github.com/hyattpd/) (citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/)  
+- **Muscle** - [https://www.drive5.com/muscle/downloads.htm](https://www.drive5.com/muscle/downloads.htm) (citation: [https://academic.oup.com/nar/article/32/5/1792/2380623](https://academic.oup.com/nar/article/32/5/1792/2380623))
+- **FastTree** - [http://www.microbesonline.org/fasttree/](http://www.microbesonline.org/fasttree/) (citation: [https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490))  
+- **prodigal** (*if providing input genomes in fasta format, or GenBank format with no CDS annotations*) - [https://github.com/hyattpd/Prodigal](https://github.com/hyattpd/) (citation: [https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/))  
 - **NCBI E-Direct** (*if providing input genomes as NCBI assembly accessions*) - [https://www.ncbi.nlm.nih.gov/books/NBK179288/](https://www.ncbi.nlm.nih.gov/books/NBK179288/) (citation: cite that page)
 - **TaxonKit** (*if changing genome labels based on lineage information for input genomes with associated NCBI taxids*) - [https://bioinf.shenwei.me/taxonkit/](https://bioinf.shenwei.me/taxonkit/) (citation: I'm not sure how to cite them yet)
 
