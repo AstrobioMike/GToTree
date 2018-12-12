@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+
+from Bio import SeqIO
+import sys
+import argparse
+
+parser = argparse.ArgumentParser(description='This script will swap the headers of a fasta file.')
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-i", "--input_fasta", help="Starting fasta file", action="store", dest="input_fasta", required=True)
+parser.add_argument("-s", "--map_of_ids_to_swap", help="Two column tab-delimited file where column 1 holds the original headers and column 2 holds the desired headers. (doesn't need to hold all headers)", action="store", dest="id_map")
+parser.add_argument("-o", "--output_fasta_name", help='Output fasta file (default: "Renamed.fasta").', dest="output_fasta_name", default="Renamed.fasta")
+
+if len(sys.argv)==1:
+  parser.print_help(sys.stderr)
+  sys.exit(1)
+
+args = parser.parse_args()
+
+map_dict = {}
+
+with open(args.id_map) as map:
+  for line in map:
+    line = line.strip()
+    line = line.split("\t")
+    map_dict[line[0]] = line[1]
+
+in_fasta = open(args.input_fasta, "r")
+out_fasta = open(args.output_fasta_name, "w")
+
+for seq_record in SeqIO.parse(in_fasta, "fasta"):
+  if seq_record.id in map_dict:
+    out_fasta.write(">" + str(map_dict[seq_record.id]) + "\n")
+    out_fasta.write(str(seq_record.seq) + "\n")
+  else:
+    out_fasta.write(">" + str(seq_record.id)  + "\n")
+    out_fasta.write(str(seq_record.seq) + "\n")
+
+in_fasta.close()
+out_fasta.close()

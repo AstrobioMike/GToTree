@@ -12,50 +12,51 @@ NC='\033[0m'
 ## called by program name with no arguments or with -h as only positional argument ##
 if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
 
-  printf "\n ############################################################################## \n"
-  printf "\n  This program takes input genomes from various sources and ultimately produces\n"
+  printf "\n ############################################################################## \n\n"
+  printf "  This program takes input genomes from various sources and ultimately produces\n"
   printf "  a phylogenomic tree. You can find detailed usage information at:\n"
   printf "                                      github.com/AstrobioMike/GToTree/UserGuide\n"
 
-  printf "\n    Required inputs include:\n"
-  printf "\n      1) Input genomes in one or any combination of the following formats:\n"
+  printf "\n    Required inputs include:\n\n"
+  printf "      1) Input genomes in one or any combination of the following formats:\n"
   printf "        - [-a <file>] single-column file of NCBI assembly accessions\n"
   printf "        - [-g <file>] single-column file with the path to each GenBank file\n"
-  printf "        - [-f <file>] single-column file with the path to each fasta file\n"
+  printf "        - [-f <file>] single-column file with the path to each fasta file\n\n"
 
-  printf "\n      2)  [-H <file>] the uncompressed hmm file being used\n"
+  printf "      2)  [-H <file>] the uncompressed hmm file being used\n\n"
 
-  printf "\n    Optional arguments include:\n"
+  printf "    Optional arguments include:\n\n"
 
-  printf "\n        - [-m <file>] specify genome IDs of input fasta or GenBank files"
-  printf "                  A two-column tab-delimited file where column 1 holds the file\n"
-  printf "                  name and column 2 holds the desired genome ID.\n"
-  printf "                  (does not need to specify all input files)\n"
+  printf "        - [-m <file>] specify desired genome IDs of input genomes"
+  printf "                  A two-column tab-delimited file where column 1 holds either the\n"
+  printf "                  file name or the NCBI accession of the genome to name, and\n"
+  printf "                  column 2 holds the desired new genome ID.\n"
+  printf "                  (does not need to specify all input genomes)\n\n"
 
-  printf "\n        - [-t ] default: false\n"
+  printf "        - [-t ] default: false\n"
   printf "                  Provide this flag with no arguments if you'd like to add lineage\n"
   printf "                  info to the sequence headers for any genomes with NCBI taxids.\n"
-  printf "                  (requires Taxonkit)\n"
+  printf "                  (requires Taxonkit)\n\n"
 
-  printf "\n        - [-c <float>] default: 0.2\n" 
+  printf "        - [-c <float>] default: 0.2\n" 
   printf "                  A float between 0-1 specifying the range about the median of\n"
   printf "                  sequences to be retained. For example, if the median length of a\n"
   printf "                  set of sequences is 100 AAs, those seqs longer than 120 or shorter\n"
-  printf "                  than 80 will be filtered out before alignment of that gene set\n"
+  printf "                  than 80 will be filtered out before alignment of that gene set\n\n"
 
-  printf "\n        - [-G <float>] default: 0.75\n"
+  printf "        - [-G <float>] default: 0.75\n"
   printf "                  A float between 0-1 specifying the minimum fraction of hits a\n"
   printf "                  genome must have of the SCG-set. For example, if there are 100\n"
   printf "                  target genes in the HMM profile, and Genome X only has hits to 74\n"
-  printf "                  of them, it will be removed from analysis.\n"
+  printf "                  of them, it will be removed from analysis.\n\n"
 
-  printf "\n        - [-d ] default: false\n"
+  printf "        - [-d ] default: false\n"
   printf "                  Provide this flag with no arguments if you'd like to keep the\n"
-  printf "                  temporary directory. (mostly useful for debugging)\n"
+  printf "                  temporary directory. (mostly useful for debugging)\n\n"
 
-  printf "\n    Example usage:\n\n\t GToTree -t ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Lee_et_al_BSCGs.hmm -t\n"
+  printf "    Example usage:\n\n\t GToTree -t ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Lee_et_al_BSCGs.hmm -t\n\n"
 
-  printf "\n ############################################################################## \n\n"
+  printf " ############################################################################## \n\n"
 
   exit
 fi
@@ -225,10 +226,13 @@ fi
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
 if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ]; then
-  if [ ! -f "$file_to_genome_id_map" ]; then
-    printf "\n${RED}      You specified $file_to_genome_id_map, but that file cannot be found :(${NC}\n"
-    printf "\nExiting for now.\n\n"
-    exit
+
+  if [ -n "$file_to_genome_id_map" ]; then
+    if [ ! -f "$file_to_genome_id_map" ]; then
+      printf "\n${RED}      You specified $file_to_genome_id_map, but that file cannot be found :(${NC}\n"
+      printf "\nExiting for now.\n\n"
+      exit
+    fi
   fi
 
   printf "\n\n    Options set:\n"
@@ -276,13 +280,32 @@ if [ $? -ne 0 ] ; then
   exit
 fi
 
+### making sure each id provided in the mapping file (if given) is found in one 
+### of the genome input files 
+if [ -n "$file_to_genome_id_map" ]; then
+  cat $NCBI_acc_file $genbank_list_file $fasta_files | sort > ${tmp_dir}/sorted_all_input_genome_ids.tmp
+  comm -23 <(cut -f1 $file_to_genome_id_map | sort) ${tmp_dir}/sorted_all_input_genome_ids.tmp > ${tmp_dir}/spurious_ids.tmp
+  if [ -s ${tmp_dir}/spurious_ids.tmp ]; then
+    spurious_ids_count=$(wc -l ${tmp_dir}/spurious_ids.tmp | sed "s/^ *//" | cut -d " " -f 1)
+    mv ${tmp_dir}/spurious_ids.tmp Missing_IDs.txt
+    rm -rf $tmp_dir
+
+    printf "\n${RED}  $spurious_ids_count genome ID(s) listed in the mapping file (passed to \"-m\") not found in${NC}\n"
+    printf "  ${RED}any of the input genomes :(${NC}\n\n"
+    printf "  Reported in the file \"Missing_IDs.txt\" for you to investigate.\n\n"
+    printf "Exiting for now.\n\n"
+    exit
+  fi
+fi
+    #### add in check that all provided in here are in the inputs... or 
+    #### maybe put that down later when doing this and just write out the ones not found
+
+
 # moving uniq_hmm_names.tmp into temp directory now that all is well
 mv uniq_hmm_names.tmp ${tmp_dir}/uniq_hmm_names.tmp
 
 # starting an all genomes file to keep track of those from all sources
 touch ${tmp_dir}/genomes_from_all_sources.tmp
-
-
 
 
 #############################################################################
@@ -386,7 +409,7 @@ if [ -n "$NCBI_acc_file" ]; then
     # downloading the protein-coding sequences for the assembly
     curl --silent --connect-timeout 5 --max-time 10 --retry 5 --retry-max-time 30 -o genes.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
-    # checking both files downloaded successfully, if not, writing problem accesion to file "NCBI_accessions_not_successfully_downloaded.txt" and moving on to next:
+    # checking both files downloaded successfully, if not, writing problem accesion to file "NCBI_accessions_not_downloaded.txt" and moving on to next:
     if [ -s report1.tmp ] && [ -s genes.tmp.gz ]; then
 
       # fixing the stupid carriage returns that for some reason NCBI assembly reports have in them...
@@ -448,17 +471,18 @@ if [ -n "$NCBI_acc_file" ]; then
     else
       printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
       printf "  \t$assembly did not download properly :(\n\n"
-      printf "  \tIt's been added to the file \"NCBI_accessions_not_successfully_downloaded.txt\"\n"
+      printf "  \tIt's been added to the file \"NCBI_accessions_not_downloaded.txt\"\n"
       printf "     ${RED}************************************************************************ ${NC}\n"
+      rm -rf report1.tmp genes.tmp.gz
       sleep 3
-      echo $assembly >> NCBI_accessions_not_successfully_downloaded.txt
+      echo $assembly >> NCBI_accessions_not_downloaded.txt
     fi
 
   done < ${tmp_dir}/ncbi_accessions_info.tmp
 
-  ## removing genomes from list if they were found in the "NCBI_accessions_not_successfully_downloaded.txt" file, i.e. they did not download properly:
-  if [ -f NCBI_accessions_not_successfully_downloaded.txt ]; then
-    comm -23 ${tmp_dir}/updated_sorted_ncbi_accs.tmp <(sort NCBI_accessions_not_successfully_downloaded.txt) | sort > ${tmp_dir}/updated_sorted_ncbi_accs2.tmp
+  ## removing genomes from list if they were found in the "NCBI_accessions_not_downloaded.txt" file, i.e. they did not download properly:
+  if [ -f NCBI_accessions_not_downloaded.txt ]; then
+    comm -23 ${tmp_dir}/updated_sorted_ncbi_accs.tmp <(sort NCBI_accessions_not_downloaded.txt) | sort > ${tmp_dir}/updated_sorted_ncbi_accs2.tmp
     mv ${tmp_dir}/updated_sorted_ncbi_accs2.tmp ${tmp_dir}/final_included_NCBI_accs.tmp
   else 
     mv ${tmp_dir}/updated_sorted_ncbi_accs.tmp ${tmp_dir}/final_included_NCBI_accs.tmp
@@ -870,7 +894,7 @@ curr_time=$(date +"%I:%M %p")
 duration=$SECONDS
 
 printf "           It is currently $curr_time; the process started at $start_time.\n"
-printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n"
+printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n"
 
 # setting new counter
 num=0
@@ -881,7 +905,7 @@ do
 
   num=$((num+1))
 
-  printf "\n   --------------------------------------------------------------------------   \n"
+  printf "\n\n\n   --------------------------------------------------------------------------   \n"
   printf "\t    Aligning and cleaning gene ${GREEN}$SCG${NC}; Number $num of $new_hmm_target_genes_total.\n"
   printf "   --------------------------------------------------------------------------   \n"
 
@@ -979,7 +1003,7 @@ paste -d "\n" ${tmp_dir}/headers.tmp ${tmp_dir}/seqs.tmp > FINAL_aligned_SCGs.fa
 # storing genomes that made it through workflow to report at end
 genomes_retained=$(wc -l ${tmp_dir}/final_genomes_from_all_sources.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
-printf "________________________________________________________________________________\n\n\n"
+printf "\n________________________________________________________________________________\n\n\n"
 
 
 
@@ -989,45 +1013,108 @@ printf "________________________________________________________________________
 ###############  ADDING MORE INFORMATIVE HEADERS IF SPECIFIED  ##############
 #############################################################################
 #############################################################################
-
-if [ $taxonkit_id_swap != "false" ]; then
+## making copy of alignment file to preserve original
+if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false"]; then
+  cp FINAL_aligned_SCGs.faa ${tmp_dir}/FINAL_aligned_SCGs_mod_names.tmp
 
   printf "\n ############################################################################## \n"
-  printf " ####     Adding more informative headers to genomes that have taxids      ####\n"
+  printf " ####                   Adding more informative headers                    ####\n"
   printf " ############################################################################## \n\n"
 
-  curr_time=$(date +"%I:%M %p")
-  duration=$SECONDS
+  ## building id swap file starting with mapping file if provided
+  if [ -n "$file_to_genome_id_map" ]; then
+    ## making sorted list of targets to change
+    cut -f1 $file_to_genome_id_map | sort > ${tmp_dir}/sorted_target_ids_to_change.tmp
 
-  printf "           It is currently $curr_time; the process started at $start_time.\n"
-  printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n"
+    ## separating out which ones are ncbi accessions (because the others need to have their extension removed)
+    for acc in $(cut -f1 NCBI_genomes_summary_info.tsv | tail -n +2)
+    do
+      grep -w -m1 "$acc" $file_to_genome_id_map
+    done | tee ${tmp_dir}/ncbi_id_swap_map.tmp | cut -f 1 | sort > ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp
 
-  ## making copy of alignment file to preserve original
-  cp FINAL_aligned_SCGs.faa FINAL_aligned_SCGs_mod_names.faa
+    ## getting which are not ncbi accessions
+    comm -23 ${tmp_dir}/sorted_target_ids_to_change.tmp ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp > ${tmp_dir}/non_ncbi_ids_to_swap.tmp
 
-  ## running taxonkit and adding to summary table ##
-  cut -f 2 All_genomes_summary_info.tsv | tail -n +2 | taxonkit lineage | taxonkit reformat -r NA | cut -f3 | tr ";" "\t" > ${tmp_dir}/lineages.tmp
+    ## removing extensions
+    for file in $(cut -f1 ${tmp_dir}/non_ncbi_ids_to_swap.tmp)
+    do
+      echo "${file%.*}"
+    done > ${tmp_dir}/non_ncbi_old_ids_to_swap.tmp
 
-  cat <(printf "domain\tphylum\tclass\torder\tfamily\tgenus\tspecific_name\n") ${tmp_dir}/lineages.tmp > ${tmp_dir}/lineages2.tmp
+    # for file in $(cut -f1 $file_to_genome_id_map)
+    # do
+    #   echo "${file%.*}"
+    # done > ${tmp_dir}/old_ids.tmp
+    
+    ## getting desired new ids for these
+    for id in $(cat ${tmp_dir}/non_ncbi_old_ids_to_swap.tmp)
+    do
+      grep -m1 $"id" $file_to_genome_id_map
+    done | cut -f 2 > ${tmp_dir}/non_ncbi_new_ids.tmp
 
-  paste All_genomes_summary_info.tsv ${tmp_dir}/lineages2.tmp > All_genomes_summary_info2.tsv
-  mv All_genomes_summary_info2.tsv All_genomes_summary_info.tsv
+    ## sticking non-ncbi new and old together formatted for swapping, and catting with the ncbi ones
+    cat <(paste ${tmp_dir}/non_ncbi_old_ids_to_swap.tmp ${tmp_dir}/non_ncbi_new_ids.tmp) ${tmp_dir}/ncbi_id_swap_map.tmp > ${tmp_dir}/id_swap_map.tmp
 
-  ## creating bash script to swap headers for those with taxids ##
-  tail -n +2 All_genomes_summary_info.tsv | awk ' $2 != "NA" ' | cut -f1 > ${tmp_dir}/ids_to_change.tmp
-  tail -n +2 All_genomes_summary_info.tsv | awk ' BEGIN { FS=OFS="\t" } $2 != "NA" ' | cut -f 6,7,8,12 | tr "\t" "_" | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "['.\[\]]" > ${tmp_dir}/ids_lineages.tmp
-  paste -d "_" ${tmp_dir}/ids_to_change.tmp ${tmp_dir}/ids_lineages.tmp > ${tmp_dir}/new_ids.tmp
+  fi
 
-  sed "s/^/sed -i.tmp \'s\//" ${tmp_dir}/ids_to_change.tmp | sed "s/$/\//" > p1
-  sed "s/$/\/g\' FINAL_aligned_SCGs_mod_names.faa/" ${tmp_dir}/new_ids.tmp > p2
+  ## now if taxonkit was specified, adding those to swap file too but only
+  ## renaming genomes with a taxid that are NOT in the user-provided mapping file
+  if [ $taxonkit_id_swap != "false" ]; then
 
-  paste -d "\0" p1 p2 > ID_swap.sh
+    ## running taxonkit and adding to summary table ##
+    cut -f 2 All_genomes_summary_info.tsv | tail -n +2 | taxonkit lineage | taxonkit reformat -r NA | cut -f3 | tr ";" "\t" > ${tmp_dir}/lineages.tmp
 
-  bash ID_swap.sh
+    cat <(printf "domain\tphylum\tclass\torder\tfamily\tgenus\tspecific_name\n") ${tmp_dir}/lineages.tmp > ${tmp_dir}/lineages2.tmp
 
-  rm ID_swap.sh p1 p2 FINAL_aligned_SCGs_mod_names.faa.tmp
+    paste All_genomes_summary_info.tsv ${tmp_dir}/lineages2.tmp > All_genomes_summary_info2.tsv
+    mv All_genomes_summary_info2.tsv All_genomes_summary_info.tsv
 
-  printf "________________________________________________________________________________\n\n\n"
+    ## getting genomes that have a taxid
+    awk ' BEGIN { FS=OFS="\t" } $2 != "NA" ' All_genomes_summary_info.tsv | tail -n +2 | cut -f1 > ${tmp_dir}/potential_ids_for_swap.tmp
+    ## removing those that the user already provided new labels for
+    comm -23 <(sort ${tmp_dir}/potential_ids_for_swap.tmp) <(cut -f1 ${tmp_dir}/id_swap_map.tmp | sort) > ${tmp_dir}/ids_for_taxonkit_swap.tmp
+    
+    ## creating new labels for them based on lineage info
+    for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
+    do
+      grep -w -m1 "$id" All_genomes_summary_info.tsv
+    done | cut -f 1,6,7,8,12 | tr "\t" "_" | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "['.\[\]]" > ${tmp_dir}/new_ids_for_taxonkit_swap.tmp
+
+    ## pasting together and adding to header_swap_map.tmp
+    cat ${tmp_dir}/id_swap_map.tmp <(paste ${tmp_dir}/ids_for_taxonkit_swap.tmp ${tmp_dir}/new_ids_for_taxonkit_swap.tmp) > ${tmp_dir}/full_id_swap_map.tmp
+  fi
+
+  ### now swapping ids 
+  gtt-swap-ids -i ${tmp_dir}/FINAL_aligned_SCGs_mod_names.tmp -s ${tmp_dir}/full_id_swap_map.tmp -o FINAL_aligned_SCGs_mod_names.faa
+
+  ### adding new ids to summary table as column "label"
+  # first pulling out and adding to those that were changed
+  for changed_id in $(cut -f1 ${tmp_dir}/full_id_swap_map.tmp)
+  do
+    grep -w -m1 "$changed_id" All_genomes_summary_info.tsv
+  done | cut -f 2- > ${tmp_dir}/building_new_genomes_tab1.tmp
+
+  paste ${tmp_dir}/full_id_swap_map.tmp ${tmp_dir}/building_new_genomes_tab1.tmp > ${tmp_dir}/building_new_genomes_tab2.tmp
+
+  # now getting those that weren't changed and adding assembly id to the "label" column
+  comm -23 <(cut -f1 All_genomes_summary_info.tsv | tail -n +2 | sort) <(cut -f1 ${tmp_dir}/full_id_swap_map.tmp | sort) > ${tmp_dir}/unchanged_ids.tmp
+
+  for unchanged_id in $(cat ${tmp_dir}/unchanged_ids.tmp)
+  do
+    grep -w -m1 "$unchanged_id" All_genomes_summary_info.tsv
+  done > ${tmp_dir}/building_new_genomes_tab3.tmp
+
+  paste ${tmp_dir}/unchanged_ids.tmp ${tmp_dir}/building_new_genomes_tab3.tmp > ${tmp_dir}/building_new_genomes_tab4.tmp
+
+  head -n 1 All_genomes_summary_info.tsv > ${tmp_dir}/old_header.tmp
+
+  # making new header
+  paste <(cut -f 1 ${tmp_dir}/old_header.tmp) <(printf "label") <(cut -f 2- ${tmp_dir}/old_header.tmp) > ${tmp_dir}/new_header.tmp
+
+  # now sticking all together into a new summary table that includes any adjusted labels
+  cat ${tmp_dir}/new_header.tmp ${tmp_dir}/building_new_genomes_tab2.tmp ${tmp_dir}/building_new_genomes_tab4.tmp > All_genomes_summary_info.tsv
+
+  printf "\n________________________________________________________________________________\n\n\n"
 
 fi
 
@@ -1064,7 +1151,7 @@ fi
 #############################################################################
 
 printf "\n\n#################################################################################\n"
-printf "####                                 ${GREEN}Done!!${NC}                                 ####\n"
+printf "####                                 ${GREEN}Done!!${NC}                                  ####\n"
 printf "#################################################################################\n\n"
 
 
@@ -1088,7 +1175,7 @@ printf "    Summary file with comp./redund. estimates written to file \"${GREEN}
 
 
 # reporting any problem files/accessions
-if [ -f NCBI_accessions_not_found.txt ] || [ -f NCBI_accessions_not_successfully_downloaded.txt ] || [ -f Genbank_files_with_no_CDSs.txt ]; then
+if [ -f NCBI_accessions_not_found.txt ] || [ -f NCBI_accessions_not_downloaded.txt ] || [ -f Genbank_files_with_no_CDSs.txt ]; then
   printf "\n  Some notes:\n\n"
 
   if [ -f NCBI_accessions_not_found.txt ]; then
@@ -1097,10 +1184,10 @@ if [ -f NCBI_accessions_not_found.txt ] || [ -f NCBI_accessions_not_successfully
     printf "      Reported in \"NCBI_accessions_not_found.txt\".\n\n"
   fi
 
-  if [ -f NCBI_accessions_not_successfully_downloaded.txt ]; then
-    num_accs_not_downloaded=$(wc -l NCBI_accessions_not_successfully_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
+  if [ -f NCBI_accessions_not_downloaded.txt ]; then
+    num_accs_not_downloaded=$(wc -l NCBI_accessions_not_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
     printf "  ${RED}$num_accs_not_downloaded did not download properly.${NC}\n" 
-    printf "      Reported in \"NCBI_accessions_not_successfully_downloaded.txt\".\n\n"
+    printf "      Reported in \"NCBI_accessions_not_downloaded.txt\".\n\n"
   fi
 
   if [ -f Genbank_files_with_no_CDSs.txt ]; then

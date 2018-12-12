@@ -1,4 +1,4 @@
-GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H ../hmm_sets/Hug_et_al.hmm
+GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H ../hmm_sets/Hug_et_al.hmm -m genome_to_id_map.tsv -t
 
 ## clear out example-run files:
 bash clean_after_test.sh
