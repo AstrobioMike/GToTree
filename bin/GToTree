@@ -222,6 +222,11 @@ if [ -f "$hmm_file" ]; then
   grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
   hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
   printf "      - $hmm_file ($hmm_target_genes_total targets)\n"
+elif [ -f "${GToTree_HMM_dir}/${hmm_file}" ]; then
+  hmm_file="${GToTree_HMM_dir}/${hmm_file}"
+  grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
+  hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
+  printf "      - ${hmm_file} ($hmm_target_genes_total targets)\n"
 else
   printf "\n${RED}      You specified $hmm_file as your HMM file to use, but that file cannot be found :(${NC}\n"
   printf "\nExiting for now.\n\n"
@@ -419,7 +424,37 @@ if [ -n "$NCBI_acc_file" ]; then
     curl --silent --connect-timeout 5 --max-time 10 --retry 5 --retry-max-time 30 -o genes.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
     # checking both files downloaded successfully, if not, writing problem accesion to file "NCBI_accessions_not_downloaded.txt" and moving on to next:
-    if [ -s report1.tmp ] && [ -s genes.tmp.gz ]; then
+    if [ -s report1.tmp ]; then
+      if [ -s genes.tmp.gz ]; then
+        gunzip genes.tmp.gz
+      else # trying to get assembly if there were no gene annotations available
+        curl --silent --connect-timeout 5 --max-time 10 --retry 5 --retry-max-time 30 -o genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
+        
+        if [ -s genome.tmp.gz ]; then
+
+          gunzip genome.tmp.gz
+
+          printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
+          printf "  \t$assembly doesn't appear to have gene annotations associated with it.\n\n"
+          printf "  \tSo we downloaded the genome and are identifying coding sequences with prodigal.\n"
+          printf "     ${RED}************************************************************************ ${NC}\n\n"
+
+          printf "      Getting coding seqs...\n\n"
+          prodigal -c -q -i genome.tmp -a genes1.tmp > /dev/null
+          tr -d '*' < genes1.tmp > genes2.tmp
+
+          ## renaming seqs to have assembly name
+          gtt-rename-fasta-headers -i genes2.tmp -w $assembly -o genes.tmp
+        else
+          printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
+          printf "  \t$assembly's genes nor genome downloaded properly :(\n\n"
+          printf "  \tIt's been added to the file \"NCBI_accessions_not_downloaded.txt\"\n"
+          printf "     ${RED}************************************************************************ ${NC}\n"
+          rm -rf report1.tmp genes.tmp.gz
+          sleep 3
+          echo $assembly >> NCBI_accessions_not_downloaded.txt
+        fi
+      fi
 
       # fixing the stupid carriage returns that for some reason NCBI assembly reports have in them...
       tr "\r" "\n" < report1.tmp > report.tmp
@@ -433,9 +468,6 @@ if [ -n "$NCBI_acc_file" ]; then
       if [ -z "$infraspecific_name" ]; then infraspecific_name="NA"; fi
       taxid=$(grep "Taxid:" report.tmp | cut -f2 -d ":" | sed 's/^ *//')
       if [ -z "$taxid" ]; then taxid="NA"; fi
-
-      # uncompressing genes' file
-      gunzip genes.tmp.gz
 
       printf "      Performing HMM search...\n"
       
