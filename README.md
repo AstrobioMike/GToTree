@@ -1,4 +1,4 @@
-# GToTree: a user-friendly workflow for phylogenomics
+# GToTree: a user-friendly workflow for large-scale phylogenomics
 
 ## Currently under initial development
 
