@@ -1,6 +1,6 @@
-# GToTree
+# GToTree: a user-friendly workflow for phylogenomics
 
-## Currently under development
+## Currently under initial development
 
 GToTree is a command-line tool that can take any combination of flat fasta files, GenBank files, and NCBI assembly accessions as input and primarily outputs an alignment file, estimates of genome completeness and redundancy, and a phylogenomic tree based on the specified single-copy gene (SCG) set. GToTree enables automation of tasks such as: filtering out genes of spurious length and genomes with too few hits to the target SCG set via adjustable parameters; adding in needed gap-sequences for genes not detected in genomes being retained in the analysis; and swapping genome identifiers so resulting trees and alignments can be explored more easily.
 
