@@ -57,7 +57,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "                  Provide this flag with no arguments if you'd like to keep the\n"
   printf "                  temporary directory. (mostly useful for debugging)\n\n"
 
-  printf "    Example usage:\n\n\t GToTree -t ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Lee_et_al_BSCGs.hmm -t\n\n"
+  printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Lee_BSCGs.hmm -t\n\n"
 
   printf " ############################################################################## \n\n"
 
@@ -163,15 +163,15 @@ if [ -n "$NCBI_acc_file" ]; then
   fi
 
   if [ -f "$NCBI_acc_file" ]; then
-    NCBI_genomes_total=$(wc -l $NCBI_acc_file | sed "s/^ *//" | cut -d " " -f 1)
-    printf "      - NCBI accessions listed in $NCBI_acc_file ($NCBI_genomes_total genomes)\n"
+    NCBI_input_genomes_total=$(wc -l $NCBI_acc_file | sed "s/^ *//" | cut -d " " -f 1)
+    printf "      - NCBI accessions listed in $NCBI_acc_file ($NCBI_input_genomes_total genomes)\n"
   else
     printf "\n${RED}      You specified $NCBI_acc_file as a source of NCBI genomes to use, but that file cannot be found :(${NC}\n"
     printf "\nExiting for now.\n\n"
     exit
   fi
 else 
-  NCBI_genomes_total=0
+  NCBI_input_genomes_total=0
 fi
 
 if [ -n "$genbank_list_file" ];then
@@ -207,7 +207,7 @@ else
 fi
 
 # reporting total number of planned genomes
-total_input_genomes=$(($NCBI_genomes_total + $genbank_genomes_total + $fasta_genomes_total))
+total_input_genomes=$(($NCBI_input_genomes_total + $genbank_genomes_total + $fasta_genomes_total))
 printf "\n                             ${GREEN}Total input genomes: $total_input_genomes${NC}\n"
 
 
@@ -374,10 +374,11 @@ if [ -n "$NCBI_acc_file" ]; then
     cp ${tmp_dir}/not_found_accs.tmp NCBI_accessions_not_found.txt
 
     comm -23 ${tmp_dir}/sorted_ncbi_accs.tmp <(sort ${tmp_dir}/not_found_accs.tmp) | sort > ${tmp_dir}/updated_sorted_ncbi_accs.tmp
-    NCBI_genomes_total=$(wc -l ${tmp_dir}/updated_sorted_ncbi_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
+    NCBI_remaining_genomes_total=$(wc -l ${tmp_dir}/updated_sorted_ncbi_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
   else
     mv ${tmp_dir}/sorted_ncbi_accs.tmp ${tmp_dir}/updated_sorted_ncbi_accs.tmp
+    NCBI_remaining_genomes_total=$(wc -l ${tmp_dir}/updated_sorted_ncbi_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
   fi
 
@@ -409,7 +410,7 @@ if [ -n "$NCBI_acc_file" ]; then
     num=$((num+1)) # to track progress
 
     printf "   --------------------------------------------------------------------------   \n"
-    printf "\tOn assembly ${GREEN}$assembly${NC}; Number $num of $NCBI_genomes_total total.\n"
+    printf "\tOn assembly ${GREEN}$assembly${NC}; Number $num of $NCBI_remaining_genomes_total total.\n"
     printf "   --------------------------------------------------------------------------   \n\n"
 
     # storing links to download stuff in variables
@@ -521,18 +522,45 @@ if [ -n "$NCBI_acc_file" ]; then
 
   done < ${tmp_dir}/ncbi_accessions_info.tmp
 
-  ## removing genomes from list if they were found in the "NCBI_accessions_not_downloaded.txt" file, i.e. they did not download properly:
+  printf "\n________________________________________________________________________________\n\n"
+
+  
+  ## reporting any accessions not successfully found or downloaded, and updating files
+  printf "     ******************************* UPDATE *******************************  \n"
+  printf "        Of the input genomes provided by NCBI accession:\n\n"
+
+  if [ -f NCBI_accessions_not_found.txt ]; then
+    num_accs_not_found=$(wc -l NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
+    printf "          ${RED}$num_accs_not_found accession(s) not found at NCBI.${NC}\n" 
+    printf "            Reported in \"NCBI_accessions_not_found.txt\".\n\n"
+  fi
+
   if [ -f NCBI_accessions_not_downloaded.txt ]; then
+    num_accs_not_downloaded=$(wc -l NCBI_accessions_not_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
+
     comm -23 ${tmp_dir}/updated_sorted_ncbi_accs.tmp <(sort NCBI_accessions_not_downloaded.txt) | sort > ${tmp_dir}/updated_sorted_ncbi_accs2.tmp
     mv ${tmp_dir}/updated_sorted_ncbi_accs2.tmp ${tmp_dir}/final_included_NCBI_accs.tmp
-  else 
+
+    printf "          ${RED}$num_accs_not_downloaded provided NCBI accessions did not download successfully.${NC}\n" 
+    printf "            Reported in \"NCBI_accessions_not_downloaded.txt\".\n\n"
+
+  else
     mv ${tmp_dir}/updated_sorted_ncbi_accs.tmp ${tmp_dir}/final_included_NCBI_accs.tmp
   fi
 
+  if [ -f NCBI_accessions_not_found.txt ] || [ -f NCBI_accessions_not_downloaded.txt ]; then
+    num_retained_ncbi_input_genomes=$(wc -l ${tmp_dir}/final_included_NCBI_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
+
+    printf "        $num_retained_ncbi_input_genomes of the total $NCBI_input_genomes_total genomes provided by NCBI accession were\n"
+    printf "        successfully downloaded and searched.\n"
+  else
+    printf "        ${GREEN}All $NCBI_input_genomes_total genomes provided NCBI accessions successfully downloaded and searched :)${NC}\n"
+  fi
+
+  printf "     ************************************************************************ \n\n\n"
+
   # adding to genomes from all sources file
   cat ${tmp_dir}/final_included_NCBI_accs.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
-
-  printf "________________________________________________________________________________\n\n\n"
 
 fi
 
@@ -1209,7 +1237,7 @@ printf "########################################################################
 if [ $genomes_retained == $total_input_genomes ]; then
   printf "            ${GREEN}All $total_input_genomes input genomes were retained through the workflow!${NC}\n\n\n"
 else
-  printf "        Overall, $genomes_retained input genomes of the input $total_input_genomes were retained. (see notes below)\n\n\n"
+  printf "    Overall, $genomes_retained input genomes of the input $total_input_genomes were retained. (see notes below)\n\n\n"
 fi
 
 # reporting primary output files
@@ -1226,7 +1254,7 @@ printf "    Summary file with comp./redund. estimates written to file \"${GREEN}
 
 # reporting any problem files/accessions
 if [ -f NCBI_accessions_not_found.txt ] || [ -f NCBI_accessions_not_downloaded.txt ] || [ -f Genbank_files_with_no_CDSs.txt ] || [ -f Genomes_removed_for_too_few_hits.tsv ]; then
-  printf "\n  Some notes:\n\n"
+  printf "\n  Notes:\n\n"
 
   if [ -f NCBI_accessions_not_found.txt ]; then
     num_accs_not_found=$(wc -l NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
