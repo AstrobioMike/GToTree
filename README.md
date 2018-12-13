@@ -4,6 +4,8 @@
 
 GToTree is a command-line tool that can take any combination of flat fasta files, GenBank files, and NCBI assembly accessions as input and primarily outputs an alignment file, estimates of genome completeness and redundancy, and a phylogenomic tree based on the specified single-copy gene (SCG) set. GToTree enables automation of tasks such as: filtering out genes of spurious length and genomes with too few hits to the target SCG set via adjustable parameters; adding in needed gap-sequences for genes not detected in genomes being retained in the analysis; and swapping genome identifiers so resulting trees and alignments can be explored more easily.
 
+Also included is a newly generated bacterial single-copy gene-set based on Pfams from release 32.0 searched against 11,405 complete bacterial genomes available from NCBI (accessed on 09-DEC-18). All code/steps used in the generation of the gene set are reported in the [wiki](https://github.com/AstrobioMike/GToTree/wiki).
+
 GToTree utilizes helper scripts written in python and R, but is primarily implemented in bash. Every attempt is being made to make it portable across all variations, including Darwin on OSX, so please send in any hiccups if you encounter them.  
 
 Dependencies include - if you use GToTree, please cite these folks :)  
