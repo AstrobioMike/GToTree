@@ -170,6 +170,8 @@ if [ -n "$NCBI_acc_file" ]; then
     printf "\nExiting for now.\n\n"
     exit
   fi
+else 
+  NCBI_genomes_total=0
 fi
 
 if [ -n "$genbank_list_file" ];then
@@ -181,6 +183,8 @@ if [ -n "$genbank_list_file" ];then
     printf "\nExiting for now.\n\n"
     exit
   fi
+else
+  genbank_genomes_total=0
 fi
 
 if [ -n "$fasta_files" ]; then
@@ -198,6 +202,8 @@ if [ -n "$fasta_files" ]; then
     printf "\nExiting for now.\n\n"
     exit
   fi
+else
+  fasta_genomes_total=0
 fi
 
 # reporting total number of planned genomes
