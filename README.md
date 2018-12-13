@@ -21,4 +21,4 @@ If you use GToTree, please cite these folks :)
 - **TaxonKit** (*if changing genome labels based on lineage information for input genomes with associated NCBI taxids*) - [https://bioinf.shenwei.me/taxonkit/](https://bioinf.shenwei.me/taxonkit/) (citation: I'm not sure how to cite them yet)
 
 ### Testing instructions  
-Clone the repo, and in the "test\_data" directory there are example files and an "example\_run\_log" code that works if the "bin" is in your PATH
+Clone the repo, and in the "test\_data" directory there are example files and an "example\_run\_log" code that works if the "bin" is in your PATH. Running `GToTree` with no arguments gives the help menu. 
