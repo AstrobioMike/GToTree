@@ -365,7 +365,7 @@ if [ -n "$NCBI_acc_file" ]; then
   # and i seem to universally get one back or the other from the search
   # so going to crop off the start and use just the numbers to compare to find if any weren't found
 
-  sed 's/GC._//' ${tmp_dir}/sorted_ncbi_accs.tmp | sort > ${tmp_dir}/sorted_base_wanted_ncbi_accs.tmp
+  sed 's/GC._//' ${tmp_dir}/sorted_ncbi_accs.tmp | sort -u -k1 > ${tmp_dir}/sorted_base_wanted_ncbi_accs.tmp # the `-u` flag to the sort command here is because the input accessions may have included the GenBank accession and the RefSeq accession for the same genome
   cut -f1 ${tmp_dir}/ncbi_accessions_info.tmp | sed 's/GC._//' | sort > ${tmp_dir}/sorted_base_got_ncbi_accs.tmp
 
   comm -23 ${tmp_dir}/sorted_base_wanted_ncbi_accs.tmp ${tmp_dir}/sorted_base_got_ncbi_accs.tmp > ${tmp_dir}/base_not_found_accs.tmp
