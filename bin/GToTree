@@ -57,6 +57,9 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "                  Provide this flag with no arguments if you'd like to keep the\n"
   printf "                  temporary directory. (mostly useful for debugging)\n\n"
 
+  printf "        - [-n <int> ] default: 2\n"
+  printf "                  The number of cpus you'd like ot use during the HMM search.\n\n"
+
   printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Lee_BSCGs.hmm -t\n\n"
 
   printf " ############################################################################## \n\n"
@@ -68,11 +71,11 @@ fi
 #############################################################################
 ############################  PARSING ARGUMENTS  ############################
 #############################################################################
-## setting defaults
+## setting boolean defaults
 taxonkit_id_swap='false'
 debug_flag='false'
 
-while getopts :a:g:f:H:m:tc:G:d args
+while getopts :a:g:f:H:m:tc:G:dn: args
 do
   case "${args}"
   in
@@ -85,6 +88,7 @@ do
     c) len_cutoff=${OPTARG};;
     G) gen_cutoff=${OPTARG};;
     d) debug_flag='true';;
+    n) num_cpus=${OPTARG};;
     \?) printf "\n  Invalid argument: -${OPTARG}\n\n  Run with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
   esac
 done
@@ -129,7 +133,16 @@ else
   fi
 fi
 
-
+if [ -z $num_cpus ]; then
+  num_cpus=2
+else
+  # checking is an integer
+  if ! [[ $num_cpus =~ ^[0-9]+$ ]]; then
+    printf "\n  ${RED}The value provided for cpus (\"-n\") needs to be an integer.${NC}\n"
+    printf "\nExiting for now.\n\n"
+    exit
+  fi
+fi
 
 
 #############################################################################
@@ -438,7 +451,7 @@ if [ -n "$NCBI_acc_file" ]; then
           printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
           printf "  \t$assembly doesn't appear to have gene annotations associated with it.\n\n"
           printf "  \tSo we downloaded the genome and are identifying coding sequences with prodigal.\n"
-          printf "     ${RED}************************************************************************ ${NC}\n\n"
+          printf "     ${RED}********************************************************************** ${NC}\n\n"
 
           printf "      Getting coding seqs...\n\n"
           prodigal -c -q -i genome.tmp -a genes1.tmp > /dev/null
@@ -473,7 +486,7 @@ if [ -n "$NCBI_acc_file" ]; then
       printf "      Performing HMM search...\n"
       
       ### running hmm search ###
-      hmmsearch --cut_ga --cpu 20 --tblout curr_hmm_hits.tmp $hmm_file genes.tmp > /dev/null
+      hmmsearch --cut_ga --cpu $num_cpus --tblout curr_hmm_hits.tmp $hmm_file genes.tmp > /dev/null
 
       ### calculating % completion and redundancy ###
       for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
@@ -557,7 +570,7 @@ if [ -n "$NCBI_acc_file" ]; then
     printf "        ${GREEN}All $NCBI_input_genomes_total genomes provided NCBI accessions successfully downloaded and searched :)${NC}\n"
   fi
 
-  printf "     ************************************************************************ \n\n\n"
+  printf "     ********************************************************************** \n\n\n"
 
   # adding to genomes from all sources file
   cat ${tmp_dir}/final_included_NCBI_accs.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
@@ -650,7 +663,7 @@ if [ -n "$genbank_list_file" ]; then
     printf "      Performing HMM search...\n"
       
     ### running hmm search ###
-    hmmsearch --cut_ga --cpu 20 --tblout curr_hmm_hits.tmp $hmm_file genes.tmp > /dev/null
+    hmmsearch --cut_ga --cpu $num_cpus --tblout curr_hmm_hits.tmp $hmm_file genes.tmp > /dev/null
 
     ### calculating % completion and redundancy ###
     for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
@@ -751,7 +764,7 @@ if [ -n "$fasta_files" ]; then
     printf "      Performing HMM search...\n"
       
     ### running hmm search ###
-    hmmsearch --cut_ga --cpu 20 --tblout curr_hmm_hits.tmp $hmm_file genes.tmp > /dev/null
+    hmmsearch --cut_ga --cpu $num_cpus --tblout curr_hmm_hits.tmp $hmm_file genes.tmp > /dev/null
 
     ### calculating % completion and redundancy ###
     for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
@@ -940,7 +953,7 @@ if [ $removed_genomes != "0" ]; then
   printf "     ${RED}*******************************${NC} NOTICE ${RED}*******************************${NC}  \n"
   printf "  \t$removed_genomes genome(s) removed from analysis due to having too few hits.\n\n"
   printf "  \tReported in \"Genomes_removed_for_too_few_hits.tsv\".\n"
-  printf "     ${RED}************************************************************************ ${NC}\n\n"
+  printf "     ${RED}********************************************************************** ${NC}\n\n"
   sleep 3
 else
   printf "             ${GREEN}No genomes were removed for having too few hits :)${NC}\n\n"
