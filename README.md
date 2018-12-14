@@ -13,6 +13,7 @@ If you use GToTree, please cite these folks :)
 
 - **HMMER3** - [http://hmmer.org/download.html](http://hmmer.org/download.html) (citation: they note to cite the website)  
 - **Muscle** - [https://www.drive5.com/muscle/downloads.htm](https://www.drive5.com/muscle/downloads.htm) (citation: [https://academic.oup.com/nar/article/32/5/1792/2380623](https://academic.oup.com/nar/article/32/5/1792/2380623))
+- **Trimal** - [http://trimal.cgenomics.org/downloads](http://trimal.cgenomics.org/downloads) (citation: [https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2712344/](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2712344/))
 - **FastTree** - [http://www.microbesonline.org/fasttree/](http://www.microbesonline.org/fasttree/) (citation: [https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490))  
 
 #### The following depend on input-genome sources and options:  
