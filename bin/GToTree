@@ -112,7 +112,7 @@ if [ -f "$NCBI_acc_file" ]; then
     exit
   fi
 fi
-  
+
 # checking numeric inputs and setting defaults if not provided
 if [ -z $len_cutoff ]; then
   len_cutoff="0.2"
@@ -395,7 +395,7 @@ if [ -n "$NCBI_acc_file" ]; then
   fi
 
   ## creating info file with E-Direct:
-  epost -db assembly -format acc -input ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp | esummary | xtract -pattern DocumentSummary -def "NA" -element AssemblyAccession Taxid SpeciesTaxid Organism AssemblyStatus RefSeq_category FtpPath_GenBank > ${tmp_dir}/ncbi_accessions_info.tmp
+  epost -db assembly -format acc -input ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp | esummary | xtract -pattern DocumentSummary -def "NA" -element AssemblyAccession Taxid SpeciesTaxid Organism AssemblyStatus RefSeq_category FtpPath_GenBank FtpPath_RefSeq > ${tmp_dir}/ncbi_accessions_info.tmp
 
   # checking and reporting if any accs weren't successfully found
   # need to take into account that people may be pulling with the GenBank (GCA_*) or RefSeq (GCF_*) accession
@@ -457,16 +457,24 @@ if [ -n "$NCBI_acc_file" ]; then
   do
 
     assembly="${curr_line[0]}"
+    printf "\n\nASSEMBLY: $assembly\n\n\n"
     downloaded_accession="${curr_line[1]}"
-
+    printf "\n\nDOWNLOADED ACCESSION: $downloaded_accession\n\n\n"
     num=$((num+1)) # to track progress
 
     printf "   --------------------------------------------------------------------------   \n"
     printf "\tOn assembly ${GREEN}$assembly${NC}; Number $num of $NCBI_remaining_genomes_total total.\n"
     printf "   --------------------------------------------------------------------------   \n\n"
 
-    # storing links to download stuff in variables
-    base_link="${curr_line[7]}"
+    # storing links to download stuff in variables (if a refseq was returned as identical to what was searched, using that)
+    if [ ${downloaded_accession:0:3} == "GCA" ]; then
+      base_link="${curr_line[7]}" # FtpPath_GenBank
+      printf "\n\nUSING GENBANK: $base_link\n\n\n"
+    else
+      base_link="${curr_line[8]}" # FtpPath_RefSeq
+      printf "\n\nUSING REFSEQ: $base_link\n\n\n"
+    fi
+
     end_path=$(basename $base_link)
 
     # downloading the report file to be able to easily pull more info about the assembly:
@@ -574,7 +582,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
   done < ${tmp_dir}/ncbi_accessions_info.tmp
 
-  printf "\n________________________________________________________________________________\n\n"
+  printf "\n________________________________________________________________________________\n\n\n"
 
   
   ## reporting any accessions not successfully found or downloaded, and updating files
@@ -611,8 +619,8 @@ if [ -n "$NCBI_acc_file" ]; then
 
   if [ -f NCBI_accessions_not_found.txt ] || [ -f NCBI_accessions_not_downloaded.txt ] || [ -f Redundant_input_accessions.txt ]; then
     
-    printf "        $num_retained_ncbi_input_genomes of the total $NCBI_input_genomes_total accessions had their genomes\n"
-    printf "        successfully downloaded and searched.\n"
+    printf "        $num_retained_ncbi_input_genomes of the total $NCBI_input_genomes_total accessions had their genomes successfully\n"
+    printf "        downloaded and searched.\n"
 
   else
     printf "        ${GREEN}All $num_retained_ncbi_input_genomes genomes provided NCBI accessions successfully downloaded and searched :)${NC}\n"
@@ -1318,7 +1326,7 @@ if [ -f NCBI_accessions_not_found.txt ] || [ -f NCBI_accessions_not_downloaded.t
   printf "\n  Notes:\n\n"
 
   if [ -f Redundant_input_accessions.txt ]; then
-    printf "    ${RED}$num_dupe_report accession(s) redundant.${NC}\n" 
+    printf "    $num_dupe_report accession(s) redundant.\n" 
     printf "        Reported in \"Redundant_input_accessions.txt\".\n\n"
   fi
 
