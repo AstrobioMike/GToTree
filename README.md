@@ -20,9 +20,12 @@ If you use GToTree, please cite these folks :)
 ### Required based on inputs and options:
 If you use GToTree in a manner that uses these tools, please cite these folks :)  
 
-- **[Prodigal](https://github.com/hyattpd/Prodigal)** (*if providing input genomes in fasta format, or GenBank format with no CDS annotations, or NCBI accessions to genomes with no gene calls*) - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/)  
-- **[NCBI E-Direct](https://www.ncbi.nlm.nih.gov/books/NBK179288/)** (*if providing input genomes as NCBI assembly accessions*) - citation: cite that page
-- **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** (*if changing genome labels based on lineage information for input genomes with associated NCBI taxids*) - citation: I'm not sure how to cite them yet
+- **[Prodigal](https://github.com/hyattpd/Prodigal)** - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/)  
+  - *if providing input genomes in fasta format, or GenBank format with no CDS annotations, or NCBI accessions to genomes with no gene calls*
+- **[NCBI E-Direct](https://www.ncbi.nlm.nih.gov/books/NBK179288/)** - citation: cite that page
+  - *if providing input genomes as NCBI assembly accessions*
+- **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** - citation: I'm not sure how to cite them yet
+  - *if changing genome labels based on lineage information for input genomes with associated NCBI taxids*
 
 ## Testing instructions for those of you kind enough to be helping me squash da bugs
 Make sure all dependencies above are installed and functioning properly. Clone the repo, add the "bin" to your PATH, and in the "test\_data" directory there are example files and an "example\_run\_log" code that should work. If it does not, please let me know what happened. If it does work, please start changing the inputs and use as you might to help try to find da bugs :)
