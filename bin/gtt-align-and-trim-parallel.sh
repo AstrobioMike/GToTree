@@ -56,5 +56,5 @@ fi
 gtt-reorder-fasta -i ${tmp_dir}/${1}.faa.tmp -w ${tmp_dir}/final_genomes_from_all_sources.tmp -o ${tmp_dir}/${1}_all_aligned.faa
 
 printf "\n\n\n   --------------------------------------------------------------------------   \n"
-printf "\t\t  Finished aligning and formatting gene-set ${GREEN}$1${NC}.\n"
+printf "\t    Finished aligning and formatting gene-set ${GREEN}$1${NC}.\n"
 printf "   --------------------------------------------------------------------------   \n"

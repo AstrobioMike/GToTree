@@ -34,15 +34,15 @@ do
 
     end_path=$(basename $base_link)
 
-    curl --silent --connect-timeout 5 --max-time 10 --retry 5 --retry-max-time 30 -o ${assembly}_report1.tmp "${base_link}/${end_path}_assembly_report.txt"
-    curl --silent --connect-timeout 5 --max-time 10 --retry 5 --retry-max-time 30 -o ${assembly}_genes.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
+    curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 -o ${assembly}_report1.tmp "${base_link}/${end_path}_assembly_report.txt"
+    curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 -o ${assembly}_genes.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
 
 if [ -s ${assembly}_report1.tmp ]; then
     if [ -s ${assembly}_genes.tmp.gz ]; then
         gunzip ${assembly}_genes.tmp.gz
     else # trying to get assembly if there were no gene annotations available
-        curl --silent --connect-timeout 5 --max-time 10 --retry 5 --retry-max-time 30 -o ${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
+        curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 -o ${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
         
         if [ -s ${assembly}_genome.tmp.gz ]; then
 
@@ -89,7 +89,7 @@ if [ -s ${assembly}_report1.tmp ]; then
       
     ### running hmm search ###
 
-    hmmsearch --cut_ga --cpu $num_cpus --tblout ${assembly}_curr_hmm_hits.tmp /Users/Mike_Lee/Documents/github/GToTree/hmm_sets/Hug_et_al.hmm ${assembly}_genes.tmp > /dev/null
+    hmmsearch --cut_ga --cpu $num_cpus --tblout ${assembly}_curr_hmm_hits.tmp $hmm_file ${assembly}_genes.tmp > /dev/null
     wait 
     ### calculating % completion and redundancy ###
     for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)

@@ -433,14 +433,19 @@ if [ -n "$NCBI_acc_file" ]; then
   fi
 
   ## creating info file with E-Direct:
-  epost -db assembly -format acc -input ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp | esummary | xtract -pattern DocumentSummary -def "NA" -element AssemblyAccession Taxid SpeciesTaxid Organism AssemblyStatus RefSeq_category FtpPath_GenBank FtpPath_RefSeq > ${tmp_dir}/ncbi_accessions_info.tmp
+  epost -db assembly -format acc -input ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp | esummary | xtract -pattern DocumentSummary -def "NA" -element AssemblyAccession LatestAccession Taxid SpeciesTaxid Organism AssemblyStatus RefSeq_category FtpPath_GenBank FtpPath_RefSeq > ${tmp_dir}/ncbi_accessions_info1.tmp
+
+  ## if the user searched without accession versions, there may be duplicates in here
+  ## in this case, keeping only the latest
+  cat ${tmp_dir}/ncbi_accessions_info1.tmp | awk ' BEGIN { FS="\t" } $2 == "NA" ' | cut -f 1,3- > ${tmp_dir}/ncbi_accessions_info.tmp
 
   # checking and reporting if any accs weren't successfully found
   # need to take into account that people may be pulling with the GenBank (GCA_*) or RefSeq (GCF_*) accession
-  # so going to crop off the start and use just the numbers to compare to find if any weren't found
+  # and that they may have provided accessions with no version number
+  # so going to crop off the start and the .X version numbers, and use just the base accession numbers to compare to find if any weren't found at ncbi
 
-  sed 's/GC._//' ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp | sort > ${tmp_dir}/sorted_base_wanted_ncbi_accs.tmp 
-  cut -f1 ${tmp_dir}/ncbi_accessions_info.tmp | sed 's/GC._//' | sort > ${tmp_dir}/sorted_base_got_ncbi_accs.tmp
+  sed 's/GC._//' ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp | sed 's/\.[0-9]*$//' | sort > ${tmp_dir}/sorted_base_wanted_ncbi_accs.tmp
+  cut -f1 ${tmp_dir}/ncbi_accessions_info.tmp | sed 's/GC._//' | sed 's/\.[0-9]*$//' | sort > ${tmp_dir}/sorted_base_got_ncbi_accs.tmp
 
   comm -23 ${tmp_dir}/sorted_base_wanted_ncbi_accs.tmp ${tmp_dir}/sorted_base_got_ncbi_accs.tmp > ${tmp_dir}/base_not_found_accs.tmp
 
@@ -541,7 +546,7 @@ if [ -n "$NCBI_acc_file" ]; then
     printf "        downloaded and searched.\n"
 
   else
-    printf "        ${GREEN}All $num_retained_ncbi_input_genomes genomes provided NCBI accessions successfully downloaded and searched :)${NC}\n"
+    printf "                ${GREEN}All $num_retained_ncbi_input_genomes successfully downloaded and searched :)${NC}\n"
   fi
 
   printf "     ********************************************************************** \n\n\n"
