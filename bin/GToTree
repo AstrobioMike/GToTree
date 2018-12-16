@@ -694,19 +694,6 @@ fi
 ### running in parallel if set, otherwise running in serial ###
 if [ $num_jobs == "1" ]; then
 
-  # creating short R scripts for getting filtering lengths
-  echo "lengths <- scan(\"lengths.tmp\", quiet=TRUE)
-  med <- median(lengths)
-  buff <- med*${len_cutoff}
-  minimum <- round(med - buff)
-  cat(minimum)" > ${tmp_dir}/min.R
-
-  echo "lengths <- scan(\"lengths.tmp\", quiet=TRUE)
-  med <- median(lengths)
-  buff <- med*${len_cutoff}
-  maximum <- round(med + buff)
-  cat(maximum)" > ${tmp_dir}/max.R
-
   for SCG in $(cat ${tmp_dir}/updated_genes_list.tmp)
   do
 
@@ -715,9 +702,14 @@ if [ $num_jobs == "1" ]; then
 
     gtt-count-bases-per-seq -i ${tmp_dir}/${SCG}_hits.faa -o Num_bps.tmp
     cut -f2 Num_bps.tmp > lengths.tmp
-    min_len=$(Rscript ${tmp_dir}/min.R)
-    max_len=$(Rscript ${tmp_dir}/max.R)
-    gtt-filter-seqs-by-length -i ${tmp_dir}/${SCG}_hits.faa -m $min_len -M $max_len -o ${tmp_dir}/${SCG}_hits_filtered.tmp
+    median=$(gtt-get-median.sh lengths.tmp)
+    buff=$(echo "$median * $len_cutoff" | bc)
+    min_len=$(echo "$median - $buff" | bc)
+    min_len_rnd=$(printf "%.0f\n" $min_len)
+    max_len=$(echo "$median + $buff" | bc)
+    max_len_rnd=$(printf "%.0f\n" $max_len)
+
+    gtt-filter-seqs-by-length -i ${tmp_dir}/${SCG}_hits.faa -m $min_len_rnd -M $max_len_rnd -o ${tmp_dir}/${SCG}_hits_filtered.tmp
 
     rm Num_bps.tmp lengths.tmp
 
