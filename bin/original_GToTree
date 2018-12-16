@@ -58,11 +58,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "                  temporary directory. (mostly useful for debugging)\n\n"
 
   printf "        - [-n <int> ] default: 2\n"
-  printf "                  The number of cpus you'd like to use during the HMM search.\n\n"
-
-  printf "        - [-p <int> ] default: 1\n"
-  printf "                  The number of jobs you'd like to run in parallel during several\n"
-  printf "                  steps: downloading genomes; identifying, filtering, and aligning genes.\n\n"
+  printf "                  The number of cpus you'd like ot use during the HMM search.\n\n"
 
   printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Lee_BSCGs.hmm -t\n\n"
 
@@ -79,7 +75,7 @@ fi
 taxonkit_id_swap='false'
 debug_flag='false'
 
-while getopts :a:g:f:H:m:tc:G:dn:p: args
+while getopts :a:g:f:H:m:tc:G:dn: args
 do
   case "${args}"
   in
@@ -93,8 +89,7 @@ do
     G) gen_cutoff=${OPTARG};;
     d) debug_flag='true';;
     n) num_cpus=${OPTARG};;
-    p) num_jobs=${OPTARG};;
-    \?) printf "\n  Invalid argument: -${OPTARG}\n\n    Run 'GToTree' with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
+    \?) printf "\n  Invalid argument: -${OPTARG}\n\n  Run with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
   esac
 done
 
@@ -153,18 +148,6 @@ else
   # checking is an integer
   if ! [[ $num_cpus =~ ^[0-9]+$ ]]; then
     printf "\n  ${RED}The value provided for cpus (\"-n\") needs to be an integer.${NC}\n"
-    printf "\nExiting for now.\n\n"
-    exit
-  fi
-fi
-
-if [ -z $num_jobs ]; then
-  num_jobs=1
-else
-  # checking is an integer
-  if ! [[ $num_jobs =~ ^[0-9]+$ ]]; then
-    printf "\n  ${RED}The value provided for number of jobs to run in parallel (\"-p\")\n"
-    printf "  needs to be an integer.${NC}\n"
     printf "\nExiting for now.\n\n"
     exit
   fi
@@ -278,7 +261,7 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ]; then
+if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ]; then
 
   if [ -n "$file_to_genome_id_map" ]; then
     if [ ! -f "$file_to_genome_id_map" ]; then
@@ -304,14 +287,6 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ $len
 
   if [ $gen_cutoff != "0.75" ]; then
     printf "      - Genome minimum gene-copy threshold (\"-G\") has been set to $gen_cutoff.\n"
-  fi
-
-  if [ $num_cpus != "2" ]; then
-    printf "      - Number of cpus to use during hmm search (\"-n\") has been set to $num_cpus.\n"
-  fi
-
-  if [ $num_jobs != "1" ]; then
-    printf "      - Number of jobs to run during parallelizable steps has been set to $num_jobs.\n"
   fi
 
   if [ $debug_flag == "true" ]; then
@@ -473,19 +448,139 @@ if [ -n "$NCBI_acc_file" ]; then
   # creating the ncbi-derived-genome output table file which will have the following as its header:
   printf "input_accession\tdownloaded_accession\tassembly_name\ttaxid\torganism_name\tinfraspecific_name\tuniq_SCG_hits\tperc_comp\tperc_redund\n" > NCBI_genomes_summary_info.tsv
 
-  # writing out variables needed for script because i don't know how to send them properly
-  echo $tmp_dir > temp_dir_name.tmp
-  echo $hmm_file > hmm_file_path.tmp
-  echo $NCBI_remaining_genomes_total > remaining_total_genomes.tmp
-  echo $num_cpus > num_cpus.tmp
-  echo $hmm_target_genes_total > hmm_target_genes_total.tmp
+  # setting a counter to track how far along we are
+  num=0
 
-  ### running in parallel if set, otherwise running in serial ###
-  if [ $num_jobs == "1" ]; then
-    gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp
-  else
-    cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh
-  fi
+  # looping through the lines of the provided [-a] file (this loop operates on one genome at a time)
+  while IFS=$'\t' read -r -a curr_line
+
+  do
+
+    assembly="${curr_line[0]}"
+    printf "\n\nASSEMBLY: $assembly\n\n\n"
+    downloaded_accession="${curr_line[1]}"
+    printf "\n\nDOWNLOADED ACCESSION: $downloaded_accession\n\n\n"
+    num=$((num+1)) # to track progress
+
+    printf "   --------------------------------------------------------------------------   \n"
+    printf "\tOn assembly ${GREEN}$assembly${NC}; Number $num of $NCBI_remaining_genomes_total total.\n"
+    printf "   --------------------------------------------------------------------------   \n\n"
+
+    # storing links to download stuff in variables (if a refseq was returned as identical to what was searched, using that)
+    if [ ${downloaded_accession:0:3} == "GCA" ]; then
+      base_link="${curr_line[7]}" # FtpPath_GenBank
+      printf "\n\nUSING GENBANK: $base_link\n\n\n"
+    else
+      base_link="${curr_line[8]}" # FtpPath_RefSeq
+      printf "\n\nUSING REFSEQ: $base_link\n\n\n"
+    fi
+
+    end_path=$(basename $base_link)
+
+    # downloading the report file to be able to easily pull more info about the assembly:
+    printf "      Downloading genome report and genes files...\n\n"
+    curl --silent --connect-timeout 5 --max-time 10 --retry 5 --retry-max-time 30 -o report1.tmp "${base_link}/${end_path}_assembly_report.txt"
+
+    # downloading the protein-coding sequences for the assembly
+    curl --silent --connect-timeout 5 --max-time 10 --retry 5 --retry-max-time 30 -o genes.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
+
+    # checking both files downloaded successfully, if not, writing problem accesion to file "NCBI_accessions_not_downloaded.txt" and moving on to next:
+    if [ -s report1.tmp ]; then
+      if [ -s genes.tmp.gz ]; then
+        gunzip genes.tmp.gz
+      else # trying to get assembly if there were no gene annotations available
+        curl --silent --connect-timeout 5 --max-time 10 --retry 5 --retry-max-time 30 -o genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
+        
+        if [ -s genome.tmp.gz ]; then
+
+          gunzip genome.tmp.gz
+
+          printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
+          printf "\t  $assembly doesn't appear to have gene annotations.\n\n"
+          printf "\t  Downloaded the genome and identifying CDSs with prodigal.\n"
+          printf "     ${RED}********************************************************************** ${NC}\n\n"
+
+          printf "      Getting coding seqs...\n\n"
+          prodigal -c -q -i genome.tmp -a genes1.tmp > /dev/null
+          tr -d '*' < genes1.tmp > genes2.tmp
+
+          ## renaming seqs to have assembly name
+          gtt-rename-fasta-headers -i genes2.tmp -w $assembly -o genes.tmp
+        else
+          printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
+          printf "\t  $assembly's genes nor genome downloaded properly :(\n\n"
+          printf "\t    Reported in \"NCBI_accessions_not_downloaded.txt\"\n"
+          printf "     ${RED}************************************************************************ ${NC}\n"
+          rm -rf report1.tmp genes.tmp.gz
+          sleep 3
+          echo $assembly >> NCBI_accessions_not_downloaded.txt
+        fi
+      fi
+
+      # fixing the stupid carriage returns that for some reason NCBI assembly reports have in them...
+      tr "\r" "\n" < report1.tmp > report.tmp
+
+      # storing more info about the assembly to write out into ncbi-derived-genome summary file (for each setting to NA if not found)
+      ass_name=$(grep "Assembly name:" report.tmp | cut -f2 -d ":" | sed 's/^ *//')
+      if [ -z "$ass_name" ]; then ass_name="NA"; fi
+      org_name=$(grep "Organism name:" report.tmp | cut -f2 -d ":" | sed 's/^ *//')
+      if [ -z "$org_name" ]; then org_name="NA"; fi
+      infraspecific_name=$(grep "Infraspecific name:" report.tmp | cut -f2 -d ":" | sed 's/^ *//')
+      if [ -z "$infraspecific_name" ]; then infraspecific_name="NA"; fi
+      taxid=$(grep "Taxid:" report.tmp | cut -f2 -d ":" | sed 's/^ *//')
+      if [ -z "$taxid" ]; then taxid="NA"; fi
+
+      printf "      Performing HMM search...\n"
+      
+      ### running hmm search ###
+      hmmsearch --cut_ga --cpu $num_cpus --tblout curr_hmm_hits.tmp $hmm_file genes.tmp > /dev/null
+
+      ### calculating % completion and redundancy ###
+      for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
+      do
+        grep -w -c "$SCG" curr_hmm_hits.tmp
+      done > uniq_counts.tmp
+
+      num_SCG_hits=$(awk ' $1 > 0 ' uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
+
+      
+      printf "        Found $num_SCG_hits of the targeted $hmm_target_genes_total SCGs.\n\n"
+
+      num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
+
+      perc_comp=$(echo "$num_SCG_hits / $hmm_target_genes_total * 100" | bc -l)
+      perc_comp_rnd=$(printf "%.2f\n" $perc_comp)
+      perc_redund=$(echo "$num_SCG_redund / $hmm_target_genes_total * 100" | bc -l)
+      perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
+
+      ## writing summary info to table ##
+      printf "$assembly\t$downloaded_accession\t$ass_name\t$taxid\t$org_name\t$infraspecific_name\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> NCBI_genomes_summary_info.tsv
+
+      ### Pulling out hits for this genome ###
+      # making fasta file searchable to pull out the hits (Easel 0.45h June 2018)
+      esl-sfetch --index genes.tmp > /dev/null
+
+      # looping through ribosomal proteins and pulling out each first hit (hmm results tab is sorted by e-value):
+      # does as a separate loop just for clarity (well, in hopes of clarity)
+      for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
+      do
+        grep -w "$SCG" curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " | esl-sfetch -f genes.tmp - | sed "s/>.*$/>$assembly/" | sed 's/^Usage.*$//' | sed 's/^To see.*$//' | sed '/^$/d' >> ${tmp_dir}/${SCG}_hits.faa
+      done
+
+      rm *.tmp
+      rm *.tmp.ssi
+
+    else
+      printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
+      printf "\t  $assembly did not download properly :(\n\n"
+      printf "\t    Reported in \"NCBI_accessions_not_downloaded.txt\"\n"
+      printf "     ${RED}************************************************************************ ${NC}\n"
+      rm -rf report1.tmp genes.tmp.gz
+      sleep 3
+      echo $assembly >> NCBI_accessions_not_downloaded.txt
+    fi
+
+  done < ${tmp_dir}/ncbi_accessions_info.tmp
 
   printf "\n________________________________________________________________________________\n\n\n"
 
@@ -562,19 +657,106 @@ if [ -n "$genbank_list_file" ]; then
   # creating the genbank-genome-derived output table which will have the following as its header:
   printf "assembly_name\toriginal_file_name\ttaxid\torganism_name\tuniq_SCG_hits\tperc_comp\tperc_redund\n" > Genbank_genomes_summary_info.tsv
 
-  # writing out variables needed for script because i don't know how to send them properly
-  echo $tmp_dir > temp_dir_name.tmp
-  echo $hmm_file > hmm_file_path.tmp
-  echo $genbank_genomes_total > genbank_genomes_total.tmp
-  echo $num_cpus > num_cpus.tmp
-  echo $hmm_target_genes_total > hmm_target_genes_total.tmp
+  # looping through the lines of the provided [-g] file (this loop operates on one genome at a time)
+  while IFS=$'\t' read -r -a file
 
-  ### running in parallel if set, otherwise running in serial ###
-  if [ $num_jobs == "1" ]; then
-    gtt-genbank-serial.sh $genbank_list_file
-  else
-    cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh
-  fi
+  do
+
+    assembly="${file%.*}"
+
+    # adding assembly to ongoing genomes list
+    echo $assembly >> ${tmp_dir}/genbank_genomes_list.tmp
+
+    num=$((num+1)) # to track progress
+
+    printf "   --------------------------------------------------------------------------   \n"
+    printf "\tOn assembly ${GREEN}$assembly${NC}; Number $num of $genbank_genomes_total total.\n"
+    printf "   --------------------------------------------------------------------------   \n\n"
+
+    # storing more info about the assembly if it's present in the genbank file:
+    # checking for organism:
+    if grep -q "ORGANISM" $file; then 
+      org_name=$(grep -m1 "ORGANISM" $file | tr -s " " | cut -f3- -d " " | tr "[ ./\\]" "_" | tr -s "_")
+    else
+      org_name="NA"
+    fi
+
+    if grep -q "taxon" $file; then
+      taxid=$(grep -m1 "taxon" $file | cut -f2 -d ":" | tr -d '"')
+    else
+      taxid="NA"
+    fi
+
+    # extracting AA coding sequences from genbank file
+    gtt-genbank-to-AA-seqs -i $file -o genes.tmp
+
+    # checking that the file had CDS annotations
+    if [ ! -s genes.tmp ]; then
+
+      printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
+      printf "\t  This genbank file doesn't appear to have CDS annotations, so we\n"
+      printf "\t  are identifying coding sequences with prodigal.\n\n"
+
+      printf "\t    Reported in \"Genbank_files_with_no_CDSs.txt\".\n"
+      printf "     ${RED}**********************************************************************${NC}  \n\n"
+
+      echo "$file" >> Genbank_files_with_no_CDSs.txt
+      rm genes.tmp
+
+      # pulling out full nucleotide fasta from genbank file
+      gtt-genbank-to-fasta -i $file -o fasta.tmp
+
+      printf "      Getting coding seqs...\n\n"
+
+      # running prodigal
+      prodigal -c -q -i fasta.tmp -a genes1.tmp > /dev/null
+      tr -d '*' < genes1.tmp > genes2.tmp
+
+      ## renaming seqs to have assembly name
+      gtt-rename-fasta-headers -i genes2.tmp -w $assembly -o genes.tmp
+    fi
+
+    printf "      Performing HMM search...\n"
+      
+    ### running hmm search ###
+    hmmsearch --cut_ga --cpu $num_cpus --tblout curr_hmm_hits.tmp $hmm_file genes.tmp > /dev/null
+
+    ### calculating % completion and redundancy ###
+    for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
+    do
+        grep -w -c "$SCG" curr_hmm_hits.tmp
+    done > uniq_counts.tmp
+
+    num_SCG_hits=$(awk ' $1 > 0 ' uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
+  
+    printf "        Found $num_SCG_hits of the targeted $hmm_target_genes_total.\n\n"
+
+    num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
+
+    perc_comp=$(echo "$num_SCG_hits / $hmm_target_genes_total * 100" | bc -l)
+    perc_comp_rnd=$(printf "%.2f\n" $perc_comp)
+    perc_redund=$(echo "$num_SCG_redund / $hmm_target_genes_total * 100" | bc -l)
+    perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
+
+    ## writing summary info to table ##
+    printf "$assembly\t$file\t$taxid\t$org_name\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> Genbank_genomes_summary_info.tsv
+
+    ### Pulling out hits for this genome ###
+    # making fasta file searchable to pull out the hits (Easel 0.45h June 2018)
+    esl-sfetch --index genes.tmp > /dev/null
+
+    # looping through ribosomal proteins and pulling out each first hit (hmm results tab is sorted by e-value):
+    # done as a separate loop just for clarity (well, in hopes of clarity)
+    for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
+
+    do
+      grep -w "$SCG" curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " | esl-sfetch -f genes.tmp - | sed "s/>.*$/>$assembly/" | sed 's/^Usage.*$//' | sed 's/^To see.*$//' | sed '/^$/d' >> ${tmp_dir}/${SCG}_hits.faa
+    done
+
+    rm *.tmp
+    rm *.tmp.ssi
+
+  done < $genbank_list_file
 
   mv ${tmp_dir}/genbank_genomes_list.tmp ${tmp_dir}/final_included_genbank_genomes.tmp
 
@@ -609,20 +791,76 @@ if [ -n "$fasta_files" ]; then
   # creating the genbank-genome-derived output table which will have the following as its header:
   printf "Assembly_name\tOriginal_file_name\ttaxid\tuniq_SCG_hits\tperc_comp\tperc_redund\n" > Fasta_genomes_summary_info.tsv
 
+  # looping through the lines of the provided [-g] file (this loop operates on one genome at a time)
+  while IFS=$'\t' read -r -a file
 
-  # writing out variables needed for script because i don't know how to send them properly
-  echo $tmp_dir > temp_dir_name.tmp
-  echo $hmm_file > hmm_file_path.tmp
-  echo $fasta_genomes_total > fasta_genomes_total.tmp
-  echo $num_cpus > num_cpus.tmp
-  echo $hmm_target_genes_total > hmm_target_genes_total.tmp
+  do
 
-  ### running in parallel if set, otherwise running in serial ###
-  if [ $num_jobs == "1" ]; then
-    gtt-fasta-serial.sh $fasta_files
-  else
-    cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh
-  fi
+    # setting assembly name as filename with no extension
+    assembly="${file%.*}"
+
+    # adding assembly to ongoing genomes list
+    echo $assembly >> ${tmp_dir}/fasta_genomes_list.tmp
+
+    num=$((num+1)) # to track progress
+
+    printf "   --------------------------------------------------------------------------   \n"
+    printf "\tOn assembly ${GREEN}$assembly${NC}; Number $num of $fasta_genomes_total total.\n"
+    printf "   --------------------------------------------------------------------------   \n\n"
+
+    printf "      Getting coding seqs...\n\n"
+
+    ## running prodigal to get coding sequences
+    prodigal -c -q -i $file -a genes1.tmp > /dev/null
+    tr -d '*' < genes1.tmp > genes2.tmp
+
+    ## renaming seqs to have assembly name
+    gtt-rename-fasta-headers -i genes2.tmp -w $assembly -o genes.tmp
+
+    printf "      Performing HMM search...\n"
+      
+    ### running hmm search ###
+    hmmsearch --cut_ga --cpu $num_cpus --tblout curr_hmm_hits.tmp $hmm_file genes.tmp > /dev/null
+
+    ### calculating % completion and redundancy ###
+    for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
+    do
+        grep -w -c "$SCG" curr_hmm_hits.tmp
+    done > uniq_counts.tmp
+
+    num_SCG_hits=$(awk ' $1 > 0 ' uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
+  
+    printf "        Found $num_SCG_hits of the targeted $hmm_target_genes_total.\n\n"
+
+    num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
+
+    perc_comp=$(echo "$num_SCG_hits / $hmm_target_genes_total * 100" | bc -l)
+    perc_comp_rnd=$(printf "%.2f\n" $perc_comp)
+    perc_redund=$(echo "$num_SCG_redund / $hmm_target_genes_total * 100" | bc -l)
+    perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
+
+    # adding NA for taxid so final table can still have the column and lineage for those that do have them
+    taxid="NA"
+
+    ## writing summary info to table ##
+    printf "$assembly\t$file\t$taxid\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> Fasta_genomes_summary_info.tsv
+
+    ### Pulling out hits for this genome ###
+    # making fasta file searchable to pull out the hits (Easel 0.45h June 2018)
+    esl-sfetch --index genes.tmp > /dev/null
+
+    # looping through ribosomal proteins and pulling out each first hit (hmm results tab is sorted by e-value):
+    # done as a separate loop just for clarity (well, in hopes of clarity)
+    for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
+
+    do
+      grep -w "$SCG" curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " | esl-sfetch -f genes.tmp - | sed "s/>.*$/>$assembly/" | sed 's/^Usage.*$//' | sed 's/^To see.*$//' | sed '/^$/d' >> ${tmp_dir}/${SCG}_hits.faa
+    done
+
+    rm *.tmp
+    rm *.tmp.ssi
+
+  done < $fasta_files
 
   # adding retained genomes to genomes from all sources file
   cat ${tmp_dir}/fasta_genomes_list.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
@@ -672,47 +910,34 @@ fi
 
 
 ### filtering out sequences that are too long or too short ###
+# creating short R scripts for getting filtering lengths
+echo "lengths <- scan(\"lengths.tmp\", quiet=TRUE)
+med <- median(lengths)
+buff <- med*${len_cutoff}
+minimum <- round(med - buff)
+cat(minimum)" > ${tmp_dir}/min.R
 
-### running in parallel if set, otherwise running in serial ###
-if [ $num_jobs == "1" ]; then
+echo "lengths <- scan(\"lengths.tmp\", quiet=TRUE)
+med <- median(lengths)
+buff <- med*${len_cutoff}
+maximum <- round(med + buff)
+cat(maximum)" > ${tmp_dir}/max.R
 
-  # creating short R scripts for getting filtering lengths
-  echo "lengths <- scan(\"lengths.tmp\", quiet=TRUE)
-  med <- median(lengths)
-  buff <- med*${len_cutoff}
-  minimum <- round(med - buff)
-  cat(minimum)" > ${tmp_dir}/min.R
+for SCG in $(cat ${tmp_dir}/updated_genes_list.tmp)
+do
 
-  echo "lengths <- scan(\"lengths.tmp\", quiet=TRUE)
-  med <- median(lengths)
-  buff <- med*${len_cutoff}
-  maximum <- round(med + buff)
-  cat(maximum)" > ${tmp_dir}/max.R
+  printf "   --------------------------------------------------------------------------   \n"
+  printf "\n    Filtering ${GREEN}$SCG${NC} sequences by length...\n"
 
-  for SCG in $(cat ${tmp_dir}/updated_genes_list.tmp)
-  do
+  gtt-count-bases-per-seq -i ${tmp_dir}/${SCG}_hits.faa -o Num_bps.tmp
+  cut -f2 Num_bps.tmp > lengths.tmp
+  min_len=$(Rscript ${tmp_dir}/min.R)
+  max_len=$(Rscript ${tmp_dir}/max.R)
+  gtt-filter-seqs-by-length -i ${tmp_dir}/${SCG}_hits.faa -m $min_len -M $max_len -o ${tmp_dir}/${SCG}_hits_filtered.tmp
 
-    printf "   --------------------------------------------------------------------------   \n"
-    printf "\n    Filtering ${GREEN}$SCG${NC} sequences by length...\n"
+  rm Num_bps.tmp lengths.tmp
 
-    gtt-count-bases-per-seq -i ${tmp_dir}/${SCG}_hits.faa -o Num_bps.tmp
-    cut -f2 Num_bps.tmp > lengths.tmp
-    min_len=$(Rscript ${tmp_dir}/min.R)
-    max_len=$(Rscript ${tmp_dir}/max.R)
-    gtt-filter-seqs-by-length -i ${tmp_dir}/${SCG}_hits.faa -m $min_len -M $max_len -o ${tmp_dir}/${SCG}_hits_filtered.tmp
-
-    rm Num_bps.tmp lengths.tmp
-
-  done
-
-else
-  # writing out variables needed for script because i don't know how to send them properly
-  echo $tmp_dir > temp_dir_name.tmp
-  echo $len_cutoff > len_cutoff.tmp
-
-  cat ${tmp_dir}/updated_genes_list.tmp | parallel -j $num_jobs gtt-filter-parallel.sh
-fi
-
+done
 
 ### removing genes again if they had all filtered, which really shouldn't happen unless there are very few sequences (like when testing) ###
 for SCG in $(cat ${tmp_dir}/updated_genes_list.tmp)
@@ -809,79 +1034,68 @@ duration=$SECONDS
 printf "           It is currently $curr_time; the process started at $start_time.\n"
 printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n"
 
+# setting new counter
+num=0
 
-### running in parallel if set, otherwise running in serial ###
-if [ $num_jobs == "1" ]; then
+for SCG in $(cat ${tmp_dir}/final_genes_list.tmp)
 
-  # setting new counter
-  num=0
+do
 
-  for SCG in $(cat ${tmp_dir}/final_genes_list.tmp)
+  num=$((num+1))
 
-  do
+  printf "\n\n\n   --------------------------------------------------------------------------   \n"
+  printf "\t    Aligning and cleaning gene ${GREEN}$SCG${NC}; Number $num of $new_hmm_target_genes_total.\n"
+  printf "   --------------------------------------------------------------------------   \n"
 
-    num=$((num+1))
+  # removing those genomes that need to be removed based on not having enough hits to the target genes
+  gtt-parse-fasta-by-headers -i ${tmp_dir}/${SCG}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${SCG}_hits_filtered.faa --inverse
 
-    printf "\n\n\n   --------------------------------------------------------------------------   \n"
-    printf "\t    Aligning and cleaning gene ${GREEN}$SCG${NC}; Number $num of $new_hmm_target_genes_total.\n"
-    printf "   --------------------------------------------------------------------------   \n"
+  # aligning
+  muscle -in ${tmp_dir}/${SCG}_hits_filtered.faa -diags -out ${tmp_dir}/aligned.tmp
+  # trimming
+  trimal -in ${tmp_dir}/aligned.tmp -out ${tmp_dir}/trimmed.faa.tmp -automated1
 
-    # removing those genomes that need to be removed based on not having enough hits to the target genes
-    gtt-parse-fasta-by-headers -i ${tmp_dir}/${SCG}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${SCG}_hits_filtered.faa --inverse
+  # removing linewraps:
+  sed 's/ .*$//' ${tmp_dir}/trimmed.faa.tmp | awk '!/^>/ { printf "%s", $0; n="\n" } /^>/ { print n $0; n = "" } END { printf "%s", n }' > ${tmp_dir}/formatted.faa.tmp
 
-    # aligning
-    muscle -in ${tmp_dir}/${SCG}_hits_filtered.faa -diags -out ${tmp_dir}/aligned.tmp
-    # trimming
-    trimal -in ${tmp_dir}/aligned.tmp -out ${tmp_dir}/trimmed.faa.tmp -automated1
+  ## adding gap-sequences for genomes missing the current gene ##
+  # finding here which ones have it
+  grep ">" ${tmp_dir}/formatted.faa.tmp | tr -d ">" | sort > ${tmp_dir}/genomes_with_gene.tmp
 
-    # removing linewraps:
-    sed 's/ .*$//' ${tmp_dir}/trimmed.faa.tmp | awk '!/^>/ { printf "%s", $0; n="\n" } /^>/ { print n $0; n = "" } END { printf "%s", n }' > ${tmp_dir}/formatted.faa.tmp
+  # now getting which ones don't have it
+  comm -23 ${tmp_dir}/final_genomes_from_all_sources.tmp ${tmp_dir}/genomes_with_gene.tmp | sort > ${tmp_dir}/needed_gappers.tmp
 
-    ## adding gap-sequences for genomes missing the current gene ##
-    # finding here which ones have it
-    grep ">" ${tmp_dir}/formatted.faa.tmp | tr -d ">" | sort > ${tmp_dir}/genomes_with_gene.tmp
-
-    # now getting which ones don't have it
-    comm -23 ${tmp_dir}/final_genomes_from_all_sources.tmp ${tmp_dir}/genomes_with_gene.tmp | sort > ${tmp_dir}/needed_gappers.tmp
-
-    # creating gap-sequences if needed
-    if [ -s ${tmp_dir}/needed_gappers.tmp ]; then
-    
-      # making a headers file for when making fasta in a few steps:
-      sed 's/^/>/' ${tmp_dir}/needed_gappers.tmp > ${tmp_dir}/needed_headers.tmp
-
-      # getting length of the alignment for the current gene:
-      aln_length_tmp=$(sed -n '2p' ${tmp_dir}/formatted.faa.tmp | wc -c | tr -s " " | cut -f2 -d " ")
-      # subtracting 1 for newline characters 
-      aln_length_tmp=$(echo "$aln_length_tmp"-1 | bc)
-      # making a string of gaps the length of the alignment for those missing it:
-      gap_seq=$(printf "%0.s-" $(seq 1 1 $aln_length_tmp))
-      # making as many gap sequences as there are genomes missing the current gene:
-      num_genomes_to_add=$(wc -l ${tmp_dir}/needed_gappers.tmp | tr -s " " "\t" | cut -f2)
-      for i in $(cat ${tmp_dir}/needed_gappers.tmp)
-      do
-        echo "$gap_seq"
-      done > ${tmp_dir}/gaps.tmp
-
-      # making fasta of those genomes missing the current gene:
-      paste -d "\n" ${tmp_dir}/needed_headers.tmp ${tmp_dir}/gaps.tmp > ${tmp_dir}/missing_genomes.faa.tmp
-      # catting the genomes missing the current gene together with those that have it
-      cat ${tmp_dir}/formatted.faa.tmp ${tmp_dir}/missing_genomes.faa.tmp > ${tmp_dir}/${SCG}.faa.tmp
-    else
-      mv ${tmp_dir}/formatted.faa.tmp ${tmp_dir}/${SCG}.faa.tmp
-    fi
-    
-    ## reordering the final fasta of this gene so that all gene sets can be pasted together at end ##
-    gtt-reorder-fasta -i ${tmp_dir}/${SCG}.faa.tmp -w ${tmp_dir}/final_genomes_from_all_sources.tmp -o ${tmp_dir}/${SCG}_all_aligned.faa
-
-  done
-
-else
-  # writing out variables needed for script because i don't know how to send them properly
-  echo $tmp_dir > temp_dir_name.tmp
+  # creating gap-sequences if needed
+  if [ -s ${tmp_dir}/needed_gappers.tmp ]; then
   
-  cat ${tmp_dir}/final_genes_list.tmp | parallel -j $num_jobs gtt-align-and-trim-parallel.sh
-fi
+    # making a headers file for when making fasta in a few steps:
+    sed 's/^/>/' ${tmp_dir}/needed_gappers.tmp > ${tmp_dir}/needed_headers.tmp
+
+    # getting length of the alignment for the current gene:
+    aln_length_tmp=$(sed -n '2p' ${tmp_dir}/formatted.faa.tmp | wc -c | tr -s " " | cut -f2 -d " ")
+    # subtracting 1 for newline characters 
+    aln_length_tmp=$(echo "$aln_length_tmp"-1 | bc)
+    # making a string of gaps the length of the alignment for those missing it:
+    gap_seq=$(printf "%0.s-" $(seq 1 1 $aln_length_tmp))
+    # making as many gap sequences as there are genomes missing the current gene:
+    num_genomes_to_add=$(wc -l ${tmp_dir}/needed_gappers.tmp | tr -s " " "\t" | cut -f2)
+    for i in $(cat ${tmp_dir}/needed_gappers.tmp)
+    do
+      echo "$gap_seq"
+    done > ${tmp_dir}/gaps.tmp
+
+    # making fasta of those genomes missing the current gene:
+    paste -d "\n" ${tmp_dir}/needed_headers.tmp ${tmp_dir}/gaps.tmp > ${tmp_dir}/missing_genomes.faa.tmp
+    # catting the genomes missing the current gene together with those that have it
+    cat ${tmp_dir}/formatted.faa.tmp ${tmp_dir}/missing_genomes.faa.tmp > ${tmp_dir}/${SCG}.faa.tmp
+  else
+    mv ${tmp_dir}/formatted.faa.tmp ${tmp_dir}/${SCG}.faa.tmp
+  fi
+  
+  ## reordering the final fasta of this gene so that all gene sets can be pasted together at end ##
+  gtt-reorder-fasta -i ${tmp_dir}/${SCG}.faa.tmp -w ${tmp_dir}/final_genomes_from_all_sources.tmp -o ${tmp_dir}/${SCG}_all_aligned.faa
+
+done
 
 printf "\n\n\n________________________________________________________________________________\n\n\n"
 
@@ -1053,7 +1267,7 @@ fi
 
 # clearing out temp files unless debug_flag is set to true
 if [ $debug_flag == 'false' ]; then
-  rm -rf $tmp_dir *.tmp
+  rm -rf $tmp_dir
 fi
 
 #############################################################################

@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+
+from Bio import SeqIO
+import sys
+import argparse
+
+parser = argparse.ArgumentParser(description='This script is for parsing NCBI\'s assembly summary file down to the provided accessions.')
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-a", "--assembly_summary", help="NCBI's assembly summary file", action="store", dest="all_assemblies", required=True)
+required.add_argument("-w", "--wanted_accessions", help="Single-column file with wanted accessions", action="store", dest="wanted_accs", required=True)
+parser.add_argument("-o", "--output_file", help='Wanted summary info only (default: "Wanted.tsv")', action="store", dest="output_file", default="Wanted.tsv")
+
+if len(sys.argv)==1:
+  parser.print_help(sys.stderr)
+  sys.exit(1)
+
+args = parser.parse_args()
+
+wanted = open(args.wanted_accs, "r")
+wanted_set = set(line.strip() for line in wanted)
+
+print(wanted_set)
+
+out_file = open(args.output_file, "w")
+
+with open(args.all_assemblies) as assemblies:
+  for line in assemblies:
+    line = line.strip()
+    line = line.split("\t")
+    if line[0] in wanted_set:
+      out_file.write(str(line) + "\n")
+    elif len(line) >= 18:
+      if line[17] in wanted_set:
+        out_file.write(str(line) + "\n")
+
+wanted.close()
+out_file.close()
