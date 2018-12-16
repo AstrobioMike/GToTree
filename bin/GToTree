@@ -94,7 +94,7 @@ do
     d) debug_flag='true';;
     n) num_cpus=${OPTARG};;
     j) num_jobs=${OPTARG};;
-    \?) printf "\n  Invalid argument: -${OPTARG}\n\n    Run 'GToTree' with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
+    \?) printf "\n  ${RED}Invalid argument: -${OPTARG}${NC}\n\n    Run 'GToTree' with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
   esac
 done
 
@@ -542,7 +542,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
   if [ -f NCBI_accessions_not_found.txt ] || [ -f NCBI_accessions_not_downloaded.txt ] || [ -f Redundant_input_accessions.txt ]; then
     
-    printf "        $num_retained_ncbi_input_genomes of the total $NCBI_input_genomes_total accessions had their genomes successfully\n"
+    printf "        $num_retained_ncbi_input_genomes of the total $NCBI_input_genomes_total input accessions had their genomes successfully\n"
     printf "        downloaded and searched.\n"
 
   else

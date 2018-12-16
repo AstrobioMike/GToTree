@@ -15,7 +15,7 @@ sort -n $1 | awk '
     } else if ( (NR % 2) == 1 ) {
       median = values[ int(counts/2) ]
     } else {
-      median = ( values[counts/2] + a[c/2-1] ) / 2
+      median = ( values[counts/2] + values[counts/2-1] ) / 2
     }
     print median;
   }
