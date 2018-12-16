@@ -6,7 +6,7 @@ GToTree is a more structured implementation of a workflow I would put together e
 
 Also included is a newly generated bacterial single-copy gene-set based on Pfams from release 32.0 searched against 11,405 complete bacterial genomes available from NCBI (accessed on 09-DEC-18). All code/steps used in the generation of the gene set are reported in the [wiki](https://github.com/AstrobioMike/GToTree/wiki/Bacterial-SCG-set-generation).
 
-GToTree utilizes helper scripts written in python and R, but is primarily implemented in bash. Every attempt is being made to make it portable across all variations, including Darwin on OSX, so please report an issue for any hiccups if you encounter them.  
+GToTree utilizes helper scripts written in python, but is primarily implemented in bash. Every attempt is being made to make it portable across all variations, including Darwin on OSX, so please report an issue for any hiccups if you encounter them.  
 
 ## Dependencies
 ### Required to use at all:
