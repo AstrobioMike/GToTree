@@ -26,6 +26,8 @@ If you use GToTree in a manner that uses these tools, please cite these folks :)
   - *if providing input genomes as NCBI assembly accessions*
 - **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** - citation: I'm not sure how to cite them yet
   - *if changing genome labels based on lineage information for input genomes with associated NCBI taxids*
+- **[GNU Parallel](https://www.gnu.org/software/parallel/)** - [citation info](https://www.gnu.org/software/parallel/parallel_design.html#Citation-notice)
+  - *if running in parallel (can make a big difference even on a laptop)*
 
 ## Testing instructions for those of you kind enough to be helping me squash da bugs
 Make sure all dependencies above are installed and functioning properly. Clone the repo, add the "bin" to your PATH, and in the "test\_data" directory there are example files and an "example\_run\_log" code that should work. If it does not, please let me know what happened. If it does work, please start changing the inputs and use as you might to help try to find da bugs :)
