@@ -27,9 +27,9 @@ do
 
     # storing links to download stuff in variables (if a refseq was returned as identical to what was searched, using that)
     if [ ${downloaded_accession:0:3} == "GCA" ]; then
-      base_link="${curr_line[7]}" # FtpPath_GenBank
+      base_link="${curr_line[8]}" # FtpPath_GenBank
     else
-      base_link="${curr_line[8]}" # FtpPath_RefSeq
+      base_link="${curr_line[9]}" # FtpPath_RefSeq
     fi
 
     end_path=$(basename $base_link)

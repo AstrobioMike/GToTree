@@ -10,9 +10,9 @@ downloaded_accession=$(echo "$1" | cut -f 2)
 
 # storing links to download stuff in variables (if a refseq was returned as identical to what was searched, using that)
 if [ ${downloaded_accession:0:3} == "GCA" ]; then
-  base_link=$(echo "$1" | cut -f 8) # FtpPath_GenBank
+  base_link=$(echo "$1" | cut -f 9) # FtpPath_GenBank
 else
-  base_link=$(echo "$1" | cut -f 9) # FtpPath_RefSeq
+  base_link=$(echo "$1" | cut -f 10) # FtpPath_RefSeq
 fi
 
 end_path=$(basename $base_link)
