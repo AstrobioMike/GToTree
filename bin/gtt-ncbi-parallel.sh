@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# setting colors to use
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 tmp_dir=$(cat temp_dir_name.tmp)
 hmm_file=$(cat hmm_file_path.tmp)
 num_cpus=$(cat num_cpus.tmp)
