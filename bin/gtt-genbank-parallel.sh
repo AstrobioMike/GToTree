@@ -58,7 +58,7 @@ if [ ! -s ${assembly}_genes.tmp ]; then
     gtt-rename-fasta-headers -i ${assembly}_genes2.tmp -w $assembly -o ${assembly}_genes.tmp
 fi
 
-printf "   $assembly\n"
+printf "   ${GREEN}$assembly${NC}\n"
 printf "      Performing HMM search...\n"
   
 ### running hmm search ###
