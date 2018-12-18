@@ -4,7 +4,7 @@
 
 GToTree is a more structured implementation of a workflow I would put together everytime I wanted to make a large-scale phylogenomic tree. What do I mean by large-scale? Anything from a full-blown Tree of Life with all 3 domains, down to, for example, all available genomes of Staphylococcus. At its heart it just takes in genomes and outputs a phylogenomic tree based on the specified HMM profiles. But its value comes from its flexibility with regard to input format, enabling the automation of required in-between-tool tasks (such as filtering hits by gene-length, filtering out genomes with too few hits to the target genes, and swapping genome labels for something more useful), and its scalability – GToTree can turn 1,000 input genomes into a tree in about 90 minutes on a standard laptop. 
 
-Also included is a newly generated bacterial single-copy gene-set based on Pfams from release 32.0 searched against 11,405 complete bacterial genomes available from NCBI (accessed on 09-DEC-18). All code/steps used in the generation of the gene set are reported in the [wiki](https://github.com/AstrobioMike/GToTree/wiki/Bacterial-SCG-set-generation).
+Also included are several newly generated single-copy gene-sets for different taxonomical groupings. These are presented in the [wiki](https://github.com/AstrobioMike/GToTree/wiki/SCG-sets), along with all code/steps used in the generation of them.  
 
 GToTree utilizes helper scripts written in python, but is primarily implemented in bash. Every attempt is being made to make it portable across all variations, including Darwin on OSX, so please report an [issue](https://github.com/AstrobioMike/GToTree/issues) for any hiccups if you encounter them.  
 
