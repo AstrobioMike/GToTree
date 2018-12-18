@@ -25,7 +25,7 @@ fasta_dict = SeqIO.index(args.input_fasta, "fasta")
 fasta_out = open(args.output_fasta, "w")
 
 for header in ordered_list:
-  fasta_out.write(fasta_dict.get_raw(header))
+  fasta_out.write(str(fasta_dict.get_raw(header)))
 
 ordered_seqs.close()
 fasta_out.close()
