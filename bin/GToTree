@@ -1095,7 +1095,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
     do
       grep -w -m1 "$id" ${output_prefix}_all_genomes_summary_info.tsv
-    done | cut -f 1,6,7,8,12 | tr "\t" "_" | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "['.\[\]]" > ${tmp_dir}/new_ids_for_taxonkit_swap.tmp
+    done | cut -f 1,6,7,8,12 | tr "\t" "_" | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]" > ${tmp_dir}/new_ids_for_taxonkit_swap.tmp
 
     ## making map for IDs changed with taxonkit
     paste ${tmp_dir}/ids_for_taxonkit_swap.tmp ${tmp_dir}/new_ids_for_taxonkit_swap.tmp > ${tmp_dir}/taxonkit_id_swap_map.tmp
@@ -1113,7 +1113,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
       # getting the ids and strains of those that have infraspecific names
       grep "strain=" ${tmp_dir}/ncbi_genomes_summary_subset_for_id_change.tmp | cut -f 1,6 | sort -k 1,1 > ${tmp_dir}/strain_info_tab.tmp
       cut -f1 ${tmp_dir}/strain_info_tab.tmp > ${tmp_dir}/sorted_ids_with_strain_info.tmp
-      cut -f2 ${tmp_dir}/strain_info_tab.tmp | sed 's/strain=//' | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "['.\[\]]" > ${tmp_dir}/sorted_strain_info.tmp
+      cut -f2 ${tmp_dir}/strain_info_tab.tmp | sed 's/strain=//' | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]" > ${tmp_dir}/sorted_strain_info.tmp
 
       # finding which IDs don't get this change, so can to separated them
       comm -23 ${tmp_dir}/ids_for_taxonkit_swap.tmp ${tmp_dir}/sorted_ids_with_strain_info.tmp > ${tmp_dir}/taxonkit_ids_to_not_change.tmp
