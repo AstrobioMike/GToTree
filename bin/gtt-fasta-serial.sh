@@ -16,7 +16,7 @@ while IFS=$'\t' read -r -a file
 do
 
     # setting assembly name as filename with no extension
-    assembly="${file%.*}"
+    assembly="$(basename ${file%.*})"
 
     # adding assembly to ongoing genomes list
     echo $assembly >> ${tmp_dir}/fasta_genomes_list.tmp

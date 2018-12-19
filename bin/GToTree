@@ -6,16 +6,18 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 
+printf "\n\n      GToTree v0.1 (still under initial development; December, 2018)\n"
+printf "         This software lives at: github.com/AstrobioMike/GToTree\n\n"
+
+
 #############################################################################
 ################################  HELP INFO  ################################
 #############################################################################
 ## called by program name with no arguments or with "-h" as only positional argument ##
 if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
 
-
-  printf "\n ############################################################################## \n"
-  printf "                     GToTree - still under initial development\n\n"
-
+  
+  printf "\n --------------------------------  HELP INFO  --------------------------------- \n\n"
   printf "  This program takes input genomes from various sources and ultimately produces\n"
   printf "  a phylogenomic tree. You can find detailed usage information at:\n"
   printf "                                  github.com/AstrobioMike/GToTree/wiki\n"
@@ -26,9 +28,15 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "        - [-g <file>] single-column file with the path to each GenBank file\n"
   printf "        - [-f <file>] single-column file with the path to each fasta file\n\n"
 
-  printf "      2)  [-H <file>] the uncompressed hmm file being used\n\n"
+  printf "      2)  [-H <file>] location of the uncompressed HMM file being used, or just the\n"
+  printf "                      HMM name if you've set the environment variable 'GToTree_HMM_dir'\n"
+  printf "                      to the appropriate location (run 'gtt-hmms' by itself to view\n"
+  printf "                      the available gene-sets)\n\n"
 
   printf "    Optional arguments include:\n\n"
+
+  printf "        - [-o <str>] default: GToTree\n"
+  printf "                  Specify the desired output prefix.\n\n"
 
   printf "        - [-m <file>] specify desired genome IDs of input genomes\n"
   printf "                  A two-column tab-delimited file where column 1 holds either the\n"
@@ -64,9 +72,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "                  The number of jobs you'd like to run in parallel during steps\n"
   printf "                  that are parallelizable. (requires GNU parallel)\n\n"
 
-  printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Lee_BSCGs.hmm -t\n\n"
-
-  printf " ############################################################################## \n\n"
+  printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Bacteria.hmm -t\n\n"
 
   exit
 fi
@@ -75,11 +81,12 @@ fi
 #############################################################################
 ############################  PARSING ARGUMENTS  ############################
 #############################################################################
-## setting boolean defaults
+## setting some defaults
+output_prefix="GToTree"
 taxonkit_id_swap='false'
 debug_flag='false'
 
-while getopts :a:g:f:H:m:tc:G:dn:j: args
+while getopts :a:g:f:H:o:m:tc:G:dn:j: args
 do
   case "${args}"
   in
@@ -87,6 +94,7 @@ do
     g) genbank_list_file=${OPTARG};;
     f) fasta_files=${OPTARG};;
     H) hmm_file=${OPTARG};;
+    o) output_prefix=${OPTARG};;
     m) file_to_genome_id_map=${OPTARG};;
     t) taxonkit_id_swap='true';;
     c) len_cutoff=${OPTARG};;
@@ -202,9 +210,13 @@ fi
 
 
 
+
 #############################################################################
 ########## CHECKING INPUT GENOME SOURCES AND SPECIFIC DEPENDENCIES ##########
 #############################################################################
+
+printf "\n ---------------------------------  RUN INFO  --------------------------------- \n\n"
+
 printf "\n    Input genome sources include:\n"
 
 if [ -n "$NCBI_acc_file" ]; then
@@ -222,16 +234,29 @@ if [ -n "$NCBI_acc_file" ]; then
     printf "\nExiting for now.\n\n"
     exit
   fi
+
 else 
   NCBI_input_genomes_total=0
 fi
 
 if [ -n "$genbank_list_file" ];then
-  if [ -f "$genbank_list_file" ]; then
+  if [ -s "$genbank_list_file" ]; then
+    # checking all the files pointed to by this file can be found
+    for file in $(cat $genbank_list_file)
+    do
+      if [ ! -s $file ]; then
+        printf "\n${RED}      The files specified in $genbank_list_file cannot be found :(${NC}\n\n"
+        printf "  Double-check the provided locations and where they should be, here's one of the problems:\n"
+        printf "            $file\n"
+        printf "\nExiting for now.\n\n"
+        exit
+      fi
+    done
+
     genbank_genomes_total=$(wc -l $genbank_list_file | sed "s/^ *//" | cut -d " " -f 1)
     printf "      - Genbank files listed in $genbank_list_file ($genbank_genomes_total genomes)\n"
   else
-    printf "\n${RED}      You specified $genbank_list_file as a source of genbank files to use, but that file cannot be found :(${NC}\n"
+    printf "\n${RED}      You specified $genbank_list_file as a source of GenBank files to use, but that file cannot be found or is empty :(${NC}\n"
     printf "\nExiting for now.\n\n"
     exit
   fi
@@ -246,11 +271,23 @@ if [ -n "$fasta_files" ]; then
     exit
   fi
   
-  if [ -f "$fasta_files" ]; then
+  if [ -s "$fasta_files" ]; then
+    # checking all files pointed to by this file can be found
+    for file in $(cat $fasta_files)
+    do
+      if [ ! -s $file ]; then
+        printf "\n${RED}      The files specified in $fasta_files cannot be found :(${NC}\n\n"
+        printf "  Double-check the provided locations and where they should be, here's one of the problems:\n"
+        printf "            $file\n"
+        printf "\nExiting for now.\n\n"
+        exit
+      fi
+    done
+
     fasta_genomes_total=$(wc -l $fasta_files | sed "s/^ *//" | cut -d " " -f 1)
     printf "      - Fasta files listed in $fasta_files ($fasta_genomes_total genomes)\n"
   else
-    printf "\n${RED}      You specified $fasta_files as a source of fasta files to use, but that file cannot be found :(${NC}\n"
+    printf "\n${RED}      You specified $fasta_files as a source of fasta files to use, but that file cannot be found or is empty :(${NC}\n"
     printf "\nExiting for now.\n\n"
     exit
   fi
@@ -259,6 +296,7 @@ else
 fi
 
 # reporting total number of planned genomes
+
 total_input_genomes=$(($NCBI_input_genomes_total + $genbank_genomes_total + $fasta_genomes_total))
 printf "\n                             ${GREEN}Total input genomes: $total_input_genomes${NC}\n"
 
@@ -278,7 +316,7 @@ elif [ -f "${GToTree_HMM_dir}/${hmm_file}" ]; then
   hmm_file="${GToTree_HMM_dir}/${hmm_file}"
   grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
   hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
-  printf "      - ${hmm_file} ($hmm_target_genes_total targets)\n"
+  printf "      - $(basename ${hmm_file}) ($hmm_target_genes_total targets)\n"
 else
   printf "\n${RED}      You specified $hmm_file as your HMM file to use, but that file cannot be found :(${NC}\n"
   printf "\nExiting for now.\n\n"
@@ -291,11 +329,11 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ]; then
+if [ -n $file_to_genome_id_map ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ]; then
 
-  if [ -n "$file_to_genome_id_map" ]; then
-    if [ ! -f "$file_to_genome_id_map" ]; then
-      printf "\n${RED}      You specified $file_to_genome_id_map, but that file cannot be found :(${NC}\n"
+  if [ -n $file_to_genome_id_map ]; then
+    if [ ! -s $file_to_genome_id_map ]; then
+      printf "\n${RED}      You specified $file_to_genome_id_map, but that file cannot be found or is empty :(${NC}\n"
       printf "\nExiting for now.\n\n"
       exit
     fi
@@ -303,7 +341,11 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ $len
 
   printf "\n\n    Options set:\n"
 
-  if [ -n "$file_to_genome_id_map" ]; then
+  if [ $output_prefix != "GToTree" ]; then
+    printf "      - The output prefix has been set to \"$output_prefix\".\n"
+  fi
+
+  if [ -n $file_to_genome_id_map ]; then
     printf "      - The file $file_to_genome_id_map will be used to label the specified genomes.\n"
   fi
 
@@ -356,8 +398,24 @@ fi
 
 ### making sure each id provided in the mapping file (if given) is found in one 
 ### of the genome input files 
-if [ -n "$file_to_genome_id_map" ]; then
-  cat $NCBI_acc_file $genbank_list_file $fasta_files | sort > ${tmp_dir}/sorted_all_input_genome_ids.tmp
+if [ -n $file_to_genome_id_map ]; then
+  if [ -n $genbank_list_file ]; then
+    for file in $(cat $genbank_list_file)
+    do
+      basename $file
+    done > ${tmp_dir}/genbank_list_file_basenames.tmp
+    genbank_list_file_basenames=${tmp_dir}/genbank_list_file_basenames.tmp
+  fi
+
+  if [ -n $fasta_files ]; then 
+    for file in $(cat $fasta_files)
+    do
+      basename $file
+    done > ${tmp_dir}/fasta_files_basenames.tmp
+    fasta_files_basenames=${tmp_dir}/fasta_files_basenames.tmp
+  fi
+
+  cat $NCBI_acc_file $genbank_list_file_basenames $fasta_files_basenames | sort > ${tmp_dir}/sorted_all_input_genome_ids.tmp
   comm -23 <(cut -f1 $file_to_genome_id_map | sort) ${tmp_dir}/sorted_all_input_genome_ids.tmp > ${tmp_dir}/spurious_ids.tmp
   if [ -s ${tmp_dir}/spurious_ids.tmp ]; then
     spurious_ids_count=$(wc -l ${tmp_dir}/spurious_ids.tmp | sed "s/^ *//" | cut -d " " -f 1)
@@ -918,7 +976,7 @@ if [ -f Fasta_genomes_summary_info.tsv ]; then
   cut -f 1,3,4,5,6 Fasta_genomes_summary_info.tsv | tail -n +2 >> ${tmp_dir}/building_genomes_tab.tmp
 fi
 
-cat <(printf "assembly_id\ttaxid\tuniq_SCG_hits\tperc_comp\tperc_redund\n") ${tmp_dir}/building_genomes_tab.tmp > All_genomes_summary_info.tsv
+cat <(printf "assembly_id\ttaxid\tuniq_SCG_hits\tperc_comp\tperc_redund\n") ${tmp_dir}/building_genomes_tab.tmp > ${output_prefix}_all_genomes_summary_info.tsv
 
 
 
@@ -939,7 +997,7 @@ printf "               Current process runtime: $(($duration / 60 / 60)) hours a
 paste ${tmp_dir}/*_all_aligned.faa > ${tmp_dir}/cat.tmp
 grep ">" ${tmp_dir}/cat.tmp | cut -f1 > ${tmp_dir}/headers.tmp
 grep -v ">" ${tmp_dir}/cat.tmp | sed -e $'s/\t/XXXXX/g' > ${tmp_dir}/seqs.tmp
-paste -d "\n" ${tmp_dir}/headers.tmp ${tmp_dir}/seqs.tmp > FINAL_aligned_SCGs.faa
+paste -d "\n" ${tmp_dir}/headers.tmp ${tmp_dir}/seqs.tmp > ${output_prefix}_aligned_SCGs.faa
 
 # storing genomes that made it through workflow to report at end
 genomes_retained=$(wc -l ${tmp_dir}/final_genomes_from_all_sources.tmp | sed "s/^ *//" | cut -d " " -f 1)
@@ -956,7 +1014,7 @@ printf "\n______________________________________________________________________
 #############################################################################
 ## making copy of alignment file to preserve original
 if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
-  cp FINAL_aligned_SCGs.faa ${tmp_dir}/FINAL_aligned_SCGs_mod_names.tmp
+  cp ${output_prefix}_aligned_SCGs.faa ${tmp_dir}/${output_prefix}_aligned_SCGs_mod_names.tmp
 
   printf "\n ############################################################################## \n"
   printf " ####                   Adding more informative headers                    ####\n"
@@ -1015,15 +1073,15 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
   if [ $taxonkit_id_swap != "false" ]; then
 
     ## running taxonkit and adding to summary table ##
-    cut -f 2 All_genomes_summary_info.tsv | tail -n +2 | taxonkit lineage | taxonkit reformat -r NA | cut -f3 | tr ";" "\t" > ${tmp_dir}/lineages.tmp
+    cut -f 2 ${output_prefix}_all_genomes_summary_info.tsv | tail -n +2 | taxonkit lineage | taxonkit reformat -r NA | cut -f3 | tr ";" "\t" > ${tmp_dir}/lineages.tmp
 
     cat <(printf "domain\tphylum\tclass\torder\tfamily\tgenus\tspecific_name\n") ${tmp_dir}/lineages.tmp > ${tmp_dir}/lineages2.tmp
 
-    paste All_genomes_summary_info.tsv ${tmp_dir}/lineages2.tmp > All_genomes_summary_info2.tsv
-    mv All_genomes_summary_info2.tsv All_genomes_summary_info.tsv
+    paste ${output_prefix}_all_genomes_summary_info.tsv ${tmp_dir}/lineages2.tmp > ${output_prefix}_all_genomes_summary_info2.tsv
+    mv ${output_prefix}_all_genomes_summary_info2.tsv ${output_prefix}_all_genomes_summary_info.tsv
 
     ## getting genomes that have a taxid
-    awk ' BEGIN { FS=OFS="\t" } $2 != "NA" ' All_genomes_summary_info.tsv | tail -n +2 | cut -f1 > ${tmp_dir}/potential_ids_for_swap.tmp
+    awk ' BEGIN { FS=OFS="\t" } $2 != "NA" ' ${output_prefix}_all_genomes_summary_info.tsv | tail -n +2 | cut -f1 > ${tmp_dir}/potential_ids_for_swap.tmp
     ## removing those that the user already provided new labels for, if they did
     if [ -f ${tmp_dir}/id_swap_map.tmp ]; then
       comm -23 <(sort ${tmp_dir}/potential_ids_for_swap.tmp) <(cut -f1 ${tmp_dir}/id_swap_map.tmp | sort) > ${tmp_dir}/ids_for_taxonkit_swap.tmp
@@ -1034,7 +1092,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     ## creating new labels for them based on lineage info
     for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
     do
-      grep -w -m1 "$id" All_genomes_summary_info.tsv
+      grep -w -m1 "$id" ${output_prefix}_all_genomes_summary_info.tsv
     done | cut -f 1,6,7,8,12 | tr "\t" "_" | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "['.\[\]]" > ${tmp_dir}/new_ids_for_taxonkit_swap.tmp
 
     ## making map for IDs changed with taxonkit
@@ -1082,39 +1140,39 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     if [ -f ${tmp_dir}/id_swap_map.tmp ]; then
       cat ${tmp_dir}/id_swap_map.tmp ${tmp_dir}/final_taxonkit_id_swap_map.tmp > ${tmp_dir}/full_id_swap_map.tmp
     else
-      cp ${tmp_dir}/final_taxonkit_id_swap_map.tmp > ${tmp_dir}/full_id_swap_map.tmp
+      cp ${tmp_dir}/final_taxonkit_id_swap_map.tmp ${tmp_dir}/full_id_swap_map.tmp
     fi
   fi
 
   ### now swapping ids 
-  gtt-swap-ids -i ${tmp_dir}/FINAL_aligned_SCGs_mod_names.tmp -s ${tmp_dir}/full_id_swap_map.tmp -o FINAL_aligned_SCGs_mod_names.faa
+  gtt-swap-ids -i ${tmp_dir}/${output_prefix}_aligned_SCGs_mod_names.tmp -s ${tmp_dir}/full_id_swap_map.tmp -o ${output_prefix}_aligned_SCGs_mod_names.faa
 
   ### adding new ids to summary table as column "label"
   # first pulling out and adding to those that were changed
   for changed_id in $(cut -f1 ${tmp_dir}/full_id_swap_map.tmp)
   do
-    grep -w -m1 "$changed_id" All_genomes_summary_info.tsv
+    grep -w -m1 "$changed_id" ${output_prefix}_all_genomes_summary_info.tsv
   done | cut -f 2- > ${tmp_dir}/building_new_genomes_tab1.tmp
 
   paste ${tmp_dir}/full_id_swap_map.tmp ${tmp_dir}/building_new_genomes_tab1.tmp > ${tmp_dir}/building_new_genomes_tab2.tmp
 
   # now getting those that weren't changed and adding assembly id to the "label" column
-  comm -23 <(cut -f1 All_genomes_summary_info.tsv | tail -n +2 | sort) <(cut -f1 ${tmp_dir}/full_id_swap_map.tmp | sort) > ${tmp_dir}/unchanged_ids.tmp
+  comm -23 <(cut -f1 ${output_prefix}_all_genomes_summary_info.tsv | tail -n +2 | sort) <(cut -f1 ${tmp_dir}/full_id_swap_map.tmp | sort) > ${tmp_dir}/unchanged_ids.tmp
 
   for unchanged_id in $(cat ${tmp_dir}/unchanged_ids.tmp)
   do
-    grep -w -m1 "$unchanged_id" All_genomes_summary_info.tsv
+    grep -w -m1 "$unchanged_id" ${output_prefix}_all_genomes_summary_info.tsv
   done > ${tmp_dir}/building_new_genomes_tab3.tmp
 
   paste ${tmp_dir}/unchanged_ids.tmp ${tmp_dir}/building_new_genomes_tab3.tmp > ${tmp_dir}/building_new_genomes_tab4.tmp
 
-  head -n 1 All_genomes_summary_info.tsv > ${tmp_dir}/old_header.tmp
+  head -n 1 ${output_prefix}_all_genomes_summary_info.tsv > ${tmp_dir}/old_header.tmp
 
   # making new header
   paste <(cut -f 1 ${tmp_dir}/old_header.tmp) <(printf "label") <(cut -f 2- ${tmp_dir}/old_header.tmp) > ${tmp_dir}/new_header.tmp
 
   # now sticking all together into a new summary table that includes any adjusted labels
-  cat ${tmp_dir}/new_header.tmp ${tmp_dir}/building_new_genomes_tab2.tmp ${tmp_dir}/building_new_genomes_tab4.tmp > All_genomes_summary_info.tsv
+  cat ${tmp_dir}/new_header.tmp ${tmp_dir}/building_new_genomes_tab2.tmp ${tmp_dir}/building_new_genomes_tab4.tmp > ${output_prefix}_all_genomes_summary_info.tsv
 
   printf "\n________________________________________________________________________________\n\n\n"
 
@@ -1141,9 +1199,9 @@ printf "               Current process runtime: $(($duration / 60 / 60)) hours a
 
 
 if [ $taxonkit_id_swap != "false" ]; then
-  FastTree FINAL_aligned_SCGs_mod_names.faa > FINAL_aligned_SCGs_mod_names.tre
+  FastTree ${output_prefix}_aligned_SCGs_mod_names.faa > ${output_prefix}_aligned_SCGs_mod_names.tre
 else
-  FastTree FINAL_aligned_SCGs.faa > FINAL_aligned_SCGs.tre
+  FastTree ${output_prefix}_aligned_SCGs.faa > ${output_prefix}_aligned_SCGs.tre
 fi
 
 
@@ -1165,15 +1223,15 @@ else
 fi
 
 # reporting primary output files
-printf "    Full alignment written to file \"${GREEN}FINAL_aligned_SCGs.faa${NC}\".\n\n"
+printf "    Full alignment written to file \"${GREEN}${output_prefix}_aligned_SCGs.faa${NC}\".\n\n"
 if [ $taxonkit_id_swap != "false" ]; then
-  printf "    Alignment with altered headers written to file \"${GREEN}FINAL_aligned_SCGs_mod_names.faa${NC}\".\n\n"
-  printf "    Tree written to file \"${GREEN}FINAL_aligned_SCGs_mod_names.tre${NC}\".\n\n"
+  printf "    Alignment with altered headers written to file \"${GREEN}${output_prefix}_aligned_SCGs_mod_names.faa${NC}\".\n\n"
+  printf "    Tree written to file \"${GREEN}${output_prefix}_aligned_SCGs_mod_names.tre${NC}\".\n\n"
 else
-  printf "    Tree written to file \"${GREEN}FINAL_aligned_SCGs.tre${NC}\".\n\n"
+  printf "    Tree written to file \"${GREEN}${output_prefix}_aligned_SCGs.tre${NC}\".\n\n"
 fi
 
-printf "    Summary file with comp./redund. estimates written to file \"${GREEN}All_genomes_summary_info.tsv${NC}\".\n\n"
+printf "    Summary file with comp./redund. estimates written to file \"${GREEN}${output_prefix}_all_genomes_summary_info.tsv${NC}\".\n\n"
 
 
 # reporting any problem files/accessions
@@ -1209,7 +1267,7 @@ if [ -f NCBI_accessions_not_found.txt ] || [ -f NCBI_accessions_not_downloaded.t
     num_genbanks_no_cds=$(wc -l Genbank_files_with_no_CDSs.txt | sed "s/^ *//" | cut -d " " -f 1)
     printf "    $num_genbanks_no_cds genbank file(s) had no indentified coding sequences.\n"
     printf "        Reported in \"Genbank_files_with_no_CDSs.txt\", but\n"
-    printf "        these were processed as though submitted as flat fasta files.\n\n"
+    printf "        processed as though submitted as flat fasta files.\n\n"
   fi
 
   printf "\n"

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# setting colors to use
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+printf "\n"
+
+if [ -n GToTree_HMM_dir ]; then
+    printf "   The environment variable ${GREEN}GToTree_HMM_dir${NC} is set to:\n"
+    printf "        $GToTree_HMM_dir\n\n"
+    printf "    The available HMM SCG-sets here include:\n\n"
+    for hmm_set in $(ls ${GToTree_HMM_dir}/*.hmm)
+    do
+        sleep 0.2
+        num_genes=$(grep -c "^ACC" $hmm_set)
+        printf "\t   %-30s %14s\n" "$(basename $hmm_set)" "($num_genes genes)"
+    done
+
+    sleep 0.2
+
+    printf "\n"
+
+else
+    printf "    The environmental variable 'GToTree_HMM_dir' is not yet set. This should\n"
+    printf "    store the path of the directory holding the HMM profiles that come with\n"
+    printf "    GToTree. See here for help:\n"
+    printf "            github.com/AstrobioMike/GToTree/wiki/installation\n\n"
+
+fi

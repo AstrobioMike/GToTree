@@ -18,7 +18,7 @@ while IFS=$'\t' read -r -a file
 
   do
 
-    assembly="${file%.*}"
+    assembly="$(basename ${file%.*})"
 
     # adding assembly to ongoing genomes list
     echo $assembly >> ${tmp_dir}/genbank_genomes_list.tmp

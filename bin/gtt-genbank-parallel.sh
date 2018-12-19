@@ -10,7 +10,7 @@ hmm_file=$(cat hmm_file_path.tmp)
 num_cpus=$(cat num_cpus.tmp)
 hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
 
-assembly="${1%.*}"
+assembly="$(basename ${1%.*})"
 
 # adding assembly to ongoing genomes list
 echo $assembly >> ${tmp_dir}/genbank_genomes_list.tmp
