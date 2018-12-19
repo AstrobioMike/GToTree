@@ -22,7 +22,7 @@ If you use GToTree in a manner that uses these tools, please cite these folks :)
 
 - **[Prodigal](https://github.com/hyattpd/Prodigal)** - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/)  
   - *if providing input genomes in fasta format, or GenBank format with no CDS annotations, or NCBI accessions to genomes with no gene calls*
-- **[NCBI E-Direct](https://www.ncbi.nlm.nih.gov/books/NBK179288/)** - citation: cite that page
+- **[NCBI E-Direct](https://dataguide.nlm.nih.gov/edirect/install.html)** - [citation](https://www.ncbi.nlm.nih.gov/books/NBK179288/)
   - *if providing input genomes as NCBI assembly accessions*
 - **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** - citation: I'm not sure how to cite them yet
   - *if changing genome labels based on lineage information for input genomes with associated NCBI taxids*
