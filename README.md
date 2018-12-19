@@ -30,7 +30,9 @@ If you use GToTree in a manner that uses these tools, please cite these folks :)
   - *if running in parallel (can make a big difference even on a laptop)*
 
 ## Testing instructions for those of you kind enough to be helping me squash da bugs
-Make sure all dependencies above are installed and functioning properly. Clone the repo, add the "bin" to your PATH, and in the "test\_data" directory there are example files and an "example\_run\_log" code that should work. If it does not, please let me know what happened. If it does work, please start changing the inputs and use as you might to help try to find da bugs :) If you have trouble getting E-Direct to work, it would still be a big help to mess with running things with just GenBank and fasta file inputs.
+Make sure all dependencies above are installed and functioning properly. Clone the repo, add the "bin" to your PATH, and in the "test\_data" directory there are example files and an "example\_run\_log" code that should work. If it does not, please let me know what happened. If it does work, please start changing the inputs and use as you might to help try to find da bugs :)
+
+If you have trouble getting E-Direct to work, it would still be a big help if you test things using just GenBank and/or fasta files as inputs (no accessions, no E-Direct needed). Thanks!
 
 Running `GToTree` with no arguments gives the help menu. 
 
