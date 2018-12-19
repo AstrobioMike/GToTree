@@ -219,7 +219,7 @@ printf "\n ---------------------------------  RUN INFO  ------------------------
 
 printf "\n    Input genome sources include:\n"
 
-if [ -n "$NCBI_acc_file" ]; then
+if [ "$NCBI_acc_file" != "" ]; then
   if ! command -v epost > /dev/null; then
     printf "\n  ${RED}NCBI's E-Direct is required when providing accessions.${NC}\n"
     printf "\nExiting for now.\n\n"
@@ -239,7 +239,7 @@ else
   NCBI_input_genomes_total=0
 fi
 
-if [ -n "$genbank_list_file" ];then
+if [ "$genbank_list_file" != "" ];then
   if [ -s "$genbank_list_file" ]; then
     # checking all the files pointed to by this file can be found
     for file in $(cat $genbank_list_file)
@@ -264,7 +264,7 @@ else
   genbank_genomes_total=0
 fi
 
-if [ -n "$fasta_files" ]; then
+if [ "$fasta_files" != "" ]; then
   if ! command -v prodigal > /dev/null; then
     printf "\n  ${RED}Prodigal is required when providing fasta files.${NC}\n"
     printf "\nExiting for now.\n\n"
@@ -400,8 +400,8 @@ fi
 
 ### making sure each id provided in the mapping file (if given) is found in one 
 ### of the genome input files 
-if [ -n $file_to_genome_id_map ]; then
-  if [ -n $genbank_list_file ]; then
+if [ "$file_to_genome_id_map" != "" ]; then
+  if [ "$genbank_list_file" != "" ]; then
     for file in $(cat $genbank_list_file)
     do
       basename $file
@@ -409,7 +409,7 @@ if [ -n $file_to_genome_id_map ]; then
     genbank_list_file_basenames=${tmp_dir}/genbank_list_file_basenames.tmp
   fi
 
-  if [ -n $fasta_files ]; then 
+  if [ "$fasta_files" != "" ]; then 
     for file in $(cat $fasta_files)
     do
       basename $file
