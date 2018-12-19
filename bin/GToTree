@@ -331,7 +331,7 @@ fi
 #############################################################################
 if [ $output_prefix != "GToTree" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ]; then
 
-  if [ "$file_to_genome_id_map" != ""]; then
+  if [ "$file_to_genome_id_map" != "" ]; then
     if [ ! -s $file_to_genome_id_map ]; then
       printf "\n${RED}      You specified $file_to_genome_id_map, but that file cannot be found or is empty :(${NC}\n"
       printf "\nExiting for now.\n\n"
