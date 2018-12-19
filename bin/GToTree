@@ -329,9 +329,9 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ -n $file_to_genome_id_map ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ]; then
+if [ $output_prefix != "GToTree" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ]; then
 
-  if [ -n $file_to_genome_id_map ]; then
+  if [ "$file_to_genome_id_map" != ""]; then
     if [ ! -s $file_to_genome_id_map ]; then
       printf "\n${RED}      You specified $file_to_genome_id_map, but that file cannot be found or is empty :(${NC}\n"
       printf "\nExiting for now.\n\n"
@@ -345,9 +345,11 @@ if [ -n $file_to_genome_id_map ] || [ $taxonkit_id_swap != "false" ] || [ $len_c
     printf "      - The output prefix has been set to \"$output_prefix\".\n"
   fi
 
-  if [ -n $file_to_genome_id_map ]; then
+
+  if [ "$file_to_genome_id_map" != "" ]; then
     printf "      - The file $file_to_genome_id_map will be used to label the specified genomes.\n"
   fi
+
 
   if [ $taxonkit_id_swap != "false" ]; then
     printf "      - Taxonkit will be used to add lineage info to headers.\n"
