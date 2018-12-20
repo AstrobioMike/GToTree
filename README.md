@@ -21,6 +21,7 @@ See the [installation wiki](https://github.com/AstrobioMike/GToTree/wiki/install
 ### Required to use at all:
 If you use GToTree, please cite these folks :)  
 
+- **[Biopython](https://biopython.org/wiki/Download)** - [citation](https://academic.oup.com/bioinformatics/article/25/11/1422/330687)
 - **[HMMER3](http://hmmer.org/download.html)** - citation: they note in the [user manual](http://eddylab.org/software/hmmer/Userguide.pdf) to cite the website, but there is also [this paper](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1002195)  
 - **[Muscle](https://www.drive5.com/muscle/downloads.htm)** - [citation](https://academic.oup.com/nar/article/32/5/1792/2380623)  
 - **[Trimal](http://trimal.cgenomics.org/downloads)** - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2712344/)  
