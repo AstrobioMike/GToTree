@@ -1,6 +1,9 @@
 # GToTree: a user-friendly workflow for phylogenomics
 The purpose of GToTree is to give more researchers the capability to create a full-scale Tree of Life, or any subset of it, to aid in their work.
-## Currently under initial development - not yet ready for use
+
+---
+
+## Currently under initial development - not yet released
 
 GToTree is a more structured implementation of a workflow I would put together everytime I wanted to make a large-scale phylogenomic tree. What do I mean by large-scale? Anything from a full-blown Tree of Life with all 3 domains, down to, for example, all available genomes of *Staphylococcus*. At its heart it just takes in genomes and outputs an alignment and phylogenomic tree based on the specified HMM profiles. But I think its value comes from three main things: 1) its flexibility with regard to input format - taking fasta files, GenBank files, and/or NCBI accessions (So if you just recovered a bunch of new genomes and you want to see where they fit in with references, you can provide references by accession and your new genomes as fasta files.); 2) its automation of required in-between-tool tasks such as filtering hits by gene-length, filtering out genomes with too few hits to the target genes, and swapping genome labels for something more useful; and 3) its scalability – GToTree can turn 1,000 input genomes into a tree in ~90 minutes on a standard laptop.
 
@@ -11,6 +14,8 @@ GToTree utilizes helper scripts written in python, but is primarily implemented 
 ---
 
 See the [installation wiki](https://github.com/AstrobioMike/GToTree/wiki/installation) for help/suggestions with installing GToTree or any of the dependencies.
+
+---
 
 ## Dependencies
 ### Required to use at all:
