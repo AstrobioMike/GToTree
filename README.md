@@ -1,4 +1,4 @@
-# GToTree: a user-friendly workflow for large-scale phylogenomics
+# GToTree: a user-friendly workflow for phylogenomics
 The purpose of GToTree is to give more researchers the capability to create a full-scale Tree of Life, or any subset of it, to aid in their work.
 ## Currently under initial development - not yet ready for use
 
@@ -7,6 +7,8 @@ GToTree is a more structured implementation of a workflow I would put together e
 Also included are several newly generated single-copy gene-sets for 13 different taxonomical groupings. These are presented in the [wiki](https://github.com/AstrobioMike/GToTree/wiki/SCG-sets), along with all code/steps used in the generation of them.  
 
 GToTree utilizes helper scripts written in python, but is primarily implemented in bash. Every attempt is being made to make it portable across all variations, including Darwin on OSX, so please report an [issue](https://github.com/AstrobioMike/GToTree/issues) for any hiccups if you encounter them.  
+
+---
 
 See the [installation wiki](https://github.com/AstrobioMike/GToTree/wiki/installation) for help/suggestions with installing GToTree or any of the dependencies.
 
