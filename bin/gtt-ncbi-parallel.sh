@@ -13,63 +13,52 @@ hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
 assembly=$(echo "$1" | cut -f 1)
 downloaded_accession=$(echo "$1" | cut -f 2)
 
-# storing links to download stuff in variables (if a refseq was returned as identical to what was searched, using that)
-if [ ${downloaded_accession:0:3} == "GCA" ]; then
-  base_link=$(echo "$1" | cut -f 9) # FtpPath_GenBank
-else
-  base_link=$(echo "$1" | cut -f 10) # FtpPath_RefSeq
-fi
-
+# storing and building links
+base_link=$(echo "$1" | cut -f 9)
 end_path=$(basename $base_link)
 
-curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 -o ${assembly}_report1.tmp "${base_link}/${end_path}_assembly_report.txt"
 curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 -o ${assembly}_genes.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
-if [ -s ${assembly}_report1.tmp ]; then
-    if [ -s ${assembly}_genes.tmp.gz ]; then
-        gunzip ${assembly}_genes.tmp.gz
-    else # trying to get assembly if there were no gene annotations available
-        curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 -o ${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
-        
-        if [ -s ${assembly}_genome.tmp.gz ]; then
 
-          gunzip ${assembly}_genome.tmp.gz
+if [ -s ${assembly}_genes.tmp.gz ]; then
+    gunzip ${assembly}_genes.tmp.gz
+else # trying to get assembly if there were no gene annotations available
+    curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 -o ${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
+    
+    if [ -s ${assembly}_genome.tmp.gz ]; then
 
-          printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
-          printf "\t  $assembly doesn't appear to have gene annotations.\n\n"
-          printf "\t  Downloaded the genome and identifying CDSs with prodigal.\n"
-          printf "     ${RED}********************************************************************** ${NC}\n\n"
+      gunzip ${assembly}_genome.tmp.gz
 
-          printf "      Getting coding seqs...\n\n"
-          prodigal -c -q -i ${assembly}_genome.tmp -a ${assembly}_genes1.tmp > /dev/null
-          tr -d '*' < ${assembly}_genes1.tmp > ${assembly}_genes2.tmp
+      printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
+      printf "\t  $assembly doesn't appear to have gene annotations.\n\n"
+      printf "\t  Downloaded the genome and identifying CDSs with prodigal.\n"
+      printf "     ${RED}********************************************************************** ${NC}\n\n"
 
-          ## renaming seqs to have assembly name
-          gtt-rename-fasta-headers -i ${assembly}_genes2.tmp -w $assembly -o ${assembly}_genes.tmp
-        else
-          printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
-          printf "\t  $assembly's genes nor genome downloaded properly :(\n\n"
-          printf "\t    Reported in \"NCBI_accessions_not_downloaded.txt\"\n"
-          printf "     ${RED}************************************************************************ ${NC}\n"
-          rm -rf ${assembly}_report1.tmp ${assembly}_genes.tmp.gz
-          sleep 3
-          echo $assembly >> NCBI_accessions_not_downloaded.txt
-        fi
+      printf "      Getting coding seqs...\n\n"
+      prodigal -c -q -i ${assembly}_genome.tmp -a ${assembly}_genes1.tmp > /dev/null
+      tr -d '*' < ${assembly}_genes1.tmp > ${assembly}_genes2.tmp
+
+      ## renaming seqs to have assembly name
+      gtt-rename-fasta-headers -i ${assembly}_genes2.tmp -w $assembly -o ${assembly}_genes.tmp
     fi
+fi
 
-
-# fixing the stupid carriage returns that for some reason NCBI assembly reports have in them...
-    tr "\r" "\n" < ${assembly}_report1.tmp > ${assembly}_report.tmp
+if [ -s ${assembly}_genes.tmp ]; then
 
     # storing more info about the assembly to write out into ncbi-derived-genome summary file (for each setting to NA if not found)
-    ass_name=$(grep "Assembly name:" ${assembly}_report.tmp | cut -f2 -d ":" | sed 's/^ *//')
+    ass_name=$(echo "$1" | cut -f 3)
     if [ -z "$ass_name" ]; then ass_name="NA"; fi
-    org_name=$(grep "Organism name:" ${assembly}_report.tmp | cut -f2 -d ":" | sed 's/^ *//')
+    org_name=$(echo "$1" | cut -f 5)
     if [ -z "$org_name" ]; then org_name="NA"; fi
-    infraspecific_name=$(grep "Infraspecific name:" ${assembly}_report.tmp | cut -f2 -d ":" | sed 's/^ *//')
+    infraspecific_name=$(echo "$1" | cut -f 6)
     if [ -z "$infraspecific_name" ]; then infraspecific_name="NA"; fi
-    taxid=$(grep "Taxid:" ${assembly}_report.tmp | cut -f2 -d ":" | sed 's/^ *//')
+    taxid=$(echo "$1" | cut -f 4)
     if [ -z "$taxid" ]; then taxid="NA"; fi
+    version_status=$(echo "$1" | cut -f 7)
+    if [ -z "$version_status" ]; then version_status="NA"; fi
+    asm_level=$(echo "$1" | cut -f 8)
+    if [ -z "$asm_level" ]; then asm_level="NA"; fi
+
 
     printf "   ${GREEN}$assembly${NC}\n"
     printf "      Performing HMM search...\n"
@@ -97,7 +86,7 @@ if [ -s ${assembly}_report1.tmp ]; then
     perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
 
     ## writing summary info to table ##
-    printf "$assembly\t$downloaded_accession\t$ass_name\t$taxid\t$org_name\t$infraspecific_name\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> NCBI_genomes_summary_info.tsv
+    printf "$assembly\t$downloaded_accession\t$ass_name\t$taxid\t$org_name\t$infraspecific_name\t$version_status\t$asm_level\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> NCBI_genomes_summary_info.tsv
 
     ### Pulling out hits for this genome ###
     # making fasta file searchable to pull out the hits (Easel 0.45h June 2018)

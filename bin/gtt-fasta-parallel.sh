@@ -19,17 +19,12 @@ echo $assembly >> ${tmp_dir}/fasta_genomes_list.tmp
 
 num=$((num+1)) # to track progress
 
-printf "  $assembly\n"
-printf "      Getting coding seqs...\n\n"
-
 ## running prodigal to get coding sequences
 prodigal -c -q -i $1 -a ${assembly}_genes1.tmp > /dev/null
 tr -d '*' < ${assembly}_genes1.tmp > ${assembly}_genes2.tmp
 
 ## renaming seqs to have assembly name
 gtt-rename-fasta-headers -i ${assembly}_genes2.tmp -w $assembly -o ${assembly}_genes.tmp
-
-printf "      Performing HMM search...\n"
   
 ### running hmm search ###
 hmmsearch --cut_ga --cpu $num_cpus --tblout ${assembly}_curr_hmm_hits.tmp $hmm_file ${assembly}_genes.tmp > /dev/null
@@ -41,8 +36,6 @@ do
 done > ${assembly}_uniq_counts.tmp
 
 num_SCG_hits=$(awk ' $1 > 0 ' ${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
-
-printf "        Found $num_SCG_hits of the targeted $hmm_target_genes_total.\n\n"
 
 num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' ${assembly}_uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
 
@@ -71,4 +64,7 @@ done
 
 rm ${assembly}_*.tmp
 rm ${assembly}_*.tmp.ssi
+
+printf "    $assembly finished.\n"
+printf "        Found $num_SCG_hits of the targeted $hmm_target_genes_total genes.\n\n"
 
