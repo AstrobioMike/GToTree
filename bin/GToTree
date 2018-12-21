@@ -831,7 +831,10 @@ done > ${tmp_dir}/counts.tmp
 
 paste ${tmp_dir}/genomes_from_all_sources.tmp ${tmp_dir}/counts.tmp > ${tmp_dir}/counts_tab.tmp
 
-awk -F "\t" -v cutoff="$cutoff" '$2 < cutoff { print $0 }' ${tmp_dir}/counts_tab.tmp | tee Genomes_removed_for_too_few_hits.tsv | cut -f1 | sort > ${tmp_dir}/sorted_genomes_to_remove.tmp
+awk -F "\t" -v cutoff="$cutoff" '$2 < cutoff { print $0 }' ${tmp_dir}/counts_tab.tmp | tee ${tmp_dir}/Genomes_removed_for_too_few_hits.tmp | cut -f1 | sort > ${tmp_dir}/sorted_genomes_to_remove.tmp
+
+# adding header to genomes' removed list
+cat <(printf "accession\tnum_SCG_hits\n") ${tmp_dir}/Genomes_removed_for_too_few_hits.tmp > Genomes_removed_for_too_few_hits.tsv
 
 # getting updated genome list with these removed from it:
 comm -23 <(sort ${tmp_dir}/genomes_from_all_sources.tmp) ${tmp_dir}/sorted_genomes_to_remove.tmp > ${tmp_dir}/final_genomes_from_all_sources.tmp
