@@ -13,7 +13,7 @@ GToTree utilizes helper scripts written in python, but is primarily implemented 
 
 ---
 
-See the [installation wiki](https://github.com/AstrobioMike/GToTree/wiki/installation) for help/suggestions with installing GToTree or any of the dependencies.
+See the [installation wiki](https://github.com/AstrobioMike/GToTree/wiki/installation) for help/suggestions with installing GToTree or any of the dependencies. *Spoiler alert:* [conda](https://conda.io/docs/) makes everything a cinch.  
 
 ---
 
