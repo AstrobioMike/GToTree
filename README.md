@@ -1,9 +1,7 @@
 ---
-<img align="right" src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree_logo.png">  
 
-<br>  
-<br>  
-<br>
+
+![alt text](https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree_logo.png)
 
 ---
 
