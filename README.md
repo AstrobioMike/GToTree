@@ -1,7 +1,6 @@
 ---
 
-
-![alt text](https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree_logo.png)
+![GToTree](https://github.com/AstrobioMike/GToTree/wiki/images/GToTree_logo.png)
 
 ---
 
