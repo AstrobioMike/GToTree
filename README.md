@@ -1,3 +1,13 @@
+---
+<img align="right" src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree_logo.png">  
+
+<br>  
+<br>  
+<br>
+
+---
+
+
 # GToTree: a user-friendly workflow for phylogenomics
 The purpose of GToTree is to give more researchers the capability to create a full-scale Tree of Life, or any subset of it, to aid in their work.
 
