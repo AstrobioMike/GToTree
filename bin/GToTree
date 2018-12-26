@@ -495,13 +495,14 @@ if [ -n "$NCBI_acc_file" ]; then
   ## downloading genbank files and/or refseq assembly summary files as needed
 
   if grep -q "^GCA" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
-      printf "        Downloading all GenBank assembly summaries...\n\n"
-      curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_genbank.txt >> ${tmp_dir}/ncbi_assembly_info.tmp
+      printf "\t\t  Downloading GenBank assembly summaries...\n\n"
+      curl --connect-timeout 10 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp
   fi
 
   if grep -q "^GCF" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
-      printf "        Downloading all RefSeq assembly summaries...\n\n"
-      curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_refseq.txt >> ${tmp_dir}/ncbi_assembly_info.tmp
+      printf "\n\t\t  Downloading RefSeq assembly summaries...\n\n"
+      curl --connect-timeout 10 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp
+      cat ${tmp_dir}/ncbi_RS_assembly_info.tmp >> ${tmp_dir}/ncbi_assembly_info.tmp
   fi
 
   ## searching assembly info table for the input accessions (NOTE: will always return latest accession version as of now)
@@ -518,7 +519,7 @@ if [ -n "$NCBI_acc_file" ]; then
   if [ -s ${tmp_dir}/not_found_accs.tmp ]; then
 
     num_accs_not_found=$(wc -l ${tmp_dir}/not_found_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
-    printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
+    printf "\n\n     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
     printf "\t  $num_accs_not_found accession(s) not successfully found at NCBI.\n\n"
     printf "\t     Reported in \"NCBI_accessions_not_found.txt\".\n"
     printf "     ${RED}**********************************************************************${NC}  \n\n"
@@ -839,9 +840,9 @@ cat <(printf "accession\tnum_SCG_hits\n") ${tmp_dir}/Genomes_removed_for_too_few
 # getting updated genome list with these removed from it:
 comm -23 <(sort ${tmp_dir}/genomes_from_all_sources.tmp) ${tmp_dir}/sorted_genomes_to_remove.tmp > ${tmp_dir}/final_genomes_from_all_sources.tmp
 
+# reporting if any genomes removed for too few hits
 removed_genomes=$(wc -l ${tmp_dir}/sorted_genomes_to_remove.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
-# reporting if any genomes removed for too few hits
 if [ $removed_genomes != "0" ]; then
   printf "     ${RED}*******************************${NC} NOTICE ${RED}*******************************${NC}  \n"
   printf "\t  $removed_genomes genome(s) removed from analysis due to having too few hits.\n\n"
@@ -1244,8 +1245,8 @@ if [ -f NCBI_accessions_not_found.txt ] || [ -f NCBI_accessions_not_downloaded.t
   fi
 
   if [ -f Genomes_removed_for_too_few_hits.tsv ]; then
-    num_genomes_removed_too_few_hits=$(wc -l Genomes_removed_for_too_few_hits.tsv | sed "s/^ *//" | cut -d " " -f 1)
-    printf "    ${RED}$num_genomes_removed_too_few_hits genome(s) removed due to having too few hits to the targeted SCGs.${NC}\n" 
+    # num_genomes_removed_too_few_hits=$(wc -l Genomes_removed_for_too_few_hits.tsv | sed "s/^ *//" | cut -d " " -f 1)
+    printf "    ${RED}$removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.${NC}\n" 
     printf "        Reported in \"Genomes_removed_for_too_few_hits.tsv\".\n\n"
   fi
 
