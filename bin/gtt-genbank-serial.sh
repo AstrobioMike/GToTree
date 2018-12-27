@@ -13,6 +13,8 @@ hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
 
 num=0
 
+rm -rf Genbank_files_with_no_CDSs.txt # deleting if file exists
+
 # looping through the lines of the provided [-g] file (this loop operates on one genome at a time)
 while IFS=$'\t' read -r -a file
 

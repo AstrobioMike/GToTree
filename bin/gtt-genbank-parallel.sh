@@ -12,6 +12,8 @@ hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
 
 assembly="$(basename ${1%.*})"
 
+rm -rf Genbank_files_with_no_CDSs.txt # deleting if file exists
+
 # adding assembly to ongoing genomes list
 echo $assembly >> ${tmp_dir}/genbank_genomes_list.tmp
 
