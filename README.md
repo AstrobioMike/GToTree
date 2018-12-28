@@ -9,7 +9,7 @@
 
 
 # GToTree: a user-friendly workflow for phylogenomics
-The purpose of GToTree is to give more researchers the capability to create a full-scale Tree of Life, or any subset of it, to aid in their work.
+The purpose of GToTree is to give more researchers the capability to create phylogenomic trees to aid in their work.  
 
 ---
 
