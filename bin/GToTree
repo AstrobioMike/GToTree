@@ -1130,6 +1130,10 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     else
       cp ${tmp_dir}/final_taxonkit_id_swap_map.tmp ${tmp_dir}/full_id_swap_map.tmp
     fi
+  
+  ## if no taxonkit swapping specified, moving user-provided map to final file
+  else
+    cp ${tmp_dir}/id_swap_map.tmp ${tmp_dir}/full_id_swap_map.tmp
   fi
 
   ### now swapping ids 
@@ -1186,7 +1190,7 @@ printf "           It is currently $curr_time; the process started at $start_tim
 printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n"
 
 
-if [ $taxonkit_id_swap != "false" ]; then
+if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
   FastTree ${output_prefix}_aligned_SCGs_mod_names.faa > ${output_prefix}_aligned_SCGs_mod_names.tre
 else
   FastTree ${output_prefix}_aligned_SCGs.faa > ${output_prefix}_aligned_SCGs.tre
@@ -1212,7 +1216,7 @@ fi
 
 # reporting primary output files
 printf "    Full alignment written to file \"${GREEN}${output_prefix}_aligned_SCGs.faa${NC}\".\n\n"
-if [ $taxonkit_id_swap != "false" ]; then
+if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
   printf "    Alignment with altered headers written to file \"${GREEN}${output_prefix}_aligned_SCGs_mod_names.faa${NC}\".\n\n"
   printf "    Tree written to file \"${GREEN}${output_prefix}_aligned_SCGs_mod_names.tre${NC}\".\n\n"
 else

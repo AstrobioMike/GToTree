@@ -17,13 +17,13 @@ downloaded_accession=$(echo "$1" | cut -f 2)
 base_link=$(echo "$1" | cut -f 9)
 end_path=$(basename $base_link)
 
-curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 -o ${assembly}_genes.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
+curl --silent --retry 10 -o ${assembly}_genes.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
 
 if [ -s ${assembly}_genes.tmp.gz ]; then
     gunzip ${assembly}_genes.tmp.gz
 else # trying to get assembly if there were no gene annotations available
-    curl --silent --connect-timeout 10 --max-time 10 --retry 10 --retry-max-time 30 -o ${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
+    curl --silent --retry 10 -o ${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
     
     if [ -s ${assembly}_genome.tmp.gz ]; then
 

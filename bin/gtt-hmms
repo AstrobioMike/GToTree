@@ -8,9 +8,18 @@ NC='\033[0m'
 printf "\n"
 
 if [ -n GToTree_HMM_dir ]; then
+    num_hmm_files=$(ls ${GToTree_HMM_dir}/*.hmm 2> /dev/null | wc -l | sed "s/^ *//" | cut -d " " -f 1)
+    if [ $num_hmm_files == 0 ]; then
+        printf "   The environment variable ${GREEN}GToTree_HMM_dir${NC} is set to:\n"
+        printf "        $GToTree_HMM_dir\n\n"
+        printf "    ${RED}But there don't appear to be any HMM files there :(${NC}\n\n"
+        exit
+    fi
+
     printf "   The environment variable ${GREEN}GToTree_HMM_dir${NC} is set to:\n"
     printf "        $GToTree_HMM_dir\n\n"
-    printf "    The available HMM SCG-sets here include:\n\n"
+    printf "    The $num_hmm_files available HMM SCG-sets here include:\n\n"
+
     for hmm_set in $(ls ${GToTree_HMM_dir}/*.hmm)
     do
         sleep 0.2
