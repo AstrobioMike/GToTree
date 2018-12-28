@@ -1,10 +1,5 @@
 ---
-<img align="right" width="400" src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-logo-1200px.png">  
-
-<br>  
-<br>  
-<br>
-
+<img width="400" src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-logo-1200px.png">  
 ---
 
 
