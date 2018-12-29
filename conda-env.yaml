@@ -35,5 +35,4 @@ dependencies:
   - mkl=2019.1=144
   - numpy=1.15.4=py36hacdab7b_0
   - numpy-base=1.15.4=py36h6575580_0
-prefix: /Users/Mike_Lee/miniconda3/envs/gtotree
 
