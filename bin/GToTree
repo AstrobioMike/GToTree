@@ -6,7 +6,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 
-printf "\n\n      GToTree v0.1 (still under initial development; December, 2018)\n"
+printf "\n\n      GToTree v0.1.1 (still under initial development; December, 2018)\n"
 printf "         This software lives at: github.com/AstrobioMike/GToTree\n\n"
 
 
@@ -110,7 +110,7 @@ done
 # checking if taxonkit is available if it was specified
 if [ $taxonkit_id_swap != "false" ]; then
   if ! command -v taxonkit > /dev/null; then
-    printf "\n  ${RED}You specified to add lineages to headers, but TaxonKit doesn't seem to be callable.${NC}\n"
+    printf "\n  ${RED}You specified to add lineages to headers, but 'taxonkit' not found in PATH :(${NC}\n"
     printf "\nExiting for now.\n\n"
     exit
   fi
