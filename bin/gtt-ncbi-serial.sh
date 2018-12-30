@@ -30,10 +30,13 @@ do
     end_path=$(basename $base_link)
 
     # attempting to download genes for assembly
-    curl --silent --retry 10 -o ${assembly}_genes.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
+    curl --silent --retry 10 -o ${assembly}_genes2.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
-    if [ -s ${assembly}_genes.tmp.gz ]; then
-        gunzip ${assembly}_genes.tmp.gz
+    if [ -s ${assembly}_genes2.tmp.gz ]; then
+        gunzip ${assembly}_genes2.tmp.gz
+        # renaming headers to avoid problems with odd characters and how hmmer parses and such
+        gtt-rename-fasta-headers -i ${assembly}_genes2.tmp -w $assembly -o ${assembly}_genes.tmp
+        
     else # trying to get assembly if there were no gene annotations available
         curl --silent --retry 10 -o ${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
       
@@ -74,7 +77,6 @@ do
         printf "      Performing HMM search...\n"
           
         ### running hmm search ###
-
         hmmsearch --cut_ga --cpu $num_cpus --tblout ${assembly}_curr_hmm_hits.tmp $hmm_file ${assembly}_genes.tmp > /dev/null
 
         ### calculating % completion and redundancy ###
@@ -98,18 +100,18 @@ do
         printf "$assembly\t$downloaded_accession\t$ass_name\t$taxid\t$org_name\t$infraspecific_name\t$version_status\t$asm_level\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> NCBI_genomes_summary_info.tsv
 
         ### Pulling out hits for this genome ###
-        # making fasta file searchable to pull out the hits (Easel 0.45h June 2018)
-        esl-sfetch --index ${assembly}_genes.tmp > /dev/null
-
+          # this was faster with esl-sfetch, but can't figure out how to install that with conda and i don't think it's too bad without it
+          # but when i want to improve efficiency, this is a good place to start, it's a tad excessive at the moment
         # looping through ribosomal proteins and pulling out each first hit (hmm results tab is sorted by e-value):
-        # does as a separate loop just for clarity (well, in hopes of clarity)
+        
         for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
         do
-            grep -w "$SCG" ${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " | esl-sfetch -f ${assembly}_genes.tmp - | sed "s/>.*$/>$assembly/" | sed 's/^Usage.*$//' | sed 's/^To see.*$//' | sed '/^$/d' >> ${tmp_dir}/${SCG}_hits.faa
+            grep -w -m1 "$SCG" ${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " > ${assembly}_${SCG}_curr_wanted_id.tmp
+            gtt-parse-fasta-by-headers -i ${assembly}_genes.tmp -w ${assembly}_${SCG}_curr_wanted_id.tmp -o ${assembly}_${SCG}_hit.tmp
+            sed 's/\(.*\)_.*/\1/' ${assembly}_${SCG}_hit.tmp >> ${tmp_dir}/${SCG}_hits.faa
         done
 
-        rm ${assembly}_*.tmp
-        rm ${assembly}_*.tmp.ssi
+        rm -rf ${assembly}_*.tmp
 
     else
         printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"

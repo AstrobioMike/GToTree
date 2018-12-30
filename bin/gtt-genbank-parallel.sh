@@ -32,10 +32,10 @@ else
 fi
 
 # extracting AA coding sequences from genbank file
-gtt-genbank-to-AA-seqs -i $1 -o ${assembly}_genes.tmp
+gtt-genbank-to-AA-seqs -i $1 -o ${assembly}_genes2.tmp
 
 # checking that the file had CDS annotations
-if [ ! -s ${assembly}_genes.tmp ]; then
+if [ ! -s ${assembly}_genes2.tmp ]; then
 
     printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
     printf "\t  $assembly doesn't appear to have CDS annotations, so we\n"
@@ -45,7 +45,7 @@ if [ ! -s ${assembly}_genes.tmp ]; then
     printf "     ${RED}**********************************************************************${NC}  \n\n"
 
     echo "$1" >> Genbank_files_with_no_CDSs.txt
-    rm ${assembly}_genes.tmp
+    rm -rf ${assembly}_genes2.tmp
 
     # pulling out full nucleotide fasta from genbank file
     gtt-genbank-to-fasta -i $1 -o ${assembly}_fasta.tmp
@@ -56,9 +56,10 @@ if [ ! -s ${assembly}_genes.tmp ]; then
     prodigal -c -q -i ${assembly}_fasta.tmp -a ${assembly}_genes1.tmp > /dev/null
     tr -d '*' < ${assembly}_genes1.tmp > ${assembly}_genes2.tmp
 
-    ## renaming seqs to have assembly name
-    gtt-rename-fasta-headers -i ${assembly}_genes2.tmp -w $assembly -o ${assembly}_genes.tmp
 fi
+
+## renaming seqs to have assembly name
+gtt-rename-fasta-headers -i ${assembly}_genes2.tmp -w $assembly -o ${assembly}_genes.tmp
 
 printf "   ${GREEN}$assembly${NC}\n"
 printf "      Performing HMM search...\n"
@@ -87,15 +88,15 @@ perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
 printf "$assembly\t$1\t$taxid\t$org_name\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> Genbank_genomes_summary_info.tsv
 
 ### Pulling out hits for this genome ###
-# making fasta file searchable to pull out the hits (Easel 0.45h June 2018)
-esl-sfetch --index ${assembly}_genes.tmp > /dev/null
-
+  # this was faster with esl-sfetch, but can't figure out how to install that with conda and i don't think it's too bad without it
+  # but when i want to improve efficiency, this is a good place to start, it's a tad excessive at the moment
 # looping through ribosomal proteins and pulling out each first hit (hmm results tab is sorted by e-value):
-# done as a separate loop just for clarity (well, in hopes of clarity)
+    
 for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
 do
-    grep -w "$SCG" ${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " | esl-sfetch -f ${assembly}_genes.tmp - | sed "s/>.*$/>$assembly/" | sed 's/^Usage.*$//' | sed 's/^To see.*$//' | sed '/^$/d' >> ${tmp_dir}/${SCG}_hits.faa
+    grep -w -m1 "$SCG" ${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " > ${assembly}_${SCG}_curr_wanted_id.tmp
+    gtt-parse-fasta-by-headers -i ${assembly}_genes.tmp -w ${assembly}_${SCG}_curr_wanted_id.tmp -o ${assembly}_${SCG}_hit.tmp
+    sed 's/\(.*\)_.*/\1/' ${assembly}_${SCG}_hit.tmp >> ${tmp_dir}/${SCG}_hits.faa
 done
 
-rm ${assembly}_*.tmp
-rm ${assembly}_*.tmp.ssi
+rm -rf ${assembly}_*.tmp

@@ -64,19 +64,19 @@ do
     ## writing summary info to table ##
     printf "$assembly\t$file\t$taxid\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> Fasta_genomes_summary_info.tsv
 
+
     ### Pulling out hits for this genome ###
-    # making fasta file searchable to pull out the hits (Easel 0.45h June 2018)
-    esl-sfetch --index ${assembly}_genes.tmp > /dev/null
-
+        # this was faster with esl-sfetch, but can't figure out how to install that with conda and i don't think it's too bad without it
+        # but when i want to improve efficiency, this is a good place to start, it's a tad excessive at the moment
     # looping through ribosomal proteins and pulling out each first hit (hmm results tab is sorted by e-value):
-    # done as a separate loop just for clarity (well, in hopes of clarity)
+        
     for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
-
     do
-      grep -w "$SCG" ${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " | esl-sfetch -f ${assembly}_genes.tmp - | sed "s/>.*$/>$assembly/" | sed 's/^Usage.*$//' | sed 's/^To see.*$//' | sed '/^$/d' >> ${tmp_dir}/${SCG}_hits.faa
+        grep -w -m1 "$SCG" ${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " > ${assembly}_${SCG}_curr_wanted_id.tmp
+        gtt-parse-fasta-by-headers -i ${assembly}_genes.tmp -w ${assembly}_${SCG}_curr_wanted_id.tmp -o ${assembly}_${SCG}_hit.tmp
+        sed 's/\(.*\)_.*/\1/' ${assembly}_${SCG}_hit.tmp >> ${tmp_dir}/${SCG}_hits.faa
     done
 
-    rm ${assembly}_*.tmp
-    rm ${assembly}_*.tmp.ssi
+    rm -rf ${assembly}_*.tmp
 
 done < $1
