@@ -1,4 +1,11 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
+# setting colors to use
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+printf "\n    ${GREEN}Setting up conda environment...${NC}\n\n"
 
 ## adding conda channels
 conda config --add channels defaults 2> /dev/null
@@ -23,11 +30,13 @@ export PATH=\"$(pwd)/bin:"'$PATH'\"" \
 
 export GToTree_HMM_dir=\"$(pwd)/hmm_sets\"" >> ${CONDA_PREFIX}/etc/conda/activate.d/env_vars.sh
 
+printf "\n    ${GREEN}Setting up taxonkit...${NC}\n\n"
+
 ## downloading ncbi tax database for taxonkit and setting variable
 mkdir ncbi_tax_info
 cd ncbi_tax_info
 
-curl --silent --retry 10 -O ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
+curl --retry 10 -O ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
 tar -xzvf taxdump.tar.gz 2&> /dev/null
 rm taxdump.tar.gz
 
