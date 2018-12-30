@@ -23,5 +23,16 @@ export PATH=\"$(pwd)/bin:"'$PATH'\"" \
 
 export GToTree_HMM_dir=\"$(pwd)/hmm_sets\"" >> ${CONDA_PREFIX}/etc/conda/activate.d/env_vars.sh
 
+## downloading ncbi tax database for taxonkit and setting variable
+mkdir ncbi_tax_info
+cd ncbi_tax_info
+
+curl --silent --retry 10 -O ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
+tar -xzvf taxdump.tar.gz 2> /dev/null
+
+echo "export TAXONKIT_DB=$(pwd)" >> ${CONDA_PREFIX}/etc/conda/activate.d/env_vars.sh
+
+cd ../
+
 # re-activating environment so variable and PATH changes take effect
 source activate gtotree

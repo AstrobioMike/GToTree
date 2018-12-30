@@ -1,8 +1,5 @@
-GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H ../hmm_sets/Universal_Hug_et_al.hmm -m genome_to_id_map.tsv -j 4
-
-# if you've set the environmental variable 'GToTree_HMM_dir' to the path of the directory holding the hmm sets, you can run it as such: 
-GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Universal_Hug_et_al.hmm -m genome_to_id_map.tsv -j 4
-  # see https://github.com/AstrobioMike/GToTree/wiki/installation#add-path-to-included-hmm-files for help in needed
+## test run if installed with conda quickstart method from here: https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart
+GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Universal_Hug_et_al.hmm -m genome_to_id_map.tsv -t -j 4
 
 ## clear out example-run files:
 gtt-clean-after-test.sh
