@@ -1,7 +1,7 @@
 #!/bin/sh
 
 ## adding conda channels
-conda config --add channels defaults
+conda config --add channels defaults 2> /dev/null
 conda config --add channels bioconda
 conda config --add channels conda-forge
 conda config --add channels au-eoed
