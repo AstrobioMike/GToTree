@@ -220,11 +220,6 @@ printf "\n ---------------------------------  RUN INFO  ------------------------
 printf "\n    Input genome sources include:\n"
 
 if [ "$NCBI_acc_file" != "" ]; then
-  if ! command -v epost > /dev/null; then
-    printf "\n  ${RED}NCBI's E-Direct is required when providing accessions.${NC}\n"
-    printf "\nExiting for now.\n\n"
-    exit
-  fi
 
   if [ -f "$NCBI_acc_file" ]; then
     NCBI_input_genomes_total=$(wc -l $NCBI_acc_file | sed "s/^ *//" | cut -d " " -f 1)
