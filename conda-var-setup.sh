@@ -12,4 +12,5 @@ export PATH=\"$(pwd)/bin:"'$PATH'\"" \
 export GToTree_HMM_dir=\"$(pwd)/hmm_sets\"" >> ${CONDA_PREFIX}/etc/conda/activate.d/env_vars.sh
 
 # re-activating environment
+source deactivate
 source activate gtotree
