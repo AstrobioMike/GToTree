@@ -28,7 +28,8 @@ mkdir ncbi_tax_info
 cd ncbi_tax_info
 
 curl --silent --retry 10 -O ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
-tar -xzvf taxdump.tar.gz 2> /dev/null
+tar -xzvf taxdump.tar.gz 2&> /dev/null
+rm taxdump.tar.gz
 
 echo "export TAXONKIT_DB=$(pwd)" >> ${CONDA_PREFIX}/etc/conda/activate.d/env_vars.sh
 

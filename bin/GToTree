@@ -6,7 +6,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 
-printf "\n\n      GToTree v0.1.1 (still under initial development; December, 2018)\n"
+printf "\n\n      GToTree v0.1.2 (still under initial development; December, 2018)\n"
 printf "         This software lives at: github.com/AstrobioMike/GToTree\n\n"
 
 
