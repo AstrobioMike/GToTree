@@ -23,7 +23,7 @@ GToTree utilizes helper scripts written in python, but is primarily implemented 
 
 ---
 
-See the [installation wiki](https://github.com/AstrobioMike/GToTree/wiki/installation) for help/suggestions with installing GToTree or any of the dependencies. *Spoiler alert:* [conda](https://conda.io/docs/) makes everything a cinch.  
+See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to have GToTree up and running in just a few steps.
 
 ---
 
@@ -48,7 +48,7 @@ If you use GToTree in a manner that uses these tools, please cite these folks :)
   - *if running in parallel*
 
 ## Testing instructions for those of you kind enough to be helping me squash da bugs
-Make sure all dependencies above are installed and functioning properly (all can be installed with the wonderful [conda](https://conda.io/docs/) if wanted). Clone the repo, add the "bin" to your PATH, and in the "test\_data" directory there are example files and an "example\_run\_log" code that should work. If it does not, please let me know what happened. If it does work, please start changing the inputs and use as you might to help find da bugs :)
+In the "test\_data" directory there are example files and an "example\_run\_log" with versions of running the program that should work. If things do not work, please let me know what happened. If it does work, please start changing the inputs and use as you might to help find da bugs :)
 
 Running `GToTree` with no arguments gives the help menu. 
 
