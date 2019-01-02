@@ -10,10 +10,11 @@ hmm_file=$(cat hmm_file_path.tmp)
 genbank_genomes_total=$(cat genbank_genomes_total.tmp)
 num_cpus=$(cat num_cpus.tmp)
 hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
+output_dir=$(cat output_dir_name.tmp)
 
 num=0
 
-rm -rf Genbank_files_with_no_CDSs.txt # deleting if file exists
+rm -rf ${output_dir}/Genbank_files_with_no_CDSs.txt # deleting if file exists
 
 # looping through the lines of the provided [-g] file (this loop operates on one genome at a time)
 while IFS=$'\t' read -r -a file
@@ -55,10 +56,10 @@ do
         printf "\t  This genbank file doesn't appear to have CDS annotations, so we\n"
         printf "\t  are identifying coding sequences with prodigal.\n\n"
 
-        printf "\t    Reported in \"Genbank_files_with_no_CDSs.txt\".\n"
+        printf "\t    Reported in \"${output_dir}/Genbank_files_with_no_CDSs.txt\".\n"
         printf "     ${RED}**********************************************************************${NC}  \n\n"
 
-        echo "$file" >> Genbank_files_with_no_CDSs.txt
+        echo "$file" >> ${output_dir}/Genbank_files_with_no_CDSs.txt
         rm -rf ${assembly}_genes2.tmp
 
         # pulling out full nucleotide fasta from genbank file
@@ -99,7 +100,7 @@ do
     perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
 
     ## writing summary info to table ##
-    printf "$assembly\t$file\t$taxid\t$org_name\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> Genbank_genomes_summary_info.tsv
+    printf "$assembly\t$file\t$taxid\t$org_name\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Genbank_genomes_summary_info.tsv
 
     ### Pulling out hits for this genome ###
       # this was faster with esl-sfetch, but can't figure out how to install that with conda and i don't think it's too bad without it

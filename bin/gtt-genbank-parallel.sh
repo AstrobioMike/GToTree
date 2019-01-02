@@ -9,10 +9,11 @@ tmp_dir=$(cat temp_dir_name.tmp)
 hmm_file=$(cat hmm_file_path.tmp)
 num_cpus=$(cat num_cpus.tmp)
 hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
+output_dir=$(cat output_dir_name.tmp)
 
 assembly="$(basename ${1%.*})"
 
-rm -rf Genbank_files_with_no_CDSs.txt # deleting if file exists
+rm -rf ${output_dir}/Genbank_files_with_no_CDSs.txt # deleting if file exists
 
 # adding assembly to ongoing genomes list
 echo $assembly >> ${tmp_dir}/genbank_genomes_list.tmp
@@ -41,10 +42,10 @@ if [ ! -s ${assembly}_genes2.tmp ]; then
     printf "\t  $assembly doesn't appear to have CDS annotations, so we\n"
     printf "\t  are identifying coding sequences with prodigal.\n\n"
 
-    printf "\t    Reported in \"Genbank_files_with_no_CDSs.txt\".\n"
+    printf "\t    Reported in \"${output_dir}/Genbank_files_with_no_CDSs.txt\".\n"
     printf "     ${RED}**********************************************************************${NC}  \n\n"
 
-    echo "$1" >> Genbank_files_with_no_CDSs.txt
+    echo "$1" >> ${output_dir}/Genbank_files_with_no_CDSs.txt
     rm -rf ${assembly}_genes2.tmp
 
     # pulling out full nucleotide fasta from genbank file
@@ -85,7 +86,7 @@ perc_redund=$(echo "$num_SCG_redund / $hmm_target_genes_total * 100" | bc -l)
 perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
 
 ## writing summary info to table ##
-printf "$assembly\t$1\t$taxid\t$org_name\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> Genbank_genomes_summary_info.tsv
+printf "$assembly\t$1\t$taxid\t$org_name\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Genbank_genomes_summary_info.tsv
 
 ### Pulling out hits for this genome ###
   # this was faster with esl-sfetch, but can't figure out how to install that with conda and i don't think it's too bad without it

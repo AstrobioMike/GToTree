@@ -10,6 +10,7 @@ hmm_file=$(cat hmm_file_path.tmp)
 fasta_genomes_total=$(cat fasta_genomes_total.tmp)
 num_cpus=$(cat num_cpus.tmp)
 hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
+output_dir=$(cat output_dir_name.tmp)
 
 # setting assembly name as filename with no extension
 assembly="$(basename ${1%.*})"
@@ -48,7 +49,7 @@ perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
 taxid="NA"
 
 ## writing summary info to table ##
-printf "$assembly\t$1\t$taxid\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> Fasta_genomes_summary_info.tsv
+printf "$assembly\t$1\t$taxid\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Fasta_genomes_summary_info.tsv
 
 ### Pulling out hits for this genome ###
     # this was faster with esl-sfetch, but can't figure out how to install that with conda and i don't think it's too bad without it

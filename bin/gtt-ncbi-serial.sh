@@ -10,6 +10,7 @@ hmm_file=$(cat hmm_file_path.tmp)
 NCBI_remaining_genomes_total=$(cat remaining_total_genomes.tmp)
 num_cpus=$(cat num_cpus.tmp)
 hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
+output_dir=$(cat output_dir_name.tmp)
 
 num=0
 
@@ -97,7 +98,7 @@ do
         perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
 
         ## writing summary info to table ##
-        printf "$assembly\t$downloaded_accession\t$ass_name\t$taxid\t$org_name\t$infraspecific_name\t$version_status\t$asm_level\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> NCBI_genomes_summary_info.tsv
+        printf "$assembly\t$downloaded_accession\t$ass_name\t$taxid\t$org_name\t$infraspecific_name\t$version_status\t$asm_level\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/NCBI_genomes_summary_info.tsv
 
         ### Pulling out hits for this genome ###
           # this was faster with esl-sfetch, but can't figure out how to install that with conda and i don't think it's too bad without it
@@ -116,11 +117,11 @@ do
     else
         printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
         printf "\t  $assembly's genes nor genome downloaded properly :(\n\n"
-        printf "\t    Reported in \"NCBI_accessions_not_downloaded.txt\"\n"
+        printf "\t    Reported in \"${output_dir}/NCBI_accessions_not_downloaded.txt\"\n"
         printf "     ${RED}************************************************************************ ${NC}\n"
         rm -rf ${assembly}_report1.tmp ${assembly}_genes.tmp.gz
         sleep 3
-        echo $assembly >> NCBI_accessions_not_downloaded.txt
+        echo $assembly >> ${output_dir}/NCBI_accessions_not_downloaded.txt
 
     fi
 

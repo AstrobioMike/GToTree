@@ -10,6 +10,7 @@ hmm_file=$(cat hmm_file_path.tmp)
 fasta_genomes_total=$(cat fasta_genomes_total.tmp)
 num_cpus=$(cat num_cpus.tmp)
 hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
+output_dir=$(cat output_dir_name.tmp)
 
 # looping through the lines of the provided [-f] file (this loop operates on one genome at a time)
 while IFS=$'\t' read -r -a file
@@ -62,7 +63,7 @@ do
     taxid="NA"
 
     ## writing summary info to table ##
-    printf "$assembly\t$file\t$taxid\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> Fasta_genomes_summary_info.tsv
+    printf "$assembly\t$file\t$taxid\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Fasta_genomes_summary_info.tsv
 
 
     ### Pulling out hits for this genome ###

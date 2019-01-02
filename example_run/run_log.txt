@@ -1,0 +1,17 @@
+### This example is explained and taken further at: https://github.com/AstrobioMike/GToTree/wiki/Alteromonas-example ###
+
+ # downloading genome in fasta format that represents our new MAG
+curl ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/002/271/865/GCA_002271865.1_ASM227186v1/GCA_002271865.1_ASM227186v1_genomic.fna.gz | gunzip - > Alteromonas_MAG.fa
+
+ # getting accessions of NCBI RefSeq Alteromonas genomes (example on page noted above of doing this at NCBI's website)
+esearch -query 'Alteromonas[ORGN] AND "latest refseq"[filter] AND "complete genome"[filter] AND (latest[filter] AND all[filter] NOT anomalous[filter])' -db assembly | esummary | xtract -pattern DocumentSummary -def "NA" -element AssemblyAccession > alteromonas_refseq_accessions.txt
+
+ # downloading an alphaproteobacterial GenBank file to use to root the tree
+curl ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/011/365/GCF_000011365.1_ASM1136v1/GCF_000011365.1_ASM1136v1_genomic.gbff.gz | gunzip - > GCF_000011365.1-alpha_outgroup.gbff
+
+ # creating input files for GToTree that specify the locations of the fasta and genbank files
+ls *.fa > fasta_files.txt
+ls *.gbff > genbank_files.txt
+
+ # running GToTree
+GToTree -a alteromonas_refseq_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Gammaproteobacteria.hmm -t -j 4 -o Alteromonas
