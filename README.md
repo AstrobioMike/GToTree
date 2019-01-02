@@ -17,7 +17,7 @@ GToTree is a more structured implementation of a workflow I would put together e
 
 Also included are several newly generated single-copy gene-sets for 13 different taxonomical groupings. These are presented in the [wiki](https://github.com/AstrobioMike/GToTree/wiki/SCG-sets), along with an explanation and example code/steps used in the generation of them. 
 
-GToTree utilizes helper scripts written in python, but is primarily implemented in bash. Every attempt is being made to make it portable across all variations of GNU/Unix, so please report an [issue](https://github.com/AstrobioMike/GToTree/issues) for any hiccups if you encounter them.  
+GToTree utilizes helper scripts written in python, but is primarily implemented in bash. Every attempt is being made to make it portable across all variations of GNU/Unix, including on Macs, so if you run into any issues, it'd be appreciated if you could [report them](https://github.com/AstrobioMike/GToTree/issues) so the problems can be found and fixed!  
 
 ---
 
