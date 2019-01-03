@@ -9,9 +9,9 @@ printf "\n    ${GREEN}Setting up conda environment...${NC}\n\n"
 
 ## adding conda channels
 conda config --add channels defaults 2> /dev/null
-conda config --add channels bioconda
-conda config --add channels conda-forge
-conda config --add channels au-eoed
+conda config --add channels bioconda 2> /dev/null
+conda config --add channels conda-forge 2> /dev/null
+conda config --add channels au-eoed 2> /dev/null
 
 ## creating GToTree environment and installing dependencies
 conda create -n gtotree biopython hmmer muscle trimal fasttree prodigal taxonkit gnu-parallel --yes
