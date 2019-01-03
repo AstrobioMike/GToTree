@@ -6,7 +6,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 
-printf "\n\n      GToTree v1.0 (github.com/AstrobioMike/GToTree)\n\n"
+printf "\n\n                 GToTree v1.0 (github.com/AstrobioMike/GToTree)\n\n"
 
 #############################################################################
 ################################  HELP INFO  ################################
@@ -47,6 +47,12 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "                  info to the sequence headers for any genomes with NCBI taxids.\n"
   printf "                  (requires Taxonkit)\n\n"
 
+
+  printf "        - [-L <str>] default: Domain,Phylum,Class,Species,Strain\n"
+  printf "                  A comma-separated list of the taxonomic ranks you'd like added to\n"
+  printf "                  the labels if using TaxonKit (-t flag specified). E.g., all would be\n"
+  printf "                  \"-L Domain,Phylum,Class,Order,Family,Genus,Species,Strain\"\n\n"
+
   printf "        - [-c <float>] default: 0.2\n" 
   printf "                  A float between 0-1 specifying the range about the median of\n"
   printf "                  sequences to be retained. For example, if the median length of a\n"
@@ -77,14 +83,47 @@ fi
 
 
 #############################################################################
+##############  CHECKING FIRST FOR ALL ESSENTIAL DEPENDENCIES  ##############
+#############################################################################
+if ! command -v muscle > /dev/null; then
+  printf "\n  ${RED}Muscle is an essential dependency but does not seem to be in your PATH :(${NC}\n"
+  printf "\n  See github.com/AstrobioMike/GToTree/wiki/installation for help if needed.\n\n"
+  printf "\nExiting for now.\n\n"
+  exit
+fi
+
+if ! command -v hmmsearch > /dev/null; then
+  printf "\n  ${RED}HMMER3 is an essential dependency but does not seem to be in your PATH :(${NC}\n"
+  printf "\n  See github.com/AstrobioMike/GToTree/wiki/installation for help if needed.\n\n"
+  printf "\nExiting for now.\n\n"
+  exit
+fi
+
+if ! command -v trimal > /dev/null; then
+  printf "\n  ${RED}Trimal is an essential dependency but does not seem to be in your PATH :(${NC}\n"
+  printf "\n  See github.com/AstrobioMike/GToTree/wiki/installation for help if needed.\n\n"
+  printf "\nExiting for now.\n\n"
+  exit
+fi
+
+if ! command -v FastTree > /dev/null; then
+  printf "\n  ${RED}FastTree is an essential dependency but does not seem to be in your PATH :(${NC}\n"
+  printf "\n  See github.com/AstrobioMike/GToTree/wiki/installation for help if needed.\n\n"
+  printf "\nExiting for now.\n\n"
+  exit
+fi
+
+
+#############################################################################
 ############################  PARSING ARGUMENTS  ############################
 #############################################################################
 ## setting some defaults
 output_dir="GToTree_output"
 taxonkit_id_swap='false'
 debug_flag='false'
+lineage_spec="Domain,Phylum,Class,Species,Strain"
 
-while getopts :a:g:f:H:o:m:tc:G:dn:j: args
+while getopts :a:g:f:H:o:m:tL:c:G:dn:j: args
 do
   case "${args}"
   in
@@ -95,6 +134,7 @@ do
     o) output_dir=${OPTARG};;
     m) file_to_genome_id_map=${OPTARG};;
     t) taxonkit_id_swap='true';;
+    L) lineage_spec=${OPTARG};;
     c) len_cutoff=${OPTARG};;
     G) gen_cutoff=${OPTARG};;
     d) debug_flag='true';;
@@ -108,7 +148,7 @@ done
 # checking if taxonkit is available if it was specified
 if [ $taxonkit_id_swap != "false" ]; then
   if ! command -v taxonkit > /dev/null; then
-    printf "\n  ${RED}You specified to add lineages to headers, but 'taxonkit' not found in PATH :(${NC}\n"
+    printf "\n  ${RED}You specified to add lineages to headers, but 'taxonkit' not found in your PATH :(${NC}\n"
     printf "\nExiting for now.\n\n"
     exit
   fi
@@ -205,6 +245,42 @@ if [ ! -n "$hmm_file" ]; then
   exit
 fi
 
+
+
+#############################################################################
+####  CHECKING SPECIFIED LINEAGE INFO TO ADD TO LABELS IS INTERPRETABLE  ####
+#############################################################################
+if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
+  echo $lineage_spec | tr "," "\n" > gtotree.specified-lineage-info.tmp
+  gtt-check-wanted-lineage-info -w gtotree.specified-lineage-info.tmp
+  
+  if [ -s gtotree.uninterpretable_ranks.tmp ]; then
+    printf "    ${RED}One or more of the specified lineage ranks to add (passed to \"-L\") were uninterpretable:${NC}\n"
+    sed 's/^/        /' gtotree.uninterpretable_ranks.tmp
+    printf "\n\n    Available options are:\n        Domain\n        Phylum\n        Class\n        Order\n        Family\n        Genus\n        Species\n        Strain\n"
+    printf "\nExiting for now.\n\n"
+    rm gtotree.specified-lineage-info.tmp gtotree.uninterpretable_ranks.tmp
+    exit
+
+  else
+    rm gtotree.specified-lineage-info.tmp gtotree.uninterpretable_ranks.tmp
+  fi
+fi
+
+
+#############################################################################
+##########  ATTEMPTING TO CREATE OUTPUT DIR AND EXITING IF FAILS  ###########
+#############################################################################
+
+mkdir $output_dir 2> /dev/null
+
+if [ $? -ne 0 ] ; then
+  printf "  ${RED}Output directory \"${output_dir}\" already exists, either remove or rename\n  that one, or specify a different output directory to the \"-o\" option.${NC}\n\n"
+  printf "Exiting for now.\n\n"
+  exit
+else
+  rm -rf $output_dir # removing here so if we abort in a later step (the gene-filtering warning in particular), the output_dir isn't created yet
+fi
 
 
 
@@ -317,25 +393,11 @@ else
 fi
 
 
-#############################################################################
-##########  ATTEMPTING TO CREATE OUTPUT DIR AND EXITING IF FAILS  ###########
-#############################################################################
-
-mkdir $output_dir 2> /dev/null
-
-if [ $? -ne 0 ] ; then
-  printf "\n${RED}  Output directory \"${output_dir}\" already exists, rename or specify a new one.${NC}\n\n"
-  printf "Exiting for now.\n\n"
-  rm -rf uniq_hmm_names.tmp
-  exit
-fi
-
-
 
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ]; then
+if [ $output_dir != "GToTree" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain"]; then
 
   if [ "$file_to_genome_id_map" != "" ]; then
     if [ ! -s $file_to_genome_id_map ]; then
@@ -358,7 +420,12 @@ if [ $output_dir != "GToTree" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxo
 
 
   if [ $taxonkit_id_swap != "false" ]; then
-    printf "      - Taxonkit will be used to add lineage info to headers.\n"
+    printf "      - Taxonkit will be used to add lineage info to labels.\n"
+  fi
+
+  if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
+    lineage_mod_report=$(echo $lineage_spec | sed 's/,/, /g')
+    printf "      - Lineage information added to labels will be $lineage_mod_report.\n"
   fi
 
   if [ $len_cutoff != "0.2" ]; then
@@ -386,7 +453,34 @@ fi
 
 printf "\n"
 
-sleep 3
+sleep 3.5
+
+
+#############################################################################
+######  ADDING NOTICE ABOUT FILTERING BY GENE-LENGTH WITH FEW GENOMES  ######
+#############################################################################
+if [ $total_input_genomes -le 20 ]; then
+    printf "\n  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}  \n"
+    printf "    Filtering by gene-length using the median length of a gene set (set with\n"
+    printf "    the \"-c\" flag) becomes less reliable with fewer genomes. With $total_input_genomes total\n"
+    printf "    input genomes, if a lot of sequences are dropped, consider increasing\n"
+    printf "    the parameter and/or visually inspecting some alignments.\n\n" 
+    printf "    More info can be found here:\n" 
+    printf "      github.com/AstrobioMike/GToTree/wiki/Considerations-when-running\n\n"
+
+    printf "\t        Moving forward with \"-c\" set to $len_cutoff this run.\n"
+
+    printf "  ${RED}****************************************************************************${NC}  \n\n"
+    
+    ## if i want this as manual input... 
+    ## for now just warning and moving on so this stays fully automated once started
+#     read -n 1 -s -p "      Press any key to continue with \"-c\" set to $len_cutoff for this run, or
+#       press \"CTRL+C\" to cancel and exit.
+# "
+
+    # printf "\n\n\t          Moving forward with \"-c\" set to $len_cutoff this run.\n\n"
+    sleep 3
+fi
 
 
 #############################################################################
@@ -448,14 +542,14 @@ mv uniq_hmm_names.tmp ${tmp_dir}/uniq_hmm_names.tmp
 # starting an all genomes file to keep track of those from all sources
 touch ${tmp_dir}/genomes_from_all_sources.tmp
 
+# remaking output directory now that things are a go
+mkdir $output_dir 2> /dev/null
 
 #############################################################################
 ########################  KEEPING TRACK OF RUN TIME  ########################
 #############################################################################
 start_time=$(date +"%I:%M %p")
 SECONDS=0
-
-
 
 
 #############################################################################
@@ -465,7 +559,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
 
   printf "\n ############################################################################## \n"
-  printf " ####          Starting on the genomes provided as NCBI accessions         ####\n"
+  printf " ####          Working on the genomes provided as NCBI accessions          ####\n"
   printf " ############################################################################## \n\n"
 
   # storing sorted ncbi accession file
@@ -624,7 +718,7 @@ fi
 if [ -n "$genbank_list_file" ]; then
 
   printf "\n ############################################################################## \n"
-  printf " ####          Starting on the genomes provided as GenBank files           ####\n"
+  printf " ####           Working on the genomes provided as GenBank files           ####\n"
   printf " ############################################################################## \n\n"
 
   curr_time=$(date +"%I:%M %p")
@@ -672,7 +766,7 @@ fi
 if [ -n "$fasta_files" ]; then
 
   printf "\n ############################################################################## \n"
-  printf " ####           Starting on the genomes provided as fasta files            ####\n"
+  printf " ####            Working on the genomes provided as fasta files            ####\n"
   printf " ############################################################################## \n\n"
 
   curr_time=$(date +"%I:%M %p")
@@ -1050,7 +1144,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
       ## getting desired new ids for these
       for id in $(cat ${tmp_dir}/non_ncbi_old_ids_to_swap.tmp)
       do
-        grep -m1 $"id" $file_to_genome_id_map
+        grep -m1 "$id" $file_to_genome_id_map
       done | cut -f 2 | tr " " "_" > ${tmp_dir}/non_ncbi_new_ids.tmp
 
       paste ${tmp_dir}/non_ncbi_old_ids_to_swap.tmp ${tmp_dir}/non_ncbi_new_ids.tmp > ${tmp_dir}/non_ncbi_id_swap_map.tmp
@@ -1092,49 +1186,100 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
     do
       grep -w -m1 "$id" ${output_dir}/All_genomes_summary_info.tsv
-    done | cut -f 1,6,7,8,12 | tr "\t" "_" | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]" > ${tmp_dir}/new_ids_for_taxonkit_swap.tmp
+    done | cut -f 1,6-12 > ${tmp_dir}/working_taxonkit_lineages.tmp
+
+    ## builing new taxonkit-swapped labels based upon desired ranks (provided by -L flag)
+    cut -f1 ${tmp_dir}/working_taxonkit_lineages.tmp > ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
+    echo $lineage_spec | tr "," "\n" > ${tmp_dir}/wanted_ranks.tmp
+
+    if grep -q "Domain" ${tmp_dir}/wanted_ranks.tmp; then
+      paste -d "_" ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp <(cut -f 2 ${tmp_dir}/working_taxonkit_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp
+      mv ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
+    fi
+
+    if grep -q "Phylum" ${tmp_dir}/wanted_ranks.tmp; then
+      paste -d "_" ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp <(cut -f 3 ${tmp_dir}/working_taxonkit_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp
+      mv ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
+    fi
+
+    if grep -q "Class" ${tmp_dir}/wanted_ranks.tmp; then
+      paste -d "_" ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp <(cut -f 4 ${tmp_dir}/working_taxonkit_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp
+      mv ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
+    fi
+
+    if grep -q "Order" ${tmp_dir}/wanted_ranks.tmp; then
+      paste -d "_" ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp <(cut -f 5 ${tmp_dir}/working_taxonkit_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp
+      mv ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
+    fi
+
+    if grep -q "Family" ${tmp_dir}/wanted_ranks.tmp; then
+      paste -d "_" ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp <(cut -f 6 ${tmp_dir}/working_taxonkit_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp
+      mv ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
+    fi
+
+    if grep -q "Genus" ${tmp_dir}/wanted_ranks.tmp; then
+      paste -d "_" ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp <(cut -f 7 ${tmp_dir}/working_taxonkit_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp
+      mv ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
+    fi
+
+    if grep -q "Species" ${tmp_dir}/wanted_ranks.tmp; then
+      paste -d "_" ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp <(cut -f 8 ${tmp_dir}/working_taxonkit_lineages.tmp | tr "." "_" | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp
+      mv ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
+    fi
+
+    mv ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp ${tmp_dir}/new_ids_for_taxonkit_swap.tmp
 
     ## making map for IDs changed with taxonkit
     paste ${tmp_dir}/ids_for_taxonkit_swap.tmp ${tmp_dir}/new_ids_for_taxonkit_swap.tmp > ${tmp_dir}/taxonkit_id_swap_map.tmp
 
-
-    #### adding on infraspecific names if they exist in the assembly report file pulled by accession
+    #### adding on infraspecific names if they exist in the assembly report file pulled by accession if Strain-level ranks desired (specified in -L flag)
+    if grep -q "Strain" ${tmp_dir}/wanted_ranks.tmp; then
     # these only exist if NCBI accessions were given, so using the ${output_dir}/NCBI_genomes_summary_info.tsv file
-    if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then 
 
-      for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
-      do
-        grep -m1 -w "$id" ${output_dir}/NCBI_genomes_summary_info.tsv
-      done > ${tmp_dir}/ncbi_genomes_summary_subset_for_id_change.tmp
+      if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then 
 
-      # getting the ids and strains of those that have infraspecific names
-      grep "strain=" ${tmp_dir}/ncbi_genomes_summary_subset_for_id_change.tmp | cut -f 1,6 | sort -k 1,1 > ${tmp_dir}/strain_info_tab.tmp
-      cut -f1 ${tmp_dir}/strain_info_tab.tmp > ${tmp_dir}/sorted_ids_with_strain_info.tmp
-      cut -f2 ${tmp_dir}/strain_info_tab.tmp | sed 's/strain=//' | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]" > ${tmp_dir}/sorted_strain_info.tmp
+        for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
+        do
+          grep -m1 -w "$id" ${output_dir}/NCBI_genomes_summary_info.tsv
+        done > ${tmp_dir}/ncbi_genomes_summary_subset_for_id_change.tmp
 
-      # finding which IDs don't get this change, so can to separated them
-      comm -23 ${tmp_dir}/ids_for_taxonkit_swap.tmp ${tmp_dir}/sorted_ids_with_strain_info.tmp > ${tmp_dir}/taxonkit_ids_to_not_change.tmp
-      # pulling out the ones we're not changing only, to start a new file
-      for i in $(cat ${tmp_dir}/taxonkit_ids_to_not_change.tmp)
-      do
-        grep -w -m1 "$i" ${tmp_dir}/taxonkit_id_swap_map.tmp
-      done > ${tmp_dir}/building_final_taxonkit_id_swap_map.tmp
+        # getting the ids and strains of those that have infraspecific names
+        grep "strain=" ${tmp_dir}/ncbi_genomes_summary_subset_for_id_change.tmp | cut -f 1,6 | sort -k 1,1 > ${tmp_dir}/strain_info_tab.tmp
+        cut -f1 ${tmp_dir}/strain_info_tab.tmp > ${tmp_dir}/sorted_ids_with_strain_info.tmp
+        cut -f2 ${tmp_dir}/strain_info_tab.tmp | sed 's/strain=//' | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]" > ${tmp_dir}/sorted_strain_info.tmp
 
-      # now pulling out only those we are adding to
-      for i in $(cat ${tmp_dir}/sorted_ids_with_strain_info.tmp)
-      do
-        grep -w -m1 "$i" ${tmp_dir}/taxonkit_id_swap_map.tmp
-      done > ${tmp_dir}/building_final_taxonkit_id_swap_map_to_paste_onto.tmp
+        # finding which IDs don't get this change, so can to separated them
+        comm -23 ${tmp_dir}/ids_for_taxonkit_swap.tmp ${tmp_dir}/sorted_ids_with_strain_info.tmp > ${tmp_dir}/taxonkit_ids_to_not_change.tmp
+        # pulling out the ones we're not changing only, to start a new file
+        for i in $(cat ${tmp_dir}/taxonkit_ids_to_not_change.tmp)
+        do
+          grep -w -m1 "$i" ${tmp_dir}/taxonkit_id_swap_map.tmp
+        done > ${tmp_dir}/building_final_taxonkit_id_swap_map.tmp
 
-      # now adding strain labels
-      paste -d "_" ${tmp_dir}/building_final_taxonkit_id_swap_map_to_paste_onto.tmp ${tmp_dir}/sorted_strain_info.tmp > ${tmp_dir}/building_final_taxonkit_id_swap_map2.tmp
+        # now pulling out only those we are adding to
+        for i in $(cat ${tmp_dir}/sorted_ids_with_strain_info.tmp)
+        do
+          grep -w -m1 "$i" ${tmp_dir}/taxonkit_id_swap_map.tmp
+        done > ${tmp_dir}/building_final_taxonkit_id_swap_map_to_paste_onto.tmp
 
-      cat ${tmp_dir}/building_final_taxonkit_id_swap_map.tmp ${tmp_dir}/building_final_taxonkit_id_swap_map2.tmp > ${tmp_dir}/final_taxonkit_id_swap_map.tmp
+        # now adding strain labels
+        paste -d "_" ${tmp_dir}/building_final_taxonkit_id_swap_map_to_paste_onto.tmp ${tmp_dir}/sorted_strain_info.tmp > ${tmp_dir}/building_final_taxonkit_id_swap_map2.tmp
+
+        cat ${tmp_dir}/building_final_taxonkit_id_swap_map.tmp ${tmp_dir}/building_final_taxonkit_id_swap_map2.tmp > ${tmp_dir}/final_taxonkit_id_swap_map.tmp
+      else
+        printf "     ${RED}*******************************${NC} NOTICE ${RED}*******************************${NC}  \n"
+        printf "\t  Strain-level info is only available for input genomes provided by NCBI accession. As there were\n"
+        printf "\t  none in this particular run, no strain-level info was added to the labels.\n"
+        printf "     ${RED}********************************************************************** ${NC}\n\n"
+        sleep 3
+        cp ${tmp_dir}/taxonkit_id_swap_map.tmp ${tmp_dir}/final_taxonkit_id_swap_map.tmp
+      fi
+
     else
       cp ${tmp_dir}/taxonkit_id_swap_map.tmp ${tmp_dir}/final_taxonkit_id_swap_map.tmp
     fi
 
-    ## pasting together and adding to the id_swap_map.tmp if other user-specified IDs were given
+    ## pasting together and adding to the id_swap_map.tmp if other user-specified IDs were given (with -m flag)
 
     if [ -f ${tmp_dir}/id_swap_map.tmp ]; then
       cat ${tmp_dir}/id_swap_map.tmp ${tmp_dir}/final_taxonkit_id_swap_map.tmp > ${tmp_dir}/full_id_swap_map.tmp
@@ -1220,21 +1365,26 @@ printf "########################################################################
 
 # genome report
 if [ $genomes_retained == $total_input_genomes ]; then
-  printf "            ${GREEN}All $total_input_genomes input genomes were retained through the workflow!${NC}\n\n\n"
+  printf "            ${GREEN}All $total_input_genomes input genomes were retained through the workflow!${NC}\n\n"
 else
-  printf "    Overall, $genomes_retained input genomes of the input $total_input_genomes were retained. (see notes below)\n\n\n"
+  printf "  Overall, $genomes_retained input genomes of the input $total_input_genomes were retained (see notes below).\n\n"
 fi
 
 # reporting primary output files
-printf "    Full alignment written to file \"${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\".\n\n"
+printf "    Full alignment written to file:\n"
+printf "        ${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\n\n"
 if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
-  printf "    Alignment with altered headers written to file \"${GREEN}${output_dir}/Aligned_SCGs_mod_names.faa${NC}\".\n\n"
-  printf "    Tree written to file \"${GREEN}${output_dir}/Aligned_SCGs_mod_names.tre${NC}\".\n\n"
+  printf "    Alignment with altered headers written to file:\n"
+  printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.faa${NC}\n\n"
+  printf "    Tree written to file:\n"
+  printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.tre${NC}\n\n"
 else
-  printf "    Tree written to file \"${GREEN}${output_dir}/Aligned_SCGs.tre${NC}\".\n\n"
+  printf "    Tree written to file:\n"
+  printf "        ${GREEN}${output_dir}/Aligned_SCGs.tre${NC}\n\n"
 fi
 
-printf "    Summary file with comp./redund. estimates written to file \"${GREEN}${output_dir}/All_genomes_summary_info.tsv${NC}\".\n\n"
+printf "    Summary file with comp./redund. estimates written to file:\n"
+printf "        ${GREEN}${output_dir}/All_genomes_summary_info.tsv${NC}\n\n"
 
 
 # reporting any problem files/accessions

@@ -1,1 +1,1 @@
-Alteromonas_MAG.fa
+GCA_002271865.1.fa

@@ -1,1 +1,1 @@
-GCF_000011365.1-alpha_outgroup.gbff
+GCF_000011365.1.gbff

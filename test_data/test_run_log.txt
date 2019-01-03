@@ -1,5 +1,5 @@
 ## test run if installed with conda quickstart method from here: https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart
-GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Universal_Hug_et_al.hmm -m genome_to_id_map.tsv -t -j 4
+GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Universal_Hug_et_al.hmm -m genome_to_id_map.tsv -t -j 4 -o GToTree_test
 
 ## clear out test-run files:
 gtt-clean-after-test.sh
