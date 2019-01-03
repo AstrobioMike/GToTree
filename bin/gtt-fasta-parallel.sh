@@ -51,18 +51,15 @@ taxid="NA"
 printf "$assembly\t$1\t$taxid\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Fasta_genomes_summary_info.tsv
 
 ### Pulling out hits for this genome ###
-    # this was faster with esl-sfetch, but can't figure out how to install that with conda and i don't think it's too bad without it
-    # but when i want to improve efficiency, this is a good place to start, it's a tad excessive at the moment
 # looping through ribosomal proteins and pulling out each first hit (hmm results tab is sorted by e-value):
-    
+esl-sfetch --index ${tmp_dir}/${assembly}_genes.tmp > /dev/null
+        
 for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
 do
-    grep -w -m1 "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " > ${tmp_dir}/${assembly}_${SCG}_curr_wanted_id.tmp
-    gtt-parse-fasta-by-headers -i ${tmp_dir}/${assembly}_genes.tmp -w ${tmp_dir}/${assembly}_${SCG}_curr_wanted_id.tmp -o ${tmp_dir}/${assembly}_${SCG}_hit.tmp
-    sed 's/\(.*\)_.*/\1/' ${tmp_dir}/${assembly}_${SCG}_hit.tmp >> ${tmp_dir}/${SCG}_hits.faa
+    grep -w "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " | esl-sfetch -f ${tmp_dir}/${assembly}_genes.tmp - | sed "s/>.*$/>$assembly/" | sed 's/^Usage.*$//' | sed 's/^To see.*$//' | sed '/^$/d' >> ${tmp_dir}/${SCG}_hits.faa
 done
 
-rm -rf ${tmp_dir}/${assembly}_*.tmp
+rm -rf ${tmp_dir}/${assembly}_*.tmp ${tmp_dir}/${assembly}_genes.tmp.ssi
 
 printf "    ${GREEN}$assembly${NC} finished.\n"
 printf "        Found $num_SCG_hits of the targeted $hmm_target_genes_total genes.\n\n"
