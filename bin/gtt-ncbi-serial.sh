@@ -5,12 +5,12 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-tmp_dir=$(cat temp_dir_name.tmp)
-hmm_file=$(cat hmm_file_path.tmp)
-NCBI_remaining_genomes_total=$(cat remaining_total_genomes.tmp)
-num_cpus=$(cat num_cpus.tmp)
-hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
-output_dir=$(cat output_dir_name.tmp)
+tmp_dir=$2
+hmm_file=$3
+NCBI_remaining_genomes_total=$4
+num_cpus=$5
+hmm_target_genes_total=$6
+output_dir=$7
 
 num=0
 
@@ -31,19 +31,19 @@ do
     end_path=$(basename $base_link)
 
     # attempting to download genes for assembly
-    curl --silent --retry 10 -o ${assembly}_genes2.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
+    curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genes2.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
-    if [ -s ${assembly}_genes2.tmp.gz ]; then
-        gunzip ${assembly}_genes2.tmp.gz
+    if [ -s ${tmp_dir}/${assembly}_genes2.tmp.gz ]; then
+        gunzip ${tmp_dir}/${assembly}_genes2.tmp.gz
         # renaming headers to avoid problems with odd characters and how hmmer parses and such
-        gtt-rename-fasta-headers -i ${assembly}_genes2.tmp -w $assembly -o ${assembly}_genes.tmp
+        gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
         
     else # trying to get assembly if there were no gene annotations available
-        curl --silent --retry 10 -o ${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
+        curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
       
-        if [ -s ${assembly}_genome.tmp.gz ]; then
+        if [ -s ${tmp_dir}/${assembly}_genome.tmp.gz ]; then
 
-            gunzip ${assembly}_genome.tmp.gz
+            gunzip ${tmp_dir}/${assembly}_genome.tmp.gz
 
             printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
             printf "\t  $assembly doesn't appear to have gene annotations.\n\n"
@@ -51,15 +51,15 @@ do
             printf "     ${RED}********************************************************************** ${NC}\n\n"
 
             printf "      Getting coding seqs...\n\n"
-            prodigal -c -q -i ${assembly}_genome.tmp -a ${assembly}_genes1.tmp > /dev/null
-            tr -d '*' < ${assembly}_genes1.tmp > ${assembly}_genes2.tmp
+            prodigal -c -q -i ${tmp_dir}/${assembly}_genome.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null
+            tr -d '*' < ${tmp_dir}/${assembly}_genes1.tmp > ${tmp_dir}/${assembly}_genes2.tmp
 
             ## renaming seqs to have assembly name
-            gtt-rename-fasta-headers -i ${assembly}_genes2.tmp -w $assembly -o ${assembly}_genes.tmp
+            gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
         fi
     fi
 
-    if [ -s ${assembly}_genes.tmp ]; then
+    if [ -s ${tmp_dir}/${assembly}_genes.tmp ]; then
 
         # storing more info about the assembly to write out into ncbi-derived-genome summary file (for each setting to NA if not found)
         ass_name="${curr_line[2]}"
@@ -78,19 +78,19 @@ do
         printf "      Performing HMM search...\n"
           
         ### running hmm search ###
-        hmmsearch --cut_ga --cpu $num_cpus --tblout ${assembly}_curr_hmm_hits.tmp $hmm_file ${assembly}_genes.tmp > /dev/null
+        hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp $hmm_file ${tmp_dir}/${assembly}_genes.tmp > /dev/null
 
         ### calculating % completion and redundancy ###
         for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
         do
-            grep -w -c "$SCG" ${assembly}_curr_hmm_hits.tmp
-        done > ${assembly}_uniq_counts.tmp
+            grep -w -c "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp
+        done > ${tmp_dir}/${assembly}_uniq_counts.tmp
 
-        num_SCG_hits=$(awk ' $1 > 0 ' ${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
+        num_SCG_hits=$(awk ' $1 > 0 ' ${tmp_dir}/${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
 
         printf "        Found $num_SCG_hits of the targeted $hmm_target_genes_total SCGs.\n\n"
 
-        num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' ${assembly}_uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
+        num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' ${tmp_dir}/${assembly}_uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
 
         perc_comp=$(echo "$num_SCG_hits / $hmm_target_genes_total * 100" | bc -l)
         perc_comp_rnd=$(printf "%.2f\n" $perc_comp)
@@ -107,19 +107,19 @@ do
         
         for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
         do
-            grep -w -m1 "$SCG" ${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " > ${assembly}_${SCG}_curr_wanted_id.tmp
-            gtt-parse-fasta-by-headers -i ${assembly}_genes.tmp -w ${assembly}_${SCG}_curr_wanted_id.tmp -o ${assembly}_${SCG}_hit.tmp
-            sed 's/\(.*\)_.*/\1/' ${assembly}_${SCG}_hit.tmp >> ${tmp_dir}/${SCG}_hits.faa
+            grep -w -m1 "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " > ${tmp_dir}/${assembly}_${SCG}_curr_wanted_id.tmp
+            gtt-parse-fasta-by-headers -i ${tmp_dir}/${assembly}_genes.tmp -w ${tmp_dir}/${assembly}_${SCG}_curr_wanted_id.tmp -o ${tmp_dir}/${assembly}_${SCG}_hit.tmp
+            sed 's/\(.*\)_.*/\1/' ${tmp_dir}/${assembly}_${SCG}_hit.tmp >> ${tmp_dir}/${SCG}_hits.faa
         done
 
-        rm -rf ${assembly}_*.tmp
+        rm -rf ${tmp_dir}/${assembly}_*.tmp
 
     else
         printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
         printf "\t  $assembly's genes nor genome downloaded properly :(\n\n"
         printf "\t    Reported in \"${output_dir}/NCBI_accessions_not_downloaded.txt\"\n"
         printf "     ${RED}************************************************************************ ${NC}\n"
-        rm -rf ${assembly}_report1.tmp ${assembly}_genes.tmp.gz
+        rm -rf ${tmp_dir}/${assembly}_report1.tmp ${tmp_dir}/${assembly}_genes.tmp.gz
         sleep 3
         echo $assembly >> ${output_dir}/NCBI_accessions_not_downloaded.txt
 

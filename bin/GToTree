@@ -314,7 +314,7 @@ if [ "$genbank_list_file" != "" ];then
     for file in $(cat $genbank_list_file)
     do
       if [ ! -s $file ]; then
-        printf "\n${RED}      The files specified in $genbank_list_file cannot be found :(${NC}\n\n"
+        printf "\n${RED}      Some fasta files specified in $genbank_list_file cannot be found :(${NC}\n\n"
         printf "  Double-check the provided locations and where they should be, here's one of the problems:\n"
         printf "            $file\n"
         printf "\nExiting for now.\n\n"
@@ -486,8 +486,7 @@ fi
 #############################################################################
 ###############  CREATE A TEMP DIRECTORY AND EXITING IF FAILS  ##############
 #############################################################################
-tmp_dir=$(date +%s)
-tmp_dir=${tmp_dir}.gtotree.tmpdir
+tmp_dir=$(date +%s).gtotree.tmpdir
 
 mkdir $tmp_dir 2> /dev/null
 
@@ -522,7 +521,7 @@ if [ "$file_to_genome_id_map" != "" ]; then
   if [ -s ${tmp_dir}/spurious_ids.tmp ]; then
     spurious_ids_count=$(wc -l ${tmp_dir}/spurious_ids.tmp | sed "s/^ *//" | cut -d " " -f 1)
     mv ${tmp_dir}/spurious_ids.tmp Missing_IDs.txt
-    rm -rf $tmp_dir
+    rm -rf $tmp_dir uniq_hmm_names.tmp
 
     printf "\n${RED}  $spurious_ids_count genome ID(s) listed in the mapping file (passed to \"-m\") not found in${NC}\n"
     printf "  ${RED}any of the input genomes :(${NC}\n\n"
@@ -535,6 +534,9 @@ fi
     #### add in check that all provided in here are in the inputs... or 
     #### maybe put that down later when doing this and just write out the ones not found
 
+# remaking output directory now that things are a go
+mkdir $output_dir 2> /dev/null
+
 
 # moving uniq_hmm_names.tmp into temp directory now that all is well
 mv uniq_hmm_names.tmp ${tmp_dir}/uniq_hmm_names.tmp
@@ -542,8 +544,7 @@ mv uniq_hmm_names.tmp ${tmp_dir}/uniq_hmm_names.tmp
 # starting an all genomes file to keep track of those from all sources
 touch ${tmp_dir}/genomes_from_all_sources.tmp
 
-# remaking output directory now that things are a go
-mkdir $output_dir 2> /dev/null
+
 
 #############################################################################
 ########################  KEEPING TRACK OF RUN TIME  ########################
@@ -597,14 +598,32 @@ if [ -n "$NCBI_acc_file" ]; then
 
   if grep -q "^GCA" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
       printf "\t\t  Downloading GenBank assembly summaries...\n\n"
-      curl --connect-timeout 10 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp
+      curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
   fi
+
+  # making sure file downloaded with no errors
+  if [ -s capture_any_dl_errors.tmp ]; then
+    printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is your internet connection weak?\n\nExiting for now.\n\n"
+    rm -rf ${tmp_dir} ${output_dir} capture_any_dl_errors.tmp
+    exit
+  else
+    rm -rf capture_any_dl_errors.tmp
+  fi 
 
   if grep -q "^GCF" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
       printf "\n\t\t  Downloading RefSeq assembly summaries...\n\n"
-      curl --connect-timeout 10 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp
+      curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
       cat ${tmp_dir}/ncbi_RS_assembly_info.tmp >> ${tmp_dir}/ncbi_assembly_info.tmp
   fi
+
+    # making sure file downloaded with no errors
+  if [ -s capture_any_dl_errors.tmp ]; then
+    printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is your internet connection weak?\n\nExiting for now.\n\n"
+    rm -rf ${tmp_dir} ${output_dir} capture_any_dl_errors.tmp
+    exit
+  else
+    rm -rf capture_any_dl_errors.tmp
+  fi 
 
   ## searching assembly info table for the input accessions (NOTE: will always return latest accession version as of now)
   # to keep track of what was searched and what was downloaded, both are included in the output summary table
@@ -643,19 +662,11 @@ if [ -n "$NCBI_acc_file" ]; then
   # creating the ncbi-derived-genome output table file which will have the following as its header:
   printf "input_accession\tdownloaded_accession\tassembly_name\ttaxid\torganism_name\tinfraspecific_name\tversion_status\tassembly_level\tuniq_SCG_hits\tperc_comp\tperc_redund\n" > ${output_dir}/NCBI_genomes_summary_info.tsv
 
-  # writing out variables needed for external scripts because i don't know how to send them properly
-  echo $tmp_dir > temp_dir_name.tmp
-  echo $hmm_file > hmm_file_path.tmp
-  echo $NCBI_remaining_genomes_total > remaining_total_genomes.tmp
-  echo $num_cpus > num_cpus.tmp
-  echo $hmm_target_genes_total > hmm_target_genes_total.tmp
-  echo $output_dir > output_dir_name.tmp
-
   ### running in parallel if set, otherwise running in serial ###
   if [ $num_jobs == "1" ]; then
-    gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp
+    gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir
   else
-    cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh
+    cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir
   fi
 
   printf "\n________________________________________________________________________________\n\n\n"
@@ -733,19 +744,11 @@ if [ -n "$genbank_list_file" ]; then
   # creating the genbank-genome-derived output table which will have the following as its header:
   printf "assembly_name\toriginal_file_name\ttaxid\torganism_name\tuniq_SCG_hits\tperc_comp\tperc_redund\n" > ${output_dir}/Genbank_genomes_summary_info.tsv
 
-  # writing out variables needed for script because i don't know how to send them properly
-  echo $tmp_dir > temp_dir_name.tmp
-  echo $hmm_file > hmm_file_path.tmp
-  echo $genbank_genomes_total > genbank_genomes_total.tmp
-  echo $num_cpus > num_cpus.tmp
-  echo $hmm_target_genes_total > hmm_target_genes_total.tmp
-  echo $output_dir > output_dir_name.tmp
-
   ### running in parallel if set, otherwise running in serial ###
   if [ $num_jobs == "1" ]; then
-    gtt-genbank-serial.sh $genbank_list_file
+    gtt-genbank-serial.sh $genbank_list_file $tmp_dir $hmm_file $genbank_genomes_total $num_cpus $hmm_target_genes_total $output_dir
   else
-    cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh
+    cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir
   fi
 
   mv ${tmp_dir}/genbank_genomes_list.tmp ${tmp_dir}/final_included_genbank_genomes.tmp
@@ -782,19 +785,11 @@ if [ -n "$fasta_files" ]; then
   printf "Assembly_name\tOriginal_file_name\ttaxid\tuniq_SCG_hits\tperc_comp\tperc_redund\n" > ${output_dir}/Fasta_genomes_summary_info.tsv
 
 
-  # writing out variables needed for script because i don't know how to send them properly
-  echo $tmp_dir > temp_dir_name.tmp
-  echo $hmm_file > hmm_file_path.tmp
-  echo $fasta_genomes_total > fasta_genomes_total.tmp
-  echo $num_cpus > num_cpus.tmp
-  echo $hmm_target_genes_total > hmm_target_genes_total.tmp
-  echo $output_dir > output_dir_name.tmp
-
   ### running in parallel if set, otherwise running in serial ###
   if [ $num_jobs == "1" ]; then
-    gtt-fasta-serial.sh $fasta_files
+    gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir
   else
-    cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh
+    cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir
   fi
 
   # adding retained genomes to genomes from all sources file
@@ -855,9 +850,9 @@ if [ $num_jobs == "1" ]; then
     printf "   --------------------------------------------------------------------------   \n"
     printf "\n    Filtering ${GREEN}$SCG${NC} sequences by length...\n"
 
-    gtt-count-bases-per-seq -i ${tmp_dir}/${SCG}_hits.faa -o Num_bps.tmp
-    cut -f2 Num_bps.tmp > lengths.tmp
-    median=$(gtt-get-median.sh lengths.tmp)
+    gtt-count-bases-per-seq -i ${tmp_dir}/${SCG}_hits.faa -o ${tmp_dir}/Num_bps.tmp
+    cut -f2 ${tmp_dir}/Num_bps.tmp > ${tmp_dir}/lengths.tmp
+    median=$(gtt-get-median.sh ${tmp_dir}/lengths.tmp)
     buff=$(echo "$median * $len_cutoff" | bc)
     min_len=$(echo "$median - $buff" | bc)
     min_len_rnd=$(printf "%.0f\n" $min_len)
@@ -866,16 +861,10 @@ if [ $num_jobs == "1" ]; then
 
     gtt-filter-seqs-by-length -i ${tmp_dir}/${SCG}_hits.faa -m $min_len_rnd -M $max_len_rnd -o ${tmp_dir}/${SCG}_hits_filtered.tmp
 
-    rm Num_bps.tmp lengths.tmp
-
   done
 
 else
-  # writing out variables needed for script because i don't know how to send them properly
-  echo $tmp_dir > temp_dir_name.tmp
-  echo $len_cutoff > len_cutoff.tmp
-
-  cat ${tmp_dir}/updated_genes_list.tmp | parallel -j $num_jobs gtt-filter-parallel.sh
+  cat ${tmp_dir}/updated_genes_list.tmp | parallel -j $num_jobs gtt-filter-parallel.sh {} $tmp_dir $len_cutoff
 fi
 
 
@@ -1046,9 +1035,8 @@ if [ $num_jobs == "1" ]; then
 
 else
   # writing out variables needed for script because i don't know how to send them properly
-  echo $tmp_dir > temp_dir_name.tmp
   
-  cat ${tmp_dir}/final_genes_list.tmp | parallel -j $num_jobs gtt-align-and-trim-parallel.sh
+  cat ${tmp_dir}/final_genes_list.tmp | parallel -j $num_jobs gtt-align-and-trim-parallel.sh {} $tmp_dir
 fi
 
 printf "\n\n\n________________________________________________________________________________\n\n\n"

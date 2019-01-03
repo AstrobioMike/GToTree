@@ -1,1 +1,1 @@
-rm -rf *.tmp *tmpdir *.gz GToTree_test/
+rm -rf *gtotree.tmpdir GToTree_test/

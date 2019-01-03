@@ -5,12 +5,12 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-tmp_dir=$(cat temp_dir_name.tmp)
-hmm_file=$(cat hmm_file_path.tmp)
-genbank_genomes_total=$(cat genbank_genomes_total.tmp)
-num_cpus=$(cat num_cpus.tmp)
-hmm_target_genes_total=$(cat hmm_target_genes_total.tmp)
-output_dir=$(cat output_dir_name.tmp)
+tmp_dir=$2
+hmm_file=$3
+genbank_genomes_total=$4
+num_cpus=$5
+hmm_target_genes_total=$6
+output_dir=$7
 
 num=0
 
@@ -47,10 +47,10 @@ do
     fi
 
     # extracting AA coding sequences from genbank file
-    gtt-genbank-to-AA-seqs -i $file -o ${assembly}_genes2.tmp
+    gtt-genbank-to-AA-seqs -i $file -o ${tmp_dir}/${assembly}_genes2.tmp
 
     # checking that the file had CDS annotations, if not running prodigal
-    if [ ! -s ${assembly}_genes2.tmp ]; then
+    if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
 
         printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
         printf "\t  This genbank file doesn't appear to have CDS annotations, so we\n"
@@ -60,39 +60,39 @@ do
         printf "     ${RED}**********************************************************************${NC}  \n\n"
 
         echo "$file" >> ${output_dir}/Genbank_files_with_no_CDSs.txt
-        rm -rf ${assembly}_genes2.tmp
+        rm -rf ${tmp_dir}/${assembly}_genes2.tmp
 
         # pulling out full nucleotide fasta from genbank file
-        gtt-genbank-to-fasta -i $file -o ${assembly}_fasta.tmp
+        gtt-genbank-to-fasta -i $file -o ${tmp_dir}/${assembly}_fasta.tmp
 
         printf "      Getting coding seqs...\n\n"
 
         # running prodigal
-        prodigal -c -q -i ${assembly}_fasta.tmp -a ${assembly}_genes1.tmp > /dev/null
-        tr -d '*' < ${assembly}_genes1.tmp > ${assembly}_genes2.tmp
+        prodigal -c -q -i ${tmp_dir}/${assembly}_fasta.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null
+        tr -d '*' < ${tmp_dir}/${assembly}_genes1.tmp > ${tmp_dir}/${assembly}_genes2.tmp
 
     fi
 
     ## renaming seqs to have assembly name
-    gtt-rename-fasta-headers -i ${assembly}_genes2.tmp -w $assembly -o ${assembly}_genes.tmp
+    gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
 
 
     printf "      Performing HMM search...\n"
       
     ### running hmm search ###
-    hmmsearch --cut_ga --cpu $num_cpus --tblout ${assembly}_curr_hmm_hits.tmp $hmm_file ${assembly}_genes.tmp > /dev/null
+    hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp $hmm_file ${tmp_dir}/${assembly}_genes.tmp > /dev/null
 
     ### calculating % completion and redundancy ###
     for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
     do
-        grep -w -c "$SCG" ${assembly}_curr_hmm_hits.tmp
-    done > ${assembly}_uniq_counts.tmp
+        grep -w -c "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp
+    done > ${tmp_dir}/${assembly}_uniq_counts.tmp
 
-    num_SCG_hits=$(awk ' $1 > 0 ' ${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
+    num_SCG_hits=$(awk ' $1 > 0 ' ${tmp_dir}/${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
   
     printf "        Found $num_SCG_hits of the targeted $hmm_target_genes_total.\n\n"
 
-    num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' ${assembly}_uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
+    num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' ${tmp_dir}/${assembly}_uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
 
     perc_comp=$(echo "$num_SCG_hits / $hmm_target_genes_total * 100" | bc -l)
     perc_comp_rnd=$(printf "%.2f\n" $perc_comp)
@@ -109,11 +109,11 @@ do
         
     for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
     do
-        grep -w -m1 "$SCG" ${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " > ${assembly}_${SCG}_curr_wanted_id.tmp
-        gtt-parse-fasta-by-headers -i ${assembly}_genes.tmp -w ${assembly}_${SCG}_curr_wanted_id.tmp -o ${assembly}_${SCG}_hit.tmp
-        sed 's/\(.*\)_.*/\1/' ${assembly}_${SCG}_hit.tmp >> ${tmp_dir}/${SCG}_hits.faa
+        grep -w -m1 "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " > ${tmp_dir}/${assembly}_${SCG}_curr_wanted_id.tmp
+        gtt-parse-fasta-by-headers -i ${tmp_dir}/${assembly}_genes.tmp -w ${tmp_dir}/${assembly}_${SCG}_curr_wanted_id.tmp -o ${tmp_dir}/${assembly}_${SCG}_hit.tmp
+        sed 's/\(.*\)_.*/\1/' ${tmp_dir}/${assembly}_${SCG}_hit.tmp >> ${tmp_dir}/${SCG}_hits.faa
     done
 
-    rm -rf ${assembly}_*.tmp
+    rm -rf ${tmp_dir}/${assembly}_*.tmp
 
 done < $1

@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-tmp_dir=$(cat temp_dir_name.tmp)
+tmp_dir=$2
 
 # removing those genomes that need to be removed based on not having enough hits to the target genes
 gtt-parse-fasta-by-headers -i ${tmp_dir}/${1}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${1}_hits_filtered.faa --inverse
