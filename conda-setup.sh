@@ -48,4 +48,7 @@ cd ../
 # re-activating environment so variable and PATH changes take effect
 source activate gtotree
 
+## removing citation notifications from `parallel` (i note on all places it is mentioned to please cite them and all tools in here)
+printf "will cite" | parallel --citation 2> /dev/null
+
 printf "\n        ${GREEN}DONE!${NC}\n\n"
