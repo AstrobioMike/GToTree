@@ -36,17 +36,18 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "        - [-o <str>] default: GToTree_output\n"
   printf "                  Specify the desired output directory.\n\n"
 
-  printf "        - [-m <file>] specify desired genome IDs of input genomes\n"
-  printf "                  A two-column tab-delimited file where column 1 holds either the\n"
-  printf "                  file name or the NCBI accession of the genome to name (depending\n"
-  printf "                  on the input source), and column 2 holds the desired new genome ID.\n"
-  printf "                  (does not need to specify all input genomes)\n\n"
+  printf "        - [-m <file>] specify desired genome labels\n"
+  printf "                  A two- or three-column tab-delimited file where column 1 holds either\n"
+  printf "                  the file name or NCBI accession of the genome to name (depending\n"
+  printf "                  on the input source), column 2 holds the desired new genome label,\n"
+  printf "                  and column 3 holds something to be appended to either initial or\n"
+  printf "                  modified labels (e.g. useful for \"tagging\" genomes in the tree based\n"
+  printf "                  on some characteristic). Columns 2 or 3 can be empty, and the file does\n"
+  printf "                  not need to include all input genomes.\n\n"
 
   printf "        - [-t ] default: false\n"
   printf "                  Provide this flag with no arguments if you'd like to add lineage\n"
-  printf "                  info to the sequence headers for any genomes with NCBI taxids.\n"
-  printf "                  (requires Taxonkit)\n\n"
-
+  printf "                  info to the sequence headers for any genomes with NCBI taxids.\n\n"
 
   printf "        - [-L <str>] default: Domain,Phylum,Class,Species,Strain\n"
   printf "                  A comma-separated list of the taxonomic ranks you'd like added to\n"
@@ -76,7 +77,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "                  The number of jobs you'd like to run in parallel during steps\n"
   printf "                  that are parallelizable. (requires GNU parallel)\n\n"
 
-  printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Bacteria.hmm -t\n\n"
+  printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Bacteria.hmm -t -j 4\n\n"
 
   exit
 fi
