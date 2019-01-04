@@ -5,14 +5,13 @@
 <br>
 <br>
 
-<a href="https://zenodo.org/badge/latestdoi/161007784"><img align="right" src="https://zenodo.org/badge/161007784.svg" alt="DOI"></a>
+<a href="https://zenodo.org/badge/latestdoi/161007784"><img align="right" src="https://zenodo.org/badge/161007784.svg" alt="DOI"></a>  
+<br>
 
 ---
 
 # GToTree: a user-friendly workflow for phylogenomics
 [GToTree](https://github.com/AstrobioMike/GToTree.wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. 
-
-<br>
 
 ---
 
