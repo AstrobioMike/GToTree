@@ -1,4 +1,4 @@
----
+
 <img align="right" width="400" src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-logo-1200px.png">  
 
 <br>
@@ -9,6 +9,8 @@
 
 # GToTree: a user-friendly workflow for phylogenomics
 [GToTree](https://github.com/AstrobioMike/GToTree.wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. 
+
+---
 
 **See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to have things up and running in just a couple steps!**
 
@@ -23,6 +25,7 @@ GToTree utilizes helper scripts written in python, but is primarily implemented 
 ---
 
 **See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to get GToTree up and running in just a couple steps!**
+
 ---
 
 ## Dependencies (the conda installation takes care of all of these)
