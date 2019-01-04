@@ -415,7 +415,7 @@ if [ $output_dir != "GToTree" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxo
 
 
   if [ "$file_to_genome_id_map" != "" ]; then
-    printf "      - The file $file_to_genome_id_map will be used to label the specified genomes.\n"
+    printf "      - The file $file_to_genome_id_map will be used to modify labels of the specified genomes.\n"
   fi
 
 
@@ -1103,8 +1103,13 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
 
   ## building id swap file starting with user-provided Genome-to-ID mapping file if given
   if [ -n "$file_to_genome_id_map" ]; then
+
+    ## first splitting file to just get those that have specific labels to swap (will handle the appending at end)
+    awk ' BEGIN { FS=OFS="\t" } $2 != "" { print $1,$2 } ' $file_to_genome_id_map > ${tmp_dir}/base_label_swap.tmp
+    awk ' BEGIN { FS=OFS="\t" } $3 != "" { print $1,$3 } ' $file_to_genome_id_map > ${tmp_dir}/base_labels_need_append.tmp
+
     ## making sorted list of targets to change
-    cut -f1 $file_to_genome_id_map | sort > ${tmp_dir}/sorted_target_ids_to_change.tmp
+    cut -f1 ${tmp_dir}/base_label_swap.tmp | sort > ${tmp_dir}/sorted_target_ids_to_change.tmp
 
     ## separating out which ones are ncbi accessions (because the others need to have their extensions removed)
 
@@ -1112,7 +1117,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
 
       for acc in $(cut -f1 ${output_dir}/NCBI_genomes_summary_info.tsv | tail -n +2)
       do
-        grep -w -m1 "$acc" $file_to_genome_id_map
+        grep -w -m1 "$acc" ${tmp_dir}/base_label_swap.tmp
       done | tr " " "_" | tee ${tmp_dir}/ncbi_id_swap_map.tmp | cut -f 1 | sort > ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp  
 
       ## getting which are not ncbi accessions
@@ -1132,7 +1137,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
       ## getting desired new ids for these
       for id in $(cat ${tmp_dir}/non_ncbi_old_ids_to_swap.tmp)
       do
-        grep -m1 "$id" $file_to_genome_id_map
+        grep -m1 "$id" ${tmp_dir}/base_label_swap.tmp
       done | cut -f 2 | tr " " "_" > ${tmp_dir}/non_ncbi_new_ids.tmp
 
       paste ${tmp_dir}/non_ncbi_old_ids_to_swap.tmp ${tmp_dir}/non_ncbi_new_ids.tmp > ${tmp_dir}/non_ncbi_id_swap_map.tmp
@@ -1280,8 +1285,38 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     cp ${tmp_dir}/id_swap_map.tmp ${tmp_dir}/full_id_swap_map.tmp
   fi
 
+  ## if some need appending, then appending here
+  if [ -s ${tmp_dir}/base_labels_need_append.tmp ]; then
+    # getting ids that need appending:
+    sort -k 1 ${tmp_dir}/base_labels_need_append.tmp | tee ${tmp_dir}/sorted_base_labels_need_append.tmp | cut -f 1 > ${tmp_dir}/sorted_base_ids_need_append.tmp
+    # getting those that don't need appending, so can separate:
+    comm -23 <(cut -f 1 ${tmp_dir}/full_id_swap_map.tmp | sort) ${tmp_dir}/sorted_base_ids_need_append.tmp | sort > ${tmp_dir}/sorted_base_ids_no_append.tmp
+
+    # making final swap table of those that don't need appending:
+    for non_append_label in $(cat ${tmp_dir}/sorted_base_ids_no_append.tmp)
+    do
+      grep -m1 -w "^$non_append_label" ${tmp_dir}/full_id_swap_map.tmp
+    done > ${tmp_dir}/p1_final_id_swap_map.tmp
+
+    # getting swap table for those that do need appending:
+    for append_label in $(cat ${tmp_dir}/sorted_base_ids_need_append.tmp)
+    do
+      grep -m1 -w "^$append_label" ${tmp_dir}/full_id_swap_map.tmp
+    done > ${tmp_dir}/p2a_final_id_swap_map.tmp
+
+    # appending labels
+    paste -d "_" ${tmp_dir}/p2a_final_id_swap_map.tmp <(cut -f2 ${tmp_dir}/sorted_base_labels_need_append.tmp) > ${tmp_dir}/p2_final_id_swap_map.tmp
+
+    # sticking together for final label swap:
+    cat ${tmp_dir}/p1_final_id_swap_map.tmp ${tmp_dir}/p2_final_id_swap_map.tmp > ${tmp_dir}/final_id_swap_map.tmp
+
+  else
+    # updating file if not changed
+    mv ${tmp_dir}/full_id_swap_map.tmp ${tmp_dir}/final_id_swap_map.tmp
+  fi
+
   ### now swapping ids 
-  gtt-swap-ids -i ${tmp_dir}/aligned_SCGs_mod_names.tmp -s ${tmp_dir}/full_id_swap_map.tmp -o ${output_dir}/Aligned_SCGs_mod_names.faa
+  gtt-swap-ids -i ${tmp_dir}/aligned_SCGs_mod_names.tmp -s ${tmp_dir}/final_id_swap_map.tmp -o ${output_dir}/Aligned_SCGs_mod_names.faa
 
   ### adding new ids to summary table as column "label"
   # first pulling out and adding to those that were changed
