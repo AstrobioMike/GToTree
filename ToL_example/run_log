@@ -2,4 +2,4 @@
 esearch -query '"latest refseq"[filter] AND "complete genome"[filter] AND "representative genome"[filter] AND all[filter] NOT anomalous[filter]' -db assembly | esummary | xtract -pattern DocumentSummary -def "NA" -element AssemblyAccession > GToTree_ToL_accessions
 
 # running GToTree:
-time GToTree -a GToTree_ToL_accessions -H Universal.hmm -t -j 4 -o ToL -G 0.4
+time GToTree -a GToTree_ToL_accessions -H Universal.hmm -t -j 4 -o ToL
