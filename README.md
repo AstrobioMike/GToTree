@@ -28,6 +28,12 @@ GToTree utilizes helper scripts written in python, but is primarily implemented 
 
 ---
 
+<p align="center">
+<a href="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-ToL_tree.pdf"><img src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-Overview-center.png"></a>
+</p>
+
+---
+
 ## Dependencies (the conda installation takes care of all of these)
 ### Required to use at all:
 If you use GToTree, please cite these folks :)  
