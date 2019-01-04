@@ -30,7 +30,7 @@ export PATH=\"$(pwd)/bin:"'$PATH'\"" \
 
 export GToTree_HMM_dir=\"$(pwd)/hmm_sets\"" >> ${CONDA_PREFIX}/etc/conda/activate.d/env_vars.sh
 
-printf "\n\n    ${GREEN}Setting up TaxonKit for adding lineage info to trees...${NC}\n\n"
+printf "    ${GREEN}Setting up TaxonKit for adding lineage info to trees...${NC}\n\n"
 
 ## downloading ncbi tax database for taxonkit and setting variable for location
 mkdir -p ncbi_tax_info
