@@ -5,7 +5,7 @@
 <br>
 <br>
 
-<a href="https://zenodo.org/badge/latestdoi/161007784"><img align="right" src="https://zenodo.org/badge/161007784.svg" alt="DOI"></a>  
+<a href="https://zenodo.org/badge/latestdoi/161007784"><img align="right" src="https://zenodo.org/badge/161007784.svg" alt="DOI"></a>
 <br>
 
 ---
