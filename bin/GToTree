@@ -6,7 +6,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 
-printf "\n\n                 GToTree v1.0 (github.com/AstrobioMike/GToTree)\n\n"
+printf "\n\n               GToTree v1.1 (github.com/AstrobioMike/GToTree/wiki)\n\n"
 
 #############################################################################
 ################################  HELP INFO  ################################
@@ -14,7 +14,7 @@ printf "\n\n                 GToTree v1.0 (github.com/AstrobioMike/GToTree)\n\n"
 ## called by program name with no arguments or with "-h" as only positional argument ##
 if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
 
-  
+
   printf "\n --------------------------------  HELP INFO  --------------------------------- \n\n"
   printf "  This program takes input genomes from various sources and ultimately produces\n"
   printf "  a phylogenomic tree. You can find detailed usage information at:\n"
@@ -54,7 +54,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "                  the labels if using TaxonKit (-t flag specified). E.g., all would be\n"
   printf "                  \"-L Domain,Phylum,Class,Order,Family,Genus,Species,Strain\"\n\n"
 
-  printf "        - [-c <float>] default: 0.2\n" 
+  printf "        - [-c <float>] default: 0.2\n"
   printf "                  A float between 0-1 specifying the range about the median of\n"
   printf "                  sequences to be retained. For example, if the median length of a\n"
   printf "                  set of sequences is 100 AAs, those seqs longer than 120 or shorter\n"
@@ -158,7 +158,7 @@ fi
 # checking no duplicates in NCBI accession file
 if [ -f "$NCBI_acc_file" ]; then
   num_dupes=$(uniq -d "$NCBI_acc_file" | wc -l | sed "s/^ *//" | cut -d " " -f 1)
-  if [ ! $num_dupes == 0 ]; then 
+  if [ ! $num_dupes == 0 ]; then
     printf "\n${RED}      $NCBI_acc_file has duplicate entries, check it out and provide unique accessions only.${NC}\n"
     printf "\nExiting for now.\n\n"
     exit
@@ -227,7 +227,7 @@ else
     printf "    to be greater than 0.${NC}\n"
     printf "\nExiting for now.\n\n"
     exit
-  fi    
+  fi
 fi
 
 
@@ -254,7 +254,7 @@ fi
 if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
   echo $lineage_spec | tr "," "\n" > gtotree.specified-lineage-info.tmp
   gtt-check-wanted-lineage-info -w gtotree.specified-lineage-info.tmp
-  
+
   if [ -s gtotree.uninterpretable_ranks.tmp ]; then
     printf "    ${RED}One or more of the specified lineage ranks to add (passed to \"-L\") were uninterpretable:${NC}\n"
     sed 's/^/        /' gtotree.uninterpretable_ranks.tmp
@@ -305,7 +305,7 @@ if [ "$NCBI_acc_file" != "" ]; then
     exit
   fi
 
-else 
+else
   NCBI_input_genomes_total=0
 fi
 
@@ -340,7 +340,7 @@ if [ "$fasta_files" != "" ]; then
     printf "\nExiting for now.\n\n"
     exit
   fi
-  
+
   if [ -s "$fasta_files" ]; then
     # checking all files pointed to by this file can be found
     for file in $(cat $fasta_files)
@@ -465,15 +465,15 @@ if [ $total_input_genomes -le 20 ]; then
     printf "    Filtering by gene-length using the median length of a gene set (set with\n"
     printf "    the \"-c\" flag) becomes less reliable with fewer genomes. With $total_input_genomes total\n"
     printf "    input genomes, if a lot of sequences are dropped, consider increasing\n"
-    printf "    the parameter and/or visually inspecting some alignments.\n\n" 
-    printf "    More info can be found here:\n" 
+    printf "    the parameter and/or visually inspecting some alignments.\n\n"
+    printf "    More info can be found here:\n"
     printf "      github.com/AstrobioMike/GToTree/wiki/Considerations-when-running\n\n"
 
     printf "\t        Moving forward with \"-c\" set to $len_cutoff this run.\n"
 
     printf "  ${RED}****************************************************************************${NC}  \n\n"
-    
-    ## if i want this as manual input... 
+
+    ## if i want this as manual input...
     ## for now just warning and moving on so this stays fully automated once started
 #     read -n 1 -s -p "      Press any key to continue with \"-c\" set to $len_cutoff for this run, or
 #       press \"CTRL+C\" to cancel and exit.
@@ -498,8 +498,8 @@ if [ $? -ne 0 ] ; then
   exit
 fi
 
-### making sure each id provided in the mapping file (if given) is found in one 
-### of the genome input files 
+### making sure each id provided in the mapping file (if given) is found in one
+### of the genome input files
 if [ "$file_to_genome_id_map" != "" ]; then
   if [ "$genbank_list_file" != "" ]; then
     for file in $(cat $genbank_list_file)
@@ -509,7 +509,7 @@ if [ "$file_to_genome_id_map" != "" ]; then
     genbank_list_file_basenames=${tmp_dir}/genbank_list_file_basenames.tmp
   fi
 
-  if [ "$fasta_files" != "" ]; then 
+  if [ "$fasta_files" != "" ]; then
     for file in $(cat $fasta_files)
     do
       basename $file
@@ -532,7 +532,7 @@ if [ "$file_to_genome_id_map" != "" ]; then
     exit
   fi
 fi
-    #### add in check that all provided in here are in the inputs... or 
+    #### add in check that all provided in here are in the inputs... or
     #### maybe put that down later when doing this and just write out the ones not found
 
 # remaking output directory now that things are a go
@@ -609,7 +609,7 @@ if [ -n "$NCBI_acc_file" ]; then
     exit
   else
     rm -rf capture_any_dl_errors.tmp
-  fi 
+  fi
 
   if grep -q "^GCF" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
       printf "\n\t\t  Downloading RefSeq assembly summaries...\n\n"
@@ -624,7 +624,7 @@ if [ -n "$NCBI_acc_file" ]; then
     exit
   else
     rm -rf capture_any_dl_errors.tmp
-  fi 
+  fi
 
   ## searching assembly info table for the input accessions (NOTE: will always return latest accession version as of now)
   # to keep track of what was searched and what was downloaded, both are included in the output summary table
@@ -650,7 +650,7 @@ if [ -n "$NCBI_acc_file" ]; then
     cp ${tmp_dir}/not_found_accs.tmp ${output_dir}/NCBI_accessions_not_found.txt
 
     mv ${tmp_dir}/sorted_got_ncbi_accs.tmp ${tmp_dir}/updated_sorted_ncbi_accs.tmp
-     
+
     NCBI_remaining_genomes_total=$(wc -l ${tmp_dir}/updated_sorted_ncbi_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
   else
@@ -672,7 +672,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
   printf "\n________________________________________________________________________________\n\n\n"
 
-  
+
   ## reporting any accessions not successfully found or downloaded, and updating files
   printf "     ******************************* UPDATE *******************************  \n"
   printf "        Of the input genomes provided by NCBI accession:\n\n"
@@ -680,13 +680,13 @@ if [ -n "$NCBI_acc_file" ]; then
   if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
     num_dupe_genomes=$(wc -l ${output_dir}/Redundant_input_accessions.txt | sed "s/^ *//" | cut -d " " -f 1)
     num_dupe_report=$(($num_dupe_genomes / 2))
-    printf "          ${RED}$num_dupe_report accession(s) redundant.${NC}\n" 
+    printf "          ${RED}$num_dupe_report accession(s) redundant.${NC}\n"
     printf "            Reported in \"${output_dir}/Redundant_input_accessions.txt\".\n\n"
   fi
 
   if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
     num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
-    printf "          ${RED}$num_accs_not_found accession(s) not found at NCBI.${NC}\n" 
+    printf "          ${RED}$num_accs_not_found accession(s) not found at NCBI.${NC}\n"
     printf "            Reported in \"${output_dir}/NCBI_accessions_not_found.txt\".\n\n"
   fi
 
@@ -696,7 +696,7 @@ if [ -n "$NCBI_acc_file" ]; then
     comm -23 ${tmp_dir}/updated_sorted_ncbi_accs.tmp <(sort ${output_dir}/NCBI_accessions_not_downloaded.txt) | sort > ${tmp_dir}/updated_sorted_ncbi_accs2.tmp
     mv ${tmp_dir}/updated_sorted_ncbi_accs2.tmp ${tmp_dir}/final_included_NCBI_accs.tmp
 
-    printf "          ${RED}$num_accs_not_downloaded NCBI accession(s) did not download successfully.${NC}\n" 
+    printf "          ${RED}$num_accs_not_downloaded NCBI accession(s) did not download successfully.${NC}\n"
     printf "            Reported in \"${output_dir}/NCBI_accessions_not_downloaded.txt\".\n\n"
 
   else
@@ -706,7 +706,7 @@ if [ -n "$NCBI_acc_file" ]; then
   num_retained_ncbi_input_genomes=$(wc -l ${tmp_dir}/final_included_NCBI_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
   if [ -f ${output_dir}/NCBI_accessions_not_found.txt ] || [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ] || [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
-    
+
     printf "        $num_retained_ncbi_input_genomes of the total $NCBI_input_genomes_total input accessions had their genomes successfully\n"
     printf "        downloaded and searched.\n"
 
@@ -1004,13 +1004,13 @@ if [ $num_jobs == "1" ]; then
 
     # creating gap-sequences if needed
     if [ -s ${tmp_dir}/needed_gappers.tmp ]; then
-    
+
       # making a headers file for when making fasta in a few steps:
       sed 's/^/>/' ${tmp_dir}/needed_gappers.tmp > ${tmp_dir}/needed_headers.tmp
 
       # getting length of the alignment for the current gene:
       aln_length_tmp=$(sed -n '2p' ${tmp_dir}/formatted.faa.tmp | wc -c | tr -s " " | cut -f2 -d " ")
-      # subtracting 1 for newline characters 
+      # subtracting 1 for newline characters
       aln_length_tmp=$(echo "$aln_length_tmp"-1 | bc)
       # making a string of gaps the length of the alignment for those missing it:
       gap_seq=$(printf "%0.s-" $(seq 1 1 $aln_length_tmp))
@@ -1028,7 +1028,7 @@ if [ $num_jobs == "1" ]; then
     else
       mv ${tmp_dir}/formatted.faa.tmp ${tmp_dir}/${SCG}.faa.tmp
     fi
-    
+
     ## reordering the final fasta of this gene so that all gene sets can be pasted together at end ##
     gtt-reorder-fasta -i ${tmp_dir}/${SCG}.faa.tmp -w ${tmp_dir}/final_genomes_from_all_sources.tmp -o ${tmp_dir}/${SCG}_all_aligned.faa
 
@@ -1036,7 +1036,7 @@ if [ $num_jobs == "1" ]; then
 
 else
   # writing out variables needed for script because i don't know how to send them properly
-  
+
   cat ${tmp_dir}/final_genes_list.tmp | parallel -j $num_jobs gtt-align-and-trim-parallel.sh {} $tmp_dir
 fi
 
@@ -1075,7 +1075,7 @@ duration=$SECONDS
 printf "           It is currently $curr_time; the process started at $start_time.\n"
 printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n"
 
-# putting a string of 5 X's in between each gene 
+# putting a string of 5 X's in between each gene
 paste ${tmp_dir}/*_all_aligned.faa > ${tmp_dir}/cat.tmp
 grep ">" ${tmp_dir}/cat.tmp | cut -f1 > ${tmp_dir}/headers.tmp
 grep -v ">" ${tmp_dir}/cat.tmp | sed -e $'s/\t/XXXXX/g' > ${tmp_dir}/seqs.tmp
@@ -1119,7 +1119,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
       for acc in $(cut -f1 ${output_dir}/NCBI_genomes_summary_info.tsv | tail -n +2)
       do
         grep -w -m1 "$acc" ${tmp_dir}/base_label_swap.tmp
-      done | tr " " "_" | tee ${tmp_dir}/ncbi_id_swap_map.tmp | cut -f 1 | sort > ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp  
+      done | tr " " "_" | tee ${tmp_dir}/ncbi_id_swap_map.tmp | cut -f 1 | sort > ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp
 
       ## getting which are not ncbi accessions
       comm -23 ${tmp_dir}/sorted_target_ids_to_change.tmp ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp > ${tmp_dir}/non_ncbi_ids_to_swap.tmp
@@ -1175,7 +1175,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     else
       sort ${tmp_dir}/potential_ids_for_swap.tmp > ${tmp_dir}/ids_for_taxonkit_swap.tmp
     fi
-    
+
     ## creating new labels for them based on lineage info
     for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
     do
@@ -1230,7 +1230,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     if grep -q "Strain" ${tmp_dir}/wanted_ranks.tmp; then
     # these only exist if NCBI accessions were given, so using the ${output_dir}/NCBI_genomes_summary_info.tsv file
 
-      if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then 
+      if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then
 
         for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
         do
@@ -1280,7 +1280,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     else
       cp ${tmp_dir}/final_taxonkit_id_swap_map.tmp ${tmp_dir}/full_id_swap_map.tmp
     fi
-  
+
   ## if no taxonkit swapping specified, moving user-provided map to final file
   else
     cp ${tmp_dir}/id_swap_map.tmp ${tmp_dir}/full_id_swap_map.tmp
@@ -1316,7 +1316,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     mv ${tmp_dir}/full_id_swap_map.tmp ${tmp_dir}/final_id_swap_map.tmp
   fi
 
-  ### now swapping ids 
+  ### now swapping ids
   gtt-swap-ids -i ${tmp_dir}/aligned_SCGs_mod_names.tmp -s ${tmp_dir}/final_id_swap_map.tmp -o ${output_dir}/Aligned_SCGs_mod_names.faa
 
   ### adding new ids to summary table as column "label"
@@ -1416,25 +1416,25 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
   printf "\n  Notes:\n\n"
 
   if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
-    printf "    $num_dupe_report accession(s) redundant.\n" 
+    printf "    $num_dupe_report accession(s) redundant.\n"
     printf "        Reported in \"${output_dir}/Redundant_input_accessions.txt\".\n\n"
   fi
 
 
   if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
     num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
-    printf "    ${RED}$num_accs_not_found accession(s) not successfully found at NCBI.${NC}\n" 
+    printf "    ${RED}$num_accs_not_found accession(s) not successfully found at NCBI.${NC}\n"
     printf "        Reported in \"${output_dir}/NCBI_accessions_not_found.txt\".\n\n"
   fi
 
   if [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ]; then
     num_accs_not_downloaded=$(wc -l ${output_dir}/NCBI_accessions_not_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
-    printf "    ${RED}$num_accs_not_downloaded did not download properly.${NC}\n" 
+    printf "    ${RED}$num_accs_not_downloaded did not download properly.${NC}\n"
     printf "        Reported in \"${output_dir}/NCBI_accessions_not_downloaded.txt\".\n\n"
   fi
 
   if [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ]; then
-    printf "    ${RED}$removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.${NC}\n" 
+    printf "    ${RED}$removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.${NC}\n"
     printf "        Reported in \"${output_dir}/Genomes_removed_for_too_few_hits.tsv\".\n\n"
   fi
 
