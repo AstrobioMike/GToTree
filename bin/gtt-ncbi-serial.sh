@@ -17,7 +17,7 @@ num=0
 while IFS=$'\t' read -r -a curr_line
 
 do
-    
+
     assembly="${curr_line[0]}"
     downloaded_accession="${curr_line[1]}"
     num=$((num+1))
@@ -37,10 +37,10 @@ do
         gunzip ${tmp_dir}/${assembly}_genes2.tmp.gz
         # renaming headers to avoid problems with odd characters and how hmmer parses and such
         gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
-        
+
     else # trying to get assembly if there were no gene annotations available
         curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
-      
+
         if [ -s ${tmp_dir}/${assembly}_genome.tmp.gz ]; then
 
             gunzip ${tmp_dir}/${assembly}_genome.tmp.gz
@@ -76,7 +76,7 @@ do
         if [ -z "$asm_level" ]; then asm_level="NA"; fi
 
         printf "      Performing HMM search...\n"
-          
+
         ### running hmm search ###
         hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp $hmm_file ${tmp_dir}/${assembly}_genes.tmp > /dev/null
 
@@ -85,6 +85,9 @@ do
         do
             grep -w -c "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp
         done > ${tmp_dir}/${assembly}_uniq_counts.tmp
+
+        ## adding SCG-hit counts to table
+        paste <(printf $assembly) <(printf %s "$(cat ${tmp_dir}/${assembly}_uniq_counts.tmp | tr "\n" "\t")") >> ${output_dir}/All_genomes_SCG_hit_counts.tsv
 
         num_SCG_hits=$(awk ' $1 > 0 ' ${tmp_dir}/${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
 
@@ -104,7 +107,7 @@ do
         # looping through ribosomal proteins and pulling out each first hit (hmm results tab is sorted by e-value):
 
         esl-sfetch --index ${tmp_dir}/${assembly}_genes.tmp > /dev/null
-        
+
         for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
         do
             grep -w "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp | awk '!x[$3]++' | cut -f1 -d " " | esl-sfetch -f ${tmp_dir}/${assembly}_genes.tmp - | sed "s/>.*$/>$assembly/" | sed 's/^Usage.*$//' | sed 's/^To see.*$//' | sed '/^$/d' >> ${tmp_dir}/${SCG}_hits.faa

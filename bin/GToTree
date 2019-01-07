@@ -550,6 +550,8 @@ mv uniq_hmm_names.tmp ${tmp_dir}/uniq_hmm_names.tmp
 # starting an all genomes file to keep track of those from all sources
 touch ${tmp_dir}/genomes_from_all_sources.tmp
 
+# starting the SCG-counts per genome tab which will have the following as its header:
+paste <(printf "assembly_id") <(printf %s "$(cat ${tmp_dir}/uniq_hmm_names.tmp | tr "\n" "\t")") > ${output_dir}/All_genomes_SCG_hit_counts.tsv
 
 
 #############################################################################
@@ -1415,6 +1417,8 @@ fi
 printf "    Summary file with comp./redund. estimates written to file:\n"
 printf "        ${GREEN}${output_dir}/All_genomes_summary_info.tsv${NC}\n\n"
 
+printf "    Summary table with hits per target gene per genome written to file:\n"
+printf "        ${GREEN}${output_dir}/All_genomes_SCG_hit_counts.tsv${NC}\n\n"
 
 # reporting any problem files/accessions
 if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCBI_accessions_not_found.txt ] || [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ] || [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ] || [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ]; then

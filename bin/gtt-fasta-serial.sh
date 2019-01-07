@@ -48,6 +48,9 @@ do
         grep -w -c "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp
     done > ${tmp_dir}/${assembly}_uniq_counts.tmp
 
+    ## adding SCG-hit counts to table
+    paste <(printf $assembly) <(printf %s "$(cat ${tmp_dir}/${assembly}_uniq_counts.tmp | tr "\n" "\t")") >> ${output_dir}/All_genomes_SCG_hit_counts.tsv
+
     num_SCG_hits=$(awk ' $1 > 0 ' ${tmp_dir}/${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
   
     printf "        Found $num_SCG_hits of the targeted $hmm_target_genes_total.\n\n"

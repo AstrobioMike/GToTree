@@ -24,10 +24,10 @@ if [ -s ${tmp_dir}/${assembly}_genes2.tmp.gz ]; then
     gunzip ${tmp_dir}/${assembly}_genes2.tmp.gz
     # renaming headers to avoid problems with odd characters and how hmmer parses and such
     gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
-        
+
 else # trying to get assembly if there were no gene annotations available
     curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
-    
+
     if [ -s ${tmp_dir}/${assembly}_genome.tmp.gz ]; then
 
       gunzip ${tmp_dir}/${assembly}_genome.tmp.gz
@@ -65,23 +65,26 @@ if [ -s ${tmp_dir}/${assembly}_genes.tmp ]; then
 
     printf "   ${GREEN}$assembly${NC}\n"
     printf "      Performing HMM search...\n"
-      
+
     ### running hmm search ###
     hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp $hmm_file ${tmp_dir}/${assembly}_genes.tmp > /dev/null
-    
+
     ### calculating % completion and redundancy ###
     for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
     do
         grep -w -c "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp
     done > ${tmp_dir}/${assembly}_uniq_counts.tmp
 
+    ## adding SCG-hit counts to table
+    paste <(printf $assembly) <(printf %s "$(cat ${tmp_dir}/${assembly}_uniq_counts.tmp | tr "\n" "\t")") >> ${output_dir}/All_genomes_SCG_hit_counts.tsv
+
     num_SCG_hits=$(awk ' $1 > 0 ' ${tmp_dir}/${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
 
-      
+
     printf "        Found $num_SCG_hits of the targeted $hmm_target_genes_total SCGs.\n\n"
 
     num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' ${tmp_dir}/${assembly}_uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
- 
+
     perc_comp=$(echo "$num_SCG_hits / $hmm_target_genes_total * 100" | bc -l)
     perc_comp_rnd=$(printf "%.2f\n" $perc_comp)
     perc_redund=$(echo "$num_SCG_redund / $hmm_target_genes_total * 100" | bc -l)
@@ -100,7 +103,7 @@ if [ -s ${tmp_dir}/${assembly}_genes.tmp ]; then
     done
 
     rm -rf ${tmp_dir}/${assembly}_*.tmp ${tmp_dir}/${assembly}_genes.tmp.ssi
-    
+
 
 else
     printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
@@ -111,4 +114,3 @@ else
     sleep 3
     echo $assembly >> ${output_dir}/NCBI_accessions_not_downloaded.txt
 fi
-
