@@ -11,7 +11,7 @@
 ---
 
 # GToTree: a user-friendly workflow for phylogenomics
-[GToTree](https://github.com/AstrobioMike/GToTree.wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. 
+[GToTree](https://github.com/AstrobioMike/GToTree.wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. The preprint is available [here](https://www.biorxiv.org/content/early/2019/01/06/512491).
 
 ---
 
@@ -32,7 +32,7 @@ GToTree utilizes helper scripts written in python, but is primarily implemented 
 ---
 
 <p align="center">
-<a href="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-ToL_tree.pdf"><img src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-Overview-w-tree.png"></a>
+<a href="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-ToL_tree.pdf"><img src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-Overview-main.png"></a>
 </p>
 
 ---
