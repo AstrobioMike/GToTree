@@ -66,16 +66,17 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "                  target genes in the HMM profile, and Genome X only has hits to 49\n"
   printf "                  of them, it will be removed from analysis.\n\n"
 
-  printf "        - [-d ] default: false\n"
-  printf "                  Provide this flag with no arguments if you'd like to keep the\n"
-  printf "                  temporary directory. (mostly useful for debugging)\n\n"
 
   printf "        - [-n <int> ] default: 2\n"
   printf "                  The number of cpus you'd like to use during the HMM search.\n\n"
 
   printf "        - [-j <int> ] default: 1\n"
   printf "                  The number of jobs you'd like to run in parallel during steps\n"
-  printf "                  that are parallelizable. (requires GNU parallel)\n\n"
+  printf "                  that are parallelizable.\n\n"
+
+  printf "        - [-d ] default: false\n"
+  printf "                  Provide this flag with no arguments if you'd like to keep the\n"
+  printf "                  temporary directory. (mostly useful for debugging)\n\n"
 
   printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Bacteria -t -j 4\n\n"
 
