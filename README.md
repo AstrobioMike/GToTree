@@ -11,7 +11,7 @@
 ---
 
 # GToTree: a user-friendly workflow for phylogenomics
-[GToTree](https://github.com/AstrobioMike/GToTree/wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. The preprint is available [here](https://www.biorxiv.org/content/early/2019/01/06/512491).
+[GToTree](https://github.com/AstrobioMike/GToTree/wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. The preprint is available [here](https://www.biorxiv.org/content/early/2019/01/06/512491). Documentation can be found [here](https://github.com/AstrobioMike/GToTree/wiki).
 
 ---
 
@@ -57,8 +57,4 @@ If you use GToTree in a manner that uses these tools, please cite these folks :)
 - **[GNU Parallel](https://www.gnu.org/software/parallel/)** - [citation info](https://www.gnu.org/software/parallel/parallel_design.html#Citation-notice)
   - *if running in parallel*
 
-## Testing instructions for those of you kind enough to be helping me squash da bugs
-In the "test\_data" directory there are example files and an "example\_run\_log" with versions of running the program that should work. If things do not work, please let me know what happened. If it does work, please start changing the inputs and use as you might to help find da bugs :)
-
-Running `GToTree` with no arguments gives the help menu. 
 
