@@ -77,7 +77,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "                  The number of jobs you'd like to run in parallel during steps\n"
   printf "                  that are parallelizable. (requires GNU parallel)\n\n"
 
-  printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Bacteria.hmm -t -j 4\n\n"
+  printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Bacteria -t -j 4\n\n"
 
   exit
 fi
@@ -382,6 +382,11 @@ if [ -f "$hmm_file" ]; then
   grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
   hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
   printf "      - $hmm_file ($hmm_target_genes_total targets)\n"
+elif [ -f "${GToTree_HMM_dir}/${hmm_file}.hmm" ]; then
+  hmm_file="${GToTree_HMM_dir}/${hmm_file}.hmm"
+  grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
+  hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
+  printf "      - $(basename ${hmm_file} | sed 's/\.hmm//') ($hmm_target_genes_total targets)\n"
 elif [ -f "${GToTree_HMM_dir}/${hmm_file}" ]; then
   hmm_file="${GToTree_HMM_dir}/${hmm_file}"
   grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
@@ -1371,7 +1376,7 @@ printf "               Current process runtime: $(($duration / 60 / 60)) hours a
 
 
 if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
-  FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre
+  FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs.tre
 else
   FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre
 fi
