@@ -35,9 +35,14 @@ GToTree utilizes helper scripts written in python, but is primarily implemented 
 <a href="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-ToL_tree.pdf"><img src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-Overview-main.png"></a>
 </p>
 
+See the ["What is GToTree?" wiki page](https://github.com/AstrobioMike/GToTree/wiki/what-is-gtotree%3F) for some more detail on the processing steps pictured above. For practical ways GToTree can be helpful, check out the [Example usage page](https://github.com/AstrobioMike/GToTree/wiki/example-usage). And for detailed information on using GToTree, see the [User guide](https://github.com/AstrobioMike/GToTree/wiki/user-guide).
+
+
 ---
 
-## Dependencies (the conda installation takes care of all of these)
+## Dependencies 
+> **NOTE: The [conda installation](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) takes care of all of these!**
+
 ### Required to use at all:
 If you use GToTree, please cite these folks :)  
 
@@ -52,7 +57,7 @@ If you use GToTree in a manner that uses these tools, please cite these folks :)
 
 - **[Prodigal](https://github.com/hyattpd/Prodigal)** - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/)  
   - *if providing input genomes in fasta format, or GenBank format with no CDS annotations, or NCBI accessions to genomes with no gene calls*
-- **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** - citation: I'm not sure how to cite them yet
+- **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** - citation: official way to cite not quite ready yet, [Wei Shen](https://github.com/shenwei356) is workin on it! Will update soon.
   - *if changing genome labels based on lineage information for input genomes with associated NCBI taxids*
 - **[GNU Parallel](https://www.gnu.org/software/parallel/)** - [citation info](https://www.gnu.org/software/parallel/parallel_design.html#Citation-notice)
   - *if running in parallel*
