@@ -57,7 +57,7 @@ If you use GToTree in a manner that uses these tools, please cite these folks :)
 
 - **[Prodigal](https://github.com/hyattpd/Prodigal)** - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/)  
   - *if providing input genomes in fasta format, or GenBank format with no CDS annotations, or NCBI accessions to genomes with no gene calls*
-- **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** - citation: official way to cite not quite ready yet, [Wei Shen](https://github.com/shenwei356) is workin on it! Will update soon.
+- **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** - [citation](https://www.biorxiv.org/content/early/2019/01/08/513523)
   - *if changing genome labels based on lineage information for input genomes with associated NCBI taxids*
 - **[GNU Parallel](https://www.gnu.org/software/parallel/)** - [citation info](https://www.gnu.org/software/parallel/parallel_design.html#Citation-notice)
   - *if running in parallel*
