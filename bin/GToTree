@@ -6,7 +6,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 
-printf "\n\n               GToTree v1.0.2 (github.com/AstrobioMike/GToTree)\n\n"
+printf "\n\n               GToTree v1.0.4 (github.com/AstrobioMike/GToTree)\n\n"
 
 #############################################################################
 ################################  HELP INFO  ################################
