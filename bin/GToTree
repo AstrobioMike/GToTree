@@ -5,6 +5,11 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
+  printf "GToTree v1.0.4\n"
+  exit
+fi
+
 
 printf "\n\n               GToTree v1.0.4 (github.com/AstrobioMike/GToTree)\n\n"
 
@@ -82,6 +87,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
 
   exit
 fi
+
 
 
 #############################################################################
