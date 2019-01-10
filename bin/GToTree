@@ -1324,8 +1324,11 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     mv ${tmp_dir}/full_id_swap_map.tmp ${tmp_dir}/final_id_swap_map.tmp
   fi
 
+  ## one last safety screen for colons and commas (as they screw with newick format)
+  paste <(cut -f 1 ${tmp_dir}/final_id_swap_map.tmp) <(cut -f 2,3 ${tmp_dir}/final_id_swap_map.tmp | tr ":" "_" | tr "," "_") > ${tmp_dir}/final_id_swap_map_colonless.tmp
+
   ### now swapping ids
-  gtt-swap-ids -i ${tmp_dir}/aligned_SCGs_mod_names.tmp -s ${tmp_dir}/final_id_swap_map.tmp -o ${output_dir}/Aligned_SCGs_mod_names.faa
+  gtt-swap-ids -i ${tmp_dir}/aligned_SCGs_mod_names.tmp -s ${tmp_dir}/final_id_swap_map_colonless.tmp -o ${output_dir}/Aligned_SCGs_mod_names.faa
 
   ### adding new ids to summary table as column "label"
   # first pulling out and adding to those that were changed
