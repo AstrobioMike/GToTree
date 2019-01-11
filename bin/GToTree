@@ -1388,9 +1388,9 @@ printf "               Current process runtime: $(($duration / 60 / 60)) hours a
 
 
 if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
-  FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs.tre
+  FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs.nwk
 else
-  FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre
+  FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.nwk
 fi
 
 
@@ -1418,10 +1418,10 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
   printf "    Alignment with altered headers written to file:\n"
   printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.faa${NC}\n\n"
   printf "    Tree written to file:\n"
-  printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.tre${NC}\n\n"
+  printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.nwk${NC}\n\n"
 else
   printf "    Tree written to file:\n"
-  printf "        ${GREEN}${output_dir}/Aligned_SCGs.tre${NC}\n\n"
+  printf "        ${GREEN}${output_dir}/Aligned_SCGs.nwk${NC}\n\n"
 fi
 
 printf "    Summary file with comp./redund. estimates written to file:\n"
