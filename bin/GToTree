@@ -1121,7 +1121,16 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
 
     ## first splitting file to just get those that have specific labels to swap (will handle the appending at end)
     awk ' BEGIN { FS=OFS="\t" } $2 != "" { print $1,$2 } ' $file_to_genome_id_map > ${tmp_dir}/base_label_swap.tmp
+
+    if [ ! -s ${tmp_dir}/base_label_swap.tmp ]; then
+      rm ${tmp_dir}/base_label_swap.tmp
+    fi
+
     awk ' BEGIN { FS=OFS="\t" } $3 != "" { print $1,$3 } ' $file_to_genome_id_map > ${tmp_dir}/base_labels_need_append.tmp
+
+    if [ ! -s ${tmp_dir}/base_labels_need_append.tmp ]; then
+      rm ${tmp_dir}/base_labels_need_append.tmp
+    fi
 
     ## making sorted list of targets to change
     cut -f1 ${tmp_dir}/base_label_swap.tmp | sort > ${tmp_dir}/sorted_target_ids_to_change.tmp
@@ -1338,15 +1347,15 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
 
   ### adding new ids to summary table as column "label"
   # first pulling out and adding to those that were changed
-  for changed_id in $(cut -f1 ${tmp_dir}/full_id_swap_map.tmp)
+  for changed_id in $(cut -f1 ${tmp_dir}/final_id_swap_map.tmp)
   do
     grep -w -m1 "$changed_id" ${output_dir}/All_genomes_summary_info.tsv
   done | cut -f 2- > ${tmp_dir}/building_new_genomes_tab1.tmp
 
-  paste ${tmp_dir}/full_id_swap_map.tmp ${tmp_dir}/building_new_genomes_tab1.tmp > ${tmp_dir}/building_new_genomes_tab2.tmp
+  paste ${tmp_dir}/final_id_swap_map.tmp ${tmp_dir}/building_new_genomes_tab1.tmp > ${tmp_dir}/building_new_genomes_tab2.tmp
 
   # now getting those that weren't changed and adding assembly id to the "label" column
-  comm -23 <(cut -f1 ${output_dir}/All_genomes_summary_info.tsv | tail -n +2 | sort) <(cut -f1 ${tmp_dir}/full_id_swap_map.tmp | sort) > ${tmp_dir}/unchanged_ids.tmp
+  comm -23 <(cut -f1 ${output_dir}/All_genomes_summary_info.tsv | tail -n +2 | sort) <(cut -f1 ${tmp_dir}/final_id_swap_map.tmp | sort) > ${tmp_dir}/unchanged_ids.tmp
 
   for unchanged_id in $(cat ${tmp_dir}/unchanged_ids.tmp)
   do
@@ -1388,9 +1397,9 @@ printf "               Current process runtime: $(($duration / 60 / 60)) hours a
 
 
 if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
-  FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs.nwk
+  FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs.tre
 else
-  FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.nwk
+  FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre
 fi
 
 
@@ -1418,10 +1427,10 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
   printf "    Alignment with altered headers written to file:\n"
   printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.faa${NC}\n\n"
   printf "    Tree written to file:\n"
-  printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.nwk${NC}\n\n"
+  printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.tre${NC}\n\n"
 else
   printf "    Tree written to file:\n"
-  printf "        ${GREEN}${output_dir}/Aligned_SCGs.nwk${NC}\n\n"
+  printf "        ${GREEN}${output_dir}/Aligned_SCGs.tre${NC}\n\n"
 fi
 
 printf "    Summary file with comp./redund. estimates written to file:\n"
