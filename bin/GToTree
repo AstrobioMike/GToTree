@@ -11,7 +11,7 @@ if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
 fi
 
 
-printf "\n\n               GToTree v1.0.4 (github.com/AstrobioMike/GToTree)\n\n"
+printf "\n\n               GToTree v1.0.5 (github.com/AstrobioMike/GToTree)\n\n"
 
 #############################################################################
 ################################  HELP INFO  ################################
