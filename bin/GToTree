@@ -410,7 +410,7 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain"]; then
+if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain"]; then
 
   if [ "$file_to_genome_id_map" != "" ]; then
     if [ ! -s $file_to_genome_id_map ]; then
@@ -422,7 +422,7 @@ if [ $output_dir != "GToTree" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxo
 
   printf "\n\n    Options set:\n"
 
-  if [ $output_dir != "GToTree" ]; then
+  if [ $output_dir != "GToTree_output" ]; then
     printf "      - The output directory has been set to \"$output_dir\".\n"
   fi
 
