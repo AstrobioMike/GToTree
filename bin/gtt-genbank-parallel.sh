@@ -39,8 +39,8 @@ gtt-genbank-to-AA-seqs -i $1 -o ${tmp_dir}/${assembly}_genes2.tmp
 if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
 
     printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
-    printf "\t  $assembly doesn't appear to have CDS annotations, so we\n"
-    printf "\t  are identifying coding sequences with prodigal.\n\n"
+    printf "\t  $assembly doesn't appear to have CDS annotations,\n"
+    printf "\t  so we are identifying coding sequences with prodigal.\n\n"
 
     printf "\t    Reported in \"${output_dir}/Genbank_files_with_no_CDSs.txt\".\n"
     printf "     ${RED}**********************************************************************${NC}  \n\n"

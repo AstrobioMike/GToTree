@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.0.5"
+VERSION="v1.0.6"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -852,7 +852,11 @@ if [ $removed_genes != "0" ]; then
   printf "\t    $removed_genes gene(s) had no hits in any genome... Just so ya know!\n\n"
   printf "\t\t  Not found:\n\n"
   sed 's/^/                   /' ${tmp_dir}/genes_to_remove.tmp
+  printf "\n        Reported in \"${output_dir}/Genes_with_no_hits_to_any_genomes.txt\".\n"
   printf "     ${RED}**********************************************************************${NC}  \n\n\n"
+  mv ${tmp_dir}/genes_to_remove.tmp ${output_dir}/Genes_with_no_hits_to_any_genomes.txt
+  
+  sleep 3
 fi
 
 
@@ -896,15 +900,18 @@ done > ${tmp_dir}/genes_to_remove2.tmp
 # removing those genes, if any:
 comm -23 <(sort ${tmp_dir}/updated_genes_list.tmp) <(sort ${tmp_dir}/genes_to_remove2.tmp) > ${tmp_dir}/final_genes_list.tmp
 
-removed_genes=$(wc -l ${tmp_dir}/genes_to_remove2.tmp | sed "s/^ *//" | cut -d " " -f 1)
+removed_genes2=$(wc -l ${tmp_dir}/genes_to_remove2.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
 # reporting
-if [ $removed_genes != "0" ]; then
+if [ $removed_genes2 != "0" ]; then
   printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
-  printf "\t  $removed_genes gene(s) had no hits in any genomes after filtering for length! Just so ya know...\n\n"
+  printf "\t  $removed_genes2 gene(s) had no hits in any genomes after filtering by length! Just so ya know...\n\n"
   printf "\t    Length-filtered out of existence:\n\n"
   sed 's/^/          /' ${tmp_dir}/genes_to_remove2.tmp
+  printf "\n     Reported in \"${output_dir}/Genes_with_no_hits_after_length_filter.txt\".\n"
   printf "     ${RED}************************************************************************ ${NC}\n\n"
+
+  mv ${tmp_dir}/genes_to_remove2.tmp ${output_dir}/Genes_with_no_hits_after_length_filter.txt
 fi
 
 new_hmm_target_genes_total=$(wc -l ${tmp_dir}/final_genes_list.tmp | sed "s/^ *//" | cut -d " " -f 1)
@@ -957,7 +964,7 @@ removed_genomes=$(wc -l ${tmp_dir}/sorted_genomes_to_remove.tmp | sed "s/^ *//" 
 if [ $removed_genomes != "0" ]; then
   printf "     ${RED}*******************************${NC} NOTICE ${RED}*******************************${NC}  \n"
   printf "\t  $removed_genomes genome(s) removed from analysis due to having too few hits.\n\n"
-  printf "\t    Reported in \"${output_dir}/Genomes_removed_for_too_few_hits.tsv\".\n"
+  printf "      Reported in \"${output_dir}/Genomes_removed_for_too_few_hits.tsv\".\n"
   printf "     ${RED}********************************************************************** ${NC}\n\n"
   sleep 3
 else
@@ -1442,7 +1449,7 @@ printf "    Summary table with hits per target gene per genome written to file:\
 printf "        ${GREEN}${output_dir}/All_genomes_SCG_hit_counts.tsv${NC}\n\n"
 
 # reporting any problem files/accessions
-if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCBI_accessions_not_found.txt ] || [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ] || [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ] || [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ]; then
+if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCBI_accessions_not_found.txt ] || [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ] || [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ] || [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ] || [ -f ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ] || [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ]; then
   printf "\n  Notes:\n\n"
 
   if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
@@ -1474,6 +1481,16 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
     printf "    $num_genbanks_no_cds genbank file(s) had no indentified coding sequences.\n"
     printf "        Reported in \"${output_dir}/Genbank_files_with_no_CDSs.txt\",\n"
     printf "        but processed as though submitted as flat fasta files.\n\n"
+  fi
+
+  if [ -f ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ]; then
+    printf "    $removed_genes gene(s) had no hits in any genome.\n"
+    printf "        Reported in \"${output_dir}/Genes_with_no_hits_to_any_genomes.txt\".\n\n"
+  fi
+
+  if [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ]; then
+    printf "    $removed_genes2 gene(s) had no hits after filtering by length.\n"
+    printf "        Reported in \"${output_dir}/Genes_with_no_hits_after_length_filter.txt\".\n\n"
   fi
 
   printf "\n"
