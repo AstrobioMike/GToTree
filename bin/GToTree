@@ -1478,7 +1478,7 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
 
   if [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ]; then
     num_genbanks_no_cds=$(wc -l ${output_dir}/Genbank_files_with_no_CDSs.txt | sed "s/^ *//" | cut -d " " -f 1)
-    printf "    $num_genbanks_no_cds genbank file(s) had no indentified coding sequences.\n"
+    printf "    $num_genbanks_no_cds genbank file(s) had no identified coding sequences.\n"
     printf "        Reported in \"${output_dir}/Genbank_files_with_no_CDSs.txt\",\n"
     printf "        but processed as though submitted as flat fasta files.\n\n"
   fi
