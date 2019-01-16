@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.0.6"
+VERSION="v1.0.7"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -481,7 +481,7 @@ if [ $total_input_genomes -le 20 ]; then
     printf "    input genomes, if a lot of sequences are dropped, consider increasing\n"
     printf "    the parameter and/or visually inspecting some alignments.\n\n"
     printf "    More info can be found here:\n"
-    printf "      github.com/AstrobioMike/GToTree/wiki/Considerations-when-running\n\n"
+    printf "      github.com/AstrobioMike/GToTree/wiki/Things-to-consider\n\n"
 
     printf "\t        Moving forward with \"-c\" set to $len_cutoff this run.\n"
 
@@ -759,7 +759,7 @@ if [ -n "$genbank_list_file" ]; then
   num=0
 
   # creating the genbank-genome-derived output table which will have the following as its header:
-  printf "assembly_name\toriginal_file_name\ttaxid\torganism_name\tuniq_SCG_hits\tperc_comp\tperc_redund\n" > ${output_dir}/Genbank_genomes_summary_info.tsv
+  printf "assembly_name\toriginal_file_name\ttaxid\torganism_name\tstrain\tuniq_SCG_hits\tperc_comp\tperc_redund\n" > ${output_dir}/Genbank_genomes_summary_info.tsv
 
   ### running in parallel if set, otherwise running in serial ###
   if [ $num_jobs == "1" ]; then
@@ -964,7 +964,7 @@ removed_genomes=$(wc -l ${tmp_dir}/sorted_genomes_to_remove.tmp | sed "s/^ *//" 
 if [ $removed_genomes != "0" ]; then
   printf "     ${RED}*******************************${NC} NOTICE ${RED}*******************************${NC}  \n"
   printf "\t  $removed_genomes genome(s) removed from analysis due to having too few hits.\n\n"
-  printf "      Reported in \"${output_dir}/Genomes_removed_for_too_few_hits.tsv\".\n"
+  printf "        Reported in \"${output_dir}/Genomes_removed_for_too_few_hits.tsv\".\n"
   printf "     ${RED}********************************************************************** ${NC}\n\n"
   sleep 3
 else
@@ -1128,67 +1128,61 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
   ## building id swap file starting with user-provided Genome-to-ID mapping file if given
   if [ -n "$file_to_genome_id_map" ]; then
 
-    ## first splitting file to just get those that have specific labels to swap (will handle the appending at end)
-    awk ' BEGIN { FS=OFS="\t" } $2 != "" { print $1,$2 } ' $file_to_genome_id_map > ${tmp_dir}/base_label_swap.tmp
+    sort -k 1,1 $file_to_genome_id_map | tee ${tmp_dir}/sorted_id_swap_map.tmp | cut -f1 > ${tmp_dir}/sorted_target_ids_to_swap.tmp
 
-    if [ ! -s ${tmp_dir}/base_label_swap.tmp ]; then
-      rm ${tmp_dir}/base_label_swap.tmp
-    fi
-
-    awk ' BEGIN { FS=OFS="\t" } $3 != "" { print $1,$3 } ' $file_to_genome_id_map > ${tmp_dir}/base_labels_need_append.tmp
-
-    if [ ! -s ${tmp_dir}/base_labels_need_append.tmp ]; then
-      rm ${tmp_dir}/base_labels_need_append.tmp
-    fi
-
-    ## making sorted list of targets to change
-    cut -f1 ${tmp_dir}/base_label_swap.tmp | sort > ${tmp_dir}/sorted_target_ids_to_change.tmp
-
-    ## separating out which ones are ncbi accessions (because the others need to have their extensions removed)
-
+    ## separating out which ones are to be swapped that are ncbi accessions (because the others need to have their extensions removed)
     if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then
 
       for acc in $(cut -f1 ${output_dir}/NCBI_genomes_summary_info.tsv | tail -n +2)
       do
-        grep -w -m1 "$acc" ${tmp_dir}/base_label_swap.tmp
-      done | tr " " "_" | tee ${tmp_dir}/ncbi_id_swap_map.tmp | cut -f 1 | sort > ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp
+        grep -w -m1 "$acc" ${tmp_dir}/sorted_id_swap_map.tmp
+      done | sort -k 1,1 | tee ${tmp_dir}/ncbi_id_swap_map.tmp | cut -f 1 > ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp
 
-      ## getting which are not ncbi accessions
-      comm -23 ${tmp_dir}/sorted_target_ids_to_change.tmp ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp > ${tmp_dir}/non_ncbi_ids_to_swap.tmp
-    else
-      cp ${tmp_dir}/sorted_target_ids_to_change.tmp ${tmp_dir}/non_ncbi_ids_to_swap.tmp
     fi
 
-    ## removing extensions if there are non-ncbi-ids to swap
-    if [ -s "${tmp_dir}/non_ncbi_ids_to_swap.tmp" ]; then
+    ## if there are ncbi accession to change, getting which are NOT ncbi accessions, and removing extensions
+    ## otherwise moving all to non-ncbi-ids-to-swap
+    if [ -s ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp ]; then
 
-      for file in $(cat ${tmp_dir}/non_ncbi_ids_to_swap.tmp)
-      do
-        echo "${file%.*}"
-      done > ${tmp_dir}/non_ncbi_old_ids_to_swap.tmp
+      comm -23 ${tmp_dir}/sorted_target_ids_to_swap.tmp ${tmp_dir}/sorted_ncbi_ids_to_swap.tmp | sort > ${tmp_dir}/sorted_non_ncbi_ids_to_swap.tmp
 
-      ## getting desired new ids for these
-      for id in $(cat ${tmp_dir}/non_ncbi_old_ids_to_swap.tmp)
-      do
-        grep -m1 "$id" ${tmp_dir}/base_label_swap.tmp
-      done | cut -f 2 | tr " " "_" > ${tmp_dir}/non_ncbi_new_ids.tmp
+      if [ -s ${tmp_dir}/sorted_non_ncbi_ids_to_swap.tmp ]; then
 
-      paste ${tmp_dir}/non_ncbi_old_ids_to_swap.tmp ${tmp_dir}/non_ncbi_new_ids.tmp > ${tmp_dir}/non_ncbi_id_swap_map.tmp
+        # making sure files being appended to are starting empty
+        rm -f ${tmp_dir}/non_ncbi_swap_map_p1.tmp ${tmp_dir}/non_ncbi_swap_map_p2.tmp
+
+        for file in $(cat ${tmp_dir}/sorted_non_ncbi_ids_to_swap.tmp)
+        do
+          echo "${file%.*}" >> ${tmp_dir}/non_ncbi_swap_map_p1.tmp
+          grep -w -m1 "^${file}" ${tmp_dir}/sorted_id_swap_map.tmp | cut -f 2- >> ${tmp_dir}/non_ncbi_swap_map_p2.tmp
+        done 
+
+        paste ${tmp_dir}/non_ncbi_swap_map_p1.tmp ${tmp_dir}/non_ncbi_swap_map_p2.tmp | sort -k 1,1 > ${tmp_dir}/sorted_non_ncbi_swap_map.tmp
+      fi
+
+    else
+      mv ${tmp_dir}/sorted_target_ids_to_swap.tmp ${tmp_dir}/sorted_non_ncbi_ids_to_swap.tmp
     fi
 
     ## updating id_swap_map
-    if [ -f ${tmp_dir}/ncbi_id_swap_map.tmp ] && [ -f ${tmp_dir}/non_ncbi_id_swap_map.tmp ]; then
-      cat ${tmp_dir}/ncbi_id_swap_map.tmp ${tmp_dir}/non_ncbi_id_swap_map.tmp > ${tmp_dir}/id_swap_map.tmp
-    elif [ -f ${tmp_dir}/ncbi_id_swap_map.tmp ] && [ ! -f ${tmp_dir}/non_ncbi_id_swap_map.tmp ]; then
+    if [ -f ${tmp_dir}/ncbi_id_swap_map.tmp ] && [ -f ${tmp_dir}/sorted_non_ncbi_swap_map.tmp ]; then
+      cat ${tmp_dir}/ncbi_id_swap_map.tmp ${tmp_dir}/sorted_non_ncbi_swap_map.tmp > ${tmp_dir}/id_swap_map.tmp
+    elif [ -f ${tmp_dir}/ncbi_id_swap_map.tmp ] && [ ! -f ${tmp_dir}/sorted_non_ncbi_swap_map.tmp ]; then
       cp ${tmp_dir}/ncbi_id_swap_map.tmp ${tmp_dir}/id_swap_map.tmp
-    elif [ ! -f ${tmp_dir}/ncbi_id_swap_map.tmp ] && [ -f ${tmp_dir}/non_ncbi_id_swap_map.tmp ]; then
-      cp ${tmp_dir}/non_ncbi_id_swap_map.tmp ${tmp_dir}/id_swap_map.tmp
+    elif [ ! -f ${tmp_dir}/ncbi_id_swap_map.tmp ] && [ -f ${tmp_dir}/sorted_non_ncbi_swap_map.tmp ]; then
+      cp ${tmp_dir}/sorted_non_ncbi_swap_map.tmp ${tmp_dir}/id_swap_map.tmp
     fi
+
+    ## splitting mapping file into those that have specific labels to swap and those that need appending
+    awk ' BEGIN { FS=OFS="\t" } $2 != "" { print $1,$2 } ' ${tmp_dir}/id_swap_map.tmp > ${tmp_dir}/base_label_swap.tmp
+
+    ## now splitting the file down to those that have labels to append (getting to this part after taxonkit)
+    awk ' BEGIN { FS=OFS="\t" } $3 != "" { print $1,$3 } ' ${tmp_dir}/id_swap_map.tmp > ${tmp_dir}/base_labels_need_append.tmp
 
   fi
 
   ## now if taxonkit was specified, adding those to swap file too, but only
-  ## renaming genomes with a taxid that are NOT in the user-provided mapping file
+  ## renaming genomes with a taxid that are NOT given a new name in the user-provided mapping file (those solely appended-to still have lineages added first)
   if [ $taxonkit_id_swap != "false" ]; then
 
     ## running taxonkit and adding to summary table ##
@@ -1202,8 +1196,8 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     ## getting genomes that have a taxid
     awk ' BEGIN { FS=OFS="\t" } $2 != "NA" ' ${output_dir}/All_genomes_summary_info.tsv | tail -n +2 | cut -f1 > ${tmp_dir}/potential_ids_for_swap.tmp
     ## removing those that the user already provided new labels for, if they did
-    if [ -f ${tmp_dir}/id_swap_map.tmp ]; then
-      comm -23 <(sort ${tmp_dir}/potential_ids_for_swap.tmp) <(cut -f1 ${tmp_dir}/id_swap_map.tmp | sort) > ${tmp_dir}/ids_for_taxonkit_swap.tmp
+    if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
+      comm -23 <(sort ${tmp_dir}/potential_ids_for_swap.tmp) <(cut -f1 ${tmp_dir}/base_label_swap.tmp | sort) > ${tmp_dir}/ids_for_taxonkit_swap.tmp
     else
       sort ${tmp_dir}/potential_ids_for_swap.tmp > ${tmp_dir}/ids_for_taxonkit_swap.tmp
     fi
@@ -1214,7 +1208,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
       grep -w -m1 "$id" ${output_dir}/All_genomes_summary_info.tsv
     done | cut -f 1,6-12 > ${tmp_dir}/working_taxonkit_lineages.tmp
 
-    ## builing new taxonkit-swapped labels based upon desired ranks (provided by -L flag)
+    ## builing new taxonkit-swapped labels based upon user-desired ranks (provided by -L flag)
     cut -f1 ${tmp_dir}/working_taxonkit_lineages.tmp > ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
     echo $lineage_spec | tr "," "\n" > ${tmp_dir}/wanted_ranks.tmp
 
@@ -1258,25 +1252,45 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     ## making map for IDs changed with taxonkit
     paste ${tmp_dir}/ids_for_taxonkit_swap.tmp ${tmp_dir}/new_ids_for_taxonkit_swap.tmp > ${tmp_dir}/taxonkit_id_swap_map.tmp
 
-    #### adding on infraspecific names if they exist in the assembly report file pulled by accession if Strain-level ranks desired (specified in -L flag)
+    #### adding on infraspecific names if they exist and if Strain-level ranks desired (specified in -L flag)
     if grep -q "Strain" ${tmp_dir}/wanted_ranks.tmp; then
-    # these only exist if NCBI accessions were given, so using the ${output_dir}/NCBI_genomes_summary_info.tsv file
+    # these only exist if NCBI accessions were given or if they were found in provided genbank files, so using the ${output_dir}/NCBI_genomes_summary_info.tsv and ${output_dir}/Genbank_genomes_summary_info.tsv files
 
-      if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then
+      if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ] || [ -f ${output_dir}/Genbank_genomes_summary_info.tsv ]; then
 
-        for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
-        do
-          grep -m1 -w "$id" ${output_dir}/NCBI_genomes_summary_info.tsv
-        done > ${tmp_dir}/ncbi_genomes_summary_subset_for_id_change.tmp
+        # input-ncbi accessions to add strain info to:
+        if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then
 
-        # getting the ids and strains of those that have infraspecific names
-        grep "strain=" ${tmp_dir}/ncbi_genomes_summary_subset_for_id_change.tmp | cut -f 1,6 | sort -k 1,1 > ${tmp_dir}/strain_info_tab.tmp
-        cut -f1 ${tmp_dir}/strain_info_tab.tmp > ${tmp_dir}/sorted_ids_with_strain_info.tmp
-        cut -f2 ${tmp_dir}/strain_info_tab.tmp | sed 's/strain=//' | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]" > ${tmp_dir}/sorted_strain_info.tmp
+          for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
+          do
+            grep -m1 -w "$id" ${output_dir}/NCBI_genomes_summary_info.tsv
+          done > ${tmp_dir}/ncbi_genomes_summary_subset_for_id_change.tmp
 
-        # finding which IDs don't get this change, so can to separated them
+          # getting the ids and strains of those that have infraspecific names
+          grep "strain=" ${tmp_dir}/ncbi_genomes_summary_subset_for_id_change.tmp | cut -f 1,6 | sed 's/strain=//' | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]" > ${tmp_dir}/strain_info_tab.tmp
+          
+        fi
+
+        # input-genbank labels to add strain info to:
+        if [ -f ${output_dir}/Genbank_genomes_summary_info.tsv ]; then
+
+          for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
+          do
+            grep -m1 -w "$id" ${output_dir}/Genbank_genomes_summary_info.tsv
+          done > ${tmp_dir}/genbank_genomes_summary_subset_for_id_change.tmp
+          
+          # getting the ids and strains of those that have strains IDs:
+          awk ' BEGIN { FS=OFS="\t" } $5 != "NA" { print $1,$5 } ' ${tmp_dir}/genbank_genomes_summary_subset_for_id_change.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]" >> ${tmp_dir}/strain_info_tab.tmp
+
+        fi
+
+        sort -k 1,1 ${tmp_dir}/strain_info_tab.tmp > ${tmp_dir}/sorted_strain_info_tab.tmp
+        cut -f 1 ${tmp_dir}/sorted_strain_info_tab.tmp > ${tmp_dir}/sorted_ids_with_strain_info.tmp
+        cut -f 2 ${tmp_dir}/sorted_strain_info_tab.tmp > ${tmp_dir}/sorted_strain_info.tmp
+
+        # finding which IDs don't get this change, so we can separate them
         comm -23 ${tmp_dir}/ids_for_taxonkit_swap.tmp ${tmp_dir}/sorted_ids_with_strain_info.tmp > ${tmp_dir}/taxonkit_ids_to_not_change.tmp
-        # pulling out the ones we're not changing only, to start a new file
+        # pulling out the ones we're not changing only, to use them to create a file of those we are changing
         for i in $(cat ${tmp_dir}/taxonkit_ids_to_not_change.tmp)
         do
           grep -w -m1 "$i" ${tmp_dir}/taxonkit_id_swap_map.tmp
@@ -1292,36 +1306,32 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
         paste -d "_" ${tmp_dir}/building_final_taxonkit_id_swap_map_to_paste_onto.tmp ${tmp_dir}/sorted_strain_info.tmp > ${tmp_dir}/building_final_taxonkit_id_swap_map2.tmp
 
         cat ${tmp_dir}/building_final_taxonkit_id_swap_map.tmp ${tmp_dir}/building_final_taxonkit_id_swap_map2.tmp > ${tmp_dir}/final_taxonkit_id_swap_map.tmp
-      else
-        printf "     ${RED}*******************************${NC} NOTICE ${RED}*******************************${NC}  \n"
-        printf "\t  Strain-level info is only available for input genomes provided by NCBI accession. As there were\n"
-        printf "\t  none in this particular run, no strain-level info was added to the labels.\n"
-        printf "     ${RED}********************************************************************** ${NC}\n\n"
-        sleep 3
-        cp ${tmp_dir}/taxonkit_id_swap_map.tmp ${tmp_dir}/final_taxonkit_id_swap_map.tmp
+
       fi
 
     else
       cp ${tmp_dir}/taxonkit_id_swap_map.tmp ${tmp_dir}/final_taxonkit_id_swap_map.tmp
     fi
 
-    ## pasting together and adding to the id_swap_map.tmp if other user-specified IDs were given (with -m flag)
+    ## pasting together and adding to the ${tmp_dir}/base_label_swap.tmp if other user-specified IDs were given (with -m flag)
 
-    if [ -f ${tmp_dir}/id_swap_map.tmp ]; then
-      cat ${tmp_dir}/id_swap_map.tmp ${tmp_dir}/final_taxonkit_id_swap_map.tmp > ${tmp_dir}/full_id_swap_map.tmp
+    if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
+      cat ${tmp_dir}/base_label_swap.tmp ${tmp_dir}/final_taxonkit_id_swap_map.tmp > ${tmp_dir}/full_id_swap_map.tmp
     else
       cp ${tmp_dir}/final_taxonkit_id_swap_map.tmp ${tmp_dir}/full_id_swap_map.tmp
     fi
 
   ## if no taxonkit swapping specified, moving user-provided map to final file
   else
-    cp ${tmp_dir}/id_swap_map.tmp ${tmp_dir}/full_id_swap_map.tmp
+    cp ${tmp_dir}/base_label_swap.tmp ${tmp_dir}/full_id_swap_map.tmp
   fi
 
-  ## if some need appending, then appending here
+  ### if some need appending, then appending here
   if [ -s ${tmp_dir}/base_labels_need_append.tmp ]; then
+    
     # getting ids that need appending:
     sort -k 1 ${tmp_dir}/base_labels_need_append.tmp | tee ${tmp_dir}/sorted_base_labels_need_append.tmp | cut -f 1 > ${tmp_dir}/sorted_base_ids_need_append.tmp
+    
     # getting those that don't need appending, so can separate:
     comm -23 <(cut -f 1 ${tmp_dir}/full_id_swap_map.tmp | sort) ${tmp_dir}/sorted_base_ids_need_append.tmp | sort > ${tmp_dir}/sorted_base_ids_no_append.tmp
 
@@ -1345,26 +1355,27 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
 
   else
     # updating file if not changed
+    rm -f ${tmp_dir}/base_labels_need_append.tmp
     mv ${tmp_dir}/full_id_swap_map.tmp ${tmp_dir}/final_id_swap_map.tmp
   fi
 
   ## one last safety screen for colons and commas (as they screw with newick format)
-  paste <(cut -f 1 ${tmp_dir}/final_id_swap_map.tmp) <(cut -f 2,3 ${tmp_dir}/final_id_swap_map.tmp | tr ":" "_" | tr "," "_") > ${tmp_dir}/final_id_swap_map_colonless.tmp
+  paste <(cut -f 1 ${tmp_dir}/final_id_swap_map.tmp) <(cut -f 2,3 ${tmp_dir}/final_id_swap_map.tmp | tr "[:, ]" "_") > ${tmp_dir}/final_id_swap_map_colonless.tmp
 
   ### now swapping ids
   gtt-swap-ids -i ${tmp_dir}/aligned_SCGs_mod_names.tmp -s ${tmp_dir}/final_id_swap_map_colonless.tmp -o ${output_dir}/Aligned_SCGs_mod_names.faa
 
   ### adding new ids to summary table as column "label"
   # first pulling out and adding to those that were changed
-  for changed_id in $(cut -f1 ${tmp_dir}/final_id_swap_map.tmp)
+  for changed_id in $(cut -f1 ${tmp_dir}/final_id_swap_map_colonless.tmp)
   do
     grep -w -m1 "$changed_id" ${output_dir}/All_genomes_summary_info.tsv
   done | cut -f 2- > ${tmp_dir}/building_new_genomes_tab1.tmp
 
-  paste ${tmp_dir}/final_id_swap_map.tmp ${tmp_dir}/building_new_genomes_tab1.tmp > ${tmp_dir}/building_new_genomes_tab2.tmp
+  paste ${tmp_dir}/final_id_swap_map_colonless.tmp ${tmp_dir}/building_new_genomes_tab1.tmp > ${tmp_dir}/building_new_genomes_tab2.tmp
 
   # now getting those that weren't changed and adding assembly id to the "label" column
-  comm -23 <(cut -f1 ${output_dir}/All_genomes_summary_info.tsv | tail -n +2 | sort) <(cut -f1 ${tmp_dir}/final_id_swap_map.tmp | sort) > ${tmp_dir}/unchanged_ids.tmp
+  comm -23 <(cut -f1 ${output_dir}/All_genomes_summary_info.tsv | tail -n +2 | sort) <(cut -f1 ${tmp_dir}/final_id_swap_map_colonless.tmp | sort) > ${tmp_dir}/unchanged_ids.tmp
 
   for unchanged_id in $(cat ${tmp_dir}/unchanged_ids.tmp)
   do
@@ -1385,7 +1396,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
 
 fi
 
-# clearing out temp files unless debug_flag is set to true
+# clearing out temp files here, unless debug_flag is set to true
 if [ $debug_flag == 'false' ]; then
   rm -rf $tmp_dir *.tmp
 fi
@@ -1480,7 +1491,7 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
     num_genbanks_no_cds=$(wc -l ${output_dir}/Genbank_files_with_no_CDSs.txt | sed "s/^ *//" | cut -d " " -f 1)
     printf "    $num_genbanks_no_cds genbank file(s) had no identified coding sequences.\n"
     printf "        Reported in \"${output_dir}/Genbank_files_with_no_CDSs.txt\",\n"
-    printf "        but processed as though submitted as flat fasta files.\n\n"
+    printf "        but processed as though submitted in fasta format.\n\n"
   fi
 
   if [ -f ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ]; then

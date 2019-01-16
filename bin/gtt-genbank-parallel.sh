@@ -26,6 +26,12 @@ else
     org_name="NA"
 fi
 
+if grep -q "strain=" $1; then 
+    strain=$(grep -m1 "strain=" $1 | tr -s " " | cut -f 2 -d '"')
+else
+    strain="NA"
+fi
+
 if grep -q "taxon" $1; then
     taxid=$(grep -m1 "taxon" $1 | cut -f2 -d ":" | tr -d '"')
 else
@@ -33,7 +39,7 @@ else
 fi
 
 # extracting AA coding sequences from genbank file
-gtt-genbank-to-AA-seqs -i $1 -o ${tmp_dir}/${assembly}_genes2.tmp
+gtt-genbank-to-AA-seqs -i $1 -o ${tmp_dir}/${assembly}_genes2.tmp 2> /dev/null
 
 # checking that the file had CDS annotations
 if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
@@ -49,7 +55,7 @@ if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
     rm -rf ${tmp_dir}/${assembly}_genes2.tmp
 
     # pulling out full nucleotide fasta from genbank file
-    gtt-genbank-to-fasta -i $1 -o ${tmp_dir}/${assembly}_fasta.tmp
+    gtt-genbank-to-fasta -i $1 -o ${tmp_dir}/${assembly}_fasta.tmp 2> /dev/null
 
     printf "      Getting coding seqs...\n\n"
 
@@ -89,7 +95,7 @@ perc_redund=$(echo "$num_SCG_redund / $hmm_target_genes_total * 100" | bc -l)
 perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
 
 ## writing summary info to table ##
-printf "$assembly\t$1\t$taxid\t$org_name\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Genbank_genomes_summary_info.tsv
+printf "$assembly\t$1\t$taxid\t$org_name\t$strain\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Genbank_genomes_summary_info.tsv
 
 ### Pulling out hits for this genome ###
 # looping through ribosomal proteins and pulling out each first hit (hmm results tab is sorted by e-value):
