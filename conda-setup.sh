@@ -6,7 +6,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 ## checking that user conda version is at least 4.5.10 to avoid problems
-cur_conda_version=$(conda --version | conda --version | cut -f2 -d " ")
+cur_conda_version=$(conda --version | cut -f2 -d " ")
 too_old_version=4.5.0
 
 if [ "$(printf '%s\n' "$cur_conda_version" "$too_old_version" | sort -V | head -n1)" != "$too_old_version" ]; then
