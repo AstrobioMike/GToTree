@@ -324,7 +324,7 @@ if [ "$genbank_list_file" != "" ];then
     for file in $(cat $genbank_list_file)
     do
       if [ ! -s $file ]; then
-        printf "\n${RED}      Some fasta files specified in $genbank_list_file cannot be found :(${NC}\n\n"
+        printf "\n${RED}      Some genbank files specified in $genbank_list_file cannot be found :(${NC}\n\n"
         printf "  Double-check the provided locations and where they should be, here's one of the problems:\n"
         printf "            $file\n"
         printf "\nExiting for now.\n\n"
@@ -355,7 +355,7 @@ if [ "$fasta_files" != "" ]; then
     for file in $(cat $fasta_files)
     do
       if [ ! -s $file ]; then
-        printf "\n${RED}      The files specified in $fasta_files cannot be found :(${NC}\n\n"
+        printf "\n${RED}      Some fasta files specified in $fasta_files cannot be found :(${NC}\n\n"
         printf "  Double-check the provided locations and where they should be, here's one of the problems:\n"
         printf "            $file\n"
         printf "\nExiting for now.\n\n"
