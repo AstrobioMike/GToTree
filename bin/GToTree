@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.0.7"
+VERSION="v1.0.8"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -81,6 +81,13 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
   printf "                  The number of jobs you'd like to run in parallel during steps\n"
   printf "                  that are parallelizable.\n\n"
 
+  printf "        - [-C ] default: false\n"
+  printf "                  Provide this flag with no arguments if you'd like to run GToTree\n"
+  printf "                  in conservative mode. This means if an HMM profile has more than\n"
+  printf "                  one hit in a genome, instead of taking the best hit, that gene won\'t\n"
+  printf "                  be contributed by that genome. See here for more discussion:\n"
+  printf "                  github.com/AstrobioMike/GToTree/wiki/things-to-consider\n\n"
+
   printf "        - [-d ] default: false\n"
   printf "                  Provide this flag with no arguments if you'd like to keep the\n"
   printf "                  temporary directory. (mostly useful for debugging)\n\n"
@@ -132,8 +139,9 @@ output_dir="GToTree_output"
 taxonkit_id_swap='false'
 debug_flag='false'
 lineage_spec="Domain,Phylum,Class,Species,Strain"
+conservative_mode='false'
 
-while getopts :a:g:f:H:o:m:tL:c:G:dn:j: args
+while getopts :a:g:f:H:o:m:tL:c:G:Cdn:j: args
 do
   case "${args}"
   in
@@ -147,6 +155,7 @@ do
     L) lineage_spec=${OPTARG};;
     c) len_cutoff=${OPTARG};;
     G) gen_cutoff=${OPTARG};;
+    C) conservative_mode='true';;
     d) debug_flag='true';;
     n) num_cpus=${OPTARG};;
     j) num_jobs=${OPTARG};;
@@ -412,7 +421,7 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain"]; then
+if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $conservative_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain"]; then
 
   if [ "$file_to_genome_id_map" != "" ]; then
     if [ ! -s $file_to_genome_id_map ]; then
@@ -458,6 +467,12 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
   if [ $num_jobs != "1" ]; then
     printf "      - Number of jobs to run during parallelizable steps has been set to $num_jobs.\n"
   fi
+
+  if [ $conservative_mode == "true" ]; then
+    printf "      - Running in conservative mode.\n"
+  fi
+
+
 
   if [ $debug_flag == "true" ]; then
     printf "      - Debug mode on. Temp directory won't be removed after run.\n"
@@ -681,9 +696,9 @@ if [ -n "$NCBI_acc_file" ]; then
 
   ### running in parallel if set, otherwise running in serial ###
   if [ $num_jobs == "1" ]; then
-    gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir
+    gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
   else
-    cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir
+    cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
   fi
 
   printf "\n________________________________________________________________________________\n\n\n"
@@ -763,9 +778,9 @@ if [ -n "$genbank_list_file" ]; then
 
   ### running in parallel if set, otherwise running in serial ###
   if [ $num_jobs == "1" ]; then
-    gtt-genbank-serial.sh $genbank_list_file $tmp_dir $hmm_file $genbank_genomes_total $num_cpus $hmm_target_genes_total $output_dir
+    gtt-genbank-serial.sh $genbank_list_file $tmp_dir $hmm_file $genbank_genomes_total $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
   else
-    cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir
+    cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
   fi
 
   mv ${tmp_dir}/genbank_genomes_list.tmp ${tmp_dir}/final_included_genbank_genomes.tmp
@@ -804,9 +819,9 @@ if [ -n "$fasta_files" ]; then
 
   ### running in parallel if set, otherwise running in serial ###
   if [ $num_jobs == "1" ]; then
-    gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir
+    gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
   else
-    cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir
+    cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
   fi
 
   # adding retained genomes to genomes from all sources file
