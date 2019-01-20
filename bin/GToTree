@@ -1432,7 +1432,7 @@ printf "               Current process runtime: $(($duration / 60 / 60)) hours a
 
 
 if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
-  FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs.tre
+  FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre
 else
   FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre
 fi
