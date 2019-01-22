@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.0.9"
+VERSION="v1.1.0"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -81,11 +81,12 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  The number of jobs you'd like to run in parallel during steps\n"
     printf "                  that are parallelizable.\n\n"
 
-    printf "        - [-C ] default: false\n"
+    printf "        - [-B ] default: false\n"
     printf "                  Provide this flag with no arguments if you'd like to run GToTree\n"
-    printf "                  in conservative mode. This means if an HMM profile has more than\n"
-    printf "                  one hit in a genome, instead of taking the best hit, that gene won\'t\n"
-    printf "                  be contributed by that genome. See here for more discussion:\n"
+    printf "                  in \"best-hit\" mode. By default, if a SCG has more than one hit\n"
+    printf "                  in a given genome, GToTree won't include a sequence for that target\n"
+    printf "                  from that genome in the final alignment. With this flag provided,\n"
+    printf "                  GToTree will use the best hit. See here for more discussion:\n"
     printf "                  github.com/AstrobioMike/GToTree/wiki/things-to-consider\n\n"
 
     printf "        - [-d ] default: false\n"
@@ -139,9 +140,9 @@ output_dir="GToTree_output"
 taxonkit_id_swap='false'
 debug_flag='false'
 lineage_spec="Domain,Phylum,Class,Species,Strain"
-conservative_mode='false'
+best_hit_mode='false'
 
-while getopts :a:g:f:H:o:m:tL:c:G:Cdn:j: args
+while getopts :a:g:f:H:o:m:tL:c:G:Bdn:j: args
 do
     case "${args}"
     in
@@ -155,7 +156,7 @@ do
         L) lineage_spec=${OPTARG};;
         c) len_cutoff=${OPTARG};;
         G) gen_cutoff=${OPTARG};;
-        C) conservative_mode='true';;
+        B) best_hit_mode='true';;
         d) debug_flag='true';;
         n) num_cpus=${OPTARG};;
         j) num_jobs=${OPTARG};;
@@ -426,7 +427,7 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $conservative_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain"]; then
+if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain"]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
@@ -471,8 +472,8 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
         printf "      - Number of jobs to run during parallelizable steps has been set to $num_jobs.\n"
     fi
 
-    if [ $conservative_mode == "true" ]; then
-        printf "      - Running in conservative mode.\n"
+    if [ $best_hit_mode == "true" ]; then
+        printf "      - Running in \"best-hit\" mode.\n"
     fi
 
     if [ $debug_flag == "true" ]; then
@@ -631,7 +632,7 @@ if [ -n "$NCBI_acc_file" ]; then
     ## downloading genbank files and/or refseq assembly summary files as needed
 
     if grep -q "^GCA" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
-        printf "\t\t  Downloading GenBank assembly summaries...\n\n"
+        printf "\t\t  ${GREEN}Downloading GenBank assembly summaries...${NC}\n\n"
         curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
     fi
 
@@ -645,7 +646,7 @@ if [ -n "$NCBI_acc_file" ]; then
     fi
 
     if grep -q "^GCF" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
-        printf "\n\t\t  Downloading RefSeq assembly summaries...\n\n"
+        printf "\n\t\t  ${GREEN}Downloading RefSeq assembly summaries...${NC}\n\n"
         curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
         cat ${tmp_dir}/ncbi_RS_assembly_info.tmp >> ${tmp_dir}/ncbi_assembly_info.tmp
     fi
@@ -698,16 +699,16 @@ if [ -n "$NCBI_acc_file" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
+        gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
     else
-        cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
+        cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
     fi
 
-    printf "\n________________________________________________________________________________\n\n\n"
+    printf "________________________________________________________________________________\n\n"
 
 
     ## reporting any accessions not successfully found or downloaded, and updating files
-    printf "     ******************************* UPDATE *******************************  \n"
+    printf "\n     ******************************* ${GREEN}UPDATE${NC} *******************************  \n"
     printf "        Of the input genomes provided by NCBI accession:\n\n"
 
     if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
@@ -747,7 +748,7 @@ if [ -n "$NCBI_acc_file" ]; then
         printf "                ${GREEN}All $num_retained_ncbi_input_genomes successfully downloaded and searched :)${NC}\n"
     fi
 
-    printf "     ********************************************************************** \n\n\n"
+    printf "     ********************************************************************** \n\n"
 
     # adding to genomes from all sources file
     cat ${tmp_dir}/final_included_NCBI_accs.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
@@ -780,9 +781,9 @@ if [ -n "$genbank_list_file" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-genbank-serial.sh $genbank_list_file $tmp_dir $hmm_file $genbank_genomes_total $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
+        gtt-genbank-serial.sh $genbank_list_file $tmp_dir $hmm_file $genbank_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
     else
-        cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
+        cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
     fi
 
     mv ${tmp_dir}/genbank_genomes_list.tmp ${tmp_dir}/final_included_genbank_genomes.tmp
@@ -790,7 +791,7 @@ if [ -n "$genbank_list_file" ]; then
     # adding retained genomes to genomes from all sources file
     cat ${tmp_dir}/final_included_genbank_genomes.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
 
-    printf "________________________________________________________________________________\n\n\n"
+    printf "________________________________________________________________________________\n\n"
 
 fi
 
@@ -821,15 +822,15 @@ if [ -n "$fasta_files" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
+        gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
     else
-        cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $conservative_mode
+        cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
     fi
 
     # adding retained genomes to genomes from all sources file
     cat ${tmp_dir}/fasta_genomes_list.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
 
-    printf "_______________________________________________________________________________\n\n\n"
+    printf "_______________________________________________________________________________\n\n"
 
 fi
 
@@ -865,12 +866,16 @@ removed_genes=$(wc -l ${tmp_dir}/genes_to_remove.tmp | sed "s/^ *//" | cut -d " 
 
 # reporting
 if [ $removed_genes != "0" ]; then
-    printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
-    printf "\t    $removed_genes gene(s) had no hits in any genome... Just so ya know!\n\n"
-    printf "\t\t  Not found:\n\n"
-    sed 's/^/                   /' ${tmp_dir}/genes_to_remove.tmp
-    printf "\n        Reported in \"${output_dir}/Genes_with_no_hits_to_any_genomes.txt\".\n"
-    printf "     ${RED}**********************************************************************${NC}  \n\n\n"
+
+    printf "  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}  \n"
+    printf "    $removed_genes gene(s) either had no hits in any genome, or only multiple hits per\n"
+    printf "    genome... Just so ya know!!\n\n"
+    printf "\t  These included:\n\n"
+    sed 's/^/                     /' ${tmp_dir}/genes_to_remove.tmp
+    printf "\n        Reported in \"${output_dir}/Genes_with_no_hits_to_any_genomes.txt\".\n\n"
+    printf "   You can figure out which of those two scenarios was the cause by checking out\n"
+    printf "   \"${output_dir}/All_genomes_SCG_hit_counts.tsv\".\n"
+    printf "  ${RED}****************************************************************************${NC}  \n\n"
     mv ${tmp_dir}/genes_to_remove.tmp ${output_dir}/Genes_with_no_hits_to_any_genomes.txt
 
     sleep 3
@@ -1090,16 +1095,77 @@ if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then
 fi
 
 if [ -f ${output_dir}/Genbank_genomes_summary_info.tsv ]; then
-    cut -f 1,3,5,6,7 ${output_dir}/Genbank_genomes_summary_info.tsv | tail -n +2 >> ${tmp_dir}/building_genomes_tab.tmp
+    cut -f 1,3,6,7,8 ${output_dir}/Genbank_genomes_summary_info.tsv | tail -n +2 >> ${tmp_dir}/building_genomes_tab.tmp
 fi
 
 if [ -f ${output_dir}/Fasta_genomes_summary_info.tsv ]; then
     cut -f 1,3,4,5,6 ${output_dir}/Fasta_genomes_summary_info.tsv | tail -n +2 >> ${tmp_dir}/building_genomes_tab.tmp
 fi
 
-cat <(printf "assembly_id\ttaxid\tuniq_SCG_hits\tperc_comp\tperc_redund\n") ${tmp_dir}/building_genomes_tab.tmp > ${output_dir}/All_genomes_summary_info.tsv
+## getting current ordered list of all genomes together:
+cut -f 1 ${tmp_dir}/building_genomes_tab.tmp | sort > ${tmp_dir}/sorted_all_output_genome_ids.tmp
+
+## adding columns stating whether genome made it into the final tree, and how many genes they contributed to final alignment if so
+# first getting which were removed from analysis due to too few hits, if any:
+if [ $removed_genomes != "0" ]; then
+    sort <(cut -f1 ${output_dir}/Genomes_removed_for_too_few_hits.tsv | tail -n 1) > ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp
+    
+    # getting a list of those that weren't removed to iterate over
+    comm -23 ${tmp_dir}/sorted_all_output_genome_ids.tmp ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp | sort > ${tmp_dir}/sorted_genomes_not_removed.tmp
+
+    ## getting table of those that were removed, and adding columns for not being included in final tree, and for the number of genes contributed:
+    for genome in $(cat ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp)
+    do
+        grep -m1 -w "^$genome" ${tmp_dir}/building_genomes_tab.tmp >> ${tmp_dir}/building_genomes_tab_for_removed_genomes.tmp
+        echo "No" >> ${tmp_dir}/reporting_that_not_in_final_tree_column.tmp
+        echo "0" >> ${tmp_dir}/reporting_no_final_genes_contributed.tmp
+    done 
+
+    # adding columns on:
+    paste ${tmp_dir}/building_genomes_tab_for_removed_genomes.tmp ${tmp_dir}/reporting_that_not_in_final_tree_column.tmp ${tmp_dir}/reporting_no_final_genes_contributed.tmp > ${tmp_dir}/genomes_tab_for_removed_genomes.tmp
+
+    ## getting table of those that weren't removed, and adding columns for being included in final tree, and for the number of genes contributed:
+    for genome in $(cat ${tmp_dir}/sorted_genomes_not_removed.tmp)
+    do
+        grep -m1 -w "^$genome" ${tmp_dir}/building_genomes_tab.tmp >> ${tmp_dir}/building_genomes_tab_for_retained_genomes.tmp
+        echo "Yes" >> ${tmp_dir}/reporting_that_in_final_tree_column.tmp
+        grep -m1 -w "^$genome" ${tmp_dir}/counts_tab.tmp | cut -f 2 >> ${tmp_dir}/reporting_num_final_genes_contributed.tmp
+    done
+
+    # adding columns on:
+    paste ${tmp_dir}/building_genomes_tab_for_retained_genomes.tmp ${tmp_dir}/reporting_that_in_final_tree_column.tmp ${tmp_dir}/reporting_num_final_genes_contributed.tmp > ${tmp_dir}/genomes_tab_for_retained_genomes.tmp
 
 
+    ## combining both together
+    cat ${tmp_dir}/genomes_tab_for_retained_genomes.tmp ${tmp_dir}/genomes_tab_for_removed_genomes.tmp > ${tmp_dir}/building_genomes_tab.tmp
+
+else
+    # if there are no genomes to remove, then generating two new columns for all
+    for genome in $(cat ${tmp_dir}/sorted_all_output_genome_ids.tmp)
+    do
+        grep -m1 -w "^$genome" ${tmp_dir}/building_genomes_tab.tmp >> ${tmp_dir}/building_genomes_tab_for_retained_genomes.tmp
+        echo "Yes" >> ${tmp_dir}/reporting_that_in_final_tree_column.tmp
+        grep -m1 -w "^$genome" ${tmp_dir}/counts_tab.tmp | cut -f 2 >> ${tmp_dir}/reporting_num_final_genes_contributed.tmp
+    done
+
+    # adding columns on:
+    paste ${tmp_dir}/building_genomes_tab_for_retained_genomes.tmp ${tmp_dir}/reporting_that_in_final_tree_column.tmp ${tmp_dir}/reporting_num_final_genes_contributed.tmp > ${tmp_dir}/building_genomes_tab.tmp
+
+fi
+
+
+# and adding header and writing to output directory
+cat <(printf "assembly_id\ttaxid\tuniq_SCG_hits\tperc_comp\tperc_redund\tin_final_tree\tnum_genes_contributed_to_alignment\n") ${tmp_dir}/building_genomes_tab.tmp > ${output_dir}/All_genomes_summary_info.tsv
+
+
+
+#############################################################################
+############  FORMATTING TABLE FOR THOSE WITH >= 10% REDUNDANCY  ############
+#############################################################################
+
+if [ -f ${tmp_dir}/Genomes_with_questionable_redundancy_estimates.tmp ]; then
+    cat <(printf "assembly_id\tuniq_SCG_hits\tperc_comp\tperc_redund\n") ${tmp_dir}/Genomes_with_questionable_redundancy_estimates.tmp > ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv
+fi
 
 #############################################################################
 #####################  CATTING ALL ALIGNMENTS TOGETHER  #####################
@@ -1234,7 +1300,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
         for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
         do
             grep -w -m1 "$id" ${output_dir}/All_genomes_summary_info.tsv
-        done | cut -f 1,6-12 > ${tmp_dir}/working_taxonkit_lineages.tmp
+        done | cut -f 1,8-14 > ${tmp_dir}/working_taxonkit_lineages.tmp
 
         ## builing new taxonkit-swapped labels based upon user-desired ranks (provided by -L flag)
         cut -f1 ${tmp_dir}/working_taxonkit_lineages.tmp > ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
@@ -1488,7 +1554,7 @@ printf "    Summary table with hits per target gene per genome written to file:\
 printf "        ${GREEN}${output_dir}/All_genomes_SCG_hit_counts.tsv${NC}\n\n"
 
 # reporting any problem files/accessions
-if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCBI_accessions_not_found.txt ] || [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ] || [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ] || [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ] || [ -f ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ] || [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ]; then
+if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCBI_accessions_not_found.txt ] || [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ] || [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ] || [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ] || [ -f ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ] || [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ] || [ -f ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ]; then
     printf "\n  Notes:\n\n"
 
     if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
@@ -1514,7 +1580,6 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
         printf "        Reported in \"${output_dir}/Genomes_removed_for_too_few_hits.tsv\".\n\n"
     fi
 
-
     if [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ]; then
         num_genbanks_no_cds=$(wc -l ${output_dir}/Genbank_files_with_no_CDSs.txt | sed "s/^ *//" | cut -d " " -f 1)
         printf "    $num_genbanks_no_cds genbank file(s) had no identified coding sequences.\n"
@@ -1530,6 +1595,12 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
     if [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ]; then
         printf "    $removed_genes2 gene(s) had no hits after filtering by length.\n"
         printf "        Reported in \"${output_dir}/Genes_with_no_hits_after_length_filter.txt\".\n\n"
+    fi
+
+    if [ -f ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ]; then
+        num_genomes_high_redund=$(wc -l ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv | sed "s/^ *//" | cut -d " " -f 1)
+        printf "    $num_genomes_high_redund genome(s) had an estimated redundancy of >= 10%%.\n"
+        printf "        Reported in \"${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv\".\n\n"
     fi
 
     printf "\n"
