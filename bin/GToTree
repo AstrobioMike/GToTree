@@ -1108,7 +1108,7 @@ cut -f 1 ${tmp_dir}/building_genomes_tab.tmp | sort > ${tmp_dir}/sorted_all_outp
 ## adding columns stating whether genome made it into the final tree, and how many genes they contributed to final alignment if so
 # first getting which were removed from analysis due to too few hits, if any:
 if [ $removed_genomes != "0" ]; then
-    sort <(cut -f1 ${output_dir}/Genomes_removed_for_too_few_hits.tsv | tail -n 1) > ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp
+    sort <(tail -n +2 ${output_dir}/Genomes_removed_for_too_few_hits.tsv | cut -f1) > ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp
     
     # getting a list of those that weren't removed to iterate over
     comm -23 ${tmp_dir}/sorted_all_output_genome_ids.tmp ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp | sort > ${tmp_dir}/sorted_genomes_not_removed.tmp
