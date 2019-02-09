@@ -7,15 +7,16 @@ NC='\033[0m'
 
 #### blocking this out for now until i can figure out why it's failing on some systems ####
 ## checking that user conda version is at least 4.5.10 to avoid problems
-# cur_conda_version=$(conda --version | cut -f2 -d " ")
-# too_old_version=4.5.0
 
-# if [ "$(printf '%s\n' "$cur_conda_version" "$too_old_version" | sort -V | head -n1)" != "$too_old_version" ]; then
-#     printf "\n    ${RED}It seems your conda version ($cur_conda_version) needs to be updated :(${NC}\n\n"
-#     printf "    Please update it with \`conda update conda\` and then try again.\n\n\n"
-#     printf "Exiting for now.\n\n"
-#     return
-# fi
+cur_conda_version=$(conda --version 2>&1 | cut -f2 -d ' ')
+too_old_version=4.5.0
+
+if [ "$(printf '%s\n' "$cur_conda_version" "$too_old_version" | sort -V | head -n1)" != "$too_old_version" ]; then
+    printf "\n    ${RED}It seems your conda version ($cur_conda_version) needs to be updated :(${NC}\n\n"
+    printf "    Please update it with \`conda update conda\` and then try again.\n\n\n"
+    printf "Exiting for now.\n\n"
+    return
+fi
 
 printf "\n    ${GREEN}Setting up conda environment...${NC}\n\n"
 
@@ -56,6 +57,10 @@ rm taxdump.tar.gz
 echo "export TAXONKIT_DB=$(pwd)" >> ${CONDA_PREFIX}/etc/conda/activate.d/env_vars.sh
 
 cd ../
+
+## adding variables to the conda environment so localization matches what the program expects
+echo 'export LC_ALL="en_US.UTF-8"' >> ${CONDA_PREFIX}/etc/conda/activate.d/env_vars.sh
+echo 'export LANG="en_US.UTF-8"' >> ${CONDA_PREFIX}/etc/conda/activate.d/env_vars.sh
 
 # re-activating environment so variable and PATH changes take effect
 source activate gtotree
