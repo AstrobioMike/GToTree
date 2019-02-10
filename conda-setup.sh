@@ -5,7 +5,6 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-#### blocking this out for now until i can figure out why it's failing on some systems ####
 ## checking that user conda version is at least 4.5.10 to avoid problems
 
 cur_conda_version=$(conda --version 2>&1 | cut -f2 -d ' ')
