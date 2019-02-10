@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.1.2"
+VERSION="v1.1.4"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -61,6 +61,13 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  the labels if using TaxonKit (-t flag specified). E.g., all would be\n"
     printf "                  \"-L Domain,Phylum,Class,Order,Family,Genus,Species,Strain\"\n\n"
 
+    printf "        - [-T <str>] default: FastTree\n"
+    printf "                  Which program to use for tree generation. Currently supported are\n"
+    printf "                  \"FastTree\" and \"IQ-TREE\". As of now, these run with default settings\n"
+    printf "                  only (and QT-TREE includes \"-mset WAG,LG\". To run either with more\n" 
+    printf "                  specific options (and there is a lot of room for variation here), you\n"
+    printf "                  can use the output alignment file from GToTree as input.\n\n"
+
     printf "        - [-c <float>] default: 0.2\n"
     printf "                  A float between 0-1 specifying the range about the median of\n"
     printf "                  sequences to be retained. For example, if the median length of a\n"
@@ -72,7 +79,6 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  genome must have of the SCG-set. For example, if there are 100\n"
     printf "                  target genes in the HMM profile, and Genome X only has hits to 49\n"
     printf "                  of them, it will be removed from analysis.\n\n"
-
 
     printf "        - [-n <int> ] default: 2\n"
     printf "                  The number of cpus you'd like to use during the HMM search.\n\n"
@@ -141,8 +147,9 @@ taxonkit_id_swap='false'
 debug_flag='false'
 lineage_spec="Domain,Phylum,Class,Species,Strain"
 best_hit_mode='false'
+tree_program='FastTree'
 
-while getopts :a:g:f:H:o:m:tL:c:G:Bdn:j: args
+while getopts :a:g:f:H:o:m:tL:T:c:G:Bdn:j: args
 do
     case "${args}"
     in
@@ -154,6 +161,7 @@ do
         m) file_to_genome_id_map=${OPTARG};;
         t) taxonkit_id_swap='true';;
         L) lineage_spec=${OPTARG};;
+        T) tree_program=${OPTARG};;
         c) len_cutoff=${OPTARG};;
         G) gen_cutoff=${OPTARG};;
         B) best_hit_mode='true';;
@@ -427,7 +435,7 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain"]; then
+if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTree" ]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
@@ -458,6 +466,10 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
 
     if [ $len_cutoff != "0.2" ]; then
         printf "      - Gene-length filtering cutoff threshold (\"-c\") has been set to $len_cutoff.\n"
+    fi
+
+    if [ $tree_program != "FastTree" ]; then
+        printf "      - Tree generation program (\"-T\") has been set to $tree_program.\n"
     fi
 
     if [ $gen_cutoff != "0.5" ]; then
@@ -1496,27 +1508,52 @@ if [ $debug_flag == 'false' ]; then
 fi
 
 #############################################################################
-############################  RUNNING FASTTREE  #############################
+##############################   MAKING TREE  ###############################
 #############################################################################
 
-printf "\n ############################################################################## \n"
-printf " ####                          Running FastTree                            ####\n"
-printf " ############################################################################## \n\n"
+if [ $tree_program == 'FastTree' ]; then
 
-curr_time=$(date +"%I:%M %p")
-duration=$SECONDS
+    printf "\n ############################################################################## \n"
+    printf " ####                          Running FastTree                            ####\n"
+    printf " ############################################################################## \n\n"
 
-printf "           It is currently $curr_time; the process started at $start_time.\n"
-printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n"
+    curr_time=$(date +"%I:%M %p")
+    duration=$SECONDS
+
+    printf "           It is currently $curr_time; the process started at $start_time.\n"
+    printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n"
 
 
-if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
-    FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre
+    if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
+        FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre
+    else
+        FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre
+    fi
+
 else
-    FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre
+
+    printf "\n ############################################################################## \n"
+    printf " ####                          Running IQ-TREE                            ####\n"
+    printf " ############################################################################## \n\n"
+
+    curr_time=$(date +"%I:%M %p")
+    duration=$SECONDS
+
+    printf "           It is currently $curr_time; the process started at $start_time.\n"
+    printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n"
+
+
+    if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
+        iqtree -s ${output_dir}/Aligned_SCGs_mod_names.faa -nt $num_jobs -mset WAG,LG -pre iqtree_out
+    else
+        iqtree -s ${output_dir}/Aligned_SCGs.faa -nt $num_jobs -mset WAG,LG -pre iqtree_out
+    fi
+
+    mkdir ${output_dir}/iqtree_out/
+    mv iqtree_out* ${output_dir}/iqtree_out/
+    cp ${output_dir}/iqtree_out/iqtree_out.treefile ${output_dir}/Aligned_SCGs_mod_names.tre
+
 fi
-
-
 
 #############################################################################
 ##########################  JOB-FINISHED REPORTING  #########################
