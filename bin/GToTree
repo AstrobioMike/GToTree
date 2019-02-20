@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.1.5"
+VERSION="v1.1.6"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -645,7 +645,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
     if grep -q "^GCA" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
         printf "\t\t  ${GREEN}Downloading GenBank assembly summaries...${NC}\n\n"
-        curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
     fi
 
     # making sure file downloaded with no errors
@@ -659,7 +659,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
     if grep -q "^GCF" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
         printf "\n\t\t  ${GREEN}Downloading RefSeq assembly summaries...${NC}\n\n"
-        curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
         cat ${tmp_dir}/ncbi_RS_assembly_info.tmp >> ${tmp_dir}/ncbi_assembly_info.tmp
     fi
 
