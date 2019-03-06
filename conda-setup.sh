@@ -29,7 +29,7 @@ conda config --add channels au-eoed 2> /dev/null
 conda create -n gtotree biopython hmmer muscle trimal fasttree iqtree prodigal taxonkit gnu-parallel --yes
 
 ## activating environment
-source activate gtotree
+source activate gtotree 2> /dev/null || conda activate gtotree
 
 ## creating directory for conda-env-specific source files
 mkdir -p ${CONDA_PREFIX}/etc/conda/activate.d
@@ -62,7 +62,7 @@ echo 'export LC_ALL="en_US.UTF-8"' >> ${CONDA_PREFIX}/etc/conda/activate.d/env_v
 echo 'export LANG="en_US.UTF-8"' >> ${CONDA_PREFIX}/etc/conda/activate.d/env_vars.sh
 
 # re-activating environment so variable and PATH changes take effect
-source activate gtotree
+source activate gtotree 2> /dev/null || conda activate gtotree
 
 ## removing citation notifications from `parallel` (i note on all places it is mentioned to please cite them and all tools in here)
 printf "will cite" | parallel --citation 2&> /dev/null
