@@ -23,7 +23,7 @@ if [ -n GToTree_HMM_dir ]; then
     for hmm_set in $(ls ${GToTree_HMM_dir}/*.hmm)
     do
         sleep 0.2
-        num_genes=$(grep -c "^ACC" $hmm_set)
+        num_genes=$(grep -c "^NAME" $hmm_set)
         printf "\t   %-30s %14s\n" "$(basename $hmm_set)" "($num_genes genes)"
     done
 
