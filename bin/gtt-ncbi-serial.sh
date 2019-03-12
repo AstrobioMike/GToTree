@@ -87,17 +87,19 @@ do
             grep -w -c "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp
         done > ${tmp_dir}/${assembly}_uniq_counts.tmp
 
-        ## making list here of only those present in exactly 1 copy, unless running in "best-hit mode" ("-B" flag specified)
-        if [ $best_hit_mode == "false" ]; then
-            paste ${tmp_dir}/uniq_hmm_names.tmp ${tmp_dir}/${assembly}_uniq_counts.tmp > ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp
-            awk -F "\t" ' $2 == 1 ' ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp | cut -f 1 > ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp
-        fi
+        ## making list here of only those present in exactly 1 copy, to get count of "unique" SCG-hits
+
+        paste ${tmp_dir}/uniq_hmm_names.tmp ${tmp_dir}/${assembly}_uniq_counts.tmp > ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp
+        awk -F "\t" ' $2 == 1 ' ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp | cut -f 1 > ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp
+        uniq_SCG_hits=$(wc -l ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp | sed 's/^ *//' | cut -f 1 -d " ")
 
         ## adding SCG-hit counts to table
         paste <(printf $assembly) <(printf %s "$(cat ${tmp_dir}/${assembly}_uniq_counts.tmp | tr "\n" "\t")") >> ${output_dir}/All_genomes_SCG_hit_counts.tsv
 
         num_SCG_hits=$(awk ' $1 > 0 ' ${tmp_dir}/${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
         num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' ${tmp_dir}/${assembly}_uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
+
+
 
         perc_comp=$(echo "$num_SCG_hits / $hmm_target_genes_total * 100" | bc -l)
         perc_comp_rnd=$(printf "%.2f\n" $perc_comp)
@@ -125,7 +127,7 @@ do
             printf "  ${RED}****************************************************************************${NC}  \n\n"
 
             # writing to table of genomes with questionable redundancy estimates
-            printf "$assembly\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${tmp_dir}/Genomes_with_questionable_redundancy_estimates.tmp
+            printf "$assembly\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${tmp_dir}/Genomes_with_questionable_redundancy_estimates.tmp
 
         else
             printf "        Est. %% comp: ${perc_comp_rnd}; Est. %% redund: ${perc_redund_rnd}\n\n"
@@ -134,7 +136,7 @@ do
 
 
         ## writing summary info to table ##
-        printf "$assembly\t$downloaded_accession\t$ass_name\t$taxid\t$org_name\t$infraspecific_name\t$version_status\t$asm_level\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/NCBI_genomes_summary_info.tsv
+        printf "$assembly\t$downloaded_accession\t$ass_name\t$taxid\t$org_name\t$infraspecific_name\t$version_status\t$asm_level\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/NCBI_genomes_summary_info.tsv
 
         ### Pulling out hits for this genome ###
         # looping through and pulling out each first hit (hmm results tab is sorted by e-value):
@@ -159,7 +161,7 @@ do
 
         fi
 
-        rm -rf ${tmp_dir}/${assembly}_*.tmp ${tmp_dir}/${assembly}_genes.tmp.ssi
+        # rm -rf ${tmp_dir}/${assembly}_*.tmp ${tmp_dir}/${assembly}_genes.tmp.ssi
 
     else
         printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"

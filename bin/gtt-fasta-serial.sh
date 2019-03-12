@@ -19,7 +19,7 @@ do
 
     ### kill backstop
     # if there is a problem on any iteration, exiting this subprocess and then exiting main script with report of problem assembly
-    if [ -s ${tmp_dir}_kill_fasta_serial.prodigal ]; then
+    if [ -s ${tmp_dir}/kill_fasta_serial.prodigal ]; then
         exit
     fi
 
@@ -80,11 +80,10 @@ do
         grep -w -c "$SCG" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp
     done > ${tmp_dir}/${assembly}_uniq_counts.tmp
 
-    ## making list here of only those present in exactly 1 copy unless running in "best-hit mode" ("-B" flag specified)
-    if [ $best_hit_mode == "false" ]; then
-        paste ${tmp_dir}/uniq_hmm_names.tmp ${tmp_dir}/${assembly}_uniq_counts.tmp > ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp
-        awk -F "\t" ' $2 == 1 ' ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp | cut -f 1 > ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp
-    fi
+    ## making list here of only those present in exactly 1 copy
+    paste ${tmp_dir}/uniq_hmm_names.tmp ${tmp_dir}/${assembly}_uniq_counts.tmp > ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp
+    awk -F "\t" ' $2 == 1 ' ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp | cut -f 1 > ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp
+    uniq_SCG_hits=$(wc -l ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp | sed 's/^ *//' | cut -f 1 -d " ")
 
     ## adding SCG-hit counts to table
     paste <(printf $assembly) <(printf %s "$(cat ${tmp_dir}/${assembly}_uniq_counts.tmp | tr "\n" "\t")") >> ${output_dir}/All_genomes_SCG_hit_counts.tsv
@@ -118,7 +117,7 @@ do
         printf "  ${RED}****************************************************************************${NC}  \n\n"
 
         # writing to table of genomes with questionable redundancy estimates
-        printf "$assembly\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${tmp_dir}/Genomes_with_questionable_redundancy_estimates.tmp
+        printf "$assembly\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${tmp_dir}/Genomes_with_questionable_redundancy_estimates.tmp
 
     else
         printf "        Est. %% comp: ${perc_comp_rnd}; Est. %% redund: ${perc_redund_rnd}\n\n"
@@ -129,7 +128,7 @@ do
     taxid="NA"
 
     ## writing summary info to table ##
-    printf "$assembly\t$file\t$taxid\t$num_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Fasta_genomes_summary_info.tsv
+    printf "$assembly\t$file\t$taxid\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Fasta_genomes_summary_info.tsv
 
 
     ### Pulling out hits for this genome ###

@@ -7,20 +7,22 @@ NC='\033[0m'
 
 tmp_dir=$2
 hmm_file=$3
-genbank_genomes_total=$4
+amino_acid_genomes_total=$4
 num_cpus=$5
 hmm_target_genes_total=$6
 output_dir=$7
 best_hit_mode=$8
 
-num=0
-
-rm -rf ${output_dir}/Genbank_files_with_no_CDSs.txt # deleting if file exists
-
-# looping through the lines of the provided [-g] file (this loop operates on one genome at a time)
+# looping through the lines of the provided [-f] file (this loop operates on one genome at a time)
 while IFS=$'\t' read -r -a file
-
 do
+
+    ### kill backstop
+    # if there is a problem on any iteration, exiting this subprocess and then exiting main script with report of problem assembly
+    if [ -s ${tmp_dir}/kill_amino_acid_serial.problem ]; then
+        exit
+    fi
+
 
     ## checking if gzipped, gunzipping if so, and setting assembly name and file location variable either way
     if $(file $file | grep -q "gzip"); then
@@ -34,68 +36,18 @@ do
         was_gzipped=FALSE
     fi
 
-
     # adding assembly to ongoing genomes list
-    echo $assembly >> ${tmp_dir}/genbank_genomes_list.tmp
+    echo $assembly >> ${tmp_dir}/amino_acid_genomes_list.tmp
 
     num=$((num+1)) # to track progress
 
     printf "   --------------------------------------------------------------------------   \n"
-    printf "\tOn assembly ${GREEN}$assembly${NC}; Number $num of $genbank_genomes_total total.\n"
+    printf "\tOn assembly ${GREEN}$assembly${NC}; Number $num of $amino_acid_genomes_total total.\n"
     printf "   --------------------------------------------------------------------------   \n\n"
 
-    # storing more info about the assembly if it's present in the genbank file:
-    if grep -q "ORGANISM" $file_location; then 
-        org_name=$(grep -m1 "ORGANISM" $file_location | tr -s " " | cut -f3- -d " " | tr "[ ./\\]" "_" | tr -s "_")
-    else
-        org_name="NA"
-    fi
 
-    if grep -q "strain=" $file_location; then 
-        strain=$(grep -m1 "strain=" $file_location | tr -s " " | cut -f 2 -d '"')
-    else
-        strain="NA"
-    fi
-
-    if grep -q "taxon" $file_location; then
-        taxid=$(grep -m1 "taxon" $file_location | cut -f2 -d ":" | tr -d '"')
-    else
-        taxid="NA"
-    fi
-
-    # extracting AA coding sequences from genbank file
-    gtt-genbank-to-AA-seqs -i $file_location -o ${tmp_dir}/${assembly}_genes2.tmp 2> /dev/null
-
-    # checking that the file had CDS annotations, if not running prodigal
-    if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
-
-        printf "  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}  \n"
-        printf "\t  This genbank file doesn't appear to have CDS annotations,\n"
-        printf "\t  so we are identifying coding sequences with prodigal.\n\n"
-
-        printf "\t    Reported in \"${output_dir}/Genbank_files_with_no_CDSs.txt\".\n"
-        printf "  ${RED}****************************************************************************${NC}  \n\n"
-
-        echo "$file" >> ${output_dir}/Genbank_files_with_no_CDSs.txt
-        rm -rf ${tmp_dir}/${assembly}_genes2.tmp
-
-        # pulling out full nucleotide fasta from genbank file
-        gtt-genbank-to-fasta -i $file_location -o ${tmp_dir}/${assembly}_fasta.tmp 2> /dev/null
-
-        # running prodigal
-        prodigal -c -q -i ${tmp_dir}/${assembly}_fasta.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
-
-        if [ -s ${file_location}_prodigal.stderr ]; then
-            printf "$assembly" >> ${tmp_dir}/kill_genbank_serial.prodigal
-            rm -rf ${file_location}_prodigal.stderr
-            exit
-        else
-            rm -rf ${file_location}_prodigal.stderr
-        fi
-
-        tr -d '*' < ${tmp_dir}/${assembly}_genes1.tmp > ${tmp_dir}/${assembly}_genes2.tmp
-
-    fi
+    ## renaming seqs to have assembly name
+    gtt-rename-fasta-headers -i $file_location -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
 
     ## removing gunzipped genome file if it was gunzipped
     if [ $was_gzipped == "TRUE" ]; then
@@ -103,8 +55,11 @@ do
     fi
 
 
-    ## renaming seqs to have assembly name
-    gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
+    ## exiting here and reporting current input file if something is wrong with it and didn't get coding sequences
+    if [ ! -s ${tmp_dir}/${assembly}_genes.tmp ]; then
+        printf "$assembly" >> ${tmp_dir}/kill_amino_acid_serial.problem
+        exit
+    fi
 
 
     printf "      Performing HMM search...\n"
@@ -122,7 +77,6 @@ do
     paste ${tmp_dir}/uniq_hmm_names.tmp ${tmp_dir}/${assembly}_uniq_counts.tmp > ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp
     awk -F "\t" ' $2 == 1 ' ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp | cut -f 1 > ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp
     uniq_SCG_hits=$(wc -l ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp | sed 's/^ *//' | cut -f 1 -d " ")
-
 
     ## adding SCG-hit counts to table
     paste <(printf $assembly) <(printf %s "$(cat ${tmp_dir}/${assembly}_uniq_counts.tmp | tr "\n" "\t")") >> ${output_dir}/All_genomes_SCG_hit_counts.tsv
@@ -163,14 +117,17 @@ do
 
     fi
 
+    # adding NA for taxid so final table can still have the column and lineage for those that do have them
+    taxid="NA"
 
     ## writing summary info to table ##
-    printf "$assembly\t$file\t$taxid\t$org_name\t$strain\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Genbank_genomes_summary_info.tsv
+    printf "$assembly\t$file\t$taxid\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Amino_acid_genomes_summary_info.tsv
+
 
     ### Pulling out hits for this genome ###
     # looping through SCGs and pulling out each first hit (hmm results tab is sorted by e-value):
     esl-sfetch --index ${tmp_dir}/${assembly}_genes.tmp > /dev/null
-        
+
     # if best-hit mode is off, then only pulling genes that were identified in exactly 1 copy
     if [ $best_hit_mode  == "false" ]; then
 

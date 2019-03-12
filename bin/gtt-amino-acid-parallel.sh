@@ -16,7 +16,7 @@ best_hit_mode=$7
 ### kill backstop
 # if there is a problem, all child processes launched (by this script) will exit immediately,
 # upon returning to main script, will check and terminate parent process
-if [ -s ${tmp_dir}/kill_fasta_parallel.prodigal ]; then
+if [ -s ${tmp_dir}/kill_amino_acid_parallel.problem ]; then
     exit
 fi
 
@@ -36,32 +36,26 @@ printf "   ---------------------------------------------------------------------
 printf "     Genome: ${GREEN}$assembly${NC}\n"
 
 # adding assembly to ongoing genomes list
-echo $assembly >> ${tmp_dir}/fasta_genomes_list.tmp
+echo $assembly >> ${tmp_dir}/amino_acid_genomes_list.tmp
 
 num=$((num+1)) # to track progress
 
-
-prodigal -c -q -i $file_location -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
-
-if [ -s ${file_location}_prodigal.stderr ]; then
-    printf "$assembly" >> ${tmp_dir}/kill_fasta_parallel.prodigal
-    rm -rf ${file_location}_prodigal.stderr
-    exit
-else
-    rm -rf ${file_location}_prodigal.stderr
-fi
-
-tr -d '*' < ${tmp_dir}/${assembly}_genes1.tmp > ${tmp_dir}/${assembly}_genes2.tmp
-
+## renaming seqs to have assembly name
+gtt-rename-fasta-headers -i $file_location -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
 
 ## removing gunzipped genome file if it was gunzipped
 if [ $was_gzipped == "TRUE" ]; then
     rm -rf $file_location
 fi
 
-## renaming seqs to have assembly name
-gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
-  
+
+## exiting here and reporting current input file if something is wrong with it and didn't get coding sequences
+if [ ! -s ${tmp_dir}/${assembly}_genes.tmp ]; then
+    printf "$assembly" >> ${tmp_dir}/kill_amino_acid_parallel.problem
+    exit
+fi
+
+
 ### running hmm search ###
 hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp $hmm_file ${tmp_dir}/${assembly}_genes.tmp > /dev/null
 
@@ -119,7 +113,7 @@ fi
 taxid="NA"
 
 ## writing summary info to table ##
-printf "$assembly\t$1\t$taxid\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Fasta_genomes_summary_info.tsv
+printf "$assembly\t$1\t$taxid\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Amino_acid_genomes_summary_info.tsv
 
 ### Pulling out hits for this genome ###
 # looping through SCGs and pulling out each first hit (hmm results tab is sorted by e-value):
