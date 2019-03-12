@@ -47,19 +47,19 @@ See the ["What is GToTree?" wiki page](https://github.com/AstrobioMike/GToTree/w
 If you use GToTree, please cite these folks :)  
 
 - **[Biopython](https://biopython.org/wiki/Download)** - [citation](https://academic.oup.com/bioinformatics/article/25/11/1422/330687)
-- **[HMMER3](http://hmmer.org/download.html)** - citation: they note in the [user manual](http://eddylab.org/software/hmmer/Userguide.pdf) to cite the website, but there is also [this paper](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1002195)  
-- **[Muscle](https://www.drive5.com/muscle/downloads.htm)** - [citation](https://academic.oup.com/nar/article/32/5/1792/2380623)  
-- **[Trimal](http://trimal.cgenomics.org/downloads)** - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2712344/)  
-- **[FastTree](http://www.microbesonline.org/fasttree/)** - [citation](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490)  
+- **[HMMER3](http://hmmer.org/download.html)** v3.2.1 - citation: they note in the [user manual](http://eddylab.org/software/hmmer/Userguide.pdf) to cite [the website](http://hmmer.org/download.html), but there is also [this paper](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1002195)  
+- **[Muscle](https://www.drive5.com/muscle/downloads.htm)** v3.8 - [citation](https://academic.oup.com/nar/article/32/5/1792/2380623)  
+- **[Trimal](http://trimal.cgenomics.org/downloads)** v1.4 - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2712344/)  
+- **[FastTree](http://www.microbesonline.org/fasttree/)** v2.1 - [citation](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490)  
 
 ### Required based on inputs and options:
 If you use GToTree in a manner that uses these tools, please cite these folks :)  
 
-- **[Prodigal](https://github.com/hyattpd/Prodigal)** - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/)  
+- **[Prodigal](https://github.com/hyattpd/Prodigal)** v2.6.3 - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/)  
   - *if providing input genomes in fasta format, or GenBank format with no CDS annotations, or NCBI accessions to genomes with no gene calls*
-- **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** - [citation](https://www.biorxiv.org/content/early/2019/01/08/513523)
+- **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** v0.3 - [citation](https://www.biorxiv.org/content/early/2019/01/08/513523)
   - *if changing genome labels based on lineage information for input genomes with associated NCBI taxids*
-- **[GNU Parallel](https://www.gnu.org/software/parallel/)** - [citation info](https://www.gnu.org/software/parallel/parallel_design.html#Citation-notice)
+- **[GNU Parallel](https://www.gnu.org/software/parallel/)** v20161122 - [citation info](https://www.gnu.org/software/parallel/parallel_design.html#Citation-notice)
   - *if running in parallel*
 
 
