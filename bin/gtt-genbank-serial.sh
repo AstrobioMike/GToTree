@@ -22,7 +22,18 @@ while IFS=$'\t' read -r -a file
 
 do
 
-    assembly="$(basename ${file%.*})"
+    ## checking if gzipped, gunzipping if so, and setting assembly name and file location variable either way
+    if $(file $file | grep -q "gzip"); then
+        was_gzipped=TRUE # setting variable to be able to check and remove gunzipped file afterwards
+        file_location=${file%.*}
+        gunzip -c $file > $file_location
+        assembly="$(basename ${file_location%.*})"
+    else
+        file_location=$file
+        assembly="$(basename ${file%.*})"
+        was_gzipped=FALSE
+    fi
+
 
     # adding assembly to ongoing genomes list
     echo $assembly >> ${tmp_dir}/genbank_genomes_list.tmp
@@ -34,26 +45,26 @@ do
     printf "   --------------------------------------------------------------------------   \n\n"
 
     # storing more info about the assembly if it's present in the genbank file:
-    if grep -q "ORGANISM" $file; then 
-        org_name=$(grep -m1 "ORGANISM" $file | tr -s " " | cut -f3- -d " " | tr "[ ./\\]" "_" | tr -s "_")
+    if grep -q "ORGANISM" $file_location; then 
+        org_name=$(grep -m1 "ORGANISM" $file_location | tr -s " " | cut -f3- -d " " | tr "[ ./\\]" "_" | tr -s "_")
     else
         org_name="NA"
     fi
 
-    if grep -q "strain=" $file; then 
-        strain=$(grep -m1 "strain=" $file | tr -s " " | cut -f 2 -d '"')
+    if grep -q "strain=" $file_location; then 
+        strain=$(grep -m1 "strain=" $file_location | tr -s " " | cut -f 2 -d '"')
     else
         strain="NA"
     fi
 
-    if grep -q "taxon" $file; then
-        taxid=$(grep -m1 "taxon" $file | cut -f2 -d ":" | tr -d '"')
+    if grep -q "taxon" $file_location; then
+        taxid=$(grep -m1 "taxon" $file_location | cut -f2 -d ":" | tr -d '"')
     else
         taxid="NA"
     fi
 
     # extracting AA coding sequences from genbank file
-    gtt-genbank-to-AA-seqs -i $file -o ${tmp_dir}/${assembly}_genes2.tmp 2> /dev/null
+    gtt-genbank-to-AA-seqs -i $file_location -o ${tmp_dir}/${assembly}_genes2.tmp 2> /dev/null
 
     # checking that the file had CDS annotations, if not running prodigal
     if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
@@ -69,13 +80,28 @@ do
         rm -rf ${tmp_dir}/${assembly}_genes2.tmp
 
         # pulling out full nucleotide fasta from genbank file
-        gtt-genbank-to-fasta -i $file -o ${tmp_dir}/${assembly}_fasta.tmp 2> /dev/null
+        gtt-genbank-to-fasta -i $file_location -o ${tmp_dir}/${assembly}_fasta.tmp 2> /dev/null
 
         # running prodigal
-        prodigal -c -q -i ${tmp_dir}/${assembly}_fasta.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null
+        prodigal -c -q -i ${tmp_dir}/${assembly}_fasta.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
+
+        if [ -s ${file_location}_prodigal.stderr ]; then
+            printf "$assembly" >> ${tmp_dir}/kill_genbank_serial.prodigal
+            rm -rf ${file_location}_prodigal.stderr
+            exit
+        else
+            rm -rf ${file_location}_prodigal.stderr
+        fi
+
         tr -d '*' < ${tmp_dir}/${assembly}_genes1.tmp > ${tmp_dir}/${assembly}_genes2.tmp
 
     fi
+
+    ## removing gunzipped genome file if it was gunzipped
+    if [ $was_gzipped == "TRUE" ]; then
+        rm -rf $file_location
+    fi
+
 
     ## renaming seqs to have assembly name
     gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp

@@ -12,8 +12,25 @@ hmm_target_genes_total=$5
 output_dir=$6
 best_hit_mode=$7
 
-# setting assembly name as filename with no extension
-assembly="$(basename ${1%.*})"
+
+### kill backstop
+# if there is a problem, all child processes launched (by this script) will exit immediately,
+# upon returning to main script, will check and terminate parent process
+if [ -s ${tmp_dir}/kill_fasta_parallel.prodigal ]; then
+    exit
+fi
+
+## checking if gzipped, gunzipping if so, and setting assembly name and file location variable either way
+if $(file $1 | grep -q "gzip"); then
+    was_gzipped=TRUE # setting variable to be able to check and remove gunzipped file afterwards
+    file_location=${1%.*}
+    gunzip -c $1 > $file_location
+    assembly="$(basename ${file_location%.*})"
+else
+    file_location=$1
+    assembly="$(basename ${1%.*})"
+    was_gzipped=FALSE
+fi
 
 printf "   --------------------------------------------------------------------------   \n\n"
 printf "     Genome: ${GREEN}$assembly${NC}\n"
@@ -23,9 +40,24 @@ echo $assembly >> ${tmp_dir}/fasta_genomes_list.tmp
 
 num=$((num+1)) # to track progress
 
-## running prodigal to get coding sequences
-prodigal -c -q -i $1 -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null
+
+prodigal -c -q -i $file_location -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
+
+if [ -s ${file_location}_prodigal.stderr ]; then
+    printf "$assembly" >> ${tmp_dir}/kill_fasta_parallel.prodigal
+    rm -rf ${file_location}_prodigal.stderr
+    exit
+else
+    rm -rf ${file_location}_prodigal.stderr
+fi
+
 tr -d '*' < ${tmp_dir}/${assembly}_genes1.tmp > ${tmp_dir}/${assembly}_genes2.tmp
+
+
+## removing gunzipped genome file if it was gunzipped
+if [ $was_gzipped == "TRUE" ]; then
+    rm -rf $file_location
+fi
 
 ## renaming seqs to have assembly name
 gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp

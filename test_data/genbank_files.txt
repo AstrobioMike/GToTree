@@ -1,2 +1,2 @@
-GCA_900473895.1_N32_genomic.gbff
+GCA_900473895.1_N32_genomic.gbff.gz
 GCF_000012505.1_ASM1250v1_genomic.gbff

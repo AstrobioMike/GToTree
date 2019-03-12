@@ -12,38 +12,55 @@ hmm_target_genes_total=$5
 output_dir=$6
 best_hit_mode=$7
 
-assembly="$(basename ${1%.*})"
+
+### kill backstop
+# if there is a problem, all child processes launched (by this script) will exit immediately,
+# upon returning to main script, will check and terminate parent process
+if [ -s ${tmp_dir}/kill_genbank_parallel.prodigal ]; then
+    exit
+fi
+
+## checking if gzipped, gunzipping if so, and setting assembly name and file location variable either way
+if $(file $1 | grep -q "gzip"); then
+    was_gzipped=TRUE # setting variable to be able to check and remove gunzipped file afterwards
+    file_location=${1%.*}
+    gunzip -c $1 > $file_location
+    assembly="$(basename ${file_location%.*})"
+else
+    file_location=$1
+    assembly="$(basename ${1%.*})"
+    was_gzipped=FALSE
+fi
+
 
 printf "   --------------------------------------------------------------------------   \n\n"
 printf "     Genome: ${GREEN}$assembly${NC}\n"
-
-rm -rf ${output_dir}/Genbank_files_with_no_CDSs.txt # deleting if file exists
 
 # adding assembly to ongoing genomes list
 echo $assembly >> ${tmp_dir}/genbank_genomes_list.tmp
 
 # storing more info about the assembly if it's present in the genbank file:
 # checking for organism:
-if grep -q "ORGANISM" $1; then 
-    org_name=$(grep -m1 "ORGANISM" $1 | tr -s " " | cut -f3- -d " " | tr "[ ./\\]" "_" | tr -s "_")
+if grep -q "ORGANISM" $file_location; then 
+    org_name=$(grep -m1 "ORGANISM" $file_location | tr -s " " | cut -f3- -d " " | tr "[ ./\\]" "_" | tr -s "_")
 else
     org_name="NA"
 fi
 
-if grep -q "strain=" $1; then 
-    strain=$(grep -m1 "strain=" $1 | tr -s " " | cut -f 2 -d '"')
+if grep -q "strain=" $file_location; then 
+    strain=$(grep -m1 "strain=" $file_location | tr -s " " | cut -f 2 -d '"')
 else
     strain="NA"
 fi
 
-if grep -q "taxon" $1; then
-    taxid=$(grep -m1 "taxon" $1 | cut -f2 -d ":" | tr -d '"')
+if grep -q "taxon" $file_location; then
+    taxid=$(grep -m1 "taxon" $file_location | cut -f2 -d ":" | tr -d '"')
 else
     taxid="NA"
 fi
 
 # extracting AA coding sequences from genbank file
-gtt-genbank-to-AA-seqs -i $1 -o ${tmp_dir}/${assembly}_genes2.tmp 2> /dev/null
+gtt-genbank-to-AA-seqs -i $file_location -o ${tmp_dir}/${assembly}_genes2.tmp 2> /dev/null
 
 # checking that the file had CDS annotations
 if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
@@ -59,12 +76,26 @@ if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
     rm -rf ${tmp_dir}/${assembly}_genes2.tmp
 
     # pulling out full nucleotide fasta from genbank file
-    gtt-genbank-to-fasta -i $1 -o ${tmp_dir}/${assembly}_fasta.tmp 2> /dev/null
+    gtt-genbank-to-fasta -i $file_location -o ${tmp_dir}/${assembly}_fasta.tmp 2> /dev/null
 
     # running prodigal
-    prodigal -c -q -i ${tmp_dir}/${assembly}_fasta.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null
+    prodigal -c -q -i ${tmp_dir}/${assembly}_fasta.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
+
+    if [ -s ${file_location}_prodigal.stderr ]; then
+        printf "$assembly" >> ${tmp_dir}/kill_genbank_parallel.prodigal
+        rm -rf ${file_location}_prodigal.stderr
+        exit
+    else
+        rm -rf ${file_location}_prodigal.stderr
+    fi
+
     tr -d '*' < ${tmp_dir}/${assembly}_genes1.tmp > ${tmp_dir}/${assembly}_genes2.tmp
 
+fi
+
+## removing gunzipped genome file if it was gunzipped
+if [ $was_gzipped == "TRUE" ]; then
+    rm -rf $file_location
 fi
 
 ## renaming seqs to have assembly name

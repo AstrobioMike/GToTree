@@ -17,8 +17,24 @@ best_hit_mode=$8
 while IFS=$'\t' read -r -a file
 do
 
-    # setting assembly name as filename with no extension
-    assembly="$(basename ${file%.*})"
+    ### kill backstop
+    # if there is a problem on any iteration, exiting this subprocess and then exiting main script with report of problem assembly
+    if [ -s ${tmp_dir}_kill_fasta_serial.prodigal ]; then
+        exit
+    fi
+
+
+    ## checking if gzipped, gunzipping if so, and setting assembly name and file location variable either way
+    if $(file $file | grep -q "gzip"); then
+        was_gzipped=TRUE # setting variable to be able to check and remove gunzipped file afterwards
+        file_location=${file%.*}
+        gunzip -c $file > $file_location
+        assembly="$(basename ${file_location%.*})"
+    else
+        file_location=$file
+        assembly="$(basename ${file%.*})"
+        was_gzipped=FALSE
+    fi
 
     # adding assembly to ongoing genomes list
     echo $assembly >> ${tmp_dir}/fasta_genomes_list.tmp
@@ -32,8 +48,23 @@ do
     printf "      Getting coding seqs...\n\n"
 
     ## running prodigal to get coding sequences
-    prodigal -c -q -i $file -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null
+    prodigal -c -q -i $file_location -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
+
+    if [ -s ${file_location}_prodigal.stderr ]; then
+        printf "$assembly" >> ${tmp_dir}/kill_fasta_serial.prodigal
+        rm -rf ${file_location}_prodigal.stderr
+
+        exit
+    else
+        rm -rf ${file_location}_prodigal.stderr
+    fi
+
     tr -d '*' < ${tmp_dir}/${assembly}_genes1.tmp > ${tmp_dir}/${assembly}_genes2.tmp
+
+    ## removing gunzipped genome file if it was gunzipped
+    if [ $was_gzipped == "TRUE" ]; then
+        rm -rf $file_location
+    fi
 
     ## renaming seqs to have assembly name
     gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp

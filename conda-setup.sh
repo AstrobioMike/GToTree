@@ -26,7 +26,7 @@ conda config --add channels conda-forge 2> /dev/null
 conda config --add channels au-eoed 2> /dev/null
 
 ## creating GToTree environment and installing dependencies
-conda create -n gtotree biopython hmmer muscle trimal fasttree iqtree prodigal taxonkit gnu-parallel --yes
+conda create -n gtotree biopython hmmer=3.2.1 muscle=3.8.1551 trimal=1.4.1 fasttree=2.1.10 iqtree=1.6.9 prodigal=2.6.3 taxonkit=0.3.0 gnu-parallel=20161122 --yes
 
 ## activating environment
 source activate gtotree 2> /dev/null || conda activate gtotree

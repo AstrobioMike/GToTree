@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.1.8"
+VERSION="v1.1.9"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -807,8 +807,71 @@ if [ -n "$genbank_list_file" ]; then
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
         gtt-genbank-serial.sh $genbank_list_file $tmp_dir $hmm_file $genbank_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+
+        ### kill backstop ###
+        # if there was a problem with the serial genbank genome processing, killing main program here and reporting
+        if [ -s ${tmp_dir}/kill_genbank_serial.prodigal ]; then
+
+            problem_assembly=$(head -n 1 ${tmp_dir}/kill_genbank_serial.prodigal)
+
+            printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
+            printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
+            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
+            printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
+            printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+
+            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
+            printf "    Something went wrong with prodigal trying to call genes on the fasta\n" | tee -a $gtotree_log
+            printf "    file generated from assembly ${GREEN}${problem_assembly}${NC}.\n" | tee -a $gtotree_log
+            printf "    GToTree is not sure it should move forward when something odd is going\n" | tee -a $gtotree_log
+            printf "    on like this :(\n" | tee -a $gtotree_log
+            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+
+            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+
+            # removing tmp directory unless debug set
+            if [ $debug_flag == 'false' ]; then
+                rm -rf $tmp_dir
+            fi
+
+            mv $gtotree_log ${output_dir}/gtotree-runlog.txt
+            exit
+        fi
+
     else
         cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+
+
+        ### kill backstop ###
+        # if there was a problem with the parallel genbank genome processing, killing main program here and reporting
+        if [ -s ${tmp_dir}/kill_genbank_parallel.prodigal ]; then
+
+            problem_assembly=$(head -n 1 ${tmp_dir}/kill_genbank_parallel.prodigal)
+
+            printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
+            printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
+            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
+            printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
+            printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+
+            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
+            printf "    Something went wrong with prodigal trying to call genes on the fasta\n" | tee -a $gtotree_log
+            printf "    file generated from assembly ${GREEN}${problem_assembly}${NC}.\n" | tee -a $gtotree_log
+            printf "    GToTree is not sure it should move forward when something odd is going\n" | tee -a $gtotree_log
+            printf "    on like this :(\n" | tee -a $gtotree_log
+            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+
+            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+
+            # removing tmp directory unless debug set
+            if [ $debug_flag == 'false' ]; then
+                rm -rf $tmp_dir
+            fi
+
+            mv $gtotree_log ${output_dir}/gtotree-runlog.txt
+            exit
+        fi
+
     fi
 
     mv ${tmp_dir}/genbank_genomes_list.tmp ${tmp_dir}/final_included_genbank_genomes.tmp
@@ -819,8 +882,6 @@ if [ -n "$genbank_list_file" ]; then
     printf "________________________________________________________________________________\n\n" | tee -a $gtotree_log
 
 fi
-
-
 
 
 #############################################################################
@@ -848,9 +909,72 @@ if [ -n "$fasta_files" ]; then
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
         gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+
+        ### kill backstop ###
+        # if there was a problem with the serial fasta genome processing, killing main program here and reporting
+        if [ -s ${tmp_dir}/kill_fasta_serial.prodigal ]; then
+
+            problem_assembly=$(head -n 1 ${tmp_dir}/kill_fasta_serial.prodigal)
+
+            printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
+            printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
+            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
+            printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
+            printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+
+            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
+            printf "    Something went wrong with prodigal trying to call genes on assembly\n" | tee -a $gtotree_log
+            printf "    ${GREEN}${problem_assembly}${NC}. GToTree is not sure it should\n" | tee -a $gtotree_log
+            printf "    move forward when something odd is going on like this :(\n" | tee -a $gtotree_log
+            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+
+            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+
+            # removing tmp directory unless debug set
+            if [ $debug_flag == 'false' ]; then
+                rm -rf $tmp_dir
+            fi
+
+            mv $gtotree_log ${output_dir}/gtotree-runlog.txt
+            exit
+        fi
+
     else
         cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+
+        ### kill backstop ###
+        # if there was a problem with the parallel fasta genome processing, killing main program here and reporting
+        if [ -s ${tmp_dir}/kill_fasta_parallel.prodigal ]; then
+
+            problem_assembly=$(head -n 1 ${tmp_dir}/kill_fasta_parallel.prodigal)
+
+            printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
+            printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
+            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
+            printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
+            printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+
+            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
+            printf "    Something went wrong with prodigal trying to call genes on assembly\n" | tee -a $gtotree_log
+            printf "    ${GREEN}${problem_assembly}${NC}. GToTree is not sure it should\n" | tee -a $gtotree_log
+            printf "    move forward when something odd is going on like this :(\n" | tee -a $gtotree_log
+            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+
+            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+
+            # removing tmp directory unless debug set
+            if [ $debug_flag == 'false' ]; then
+                rm -rf $tmp_dir
+            fi
+
+            mv $gtotree_log ${output_dir}/gtotree-runlog.txt
+            exit
+        fi
+
     fi
+
+
+
 
     # adding retained genomes to genomes from all sources file
     cat ${tmp_dir}/fasta_genomes_list.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
@@ -1658,6 +1782,7 @@ else
 fi
 
 # reporting primary output files
+
 printf "    Full alignment written to file:\n" | tee -a $gtotree_log
 printf "        ${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\n\n" | tee -a $gtotree_log
 if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
@@ -1733,6 +1858,10 @@ fi
 duration=$SECONDS
 
 printf "                                         Total process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+
+# reporting log file output
+printf "    Log file written to:\n" | tee -a $gtotree_log
+printf "        ${GREEN}${output_dir}/gtotree-runlog.txt${NC}\n\n" | tee -a $gtotree_log
 
 mv $gtotree_log ${output_dir}/gtotree-runlog.txt
 rm -rf  *.tmp
