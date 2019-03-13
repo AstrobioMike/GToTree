@@ -11,7 +11,7 @@
 ---
 
 # GToTree: a user-friendly workflow for phylogenomics
-[GToTree](https://github.com/AstrobioMike/GToTree/wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. The preprint is available [here](https://www.biorxiv.org/content/early/2019/01/06/512491), and documentation and examples can be found [at the wiki here](https://github.com/AstrobioMike/GToTree/wiki).
+[GToTree](https://github.com/AstrobioMike/GToTree/wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. The open-access Bioinformatics Journal publication is available [here](https://doi.org/10.1093/bioinformatics/btz188), and documentation and examples can be found [at the wiki here](https://github.com/AstrobioMike/GToTree/wiki).
 
 ---
 
