@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.1.10"
+VERSION="v1.1.11"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -31,7 +31,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "      1) Input genomes in one or any combination of the following formats:\n"
     printf "        - [-a <file>] single-column file of NCBI assembly accessions\n"
     printf "        - [-g <file>] single-column file with the paths to each GenBank file\n"
-    printf "        - [-f <file>] single-column file with the paths to each fasta file\n\n"
+    printf "        - [-f <file>] single-column file with the paths to each fasta file\n"
     printf "        - [-A <file>] single-column file with the paths to each amino acid file,\n"
     printf "                      each file should hold the coding sequences for just one genome\n\n"
 
@@ -870,7 +870,14 @@ if [ -n "$genbank_list_file" ]; then
             printf "    Something went wrong with prodigal trying to call genes on the fasta\n" | tee -a $gtotree_log
             printf "    file generated from assembly ${GREEN}${problem_assembly}${NC}.\n" | tee -a $gtotree_log
             printf "    GToTree is not sure it should move forward when something odd is going\n" | tee -a $gtotree_log
-            printf "    on like this :(\n" | tee -a $gtotree_log
+            printf "    on like this :(\n\n" | tee -a $gtotree_log
+
+            printf "    It is possible this is just because this assembly is shorter than\n" | tee -a $gtotree_log
+            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee -a $gtotree_log
+            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee -a $gtotree_log
+            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee -a $gtotree_log
+            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee -a $gtotree_log
+            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee -a $gtotree_log
             printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
 
             printf "\nExiting for now.\n\n" | tee -a $gtotree_log
@@ -904,7 +911,15 @@ if [ -n "$genbank_list_file" ]; then
             printf "    Something went wrong with prodigal trying to call genes on the fasta\n" | tee -a $gtotree_log
             printf "    file generated from assembly ${GREEN}${problem_assembly}${NC}.\n" | tee -a $gtotree_log
             printf "    GToTree is not sure it should move forward when something odd is going\n" | tee -a $gtotree_log
-            printf "    on like this :(\n" | tee -a $gtotree_log
+            printf "    on like this :(\n\n" | tee -a $gtotree_log
+
+
+            printf "    It is possible this is just because this assembly is shorter than\n" | tee -a $gtotree_log
+            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee -a $gtotree_log
+            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee -a $gtotree_log
+            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee -a $gtotree_log
+            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee -a $gtotree_log
+            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee -a $gtotree_log
             printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
 
             printf "\nExiting for now.\n\n" | tee -a $gtotree_log
@@ -971,7 +986,14 @@ if [ -n "$fasta_files" ]; then
             printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
             printf "    Something went wrong with prodigal trying to call genes on assembly\n" | tee -a $gtotree_log
             printf "    ${GREEN}${problem_assembly}${NC}. GToTree is not sure it should\n" | tee -a $gtotree_log
-            printf "    move forward when something odd is going on like this :(\n" | tee -a $gtotree_log
+            printf "    move forward when something odd is going on like this :(\n\n" | tee -a $gtotree_log
+
+            printf "    It is possible this is just because this assembly is shorter than\n" | tee -a $gtotree_log
+            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee -a $gtotree_log
+            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee -a $gtotree_log
+            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee -a $gtotree_log
+            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee -a $gtotree_log
+            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee -a $gtotree_log
             printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
 
             printf "\nExiting for now.\n\n" | tee -a $gtotree_log
@@ -1003,7 +1025,14 @@ if [ -n "$fasta_files" ]; then
             printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
             printf "    Something went wrong with prodigal trying to call genes on assembly\n" | tee -a $gtotree_log
             printf "    ${GREEN}${problem_assembly}${NC}. GToTree is not sure it should\n" | tee -a $gtotree_log
-            printf "    move forward when something odd is going on like this :(\n" | tee -a $gtotree_log
+            printf "    move forward when something odd is going on like this :(\n\n" | tee -a $gtotree_log
+
+            printf "    It is possible this is just because this assembly is shorter than\n" | tee -a $gtotree_log
+            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee -a $gtotree_log
+            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee -a $gtotree_log
+            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee -a $gtotree_log
+            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee -a $gtotree_log
+            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee -a $gtotree_log
             printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
 
             printf "\nExiting for now.\n\n" | tee -a $gtotree_log

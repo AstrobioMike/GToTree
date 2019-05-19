@@ -82,7 +82,7 @@ if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
     prodigal -c -q -i ${tmp_dir}/${assembly}_fasta.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
 
     if [ -s ${file_location}_prodigal.stderr ]; then
-        printf "$assembly" >> ${tmp_dir}/kill_genbank_parallel.prodigal
+        printf "$assembly\n" >> ${tmp_dir}/kill_genbank_parallel.prodigal
         rm -rf ${file_location}_prodigal.stderr
         exit
     else

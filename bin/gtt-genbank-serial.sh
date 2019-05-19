@@ -86,7 +86,7 @@ do
         prodigal -c -q -i ${tmp_dir}/${assembly}_fasta.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
 
         if [ -s ${file_location}_prodigal.stderr ]; then
-            printf "$assembly" >> ${tmp_dir}/kill_genbank_serial.prodigal
+            printf "$assembly\n" >> ${tmp_dir}/kill_genbank_serial.prodigal
             rm -rf ${file_location}_prodigal.stderr
             exit
         else

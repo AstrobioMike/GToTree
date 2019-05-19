@@ -44,7 +44,7 @@ num=$((num+1)) # to track progress
 prodigal -c -q -i $file_location -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
 
 if [ -s ${file_location}_prodigal.stderr ]; then
-    printf "$assembly" >> ${tmp_dir}/kill_fasta_parallel.prodigal
+    printf "$assembly\n" >> ${tmp_dir}/kill_fasta_parallel.prodigal
     rm -rf ${file_location}_prodigal.stderr
     exit
 else
