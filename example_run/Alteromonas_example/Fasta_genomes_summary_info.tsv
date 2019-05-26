@@ -1,2 +1,2 @@
-Assembly_name	Original_file_name	taxid	uniq_SCG_hits	perc_comp	perc_redund
-GCA_002271865.1	GCA_002271865.1.fa	NA	172	100.00	0.58
+Assembly_name	Original_file_name	taxid	num_SCG_hits	uniq_SCG_hits	perc_comp	perc_redund
+GCA_002271865.1	GCA_002271865.1.fa	NA	172	171	100.00	0.58

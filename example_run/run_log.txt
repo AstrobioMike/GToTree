@@ -16,4 +16,4 @@ ls *.fa > fasta_files.txt
 ls *.gbff > genbank_files.txt
 
  # running GToTree
-GToTree -a alteromonas_refseq_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Gammaproteobacteria.hmm -t -L Species,Strain -m genome_to_id_map.tsv -j 4 -o Alteromonas_example
+GToTree -a alteromonas_refseq_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Gammaproteobacteria -t -L Species,Strain -m genome_to_id_map.tsv -j 4 -o Alteromonas_example

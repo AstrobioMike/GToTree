@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.1.12"
+VERSION="v1.1.13"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -1701,7 +1701,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
             for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
             do
                 grep -w -m1 "$id" ${output_dir}/All_genomes_summary_info.tsv
-            done | cut -f 1,10-16 > ${tmp_dir}/working_taxonkit_lineages.tmp
+            done | cut -f 1,9-15 > ${tmp_dir}/working_taxonkit_lineages.tmp
 
             ## builing new taxonkit-swapped labels based upon user-desired ranks (provided by -L flag)
             cut -f1 ${tmp_dir}/working_taxonkit_lineages.tmp > ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
