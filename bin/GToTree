@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.1.13"
+VERSION="v1.2.1"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -62,6 +62,9 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  A comma-separated list of the taxonomic ranks you'd like added to\n"
     printf "                  the labels if using TaxonKit (-t flag specified). E.g., all would be\n"
     printf "                  \"-L Domain,Phylum,Class,Order,Family,Genus,Species,Strain\"\n\n"
+
+    printf "        - [-N] default: false\n"
+    printf "                  No tree. Generate alignment only.\n\n"    
 
     printf "        - [-T <str>] default: FastTree\n"
     printf "                  Which program to use for tree generation. Currently supported are\n"
@@ -149,9 +152,10 @@ taxonkit_id_swap='false'
 debug_flag='false'
 lineage_spec="Domain,Phylum,Class,Species,Strain"
 best_hit_mode='false'
+align_only='false'
 tree_program='FastTree'
 
-while getopts :a:g:f:A:H:o:m:tL:T:c:G:Bdn:j: args
+while getopts :a:g:f:A:H:o:m:tL:NT:c:G:Bdn:j: args
 do
     case "${args}"
     in
@@ -164,6 +168,7 @@ do
         m) file_to_genome_id_map=${OPTARG};;
         t) taxonkit_id_swap='true';;
         L) lineage_spec=${OPTARG};;
+        N) align_only='true' ;;
         T) tree_program=${OPTARG};;
         c) len_cutoff=${OPTARG};;
         G) gen_cutoff=${OPTARG};;
@@ -488,7 +493,7 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTree" ]; then
+if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTree" ] || [ $align_only == 'true' ]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
@@ -521,8 +526,16 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
         printf "      - Gene-length filtering cutoff threshold (\"-c\") has been set to $len_cutoff.\n" | tee -a $gtotree_log
     fi
 
-    if [ $tree_program != "FastTree" ]; then
-        printf "      - Tree generation program (\"-T\") has been set to $tree_program.\n" | tee -a $gtotree_log
+    if [ $align_only == 'true' ]; then
+        printf "      - Only generating alignment, no tree, as \"-N\" option has been provided.\n" | tee -a $gtotree_log
+    fi
+
+    if [ $align_only == 'false' ]; then
+
+        if [ $tree_program != "FastTree" ]; then
+            printf "      - Tree generation program (\"-T\") has been set to $tree_program.\n" | tee -a $gtotree_log
+        fi
+
     fi
 
     if [ $gen_cutoff != "0.5" ]; then
@@ -1579,6 +1592,42 @@ grep ">" ${tmp_dir}/cat.tmp | cut -f1 > ${tmp_dir}/headers.tmp
 grep -v ">" ${tmp_dir}/cat.tmp | sed -e $'s/\t/XXXXX/g' > ${tmp_dir}/seqs.tmp
 paste -d "\n" ${tmp_dir}/headers.tmp ${tmp_dir}/seqs.tmp > ${output_dir}/Aligned_SCGs.faa
 
+# creating partitions file of gene coordinates for those that want might want it for mixed models with something like iqtree
+curr_start=1
+curr_stop=0
+n=1
+num_to_do=$(ls ${tmp_dir}/*_all_aligned.faa | wc -l)
+
+for gene_file in $(ls ${tmp_dir}/*_all_aligned.faa)
+
+do
+    if [ $n == 1 ]; then
+        n=$(($n + 1))
+        gene_base=$(basename $gene_file)
+        gene=${gene_base%%_all_aligned.faa}
+        len_tmp=$(head -n 2 $gene_file | grep -v ">" | wc -c)
+        len_tmp=$(echo "$len_tmp - 1" | bc)
+
+        printf "AA, $gene = 1-${len_tmp}\n"
+
+        curr_start=$(echo "$len_tmp + 6" | bc)
+
+    else
+        n=$(($n + 1))
+        gene_base=$(basename $gene_file)
+        gene=${gene_base%%_all_aligned.faa}
+        len_tmp=$(head -n 2 $gene_file | grep -v ">" | wc -c)
+        len_tmp=$(echo "$len_tmp - 1" | bc)
+
+        curr_stop=$(echo "$curr_start + $len_tmp - 1" | bc)
+
+        printf "AA, $gene = ${curr_start}-${curr_stop}\n"
+
+        curr_start=$(echo "$curr_stop + 6" | bc)
+    fi
+
+done > ${output_dir}/Partitions.txt
+
 # storing genomes that made it through workflow to report at end
 genomes_retained=$(wc -l ${tmp_dir}/final_genomes_from_all_sources.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
@@ -1938,47 +1987,51 @@ fi
 ##############################   MAKING TREE  ###############################
 #############################################################################
 
-if [ $tree_program == 'FastTree' ]; then
+if [ $align_only == 'false' ]; then
 
-    printf "\n ############################################################################## \n" | tee -a $gtotree_log
-    printf " ####                          Running FastTree                            ####\n" | tee -a $gtotree_log
-    printf " ############################################################################## \n\n" | tee -a $gtotree_log
+    if [ $tree_program == 'FastTree' ]; then
 
-    curr_time=$(date +"%I:%M %p")
-    duration=$SECONDS
+        printf "\n ############################################################################## \n" | tee -a $gtotree_log
+        printf " ####                          Running FastTree                            ####\n" | tee -a $gtotree_log
+        printf " ############################################################################## \n\n" | tee -a $gtotree_log
 
-    printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-    printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+        curr_time=$(date +"%I:%M %p")
+        duration=$SECONDS
+
+        printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
+        printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
 
 
-    if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-        FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre | tee -a $gtotree_log
+        if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
+            FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre | tee -a $gtotree_log
+        else
+            FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre | tee -a $gtotree_log
+        fi
+
     else
-        FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre | tee -a $gtotree_log
+
+        printf "\n ############################################################################## \n" | tee -a $gtotree_log
+        printf " ####                          Running IQ-TREE                            ####\n" | tee -a $gtotree_log
+        printf " ############################################################################## \n\n" | tee -a $gtotree_log
+
+        curr_time=$(date +"%I:%M %p")
+        duration=$SECONDS
+
+        printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
+        printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+
+
+        if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
+            iqtree -s ${output_dir}/Aligned_SCGs_mod_names.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out
+        else
+            iqtree -s ${output_dir}/Aligned_SCGs.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out
+        fi
+
+        mkdir ${output_dir}/iqtree_out/
+        mv iqtree_out* ${output_dir}/iqtree_out/
+        cp ${output_dir}/iqtree_out/iqtree_out.treefile ${output_dir}/Aligned_SCGs_mod_names.tre
+
     fi
-
-else
-
-    printf "\n ############################################################################## \n" | tee -a $gtotree_log
-    printf " ####                          Running IQ-TREE                            ####\n" | tee -a $gtotree_log
-    printf " ############################################################################## \n\n" | tee -a $gtotree_log
-
-    curr_time=$(date +"%I:%M %p")
-    duration=$SECONDS
-
-    printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-    printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
-
-
-    if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-        iqtree -s ${output_dir}/Aligned_SCGs_mod_names.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out
-    else
-        iqtree -s ${output_dir}/Aligned_SCGs.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out
-    fi
-
-    mkdir ${output_dir}/iqtree_out/
-    mv iqtree_out* ${output_dir}/iqtree_out/
-    cp ${output_dir}/iqtree_out/iqtree_out.treefile ${output_dir}/Aligned_SCGs_mod_names.tre
 
 fi
 
@@ -2000,22 +2053,34 @@ fi
 
 # reporting primary output files
 
-printf "    Full alignment written to file:\n" | tee -a $gtotree_log
-printf "        ${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\n\n" | tee -a $gtotree_log
-if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-    printf "    Alignment with altered headers written to file:\n" | tee -a $gtotree_log
-    printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.faa${NC}\n\n" | tee -a $gtotree_log
-    printf "    Tree written to file:\n" | tee -a $gtotree_log
-    printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.tre${NC}\n\n" | tee -a $gtotree_log
-else
-    printf "    Tree written to file:\n" | tee -a $gtotree_log
-    printf "        ${GREEN}${output_dir}/Aligned_SCGs.tre${NC}\n\n" | tee -a $gtotree_log
+if [ $align_only == 'false' ]; then
+
+    if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
+
+        printf "    Tree written to:\n" | tee -a $gtotree_log
+        printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.tre${NC}\n\n" | tee -a $gtotree_log
+    else
+        printf "    Tree written to:\n" | tee -a $gtotree_log
+        printf "        ${GREEN}${output_dir}/Aligned_SCGs.tre${NC}\n\n" | tee -a $gtotree_log
+    fi
+
 fi
 
-printf "    Summary file with comp./redund. estimates written to file:\n" | tee -a $gtotree_log
+printf "    Full alignment written to:\n" | tee -a $gtotree_log
+printf "        ${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\n\n" | tee -a $gtotree_log
+
+if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
+    printf "    Alignment with altered headers written to:\n" | tee -a $gtotree_log
+    printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.faa${NC}\n\n" | tee -a $gtotree_log
+fi
+
+printf "    Partitions (for downstream use with mixed-model treeing) written to:\n" | tee -a $gtotree_log
+printf "        ${GREEN}${output_dir}/Partitions.txt${NC}\n\n" | tee -a $gtotree_log
+
+printf "    Summary file with comp./redund. estimates written to:\n" | tee -a $gtotree_log
 printf "        ${GREEN}${output_dir}/All_genomes_summary_info.tsv${NC}\n\n" | tee -a $gtotree_log
 
-printf "    Summary table with hits per target gene per genome written to file:\n" | tee -a $gtotree_log
+printf "    Summary table with hits per target gene per genome written to:\n" | tee -a $gtotree_log
 printf "        ${GREEN}${output_dir}/All_genomes_SCG_hit_counts.tsv${NC}\n\n" | tee -a $gtotree_log
 
 # reporting any problem files/accessions
