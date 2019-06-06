@@ -1,0 +1,3 @@
+GToTree-pfam-search -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -A amino_acid_files.txt -p pfam_targets.txt -o pfam_search_test
+
+gtt-clean-after-test.sh

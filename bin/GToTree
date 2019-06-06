@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.2.1"
+VERSION="v1.3.1"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -69,7 +69,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "        - [-T <str>] default: FastTree\n"
     printf "                  Which program to use for tree generation. Currently supported are\n"
     printf "                  \"FastTree\" and \"IQ-TREE\". As of now, these run with default settings\n"
-    printf "                  only (and QT-TREE includes \"-mset WAG,LG\". To run either with more\n" 
+    printf "                  only (and IQ-TREE includes \"-mset WAG,LG\". To run either with more\n" 
     printf "                  specific options (and there is a lot of room for variation here), you\n"
     printf "                  can use the output alignment file from GToTree as input.\n\n"
 
@@ -142,6 +142,19 @@ if ! command -v FastTree > /dev/null; then
     exit
 fi
 
+#############################################################################
+##########  SETTING VARIABLES TO REPORT WHAT SHOULD BE CITED AT END #########
+#############################################################################
+parallel_used="false"
+prodigal_used="false"
+hmmer_used="false"
+muscle_used="false"
+trimal_used="false"
+taxonkit_used="false"
+fasttree_used="false"
+iqtree_used="false"
+universal_SCGs_used="false"
+
 
 #############################################################################
 ############################  PARSING ARGUMENTS  ############################
@@ -189,6 +202,26 @@ if [ $taxonkit_id_swap != "false" ]; then
         exit
     fi
 fi
+
+# checking iqtree is available if it was specified, and checking tree program properly specified
+if [ $tree_program != "FastTree" ]; then
+    if [ $tree_program == "IQ-TREE" ]; then    
+        if ! command -v iqtree > /dev/null; then
+            printf "\n  ${RED}You specified to use IQ-TREE, but 'iqtree' not found in your PATH :(${NC}\n"
+            printf "\nExiting for now.\n\n"
+            exit
+        fi
+    else
+        printf "\n  ${RED}You specified to use $tree_program, but that is not one of the options :(${NC}\n"
+        printf "\n  Currently available options are 'FastTree' (the default), or 'IQ-TREE'.\n\n"
+
+        printf "  You can also run GToTree in alignment-only mode by adding the \"-N\" flag,\n"
+        printf "  and then take your concatenated alignment to another tree program :)\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+fi
+
 
 # checking no duplicates in NCBI accession file
 if [ -f "$NCBI_acc_file" ]; then
@@ -263,6 +296,7 @@ else
         printf "\nExiting for now.\n\n"
         exit
     fi
+
 fi
 
 
@@ -468,6 +502,11 @@ printf "\n                             ${GREEN}Total input genomes: $total_input
 #### checking and reporting specified hmm source ####
 printf "\n    HMM source to be used:\n" | tee -a $gtotree_log
 
+if [ $hmm_file == "Universal" ]; then
+    hmm_file="Universal_Hug_et_al"
+    universal_SCGs_used="true"
+fi
+
 if [ -f "$hmm_file" ]; then
     grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
     hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
@@ -487,7 +526,6 @@ else
     printf "\nExiting for now.\n\n" | tee -a $gtotree_log
     exit
 fi
-
 
 
 #############################################################################
@@ -515,6 +553,7 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
 
     if [ $taxonkit_id_swap != "false" ]; then
         printf "      - Taxonkit will be used to add lineage info to labels.\n" | tee -a $gtotree_log
+        taxonkit_used="true"
     fi
 
     if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
@@ -548,6 +587,7 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
 
     if [ $num_jobs != "1" ]; then
         printf "      - Number of jobs to run during parallelizable steps has been set to $num_jobs.\n" | tee -a $gtotree_log
+        parallel_used="true"
     fi
 
     if [ $best_hit_mode == "true" ]; then
@@ -581,13 +621,16 @@ if [ $total_input_genomes -le 20 ]; then
 
     printf "  ${RED}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
 
-    ## if i want this as manual input can use the following...
-    ## for now just warning and moving on so this stays fully automated once started
+    ### if i want this as manual input can use the following... ###
+
 #     read -n 1 -s -p "      Press any key to continue with \"-c\" set to $len_cutoff for this run, or
 #       press \"CTRL+C\" to cancel and exit.
 # "
 
     # printf "\n\n\t          Moving forward with \"-c\" set to $len_cutoff this run.\n\n"
+
+
+    ### for now just warning and moving on so this stays fully automated once started ###
 
     sleep 3
 fi
@@ -788,6 +831,11 @@ if [ -n "$NCBI_acc_file" ]; then
         cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
     fi
 
+    ## checking if prodigal was used to add to citations list being reported at end
+    if [ -s ${tmp_dir}/prodigal_used ]; then
+        prodigal_used="true"
+    fi
+
     printf "________________________________________________________________________________\n\n" | tee -a $gtotree_log
 
 
@@ -953,6 +1001,11 @@ if [ -n "$genbank_list_file" ]; then
     # adding retained genomes to genomes from all sources file
     cat ${tmp_dir}/final_included_genbank_genomes.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
 
+    ## checking if prodigal was used to add to citations list being reported at end
+    if [ -s ${tmp_dir}/prodigal_used ]; then
+        prodigal_used="true"
+    fi
+
     printf "________________________________________________________________________________\n\n" | tee -a $gtotree_log
 
 fi
@@ -1061,11 +1114,12 @@ if [ -n "$fasta_files" ]; then
 
     fi
 
-
-
-
     # adding retained genomes to genomes from all sources file
     cat ${tmp_dir}/fasta_genomes_list.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
+
+    ## prodigal must have been used with input fastas, setting to add to citations list being reported at end
+    prodigal_used="true"
+
 
     printf "_______________________________________________________________________________\n\n" | tee -a $gtotree_log
 
@@ -2008,6 +2062,8 @@ if [ $align_only == 'false' ]; then
             FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre | tee -a $gtotree_log
         fi
 
+        fasttree_used="true" # setting to report citations at end
+
     else
 
         printf "\n ############################################################################## \n" | tee -a $gtotree_log
@@ -2030,6 +2086,8 @@ if [ $align_only == 'false' ]; then
         mkdir ${output_dir}/iqtree_out/
         mv iqtree_out* ${output_dir}/iqtree_out/
         cp ${output_dir}/iqtree_out/iqtree_out.treefile ${output_dir}/Aligned_SCGs_mod_names.tre
+
+        iqtree_used="true" # setting to report citations at end
 
     fi
 
@@ -2141,6 +2199,39 @@ printf "________________________________________________________________________
 # reporting log file output
 printf "    Log file written to:\n" | tee -a $gtotree_log
 printf "        ${GREEN}${output_dir}/gtotree-runlog.txt${NC}\n\n" | tee -a $gtotree_log
+
+### checking programs used and reporting a citations file ###
+printf "    Programs used and their citations have been written to:\n" | tee -a $gtotree_log
+printf "        ${GREEN}${output_dir}/citations.txt${NC}\n\n" | tee -a $gtotree_log
+
+printf "GToTree\nLee MD. GToTree: a user-friendly workflow for phylogenomics. Bioinformatics. 2019; (March):1-3. doi:10.1093/bioinformatics/btz188\n\n" >> ${output_dir}/citations.txt
+printf "HMMER3\nEddy SR. Accelerated profile HMM searches. PLoS Comput. Biol. 2011; (7)10. doi:10.1371/journal.pcbi.1002195\n\n" >> ${output_dir}/citations.txt
+printf "Muscle\nEdgar RC. MUSCLE: a multiple sequence alignment method with reduced time and space complexity. BMC Bioinformatics. 2004; 5, 113. doi:10.1093/nar/gkh340\n\n" >> ${output_dir}/citations.txt
+printf "TrimAl\nGutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972–1973. doi:10.1093/bioinformatics/btp348\n\n" >> ${output_dir}/citations.txt
+
+if [ $prodigal_used == "true" ]; then
+    printf "Prodigal\nHyatt,D. et al. Gene and translation initiation site prediction in metagenomic sequences. Bioinformatics. 2010; 28, 2223–2230. doi:10.1186/1471-2105-11-119\n\n" >> ${output_dir}/citations.txt
+fi
+
+if [ $taxonkit_used == "true" ]; then
+    printf "TaxonKit\nShen W. and Xiong J. TaxonKit: a cross-platform and efficient NCBI taxonomy toolkit. bioRxiv. 2019. doi:10.1101/513523\n\n" >> ${output_dir}/citations.txt
+fi
+
+if [ $fasttree_used == "true" ]; then
+    printf "FastTree 2\nPrice MN. et al. FastTree 2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi:10.1371/journal.pone.0009490\n\n" >> ${output_dir}/citations.txt
+fi
+
+if [ $iqtree_used == "true" ]; then
+    printf "IQ-TREE\nNguyen L.-T. et al. IQ-TREE: a fast and effective stochastic algorithm for estimating maximum likelihood phylogenies. Mol. Biol. Evol. 2015; 32, 268–274. doi:10.1093/molbev/msu300\n\n" >> ${output_dir}/citations.txt
+fi
+
+if [ $parallel_used == "true" ]; then
+    printf "GNU Parallel\nTange O. GNU Parallel 2018. doi:10.5281/zenodo.1146014\n\n" >> ${output_dir}/citations.txt
+fi
+
+if [ $universal_SCGs_used == "true" ]; then
+    printf "Universal SCG-set\nHug LA. et al. A new view of the tree of life. Nat. Microbiol. 2016; 1, 1–6. doi:10.1038/NMICROBIOL.2016.48\n\n" >> ${output_dir}/citations.txt
+fi
 
 duration=$SECONDS
 

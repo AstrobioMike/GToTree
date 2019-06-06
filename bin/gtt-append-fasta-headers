@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+
+from Bio import SeqIO
+import sys
+import argparse
+
+parser = argparse.ArgumentParser(description='This script will modify headers of sequences of a multifasta, specific for use in GToTree.')
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-i", "--input_fasta", help="Starting fasta file", action="store", dest="input_fasta", required=True)
+parser.add_argument("-w", "--desired_append", help='Name to append to seqs (default: "Seq"', action="store", dest="wanted_name", default="Seq")
+parser.add_argument("-o", "--output_fasta_name", help='Output fasta file (default: "Renamed.fasta").', dest="output_fasta_name", default="Renamed.fasta")
+
+if len(sys.argv)==1:
+  parser.print_help(sys.stderr)
+  sys.exit(1)
+
+args = parser.parse_args()
+
+in_fasta = open(args.input_fasta, "r")
+new_header = args.wanted_name
+out_fasta = open(args.output_fasta_name, "w")
+
+n = 0
+
+for seq_record in SeqIO.parse(in_fasta, "fasta"):
+	n = n + 1
+	out_fasta.write(">" + new_header + "_" + seq_record.id + "_" + str(n) + "\n")
+	out_fasta.write(str(seq_record.seq) + "\n")
+
+in_fasta.close()
+out_fasta.close()

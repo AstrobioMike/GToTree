@@ -79,6 +79,7 @@ if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
     gtt-genbank-to-fasta -i $file_location -o ${tmp_dir}/${assembly}_fasta.tmp 2> /dev/null
 
     # running prodigal
+    echo "prodigal used" > ${tmp_dir}/prodigal_used # marking so can add to citations list reported at end
     prodigal -c -q -i ${tmp_dir}/${assembly}_fasta.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
 
     if [ -s ${file_location}_prodigal.stderr ]; then

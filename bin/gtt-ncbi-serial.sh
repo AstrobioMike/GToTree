@@ -52,6 +52,7 @@ do
             printf "  ${RED}****************************************************************************${NC}  \n\n"
 
             printf "      Getting coding seqs...\n\n"
+            echo "prodigal used" > ${tmp_dir}/prodigal_used # marking so can add to citations list reported at end
             prodigal -c -q -i ${tmp_dir}/${assembly}_genome.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null
             tr -d '*' < ${tmp_dir}/${assembly}_genes1.tmp > ${tmp_dir}/${assembly}_genes2.tmp
 

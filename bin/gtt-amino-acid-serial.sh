@@ -54,13 +54,11 @@ do
         rm -rf $file_location
     fi
 
-
     ## exiting here and reporting current input file if something is wrong with it and didn't get coding sequences
     if [ ! -s ${tmp_dir}/${assembly}_genes.tmp ]; then
         printf "$assembly" >> ${tmp_dir}/kill_amino_acid_serial.problem
         exit
     fi
-
 
     printf "      Performing HMM search...\n"
       
