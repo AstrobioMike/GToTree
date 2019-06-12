@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.3.1"
+VERSION="v1.4.1"
 
 printf "\n\n               GToTree ${VERSION} (github.com/AstrobioMike/GToTree)\n\n"
 
@@ -1002,6 +1002,26 @@ if [ -n "$amino_acid_files" ]; then
 
 fi
 
+## writing out files for each searched gene holding the genomes with hits to that gene, and making iToL files for each
+num=4
+for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
+do
+
+    awk -F $'\t' -v col="$num" ' $col > 0 { print $1 } ' ${output_dir}/All_genomes_Pfam_target_counts.tsv | tail -n +2 > ${output_dir}/Genomes_with_hits_to_${target}.txt
+
+    if [ -s ${output_dir}/Genomes_with_hits_to_${target}.txt ]; then
+        printf "DATASET_STYLE\nSEPARATOR SPACE\nDATASET_LABEL $target\nCOLOR\t#0000ff\nDATA\n" > ${output_dir}/${target}-iToL.txt
+
+        cat <(sed 's/$/ branch node #0000ff 3 normal/' ${output_dir}/Genomes_with_hits_to_${target}.txt) >> ${output_dir}/${target}-iToL.txt
+    
+    else
+        rm ${output_dir}/Genomes_with_hits_to_${target}.txt
+
+    fi
+
+    num=$(($num + 1))
+
+done
 
 # removing temp directory unless debug mode on
 if [ $debug_flag == 'false' ]; then

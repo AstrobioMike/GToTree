@@ -12,6 +12,7 @@ num_cpus=$5
 hmm_target_genes_total=$6
 output_dir=$7
 best_hit_mode=$8
+additional_pfam_targets=$9
 
 num=0
 
@@ -77,6 +78,10 @@ do
         asm_level="${curr_line[7]}"
         if [ -z "$asm_level" ]; then asm_level="NA"; fi
 
+
+        ### counting how many genes in this genome
+        gene_count=$(grep -c ">" ${tmp_dir}/${assembly}_genes.tmp)
+
         printf "      Performing HMM search...\n"
 
         ### running hmm search ###
@@ -95,12 +100,10 @@ do
         uniq_SCG_hits=$(wc -l ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp | sed 's/^ *//' | cut -f 1 -d " ")
 
         ## adding SCG-hit counts to table
-        paste <(printf $assembly) <(printf %s "$(cat ${tmp_dir}/${assembly}_uniq_counts.tmp | tr "\n" "\t")") >> ${output_dir}/All_genomes_SCG_hit_counts.tsv
+        paste <(printf $assembly) <(printf %s "$(cat ${tmp_dir}/${assembly}_uniq_counts.tmp | tr "\n" "\t")") >> ${output_dir}/SCG_hit_counts.tsv
 
         num_SCG_hits=$(awk ' $1 > 0 ' ${tmp_dir}/${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
         num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' ${tmp_dir}/${assembly}_uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
-
-
 
         perc_comp=$(echo "$num_SCG_hits / $hmm_target_genes_total * 100" | bc -l)
         perc_comp_rnd=$(printf "%.2f\n" $perc_comp)
@@ -124,7 +127,7 @@ do
             printf "   going over 10%% is getting into the questionable range. You may want to\n"
             printf "   consider taking a closer look and/or removing it from the input genomes.\n\n"
 
-            printf "   Reported in \"${output_dir}/Genomes_with_questionable_redund_estimates.tsv\".\n"
+            printf "   Reported in \"${output_dir}/run_files/Genomes_with_questionable_redund_estimates.tsv\".\n"
             printf "  ${RED}****************************************************************************${NC}  \n\n"
 
             # writing to table of genomes with questionable redundancy estimates
@@ -134,7 +137,6 @@ do
             printf "        Est. %% comp: ${perc_comp_rnd}; Est. %% redund: ${perc_redund_rnd}\n\n"
 
         fi
-
 
         ## writing summary info to table ##
         printf "$assembly\t$downloaded_accession\t$ass_name\t$taxid\t$org_name\t$infraspecific_name\t$version_status\t$asm_level\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/NCBI_genomes_summary_info.tsv
@@ -162,12 +164,46 @@ do
 
         fi
 
-        # rm -rf ${tmp_dir}/${assembly}_*.tmp ${tmp_dir}/${assembly}_genes.tmp.ssi
+        ## searching for additional targets if provided
+        if [ $additional_pfam_targets == "true" ]; then
+            hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp ${tmp_dir}/all_targets.hmm ${tmp_dir}/${assembly}_genes.tmp > /dev/null
+
+            ### getting counts of each target in this genome
+            for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
+            do
+                grep -w ${target} ${tmp_dir}/${assembly}_curr_hmm_hits.tmp | wc -l | sed 's/^ *//' >> ${tmp_dir}/${assembly}_hit_counts.tmp
+            done
+
+            ### writing results to main output file
+            paste <( printf "${assembly}\t${downloaded_accession}\t${gene_count}" ) <(printf %s "$(cat ${tmp_dir}/${assembly}_hit_counts.tmp | tr "\n" "\t") " )  >> ${output_dir}/additional_pfam_search_results/Additional_Pfam_hit_counts.tsv
+
+            ### Pulling out hits to additional pfam targets for this genome ###
+            for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
+            do
+                if grep -w -q "$target" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp; then
+
+                    grep -w "$target" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp | cut -f 1 -d " " >> ${tmp_dir}/${assembly}_${target}_genes_of_int.tmp
+
+                    for gene in $(cat ${tmp_dir}/${assembly}_${target}_genes_of_int.tmp)
+                    do
+                        echo $gene | esl-sfetch -f ${tmp_dir}/${assembly}_genes.tmp -
+                    done >> ${tmp_dir}/${assembly}_${target}_genes1.tmp
+
+                    gtt-append-fasta-headers -i ${tmp_dir}/${assembly}_${target}_genes1.tmp -w ${assembly}_${target} -o ${tmp_dir}/${assembly}_${target}_genes.tmp
+                
+                    # adding to fasta of that target holding all genomes
+                    cat ${tmp_dir}/${assembly}_${target}_genes.tmp >> ${output_dir}/additional_pfam_search_results/${target}_hits.faa
+                fi
+
+            done
+        fi
+
+        rm -rf ${tmp_dir}/${assembly}_*.tmp ${tmp_dir}/${assembly}_genes.tmp.ssi
 
     else
         printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n"
         printf "\t  $assembly's genes nor genome downloaded properly :(\n\n"
-        printf "\t    Reported in \"${output_dir}/NCBI_accessions_not_downloaded.txt\"\n"
+        printf "\t    Reported in \"${output_dir}/run_files/NCBI_accessions_not_downloaded.txt\"\n"
         printf "     ${RED}************************************************************************ ${NC}\n"
         rm -rf ${tmp_dir}/${assembly}_report1.tmp ${tmp_dir}/${assembly}_genes.tmp.gz
         sleep 3

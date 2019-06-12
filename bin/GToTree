@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.3.1"
+VERSION="v1.4.1"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -62,6 +62,12 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  A comma-separated list of the taxonomic ranks you'd like added to\n"
     printf "                  the labels if using TaxonKit (-t flag specified). E.g., all would be\n"
     printf "                  \"-L Domain,Phylum,Class,Order,Family,Genus,Species,Strain\"\n\n"
+
+    printf "        - [-p <file>] single-column file of additiona PFam targets to search for.\n"
+    printf "                  Table of hit counts, fasta of hit sequences, and files compatible\n"
+    printf "                  with the iToL web-based tree-viewer will be generated for each\n"
+    printf "                  target. See visualization of gene presence/absence example at\n"
+    printf "                  github.com/AstrobioMike/GToTree/wiki/example-usage for example.\n\n"
 
     printf "        - [-N] default: false\n"
     printf "                  No tree. Generate alignment only.\n\n"    
@@ -167,8 +173,9 @@ lineage_spec="Domain,Phylum,Class,Species,Strain"
 best_hit_mode='false'
 align_only='false'
 tree_program='FastTree'
+additional_pfam_targets='false'
 
-while getopts :a:g:f:A:H:o:m:tL:NT:c:G:Bdn:j: args
+while getopts :a:g:f:A:H:o:m:tL:p:NT:c:G:Bdn:j: args
 do
     case "${args}"
     in
@@ -181,6 +188,7 @@ do
         m) file_to_genome_id_map=${OPTARG};;
         t) taxonkit_id_swap='true';;
         L) lineage_spec=${OPTARG};;
+        p) target_pfams=${OPTARG};;
         N) align_only='true' ;;
         T) tree_program=${OPTARG};;
         c) len_cutoff=${OPTARG};;
@@ -357,7 +365,6 @@ else
 fi
 
 
-
 #############################################################################
 ########################### STARTING LOG FILE ###############################
 #############################################################################
@@ -499,7 +506,6 @@ printf "\n                             ${GREEN}Total input genomes: $total_input
 #############################################################################
 ###############  CHECKING AND REPORTING SPECIFIED HMM SOURCE  ###############
 #############################################################################
-#### checking and reporting specified hmm source ####
 printf "\n    HMM source to be used:\n" | tee -a $gtotree_log
 
 if [ $hmm_file == "Universal" ]; then
@@ -544,11 +550,11 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
     printf "\n\n    Options set:\n" | tee -a $gtotree_log
 
     if [ $output_dir != "GToTree_output" ]; then
-        printf "      - The output directory has been set to \"$output_dir\".\n" | tee -a $gtotree_log
+        printf "      - The output directory has been set to \"$output_dir/\".\n" | tee -a $gtotree_log
     fi
 
     if [ "$file_to_genome_id_map" != "" ]; then
-        printf "      - The file $file_to_genome_id_map will be used to modify labels of the specified genomes.\n" | tee -a $gtotree_log
+        printf "      - The file \"$file_to_genome_id_map\" will be used to modify labels of the specified genomes.\n" | tee -a $gtotree_log
     fi
 
     if [ $taxonkit_id_swap != "false" ]; then
@@ -600,6 +606,22 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
 
 fi
 
+## checking and reporting if additional pfams targeted
+if [ "$target_pfams" != "" ]; then
+
+    if [ -s "$target_pfams" ]; then
+        uniq ${target_pfams} > uniq_pfam_targets.tmp
+        pfam_target_genes_total=$(wc -l uniq_pfam_targets.tmp | sed "s/^ *//" | cut -d " " -f 1)
+        printf "      - Additional PFams will be searched from: $target_pfams ($pfam_target_genes_total targets)\n" | tee -a $gtotree_log
+        additional_pfam_targets="true"
+    else
+        printf "\n${RED}      You specified $target_pfams as your target Pfams to sesarch, but that file cannot be found :(${NC}\n" | tee -a $gtotree_log
+        printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+        exit
+    fi
+
+fi
+
 printf "\n"
 
 sleep 3.5
@@ -645,7 +667,7 @@ mkdir $tmp_dir 2> /dev/null
 
 if [ $? -ne 0 ] ; then
     printf "\n${RED}  Tried to make temporary directory named ${tmp_dir} but failed, this shouldn't happen :(${NC}\n\n" | tee -a $gtotree_log
-    rm uniq_hmm_names.tmp
+    rm uniq_hmm_names.tmp uniq_pfam_targets.tmp
     printf "Exiting for now.\n\n" | tee -a $gtotree_log
     exit
 fi
@@ -683,7 +705,7 @@ if [ "$file_to_genome_id_map" != "" ]; then
     if [ -s ${tmp_dir}/spurious_ids.tmp ]; then
         spurious_ids_count=$(wc -l ${tmp_dir}/spurious_ids.tmp | sed "s/^ *//" | cut -d " " -f 1)
         mv ${tmp_dir}/spurious_ids.tmp Missing_IDs.txt
-        rm -rf $tmp_dir uniq_hmm_names.tmp
+        rm -rf $tmp_dir uniq_hmm_names.tmp uniq_pfam_targets.tmp
 
         printf "\n${RED}  $spurious_ids_count genome ID(s) listed in the mapping file (passed to \"-m\") not found in${NC}\n" | tee -a $gtotree_log
         printf "  ${RED}any of the input genomes :(${NC}\n\n" | tee -a $gtotree_log
@@ -696,16 +718,21 @@ fi
 
 # remaking output directory now that things are a go
 mkdir $output_dir 2> /dev/null
+mkdir ${output_dir}/run_files/
 
-
-# moving uniq_hmm_names.tmp into temp directory now that all is well
+# moving files into temp directory now that all is well
 mv uniq_hmm_names.tmp ${tmp_dir}/uniq_hmm_names.tmp
+
+if [ "$additional_pfam_targets" != 'false' ]; then
+    mv uniq_pfam_targets.tmp ${tmp_dir}/uniq_pfam_targets.tmp
+    mkdir ${output_dir}/additional_pfam_search_results/
+fi
 
 # starting an all genomes file to keep track of those from all sources
 touch ${tmp_dir}/genomes_from_all_sources.tmp
 
 # starting the SCG-counts per genome tab which will have the following as its header:
-paste <(printf "assembly_id") <(printf %s "$(cat ${tmp_dir}/uniq_hmm_names.tmp | tr "\n" "\t")") > ${output_dir}/All_genomes_SCG_hit_counts.tsv
+paste <(printf "assembly_id") <(printf %s "$(cat ${tmp_dir}/uniq_hmm_names.tmp | tr "\n" "\t")") > ${output_dir}/SCG_hit_counts.tsv
 
 
 #############################################################################
@@ -714,6 +741,54 @@ paste <(printf "assembly_id") <(printf %s "$(cat ${tmp_dir}/uniq_hmm_names.tmp |
 start_time=$(date +"%I:%M %p")
 SECONDS=0
 
+
+#############################################################################
+##########  GETTING AND BUILDING ADDITIONAL TARGET PFAM HMM IF SET  #########
+#############################################################################
+if [ "$additional_pfam_targets" != 'false' ]; then
+
+    printf "\n ############################################################################## \n" | tee -a $gtotree_log
+    printf " ####              Downloading HMMs for additional PFam targets            ####\n" | tee -a $gtotree_log
+    printf " ############################################################################## \n\n" | tee -a $gtotree_log
+
+    base_link="https://pfam.xfam.org/family/"
+
+    for target in $(cat ${tmp_dir}/uniq_pfam_targets.tmp)
+    do
+        curl --silent --retry 10 -o ${tmp_dir}/${target}.hmm "${base_link}${target}/hmm"
+
+        if [ -s ${tmp_dir}/${target}.hmm ]; then
+            # getting accession pulled (to account for current version on Pfam as compared to what was searched)
+            actual_target=$(grep -m1 "^ACC" ${tmp_dir}/${target}.hmm | tr -s " " "\t" | cut -f 2)
+            printf "$actual_target\n" >> ${tmp_dir}/actual_pfam_targets.tmp
+
+            if [ $target != $actual_target ]; then
+                mv ${tmp_dir}/${target}.hmm ${tmp_dir}/${actual_target}.hmm
+            fi
+
+            cat ${tmp_dir}/${actual_target}.hmm >> ${tmp_dir}/all_targets.hmm
+
+        else # aborting if any of the pfam targets couldn't be pulled successfully
+            printf "\n  ${RED}One of the target Pfams could not be successfully downloaded :(${NC}\n"
+            printf "\n  The problem child was ${target}.\n\n"
+            printf "\nExiting for now.\n\n"
+
+            rm -rf ${output_dir}
+            # removing temp directory unless debug mode on
+            if [ $debug_flag == 'false' ]; then
+                 rm -rf $tmp_dir
+            fi
+
+            exit
+
+        fi
+
+    done
+
+    # starting the main results table which will have the following as its header:
+    paste <(printf "assembly_id\tdownloaded_accession\tTotal_gene_count") <(printf %s "$(cat ${tmp_dir}/actual_pfam_targets.tmp | tr "\n" "\t")") > ${output_dir}/additional_pfam_search_results/Additional_Pfam_hit_counts.tsv
+
+fi
 
 #############################################################################
 #####################  NCBI-DERIVED GENOME PROCESSING  ######################
@@ -743,7 +818,7 @@ if [ -n "$NCBI_acc_file" ]; then
         printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n" | tee -a $gtotree_log
         printf "\t$num_dupe_genomes accession(s) redundant - meaning GenBank and RefSeq accessions\n" | tee -a $gtotree_log
         printf "\twere provided for the same genome. Only RefSeq accession used.\n\n" | tee -a $gtotree_log
-        printf "\t  Reported in \"${output_dir}/Redundant_input_accessions.txt\".\n" | tee -a $gtotree_log
+        printf "\t  Reported in \"${output_dir}/run_files/Redundant_input_accessions.txt\".\n" | tee -a $gtotree_log
         printf "     ${RED}**********************************************************************${NC}  \n\n" | tee -a $gtotree_log
 
         comm -23 ${tmp_dir}/sorted_ncbi_accs.tmp <(sort ${output_dir}/Redundant_input_accessions.txt) | sort > ${tmp_dir}/sorted_building_new_input_ncbi_accs.tmp
@@ -756,7 +831,7 @@ if [ -n "$NCBI_acc_file" ]; then
         mv ${tmp_dir}/sorted_ncbi_accs.tmp ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp
     fi
 
-    ## downloading genbank files and/or refseq assembly summary files as needed
+    # downloading genbank files and/or refseq assembly summary files as needed
 
     if grep -q "^GCA" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
         printf "\t\t  ${GREEN}Downloading GenBank assembly summaries...${NC}\n\n" | tee -a $gtotree_log
@@ -787,6 +862,7 @@ if [ -n "$NCBI_acc_file" ]; then
         rm -rf capture_any_dl_errors.tmp
     fi
 
+
     ## searching assembly info table for the input accessions (NOTE: will always return latest accession version as of now)
     # to keep track of what was searched and what was downloaded, both are included in the output summary table
     gtt-parse-assembly-summary-file -a ${tmp_dir}/ncbi_assembly_info.tmp -w ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp -o ${tmp_dir}/ncbi_accessions_info.tmp
@@ -803,7 +879,7 @@ if [ -n "$NCBI_acc_file" ]; then
         num_accs_not_found=$(wc -l ${tmp_dir}/not_found_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
         printf "\n\n     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n" | tee -a $gtotree_log
         printf "\t  $num_accs_not_found accession(s) not successfully found at NCBI.\n\n" | tee -a $gtotree_log
-        printf "\t     Reported in \"${output_dir}/NCBI_accessions_not_found.txt\".\n" | tee -a $gtotree_log
+        printf "\t     Reported in \"${output_dir}/run_files/NCBI_accessions_not_found.txt\".\n" | tee -a $gtotree_log
         printf "     ${RED}**********************************************************************${NC}  \n\n" | tee -a $gtotree_log
 
         sleep 3
@@ -826,9 +902,9 @@ if [ -n "$NCBI_acc_file" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+        gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
     else
-        cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+        cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
     fi
 
     ## checking if prodigal was used to add to citations list being reported at end
@@ -847,13 +923,13 @@ if [ -n "$NCBI_acc_file" ]; then
         num_dupe_genomes=$(wc -l ${output_dir}/Redundant_input_accessions.txt | sed "s/^ *//" | cut -d " " -f 1)
         num_dupe_report=$(($num_dupe_genomes / 2))
         printf "          ${RED}$num_dupe_report accession(s) redundant.${NC}\n" | tee -a $gtotree_log
-        printf "            Reported in \"${output_dir}/Redundant_input_accessions.txt\".\n\n" | tee -a $gtotree_log
+        printf "            Reported in \"${output_dir}/run_files/Redundant_input_accessions.txt\".\n\n" | tee -a $gtotree_log
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
         num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
         printf "          ${RED}$num_accs_not_found accession(s) not found at NCBI.${NC}\n" | tee -a $gtotree_log
-        printf "            Reported in \"${output_dir}/NCBI_accessions_not_found.txt\".\n\n" | tee -a $gtotree_log
+        printf "            Reported in \"${output_dir}/run_files/NCBI_accessions_not_found.txt\".\n\n" | tee -a $gtotree_log
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ]; then
@@ -863,7 +939,7 @@ if [ -n "$NCBI_acc_file" ]; then
         mv ${tmp_dir}/updated_sorted_ncbi_accs2.tmp ${tmp_dir}/final_included_NCBI_accs.tmp
 
         printf "          ${RED}$num_accs_not_downloaded NCBI accession(s) did not download successfully.${NC}\n" | tee -a $gtotree_log
-        printf "            Reported in \"${output_dir}/NCBI_accessions_not_downloaded.txt\".\n\n" | tee -a $gtotree_log
+        printf "            Reported in \"${output_dir}/run_files/NCBI_accessions_not_downloaded.txt\".\n\n" | tee -a $gtotree_log
 
     else
         mv ${tmp_dir}/updated_sorted_ncbi_accs.tmp ${tmp_dir}/final_included_NCBI_accs.tmp
@@ -913,7 +989,7 @@ if [ -n "$genbank_list_file" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-genbank-serial.sh $genbank_list_file $tmp_dir $hmm_file $genbank_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+        gtt-genbank-serial.sh $genbank_list_file $tmp_dir $hmm_file $genbank_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
 
         ### kill backstop ###
         # if there was a problem with the serial genbank genome processing, killing main program here and reporting
@@ -953,7 +1029,7 @@ if [ -n "$genbank_list_file" ]; then
         fi
 
     else
-        cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+        cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
 
 
         ### kill backstop ###
@@ -1035,7 +1111,7 @@ if [ -n "$fasta_files" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+        gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
 
         ### kill backstop ###
         # if there was a problem with the serial fasta genome processing, killing main program here and reporting
@@ -1074,7 +1150,7 @@ if [ -n "$fasta_files" ]; then
         fi
 
     else
-        cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+        cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
 
         ### kill backstop ###
         # if there was a problem with the parallel fasta genome processing, killing main program here and reporting
@@ -1150,7 +1226,7 @@ if [ -n "$amino_acid_files" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-amino-acid-serial.sh $amino_acid_files $tmp_dir $hmm_file $amino_acid_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+        gtt-amino-acid-serial.sh $amino_acid_files $tmp_dir $hmm_file $amino_acid_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
 
         ### kill backstop ###
         # if there was a problem with the serial fasta genome processing, killing main program here and reporting
@@ -1182,7 +1258,7 @@ if [ -n "$amino_acid_files" ]; then
         fi
 
     else
-        cat $amino_acid_files | parallel -j $num_jobs gtt-amino-acid-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode
+        cat $amino_acid_files | parallel -j $num_jobs gtt-amino-acid-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
 
         ### kill backstop ###
         # if there was a problem with the parallel fasta genome processing, killing main program here and reporting
@@ -1223,7 +1299,6 @@ if [ -n "$amino_acid_files" ]; then
 fi
 
 
-
 #############################################################################
 #############################  FILTERING GENES  #############################
 #############################################################################
@@ -1260,9 +1335,9 @@ if [ $removed_genes != "0" ]; then
     printf "    genome... Just so ya know!!\n\n" | tee -a $gtotree_log
     printf "\t  These included:\n\n" | tee -a $gtotree_log
     sed 's/^/                     /' ${tmp_dir}/genes_to_remove.tmp | tee -a $gtotree_log
-    printf "\n        Reported in \"${output_dir}/Genes_with_no_hits_to_any_genomes.txt\".\n\n" | tee -a $gtotree_log
+    printf "\n        Reported in \"${output_dir}/run_files/Genes_with_no_hits_to_any_genomes.txt\".\n\n" | tee -a $gtotree_log
     printf "   You can figure out which of those two scenarios was the cause by checking out\n" | tee -a $gtotree_log
-    printf "   \"${output_dir}/All_genomes_SCG_hit_counts.tsv\".\n" | tee -a $gtotree_log
+    printf "   \"${output_dir}/SCG_hit_counts.tsv\".\n" | tee -a $gtotree_log
     printf "  ${RED}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
     mv ${tmp_dir}/genes_to_remove.tmp ${output_dir}/Genes_with_no_hits_to_any_genomes.txt
 
@@ -1291,7 +1366,7 @@ if [ $len_updated_genes_list == "0" ]; then
     printf "    to make sure nothing weird is going on.\n\n" | tee -a $gtotree_log
 
     printf "    You can see the number of target-gene hits per genome by checking out \n" | tee -a $gtotree_log
-    printf "    \"${output_dir}/All_genomes_SCG_hit_counts.tsv\".\n" | tee -a $gtotree_log
+    printf "    \"${output_dir}/SCG_hit_counts.tsv\".\n" | tee -a $gtotree_log
     printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
 
     printf "\nExiting for now.\n\n" | tee -a $gtotree_log
@@ -1387,7 +1462,7 @@ if [ $removed_genes2 != "0" ]; then
     printf "\t  $removed_genes2 gene(s) had no hits in any genomes after filtering by length! Just so ya know...\n\n" | tee -a $gtotree_log
     printf "\t    Length-filtered out of existence:\n\n" | tee -a $gtotree_log
     sed 's/^/          /' ${tmp_dir}/genes_to_remove2.tmp | tee -a $gtotree_log
-    printf "\n     Reported in \"${output_dir}/Genes_with_no_hits_after_length_filter.txt\".\n" | tee -a $gtotree_log
+    printf "\n     Reported in \"${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt\".\n" | tee -a $gtotree_log
     printf "     ${RED}************************************************************************ ${NC}\n\n" | tee -a $gtotree_log
 
     mv ${tmp_dir}/genes_to_remove2.tmp ${output_dir}/Genes_with_no_hits_after_length_filter.txt
@@ -1443,7 +1518,7 @@ removed_genomes=$(wc -l ${tmp_dir}/sorted_genomes_to_remove.tmp | sed "s/^ *//" 
 if [ $removed_genomes != "0" ]; then
     printf "     ${RED}*******************************${NC} NOTICE ${RED}*******************************${NC}  \n" | tee -a $gtotree_log
     printf "\t  $removed_genomes genome(s) removed from analysis due to having too few hits.\n\n" | tee -a $gtotree_log
-    printf "        Reported in \"${output_dir}/Genomes_removed_for_too_few_hits.tsv\".\n" | tee -a $gtotree_log
+    printf "        Reported in \"${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv\".\n" | tee -a $gtotree_log
     printf "     ${RED}********************************************************************** ${NC}\n\n" | tee -a $gtotree_log
     sleep 3
 else
@@ -1617,7 +1692,7 @@ fi
 
 
 # and adding header and writing to output directory
-cat <(printf "assembly_id\ttaxid\tnum_SCG_hits\tuniq_SCG_hits\tperc_comp\tperc_redund\tnum_SCG_hits_after_len_filt\tin_final_tree\n") ${tmp_dir}/building_genomes_tab.tmp > ${output_dir}/All_genomes_summary_info.tsv
+cat <(printf "assembly_id\ttaxid\tnum_SCG_hits\tuniq_SCG_hits\tperc_comp\tperc_redund\tnum_SCG_hits_after_len_filt\tin_final_tree\n") ${tmp_dir}/building_genomes_tab.tmp > ${output_dir}/Genomes_summary_info.tsv
 
 #############################################################################
 ############  FORMATTING TABLE FOR THOSE WITH >= 10% REDUNDANCY  ############
@@ -1688,12 +1763,8 @@ genomes_retained=$(wc -l ${tmp_dir}/final_genomes_from_all_sources.tmp | sed "s/
 printf "\n________________________________________________________________________________\n\n\n" | tee -a $gtotree_log
 
 
-
-
 #############################################################################
-#############################################################################
-###############  ADDING MORE INFORMATIVE HEADERS IF SPECIFIED  ##############
-#############################################################################
+##############  ADDING MORE INFORMATIVE HEADERS IF SPECIFIED  ###############
 #############################################################################
 ## making copy of alignment file to preserve original
 if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
@@ -1779,20 +1850,20 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     if [ $taxonkit_id_swap != "false" ]; then
 
         ### checking there are actually some taxids to work with, if not, then printing message at end that no lineage info added
-        taxid_counts=$(cut -f 2 ${output_dir}/All_genomes_summary_info.tsv | sed '/^NA$/d' | wc -l | sed 's/^ *//')
+        taxid_counts=$(cut -f 2 ${output_dir}/Genomes_summary_info.tsv | sed '/^NA$/d' | wc -l | sed 's/^ *//')
 
         if [ $taxid_counts -gt 1 ]; then 
 
             ## running taxonkit and adding to summary table ##
-            cut -f 2 ${output_dir}/All_genomes_summary_info.tsv | tail -n +2 | taxonkit lineage | taxonkit reformat -r NA | cut -f3 | tr ";" "\t" > ${tmp_dir}/lineages.tmp
+            cut -f 2 ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | taxonkit lineage | taxonkit reformat -r NA | cut -f3 | tr ";" "\t" > ${tmp_dir}/lineages.tmp
 
             cat <(printf "domain\tphylum\tclass\torder\tfamily\tgenus\tspecific_name\n") ${tmp_dir}/lineages.tmp > ${tmp_dir}/lineages2.tmp
 
-            paste ${output_dir}/All_genomes_summary_info.tsv ${tmp_dir}/lineages2.tmp > ${output_dir}/All_genomes_summary_info2.tsv
-            mv ${output_dir}/All_genomes_summary_info2.tsv ${output_dir}/All_genomes_summary_info.tsv
+            paste ${output_dir}/Genomes_summary_info.tsv ${tmp_dir}/lineages2.tmp > ${output_dir}/All_genomes_summary_info2.tsv
+            mv ${output_dir}/All_genomes_summary_info2.tsv ${output_dir}/Genomes_summary_info.tsv
 
             ## getting genomes that have a taxid
-            awk ' BEGIN { FS=OFS="\t" } $2 != "NA" ' ${output_dir}/All_genomes_summary_info.tsv | tail -n +2 | cut -f1 > ${tmp_dir}/potential_ids_for_swap.tmp
+            awk ' BEGIN { FS=OFS="\t" } $2 != "NA" ' ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | cut -f1 > ${tmp_dir}/potential_ids_for_swap.tmp
             ## removing those that the user already provided new labels for, if they did
             if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
                 comm -23 <(sort ${tmp_dir}/potential_ids_for_swap.tmp) <(cut -f1 ${tmp_dir}/base_label_swap.tmp | sort) > ${tmp_dir}/ids_for_taxonkit_swap.tmp
@@ -1803,7 +1874,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
             ## creating new labels for them based on lineage info
             for id in $(cat ${tmp_dir}/ids_for_taxonkit_swap.tmp)
             do
-                grep -w -m1 "$id" ${output_dir}/All_genomes_summary_info.tsv
+                grep -w -m1 "$id" ${output_dir}/Genomes_summary_info.tsv
             done | cut -f 1,9-15 > ${tmp_dir}/working_taxonkit_lineages.tmp
 
             ## builing new taxonkit-swapped labels based upon user-desired ranks (provided by -L flag)
@@ -1976,7 +2047,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     ## one last safety screen for colons and commas (as they screw with newick format)
 
     ## if final_id_swap_map.tmp exists here, moving forward with swap
-    ## if it does not (which may happen if Taxonkit was specified, but not input sources had any taxids, for example), then not performing id swapping and reporting to user
+    ## if it does not (which may happen if Taxonkit was specified, but no input sources had any taxids, for example), then not performing id swapping and reporting to user
 
     if [ -s ${tmp_dir}/final_id_swap_map.tmp ]; then
 
@@ -1989,28 +2060,28 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
         # first pulling out and adding to those that were changed
         for changed_id in $(cut -f1 ${tmp_dir}/final_id_swap_map_colonless.tmp)
         do
-            grep -w -m1 "$changed_id" ${output_dir}/All_genomes_summary_info.tsv
+            grep -w -m1 "$changed_id" ${output_dir}/Genomes_summary_info.tsv
         done | cut -f 2- > ${tmp_dir}/building_new_genomes_tab1.tmp
 
         paste ${tmp_dir}/final_id_swap_map_colonless.tmp ${tmp_dir}/building_new_genomes_tab1.tmp > ${tmp_dir}/building_new_genomes_tab2.tmp
 
         # now getting those that weren't changed and adding assembly id to the "label" column
-        comm -23 <(cut -f1 ${output_dir}/All_genomes_summary_info.tsv | tail -n +2 | sort) <(cut -f1 ${tmp_dir}/final_id_swap_map_colonless.tmp | sort) > ${tmp_dir}/unchanged_ids.tmp
+        comm -23 <(cut -f1 ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | sort) <(cut -f1 ${tmp_dir}/final_id_swap_map_colonless.tmp | sort) > ${tmp_dir}/unchanged_ids.tmp
 
         for unchanged_id in $(cat ${tmp_dir}/unchanged_ids.tmp)
         do
-            grep -w -m1 "$unchanged_id" ${output_dir}/All_genomes_summary_info.tsv
+            grep -w -m1 "$unchanged_id" ${output_dir}/Genomes_summary_info.tsv
         done > ${tmp_dir}/building_new_genomes_tab3.tmp
 
         paste ${tmp_dir}/unchanged_ids.tmp ${tmp_dir}/building_new_genomes_tab3.tmp > ${tmp_dir}/building_new_genomes_tab4.tmp
 
-        head -n 1 ${output_dir}/All_genomes_summary_info.tsv > ${tmp_dir}/old_header.tmp
+        head -n 1 ${output_dir}/Genomes_summary_info.tsv > ${tmp_dir}/old_header.tmp
 
         # making new header
         paste <(cut -f 1 ${tmp_dir}/old_header.tmp) <(printf "label") <(cut -f 2- ${tmp_dir}/old_header.tmp) > ${tmp_dir}/new_header.tmp
 
         # now sticking all together into a new summary table that includes any adjusted labels
-        cat ${tmp_dir}/new_header.tmp ${tmp_dir}/building_new_genomes_tab2.tmp ${tmp_dir}/building_new_genomes_tab4.tmp > ${output_dir}/All_genomes_summary_info.tsv
+        cat ${tmp_dir}/new_header.tmp ${tmp_dir}/building_new_genomes_tab2.tmp ${tmp_dir}/building_new_genomes_tab4.tmp > ${output_dir}/Genomes_summary_info.tsv
 
     else
         printf "  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}\n" | tee -a $gtotree_log
@@ -2020,7 +2091,7 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
         printf "    Genomes from your mapping file may have been filtered out, and if Taxonkit\n" | tee -a $gtotree_log
         printf "    was specified, there may have been no taxids available (which typically\n" | tee -a $gtotree_log
         printf "    come from inputs provided as NCBI accessions or GenBank files that might\n" | tee -a $gtotree_log
-        printf "    hold that information.\n\n" | tee -a $gtotree_log
+        printf "    hold that information).\n\n" | tee -a $gtotree_log
 
         printf "    In this case no labels could be swapped.\n" | tee -a $gtotree_log
         printf "  ${RED}***************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
@@ -2032,7 +2103,88 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
 
 fi
 
-# clearing out temp files here, unless debug_flag is set to true
+#############################################################################
+##########  WRITING OUT ADDITIONAL TARGET PFAM RESULTS IF NEEDED  ###########
+#############################################################################
+if [ $additional_pfam_targets != 'false' ]; then
+
+    printf "\n ############################################################################## \n" | tee -a $gtotree_log
+    printf " ####            Parsing results of additional PFam searches               ####\n" | tee -a $gtotree_log
+    printf " ############################################################################## \n\n" | tee -a $gtotree_log
+
+    ## setting variable holding whether or not any labels were swapped
+    if grep -q label <(head -n 1 ${output_dir}/Genomes_summary_info.tsv); then 
+        labels_swapped='true'
+    else
+        labels_swapped='false'
+    fi
+
+    num=4
+    for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
+    do
+
+        awk -F $'\t' -v col="$num" ' $col > 0 { print $1 } ' ${output_dir}/additional_pfam_search_results/Additional_Pfam_hit_counts.tsv | tail -n +2 > ${tmp_dir}/Genomes_with_hits_to_${target}.tmp
+
+        if [ -s ${tmp_dir}/Genomes_with_hits_to_${target}.tmp ]; then
+
+            if [ $labels_swapped == 'true' ]; then
+
+                for genome in $(cat ${tmp_dir}/Genomes_with_hits_to_${target}.tmp)
+                do
+                    
+                    grep -m1 "^$genome" ${output_dir}/Genomes_summary_info.tsv | cut -f 2 
+
+                done > ${tmp_dir}/Genome_labels_with_hits_to_${target}.tmp
+
+                paste ${tmp_dir}/Genomes_with_hits_to_${target}.tmp ${tmp_dir}/Genome_labels_with_hits_to_${target}.tmp > ${output_dir}/additional_pfam_search_results/Genomes_with_hits_to_${target}.tsv
+
+            else
+              
+                cp ${tmp_dir}/Genomes_with_hits_to_${target}.tmp ${output_dir}/additional_pfam_search_results/Genomes_with_hits_to_${target}.txt
+
+            fi
+            
+            ## if any, removing those not in final tree before making iToL file
+            awk -F $'\t' ' $8 == "No" { print $1 } ' ${output_dir}/Genomes_summary_info.tsv | sort > ${tmp_dir}/sorted_genomes_to_leave_out_of_iToL_files.tmp
+
+            if [ -s ${tmp_dir}/sorted_genomes_to_leave_out_of_iToL_files.tmp ]; then
+                comm -23 ${tmp_dir}/Genomes_with_hits_to_${target}.tmp ${tmp_dir}/sorted_genomes_to_leave_out_of_iToL_files.tmp > ${tmp_dir}/genomes_retained_for_${target}_iToL.tmp
+            else
+                cp ${tmp_dir}/Genomes_with_hits_to_${target}.tmp ${tmp_dir}/genomes_retained_for_${target}_iToL.tmp
+            fi
+
+            ## making iToL file for each additional target pfam
+            if [ $labels_swapped == 'true' ]; then
+                for genome in $(cat ${tmp_dir}/genomes_retained_for_${target}_iToL.tmp)
+                do
+                    grep -m 1 -w "$genome" ${output_dir}/additional_pfam_search_results/Genomes_with_hits_to_${target}.tsv
+                done | cut -f 2 > ${tmp_dir}/genomes_for_iToL_for_${target}.tmp
+
+            else
+                for genome in $(cat ${tmp_dir}/genomes_retained_for_${target}_iToL.tmp)
+                do
+                    grep -m 1 -w "$genome" ${output_dir}/additional_pfam_search_results/Genomes_with_hits_to_${target}.txt
+                done > ${tmp_dir}/genomes_for_iToL_for_${target}.tmp
+            fi
+
+            printf "DATASET_STYLE\nSEPARATOR SPACE\nDATASET_LABEL $target\nCOLOR #0000ff\nDATA\n" > ${output_dir}/additional_pfam_search_results/${target}-iToL.txt
+
+            cat <(sed 's/$/ branch node #0000ff 3 normal/' ${tmp_dir}/genomes_for_iToL_for_${target}.tmp) >> ${output_dir}/additional_pfam_search_results/${target}-iToL.txt
+        
+        else
+            rm ${tmp_dir}/Genomes_with_hits_to_${target}.tmp
+
+        fi
+
+        num=$(($num + 1))
+
+    done
+fi
+
+
+#############################################################################
+#############  CLEARING OUT TMP FILES UNLESS -d FLAG PROVIDED  ##############
+#############################################################################
 if [ $debug_flag == 'false' ]; then
     rm -rf $tmp_dir
 fi
@@ -2093,14 +2245,33 @@ if [ $align_only == 'false' ]; then
 
 fi
 
+
+#############################################################################
+##########################  ORGANIZING OUTPUT DIR  ##########################
+#############################################################################
+if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then
+    mv ${output_dir}/NCBI_genomes_summary_info.tsv ${output_dir}/run_files/NCBI_genomes_summary_info.tsv
+fi
+
+if [ -f ${output_dir}/Genbank_genomes_summary_info.tsv ]; then
+    mv ${output_dir}/Genbank_genomes_summary_info.tsv ${output_dir}/run_files/Genbank_genomes_summary_info.tsv
+fi
+
+if [ -f ${output_dir}/Fasta_genomes_summary_info.tsv ]; then
+    mv ${output_dir}/Fasta_genomes_summary_info.tsv ${output_dir}/run_files/Fasta_genomes_summary_info.tsv
+fi
+
+if [ -f ${output_dir}/Amino_acid_genomes_summary_info.tsv ]; then
+    mv ${output_dir}/Amino_acid_genomes_summary_info.tsv ${output_dir}/run_files/Amino_acid_genomes_summary_info.tsv
+fi
+
+
 #############################################################################
 ##########################  JOB-FINISHED REPORTING  #########################
 #############################################################################
-
 printf "\n\n#################################################################################\n" | tee -a $gtotree_log
 printf "####                                 ${GREEN}Done!!${NC}                                  ####\n" | tee -a $gtotree_log
 printf "#################################################################################\n\n" | tee -a $gtotree_log
-
 
 # genome report
 if [ $genomes_retained == $total_input_genomes ]; then
@@ -2116,80 +2287,103 @@ if [ $align_only == 'false' ]; then
     if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
 
         printf "    Tree written to:\n" | tee -a $gtotree_log
-        printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.tre${NC}\n\n" | tee -a $gtotree_log
+        printf "        ${GREEN}${output_dir}/${output_dir}.tre${NC}\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/Aligned_SCGs_mod_names.tre ${output_dir}/${output_dir}.tre
     else
         printf "    Tree written to:\n" | tee -a $gtotree_log
-        printf "        ${GREEN}${output_dir}/Aligned_SCGs.tre${NC}\n\n" | tee -a $gtotree_log
+        printf "        ${GREEN}${output_dir}/${output_dir}.tre${NC}\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/Aligned_SCGs.tre ${output_dir}/${output_dir}.tre
     fi
 
 fi
 
-printf "    Full alignment written to:\n" | tee -a $gtotree_log
-printf "        ${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\n\n" | tee -a $gtotree_log
-
 if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-    printf "    Alignment with altered headers written to:\n" | tee -a $gtotree_log
+    printf "    Alignment written to:\n" | tee -a $gtotree_log
     printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.faa${NC}\n\n" | tee -a $gtotree_log
+    mv ${output_dir}/Aligned_SCGs.faa ${output_dir}/run_files/Aligned_SCGs.faa
+else
+    printf "    Alignment written to:\n" | tee -a $gtotree_log
+    printf "        ${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\n\n" | tee -a $gtotree_log
+fi
+
+printf "    Summary file with comp./redund. estimates written to:\n" | tee -a $gtotree_log
+printf "        ${GREEN}${output_dir}/Genomes_summary_info.tsv${NC}\n\n" | tee -a $gtotree_log
+
+printf "    Summary table with hits per target gene per genome written to:\n" | tee -a $gtotree_log
+printf "        ${GREEN}${output_dir}/SCG_hit_counts.tsv${NC}\n\n" | tee -a $gtotree_log
+
+
+if [ $additional_pfam_targets == 'true' ]; then
+    printf "    Files for additional PFam searches written to:\n" | tee -a $gtotree_log
+    printf "        ${GREEN}${output_dir}/additional_pfam_search_results/${NC}\n\n" | tee -a $gtotree_log
 fi
 
 printf "    Partitions (for downstream use with mixed-model treeing) written to:\n" | tee -a $gtotree_log
-printf "        ${GREEN}${output_dir}/Partitions.txt${NC}\n\n" | tee -a $gtotree_log
-
-printf "    Summary file with comp./redund. estimates written to:\n" | tee -a $gtotree_log
-printf "        ${GREEN}${output_dir}/All_genomes_summary_info.tsv${NC}\n\n" | tee -a $gtotree_log
-
-printf "    Summary table with hits per target gene per genome written to:\n" | tee -a $gtotree_log
-printf "        ${GREEN}${output_dir}/All_genomes_SCG_hit_counts.tsv${NC}\n\n" | tee -a $gtotree_log
+printf "        ${GREEN}${output_dir}/run_files/Partitions.txt${NC}\n\n" | tee -a $gtotree_log
+mv ${output_dir}/Partitions.txt ${output_dir}/run_files/Partitions.txt
 
 # reporting any problem files/accessions
 if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCBI_accessions_not_found.txt ] || [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ] || [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ] || [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ] || [ -f ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ] || [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ] || [ -f ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ]; then
-    printf "\n  Notes:\n\n" | tee -a $gtotree_log
+
+printf "________________________________________________________________________________\n\n" | tee -a $gtotree_log
+
+    printf "  Notes:\n\n" | tee -a $gtotree_log
 
     if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
         printf "    $num_dupe_report accession(s) redundant.\n" | tee -a $gtotree_log
-        printf "        Reported in \"${output_dir}/Redundant_input_accessions.txt\".\n\n" | tee -a $gtotree_log
+        # printf "        Reported in \"${output_dir}/run_files/Redundant_input_accessions.txt\".\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/Redundant_input_accessions.txt ${output_dir}/run_files/Redundant_input_accessions.txt
     fi
 
 
     if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
         num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
         printf "    ${RED}$num_accs_not_found accession(s) not successfully found at NCBI.${NC}\n" | tee -a $gtotree_log
-        printf "        Reported in \"${output_dir}/NCBI_accessions_not_found.txt\".\n\n" | tee -a $gtotree_log
+        # printf "        Reported in \"${output_dir}/run_files/NCBI_accessions_not_found.txt\".\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/NCBI_accessions_not_found.txt ${output_dir}/run_files/NCBI_accessions_not_found.txt
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ]; then
         num_accs_not_downloaded=$(wc -l ${output_dir}/NCBI_accessions_not_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
         printf "    ${RED}$num_accs_not_downloaded did not download properly.${NC}\n" | tee -a $gtotree_log
-        printf "        Reported in \"${output_dir}/NCBI_accessions_not_downloaded.txt\".\n\n" | tee -a $gtotree_log
+        # printf "        Reported in \"${output_dir}/run_files/NCBI_accessions_not_downloaded.txt\".\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/NCBI_accessions_not_downloaded.txt ${output_dir}/run_files/NCBI_accessions_not_downloaded.txt
     fi
 
     if [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ]; then
         printf "    ${RED}$removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.${NC}\n" | tee -a $gtotree_log
-        printf "        Reported in \"${output_dir}/Genomes_removed_for_too_few_hits.tsv\".\n\n" | tee -a $gtotree_log
+        # printf "        Reported in \"${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv\".\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/Genomes_removed_for_too_few_hits.tsv ${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv
     fi
 
     if [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ]; then
         num_genbanks_no_cds=$(wc -l ${output_dir}/Genbank_files_with_no_CDSs.txt | sed "s/^ *//" | cut -d " " -f 1)
         printf "    $num_genbanks_no_cds genbank file(s) had no identified coding sequences.\n" | tee -a $gtotree_log
-        printf "        Reported in \"${output_dir}/Genbank_files_with_no_CDSs.txt\",\n" | tee -a $gtotree_log
-        printf "        but processed as though submitted in fasta format.\n\n" | tee -a $gtotree_log
+        # printf "        Reported in \"${output_dir}/run_files/Genbank_files_with_no_CDSs.txt\",\n" | tee -a $gtotree_log
+        # printf "        but processed as though submitted in fasta format.\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/Genbank_files_with_no_CDSs.txt ${output_dir}/run_files/Genbank_files_with_no_CDSs.txt
     fi
 
     if [ -f ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ]; then
         printf "    $removed_genes gene(s) had no hits in any genome.\n" | tee -a $gtotree_log
-        printf "        Reported in \"${output_dir}/Genes_with_no_hits_to_any_genomes.txt\".\n\n" | tee -a $gtotree_log
+        # printf "        Reported in \"${output_dir}/run_files/Genes_with_no_hits_to_any_genomes.txt\".\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ${output_dir}/run_files/Genes_with_no_hits_to_any_genomes.txt
     fi
 
     if [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ]; then
         printf "    $removed_genes2 gene(s) had no hits after filtering by length.\n" | tee -a $gtotree_log
-        printf "        Reported in \"${output_dir}/Genes_with_no_hits_after_length_filter.txt\".\n\n" | tee -a $gtotree_log
+        # printf "        Reported in \"${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt\".\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/Genes_with_no_hits_after_length_filter.txt ${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt
     fi
 
     if [ -f ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ]; then
         num_genomes_high_redund=$(tail -n +2 ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv | wc -l | sed "s/^ *//" | cut -d " " -f 1)
         printf "    $num_genomes_high_redund genome(s) had an estimated redundancy of >= 10%%.\n" | tee -a $gtotree_log
-        printf "        Reported in \"${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv\".\n\n" | tee -a $gtotree_log
+        # printf "        Reported in \"${output_dir}/run_files/Genomes_with_questionable_redundancy_estimates.tsv\".\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ${output_dir}/run_files/Genomes_with_questionable_redundancy_estimates.tsv
     fi
+
+    printf "\n        Reported in \"${output_dir}/run_files/\".\n" | tee -a $gtotree_log
 
 fi
 

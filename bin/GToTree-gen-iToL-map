@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+
+import sys
+import argparse
+
+parser = argparse.ArgumentParser(description='This script is for creating a standard iToL color file give the genomes of interest and the "All_genomes_summary_info.tsv" output file from a normal GToTree run.')
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-s", "--all_genomes_summary", help="All_genomes_summary_info.tsv file from a typical GToTree run", action="store", dest="summary", required=True)
+
+required.add_argument("-g", "--target_genomes", help="Single-column file with the genomes to color (should match their initial IDs when given to GToTree, e.g. input file with no extension, or NCBI accessions)", action="store", dest="target_genomes", required=True)
+parser.add_argument("-o", "--output_file", help='Output file for iToL (default: "iToL-colors.txt")', action="store", dest="output_file", default="iToL-colors.txt")
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(1)
+
+args = parser.parse_args()
+
+target_list = []
+
+with open(args.target_genomes, "r") as target_genomes:
+    for genome in target_genomes:
+        target_list.append(genome.strip())
+
+out_file = open(args.output_file, "w")
+
+out_file.write("DATASET_STYLE\nSEPARATOR TAB\nDATASET_LABEL\tGToTree\nCOLOR\t#0000ff\nDATA\n")
+
+with open(args.summary) as summary:
+    for line in summary:
+        line = line.split("\t")
+    
+        if line[0] in target_list:
+            out_file.write(str(line[1]) + "\tbranch\tnode\t#0000ff\t3\tnormal")
