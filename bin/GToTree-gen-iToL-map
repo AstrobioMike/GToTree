@@ -11,7 +11,7 @@ required = parser.add_argument_group('required arguments')
 
 required.add_argument("-s", "--all_genomes_summary", help="All_genomes_summary_info.tsv file from a typical GToTree run", action="store", dest="summary", required=True)
 
-required.add_argument("-g", "--target_genomes", help="Single-column file with the genomes to color (should match their initial IDs when given to GToTree, e.g. input file with no extension, or NCBI accessions)", action="store", dest="target_genomes", required=True)
+required.add_argument("-g", "--target_genomes", help="Single-column file with the genomes to color (should match their initial IDs when given to GToTree, which is what is in the first column of the input genomes summary file, e.g. input file with no extension, or NCBI accessions)", action="store", dest="target_genomes", required=True)
 parser.add_argument("-o", "--output_file", help='Output file for iToL (default: "iToL-colors.txt")', action="store", dest="output_file", default="iToL-colors.txt")
 
 if len(sys.argv)==1:
