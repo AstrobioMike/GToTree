@@ -1565,7 +1565,7 @@ if [ $num_jobs == "1" ]; then
         gtt-parse-fasta-by-headers -i ${tmp_dir}/${SCG}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${SCG}_hits_filtered.faa --inverse
 
         # aligning
-        muscle -in ${tmp_dir}/${SCG}_hits_filtered.faa -diags -out ${tmp_dir}/aligned.tmp
+        muscle -in ${tmp_dir}/${SCG}_hits_filtered.faa -diags -maxiters 4 -out ${tmp_dir}/aligned.tmp
         # trimming
         trimal -in ${tmp_dir}/aligned.tmp -out ${tmp_dir}/trimmed.faa.tmp -automated1
 

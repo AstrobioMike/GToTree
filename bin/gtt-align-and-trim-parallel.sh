@@ -11,7 +11,7 @@ tmp_dir=$2
 gtt-parse-fasta-by-headers -i ${tmp_dir}/${1}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${1}_hits_filtered.faa --inverse
 
 # aligning
-muscle -in ${tmp_dir}/${1}_hits_filtered.faa -diags -out ${tmp_dir}/${1}_aligned.tmp &> /dev/null
+muscle -in ${tmp_dir}/${1}_hits_filtered.faa -diags -maxiters 4 -out ${tmp_dir}/${1}_aligned.tmp &> /dev/null
 # trimming
 trimal -in ${tmp_dir}/${1}_aligned.tmp -out ${tmp_dir}/${1}_trimmed.faa.tmp -automated1
 
