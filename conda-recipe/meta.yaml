@@ -7,7 +7,7 @@ package:
 
 source:
   url: https://github.com/AstrobioMike/GToTree/archive/master.zip
-  md5: da825c0de0dfd55438b143c41c78fc9e
+  md5: 27e8f51d3e0f47406369c1bd86c83db1
 
 build:
   number: 0
