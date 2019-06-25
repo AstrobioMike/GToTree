@@ -1,0 +1,29 @@
+{% set name = "GToTree" %}
+{% set version = "1.4.2" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: https://github.com/AstrobioMike/GToTree/archive/master.zip
+  md5: da825c0de0dfd55438b143c41c78fc9e
+
+build:
+  number: 0
+
+requirements:
+  host:
+    - pip
+    - python
+  run:
+    - python
+
+test:
+  imports:
+    - gtotree
+
+about:
+  home: https://github.com/AstrobioMike/GToTree/wiki/what-is-gtotree%3F
+  license: GNU General Public License v3.0
+  summary: GToTree is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. The open-access Bioinformatics Journal publication is available here (https://doi.org/10.1093/bioinformatics/btz188), and documentation and examples can be found at the wiki here (https://github.com/AstrobioMike/GToTree/wiki).
