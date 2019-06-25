@@ -13,8 +13,6 @@ setup(
     author_email="Mike.Lee@nasa.gov",
     description="A user-friendly workflow for phylogenomics.",
     long_description="GToTree is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. The open-access Bioinformatics Journal publication is available here (https://doi.org/10.1093/bioinformatics/btz188), and documentation and examples can be found at the wiki here (https://github.com/AstrobioMike/GToTree/wiki).",
-    packages=["gtotree"],
-    include_package_data=True,
     python_requires=">=3.7",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
