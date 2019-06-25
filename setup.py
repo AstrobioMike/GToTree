@@ -1,3 +1,5 @@
+from setuptools import setup
+
 setup(
     name="GToTree",
     version="1.4.2",
