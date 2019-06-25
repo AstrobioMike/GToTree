@@ -16,6 +16,5 @@ setup(
     python_requires=">=3.7",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
-    scripts=['bin/*']
-    ],
+    scripts=['bin/*'],
 )
