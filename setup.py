@@ -1,6 +1,6 @@
 setup(
     name="GToTree",
-    version=1.4.2,
+    version="1.4.2",
     url="https://github.com/AstrobioMike/GToTree",
     project_urls={
         "Documentation": "https://github.com/AstrobioMike/GToTree/wiki",
