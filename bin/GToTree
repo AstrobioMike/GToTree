@@ -382,6 +382,8 @@ printf "\n ---------------------------------  RUN INFO  ------------------------
 # storing the command as entered for the log file
 command_call="$(printf %q "$BASH_SOURCE")$(printf ' %q' "$@")"
 
+command_call=$(printf "$command_call" | sed 's/\\,/,/g')
+
 printf "    Command entered:\n" >> $gtotree_log
 printf "    $command_call\n\n" >> $gtotree_log
 
