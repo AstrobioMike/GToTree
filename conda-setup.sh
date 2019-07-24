@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-## checking that user conda version is at least 4.5.10 to avoid problems
+## checking that user conda version is at least 4.5.0 to avoid problems
 
 cur_conda_version=$(conda --version 2>&1 | cut -f2 -d ' ')
 too_old_version=4.5.0
@@ -19,14 +19,8 @@ fi
 
 printf "\n    ${GREEN}Setting up conda environment...${NC}\n\n"
 
-## adding conda channels
-conda config --add channels defaults 2> /dev/null
-conda config --add channels bioconda 2> /dev/null
-conda config --add channels conda-forge 2> /dev/null
-conda config --add channels au-eoed 2> /dev/null
-
 ## creating GToTree environment and installing dependencies
-conda create -n gtotree biopython hmmer=3.2.1 muscle=3.8.1551 trimal=1.4.1 fasttree=2.1.10 iqtree=1.6.9 prodigal=2.6.3 taxonkit=0.3.0 gnu-parallel=20161122 --yes
+conda create -n gtotree -c conda-forge -c bioconda -c defaults biopython hmmer=3.2.1 muscle=3.8.1551 trimal=1.4.1 fasttree=2.1.10 iqtree=1.6.9 prodigal=2.6.3 taxonkit=0.3.0 parallel=20190722 --yes
 
 ## activating environment
 source activate gtotree 2> /dev/null || conda activate gtotree
