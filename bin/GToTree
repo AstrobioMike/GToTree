@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.4.3"
+VERSION="v1.4.4"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -869,11 +869,11 @@ if [ -n "$NCBI_acc_file" ]; then
     # to keep track of what was searched and what was downloaded, both are included in the output summary table
     gtt-parse-assembly-summary-file -a ${tmp_dir}/ncbi_assembly_info.tmp -w ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp -o ${tmp_dir}/ncbi_accessions_info.tmp
 
-    ## sorting and saving found input accs
+    ## sorting and saving found input accs 
     cut -f 1 ${tmp_dir}/ncbi_accessions_info.tmp | sort > ${tmp_dir}/sorted_got_ncbi_accs.tmp
 
-    # checking if any accs weren't successfully found:
-    comm -23 ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp ${tmp_dir}/sorted_got_ncbi_accs.tmp > ${tmp_dir}/not_found_accs.tmp
+    # checking if any accs weren't successfully found (including removing any potential whitespace which users may have accidentally left in, eventually should put a check for this at the start):
+    comm -23 <(sed 's/ *$//' ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp) <(sed 's/ *$//' ${tmp_dir}/sorted_got_ncbi_accs.tmp) > ${tmp_dir}/not_found_accs.tmp
 
     # if any not found, removing from current list, and reporting:
     if [ -s ${tmp_dir}/not_found_accs.tmp ]; then
