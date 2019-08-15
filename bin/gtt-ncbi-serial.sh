@@ -30,7 +30,34 @@ do
 
     # storing and building links
     base_link="${curr_line[8]}"
-    end_path=$(basename $base_link)
+
+    # checking link was actually present (sometimes, very rarely, it is not there)
+    # if not there, attempting to build ourselves
+    if [ $base_link == "na" ] || [ -z $base_link ]; then
+
+        p1=$(printf "ftp://ftp.ncbi.nlm.nih.gov/genomes/all")
+
+        # checking if GCF or GCA
+        if [[ $assembly == "GCF"* ]]; then 
+            p2="GCF"
+        else
+            p2="GCA"
+        fi
+        
+        p3=$(echo $assembly | cut -f 2 -d "_" | cut -c 1-3)
+        p4=$(echo $assembly | cut -f 2 -d "_" | cut -c 4-6)
+        p5=$(echo $assembly | cut -f 2 -d "_" | cut -c 7-9)
+
+        ass_name="${curr_line[2]}"
+        end_path=$(paste -d "_" <(echo "$assembly") <(echo "$ass_name"))
+
+        base_link=$(paste -d "/" <(echo "$p1") <(echo "$p2") <(echo "$p3") <(echo "$p4") <(echo "$p5") <(echo "$end_path"))
+
+    else
+
+        end_path=$(basename $base_link)
+    
+    fi
 
     # attempting to download genes for assembly
     curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genes2.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
