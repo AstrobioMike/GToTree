@@ -15,7 +15,7 @@
 
 ---
 
-**See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to have things up and running in just a couple steps!**
+**See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to have things up and running in just a single step!**
 
 ---
 
@@ -27,7 +27,7 @@ GToTree utilizes helper scripts written in python, but is primarily implemented 
 
 ---
 
-**See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to get GToTree up and running in just a couple steps!**
+**See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to get GToTree up and running in just a single step!**
 
 ---
 
