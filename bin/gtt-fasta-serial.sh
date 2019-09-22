@@ -51,7 +51,7 @@ do
     ## running prodigal to get coding sequences
     prodigal -c -q -i $file_location -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
 
-    if [ -s ${file_location}_prodigal.stderr ]; then
+    if grep -q "at least 100000 bases for training." ${file_location}_prodigal.stderr; then
         printf "$assembly\n" >> ${tmp_dir}/kill_fasta_serial.prodigal
         rm -rf ${file_location}_prodigal.stderr
 

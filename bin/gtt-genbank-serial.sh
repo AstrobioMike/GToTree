@@ -87,7 +87,7 @@ do
         echo "prodigal used" > ${tmp_dir}/prodigal_used # marking so can add to citations list reported at end
         prodigal -c -q -i ${tmp_dir}/${assembly}_fasta.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null 2> ${file_location}_prodigal.stderr
 
-        if [ -s ${file_location}_prodigal.stderr ]; then
+        if grep -q "at least 100000 bases for training." ${file_location}_prodigal.stderr; then
             printf "$assembly\n" >> ${tmp_dir}/kill_genbank_serial.prodigal
             rm -rf ${file_location}_prodigal.stderr
             exit
