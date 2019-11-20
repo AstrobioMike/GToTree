@@ -37,8 +37,8 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
 
     printf "      2)  [-H <file>] location of the uncompressed HMM file being used, or just the\n"
     printf "                      HMM name if you've set the environment variable 'GToTree_HMM_dir'\n"
-    printf "                      to the appropriate location (run 'gtt-hmms' by itself to view\n"
-    printf "                      the available gene-sets)\n\n"
+    printf "                      to the appropriate location or installed via conda (run 'gtt-hmms'\n"
+    printf "                      by itself to view the available gene-sets)\n\n"
 
     printf "    Optional arguments include:\n\n"
 
@@ -63,7 +63,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  the labels if using TaxonKit (-t flag specified). E.g., all would be\n"
     printf "                  \"-L Domain,Phylum,Class,Order,Family,Genus,Species,Strain\"\n\n"
 
-    printf "        - [-p <file>] single-column file of additiona PFam targets to search for.\n"
+    printf "        - [-p <file>] single-column file of additional PFam targets to search for.\n"
     printf "                  Table of hit counts, fasta of hit sequences, and files compatible\n"
     printf "                  with the iToL web-based tree-viewer will be generated for each\n"
     printf "                  target. See visualization of gene presence/absence example at\n"
@@ -77,19 +77,20 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  \"FastTree\" and \"IQ-TREE\". As of now, these run with default settings\n"
     printf "                  only (and IQ-TREE includes \"-mset WAG,LG\". To run either with more\n" 
     printf "                  specific options (and there is a lot of room for variation here), you\n"
-    printf "                  can use the output alignment file from GToTree as input.\n\n"
+    printf "                  can use the output alignment file from GToTree as input in them.\n\n"
 
     printf "        - [-c <float>] default: 0.2\n"
     printf "                  A float between 0-1 specifying the range about the median of\n"
     printf "                  sequences to be retained. For example, if the median length of a\n"
     printf "                  set of sequences is 100 AAs, those seqs longer than 120 or shorter\n"
-    printf "                  than 80 will be filtered out before alignment of that gene set\n\n"
+    printf "                  than 80 will be filtered out before alignment of that gene set\n"
+    printf "                  with the default 0.2 setting.\n"
 
     printf "        - [-G <float>] default: 0.5\n"
     printf "                  A float between 0-1 specifying the minimum fraction of hits a\n"
     printf "                  genome must have of the SCG-set. For example, if there are 100\n"
     printf "                  target genes in the HMM profile, and Genome X only has hits to 49\n"
-    printf "                  of them, it will be removed from analysis.\n\n"
+    printf "                  of them, it will be removed from analysis with default value 0.5.\n\n"
 
     printf "        - [-n <int> ] default: 2\n"
     printf "                  The number of cpus you'd like to use during the HMM search.\n\n"
