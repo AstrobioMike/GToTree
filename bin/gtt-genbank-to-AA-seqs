@@ -7,7 +7,7 @@ import argparse
 import re
 import sys
 
-parser = argparse.ArgumentParser(description="This script takes a genbank file and returns amino acid sequences for all coding sequences.")
+parser = argparse.ArgumentParser(description="This script takes a genbank file and returns the amino acid sequences for all coding sequences.")
 
 required = parser.add_argument_group('required arguments')
 
@@ -55,8 +55,20 @@ for rec in recs:
         # dumping if noted a pseudo gene
     if "pseudo" in gene.qualifiers:
       continue
+    
+        # making gene header locus_tag if present. If not, building by contig name and gene coordinates
+    if "locus_tag" in gene.qualifiers:
+      header = str(gene.qualifiers["locus_tag"][0])
+    else:
+      location = location.replace("[", "")
+      location = re.sub('](.*)', '', location)
+      location = location.split(":")
+      start = location[0]
+      end = location[1]
 
-    output_fasta.write(">" + str(gene.qualifiers["locus_tag"][0])  + "\n" + str(gene.qualifiers["translation"][0]) + "\n")
+      header = str(rec.name) + "_" + str(start) + "_" + str(end)
+
+    output_fasta.write(">" + str(header)  + "\n" + str(gene.qualifiers["translation"][0]) + "\n")
 
 input_gb.close()
 output_fasta.close()
