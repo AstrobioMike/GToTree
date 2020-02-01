@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-
 import sys
 import argparse
 
-parser = argparse.ArgumentParser(description='This script is for creating a standard iToL color file give the genomes of interest and the "All_genomes_summary_info.tsv" output file from a normal GToTree run.')
+parser = argparse.ArgumentParser(description='This script is for creating a standard iToL "label" and/or "branch" color file when given the IDs of the genomes you want to color.')
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-s", "--all_genomes_summary", help="All_genomes_summary_info.tsv file from a typical GToTree run", action="store", dest="summary", required=True)
-
-required.add_argument("-g", "--target_genomes", help="Single-column file with the genomes to color (should match their initial IDs when given to GToTree, which is what is in the first column of the input genomes summary file, e.g. input file with no extension, or NCBI accessions)", action="store", dest="target_genomes", required=True)
+required.add_argument("-g", "--target_genomes", help='Single-column file with the genomes to color (need to match the IDs in the tree file, with no "">")', action="store", dest="target_genomes", required=True)
+parser.add_argument("-w", "--what_to_color", help='What to color, must be: "branches", "labels", or "both" (default: "both")', action="store", dest="to_color", default="both")
+parser.add_argument("-c", "--color", help='Color to use of either: "blue", "green", or "red" (default: "blue", of course, \'cause it\'s the best)', action="store", dest="color", default="blue")
 parser.add_argument("-o", "--output_file", help='Output file for iToL (default: "iToL-colors.txt")', action="store", dest="output_file", default="iToL-colors.txt")
 
 if len(sys.argv)==1:
@@ -19,6 +17,22 @@ if len(sys.argv)==1:
     sys.exit(1)
 
 args = parser.parse_args()
+
+if args.color == "blue":
+    col = "#0000ff"
+elif args.color == "green":
+    col = "#00a33f"
+elif args.color == "red":
+    col = "#a30000"
+else:
+    print("\n\tSorry, we're not prepared to handle \"" + str(args.color) + "\" as the color... :(\n")
+    parser.print_help(sys.stderr)
+    sys.exit(1)
+
+if args.to_color not in ["both", "branches", "labels"]:
+    print("\n\tSorry, we're not prepared to handle \"" + str(args.to_color) + "\" as the argument for what to color... :(\n")
+    parser.print_help(sys.stderr)
+    sys.exit(1)
 
 target_list = []
 
@@ -28,11 +42,18 @@ with open(args.target_genomes, "r") as target_genomes:
 
 out_file = open(args.output_file, "w")
 
-out_file.write("DATASET_STYLE\nSEPARATOR TAB\nDATASET_LABEL\tGToTree\nCOLOR\t#0000ff\nDATA\n")
+out_file.write("TREE_COLORS\nSEPARATOR TAB\nDATA\n\n")
 
-with open(args.summary) as summary:
-    for line in summary:
-        line = line.split("\t")
-    
-        if line[0] in target_list:
-            out_file.write(str(line[1]) + "\tbranch\tnode\t#0000ff\t3\tnormal")
+# writing lines for coloring labels if needed
+if args.to_color in ["both", "labels"]:
+
+    for target in target_list:
+        out_file.write(str(target) + "\tlabel\t" + str(col) + "\tbold\n")
+
+# writing lines for coloring branches if needed
+if args.to_color in ["both", "branches"]:
+
+    for target in target_list:
+        out_file.write(str(target) + "\tbranch\t" + str(col) + "\tnormal\t1.5\n")
+
+out_file.close()
