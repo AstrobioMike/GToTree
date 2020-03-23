@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.4.11"
+VERSION="v1.4.12"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -703,13 +703,24 @@ if [ "$file_to_genome_id_map" != "" ]; then
     fi
 
     cat $NCBI_acc_file $genbank_list_file_basenames $fasta_files_basenames $amino_acid_files_basenames | sort > ${tmp_dir}/sorted_all_input_genome_ids.tmp
-    comm -23 <(cut -f1 $file_to_genome_id_map | sort) ${tmp_dir}/sorted_all_input_genome_ids.tmp > ${tmp_dir}/spurious_ids.tmp
+    
+    ## adding in properly handling mapping file if the user provides paths rather than just file names, re: https://github.com/AstrobioMike/GToTree/issues/14
+
+    paste <( cut -f 1 $file_to_genome_id_map | awk -F '/' ' { print $NF } ' ) <( cut -f 2- $file_to_genome_id_map ) > ${tmp_dir}/new_id_map.tmp
+    new_file_to_genome_id_map=${tmp_dir}/new_id_map.tmp
+
+    comm -23 <(cut -f 1 ${tmp_dir}/new_id_map.tmp | sort) ${tmp_dir}/sorted_all_input_genome_ids.tmp > ${tmp_dir}/spurious_ids.tmp
 
     if [ -s ${tmp_dir}/spurious_ids.tmp ]; then
         spurious_ids_count=$(wc -l ${tmp_dir}/spurious_ids.tmp | sed "s/^ *//" | cut -d " " -f 1)
-        mv ${tmp_dir}/spurious_ids.tmp Missing_IDs.txt
-        rm -rf $tmp_dir uniq_hmm_names.tmp uniq_pfam_targets.tmp
+        
+        cp ${tmp_dir}/spurious_ids.tmp Missing_IDs.txt
+        mv uniq_hmm_names.tmp uniq_pfam_targets.tmp ${tmp_dir}/
 
+        if [ $debug_flag == 'false' ]; then
+             rm -rf $tmp_dir
+        fi
+        
         printf "\n${RED}  $spurious_ids_count genome ID(s) listed in the mapping file (passed to \"-m\") not found in${NC}\n" | tee -a $gtotree_log
         printf "  ${RED}any of the input genomes :(${NC}\n\n" | tee -a $gtotree_log
         printf "  Reported in the file \"Missing_IDs.txt\" for you to investigate.\n\n" | tee -a $gtotree_log
@@ -1770,7 +1781,7 @@ printf "\n______________________________________________________________________
 ##############  ADDING MORE INFORMATIVE HEADERS IF SPECIFIED  ###############
 #############################################################################
 ## making copy of alignment file to preserve original
-if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
+if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
 
     cp ${output_dir}/Aligned_SCGs.faa ${tmp_dir}/aligned_SCGs_mod_names.tmp
 
@@ -1779,9 +1790,9 @@ if [ -n "$file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
     printf " ############################################################################## \n\n" | tee -a $gtotree_log
 
     ## building id swap file starting with user-provided Genome-to-ID mapping file if given
-    if [ -n "$file_to_genome_id_map" ]; then
+    if [ -n "$new_file_to_genome_id_map" ]; then
 
-        sort -k 1,1 $file_to_genome_id_map | tee ${tmp_dir}/sorted_id_swap_map.tmp | cut -f1 > ${tmp_dir}/sorted_target_ids_to_swap.tmp
+        sort -k 1,1 $new_file_to_genome_id_map | tee ${tmp_dir}/sorted_id_swap_map.tmp | cut -f1 > ${tmp_dir}/sorted_target_ids_to_swap.tmp
 
         ## separating out which ones are to be swapped that are ncbi accessions (because the others need to have their extensions removed)
         if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then
