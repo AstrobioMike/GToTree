@@ -242,6 +242,16 @@ if [ -f "$NCBI_acc_file" ]; then
     fi
 fi
 
+# checking no duplicates labels in label file
+if [ -f "$file_to_genome_id_map" ]; then
+    num_dupes=$(cut -f 2,3 "$file_to_genome_id_map" | tr "\t" "_" | sort | uniq -d | wc -l)
+    if [ ! $num_dupes == 0 ]; then
+        printf "\n${RED} $file_to_genome_id_map appears to have duplicate labels in there, check it out and provide unique labels only.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+fi
+
 # checking numeric inputs and setting defaults if not provided
 if [ -z $len_cutoff ]; then
     len_cutoff="0.2"
