@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.4.12"
+VERSION="v1.4.13"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -236,17 +236,17 @@ fi
 if [ -f "$NCBI_acc_file" ]; then
     num_dupes=$(uniq -d "$NCBI_acc_file" | wc -l | sed "s/^ *//" | cut -d " " -f 1)
     if [ ! $num_dupes == 0 ]; then
-        printf "\n${RED}      $NCBI_acc_file has duplicate entries, check it out and provide unique accessions only.${NC}\n"
+        printf "\n${RED}  $NCBI_acc_file has duplicate entries, check it out and provide unique accessions only.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
     fi
 fi
 
-# checking no duplicates labels in label file
+# checking no duplicate desired labels in mapping file
 if [ -f "$file_to_genome_id_map" ]; then
     num_dupes=$(cut -f 2,3 "$file_to_genome_id_map" | tr "\t" "_" | sort | uniq -d | wc -l)
     if [ ! $num_dupes == 0 ]; then
-        printf "\n${RED} $file_to_genome_id_map appears to have duplicate labels in there, check it out and provide unique labels only.${NC}\n"
+        printf "\n${RED}  $file_to_genome_id_map appears to have duplicate labels in there, check it out and provide unique labels only.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
     fi
