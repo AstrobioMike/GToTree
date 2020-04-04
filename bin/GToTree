@@ -244,9 +244,9 @@ fi
 
 # checking no duplicates labels in label file
 if [ -f "$file_to_genome_id_map" ]; then
-    num_dupes=$(cut -f 2 -d$'\t' "$file_to_genome_id_map" | uniq -d | wc -l)
+    num_dupes=$(cut -f 2,3 "$file_to_genome_id_map" | tr "\t" "_" | sort | uniq -d | wc -l)
     if [ ! $num_dupes == 0 ]; then
-        printf "\n${RED}      $file_to_genome_id_map has duplicate labels on the second column, check it out and provide unique labels only.${NC}\n"
+        printf "\n${RED} $file_to_genome_id_map appears to have duplicate labels in there, check it out and provide unique labels only.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
     fi
