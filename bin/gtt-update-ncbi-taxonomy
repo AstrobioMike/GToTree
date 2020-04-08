@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -e
+
+# setting colors to use
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+printf "\n"
+
+curl --retry 10 -o ${TAXONKIT_DB}/taxdump.tar.gz ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
+
+tar -xzf ${TAXONKIT_DB}/taxdump.tar.gz -C ${TAXONKIT_DB}
+
+rm ${TAXONKIT_DB}/taxdump.tar.gz
+
+printf "\n\t\t${GREEN}The NCBI taxonomy database info has been updated!${NC}\n\n"
