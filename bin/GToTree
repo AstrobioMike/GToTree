@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.4.14"
+VERSION="v1.4.15"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -2068,14 +2068,12 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
         fi
     fi
 
-    ## one last safety screen for colons and commas (as they screw with newick format)
-
     ## if final_id_swap_map.tmp exists here, moving forward with swap
-    ## if it does not (which may happen if Taxonkit was specified, but no input sources had any taxids, for example), then not performing id swapping and reporting to user
+    ## if it does not exist here (which may happen if Taxonkit was specified, but no input sources had any taxids, for example), then not performing id swapping and reporting to user
 
     if [ -s ${tmp_dir}/final_id_swap_map.tmp ]; then
-
-        paste <(cut -f 1 ${tmp_dir}/final_id_swap_map.tmp) <(cut -f 2,3 ${tmp_dir}/final_id_swap_map.tmp | tr "[:, ]" "_") > ${tmp_dir}/final_id_swap_map_colonless.tmp
+          ## one last safety screen for colons, commas, semi-colons, and spaces, and if multiple underscores in a row, collapsing to just 1
+        paste <(cut -f 1 ${tmp_dir}/final_id_swap_map.tmp) <(cut -f 2,3 ${tmp_dir}/final_id_swap_map.tmp | tr "[:,; ]" "_" | tr -s "_") > ${tmp_dir}/final_id_swap_map_colonless.tmp
 
         ### now swapping ids
         gtt-swap-ids -i ${tmp_dir}/aligned_SCGs_mod_names.tmp -s ${tmp_dir}/final_id_swap_map_colonless.tmp -o ${output_dir}/Aligned_SCGs_mod_names.faa
