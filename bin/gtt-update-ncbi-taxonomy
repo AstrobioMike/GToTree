@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-
 # setting colors to use
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -9,7 +7,8 @@ NC='\033[0m'
 
 printf "\n"
 
-curl --retry 10 -o ${TAXONKIT_DB}/taxdump.tar.gz ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
+## trying https if ftp fails
+curl --retry 10 -o ${TAXONKIT_DB}/taxdump.tar.gz ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz || curl --retry 10 -o ${TAXONKIT_DB}/taxdump.tar.gz https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz
 
 tar -xzf ${TAXONKIT_DB}/taxdump.tar.gz -C ${TAXONKIT_DB}
 

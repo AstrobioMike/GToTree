@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.4.1"
+VERSION="v1.4.16"
 
 printf "\n\n               GToTree ${VERSION} (github.com/AstrobioMike/GToTree)\n\n"
 
@@ -43,6 +43,10 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  Provide this flag with no arguments if you'd like to keep the\n"
     printf "                  temporary directory. (mostly useful for debugging)\n\n"
 
+    printf "        - [-P ] default: false\n"
+    printf "                  Provide this flag with no arguments if your system can't use ftp,\n"
+    printf "                  and you'd like to try using http.\n\n"
+
     printf "    Example usage:\n\n\t GToTree-pfam-search -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -p target_pfams.txt\n\n"
 
     exit
@@ -65,8 +69,9 @@ fi
 ## setting some defaults
 output_dir="pfam_search_output"
 debug_flag='false'
+http_flag='false'
 
-while getopts :a:g:f:A:p:o:dn: args
+while getopts :a:g:f:A:p:o:dn:P args
 do
     case "${args}"
     in
@@ -78,6 +83,7 @@ do
         o) output_dir=${OPTARG};;
         d) debug_flag='true';;
         n) num_cpus=${OPTARG};;
+        P) http_flag='true';;
         \?) printf "\n  ${RED}Invalid argument: -${OPTARG}${NC}\n\n    Run 'GToTree-pfam-search' with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
     esac
 done
@@ -446,7 +452,11 @@ if [ -n "$NCBI_acc_file" ]; then
 
     if grep -q "^GCA" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
         printf "\t\t  ${GREEN}Downloading GenBank assembly summaries...${NC}\n\n" | tee -a $gtt_pfam_search_log
-        curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        if [ "$http_flag" == 'false' ]; then
+            curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        else
+            curl --connect-timeout 30 --retry 10 https://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        fi
     fi
 
     # making sure file downloaded with no errors
@@ -460,7 +470,11 @@ if [ -n "$NCBI_acc_file" ]; then
 
     if grep -q "^GCF" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
         printf "\n\t\t  ${GREEN}Downloading RefSeq assembly summaries...${NC}\n\n" | tee -a $gtt_pfam_search_log
-        curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        if [ "$http_flag" == 'false' ]; then
+            curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        else
+            curl --connect-timeout 30 --retry 10 https://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        fi
         cat ${tmp_dir}/ncbi_RS_assembly_info.tmp >> ${tmp_dir}/ncbi_assembly_info.tmp
     fi
 
@@ -521,7 +535,12 @@ if [ -n "$NCBI_acc_file" ]; then
         printf "   --------------------------------------------------------------------------   \n\n"
 
         # storing and building links
-        base_link="${curr_line[8]}"
+        if [ "$http_flag" == 'false' ]; then
+            base_link="${curr_line[8]}"
+        else
+            base_link=$(echo ${curr_line[8]} | sed 's/^ftp/https/')
+        fi
+
         end_path=$(basename $base_link)
 
         # attempting to download genes for assembly

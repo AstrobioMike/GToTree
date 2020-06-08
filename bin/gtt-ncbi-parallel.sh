@@ -12,19 +12,27 @@ hmm_target_genes_total=$5
 output_dir=$6
 best_hit_mode=$7
 additional_pfam_targets=$8
+http_flag=$9
 
 assembly=$(echo "$1" | cut -f 1)
 downloaded_accession=$(echo "$1" | cut -f 2)
 
 # storing and building links
-base_link=$(echo "$1" | cut -f 9)
-
+if [ "$http_flag" == 'false' ]; then
+    base_link=$(echo "$1" | cut -f 9)
+else
+    base_link=$(echo "$1" | cut -f 9 | sed 's/^ftp/https/')
+fi
 
 # checking link was actually present (sometimes, very rarely, it is not there)
 # if not there, attempting to build ourselves
 if [ $base_link == "na" ] || [ -z $base_link ]; then
 
-    p1=$(printf "ftp://ftp.ncbi.nlm.nih.gov/genomes/all")
+    if [ "$http_flag" == 'false' ]; then
+        p1=$(printf "ftp://ftp.ncbi.nlm.nih.gov/genomes/all")
+    else
+        p1=$(printf "https://ftp.ncbi.nlm.nih.gov/genomes/all")
+    fi
 
     # checking if GCF or GCA
     if [[ $assembly == "GCF"* ]]; then 

@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.4.15"
+VERSION="v1.4.16"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -111,6 +111,10 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  Provide this flag with no arguments if you'd like to keep the\n"
     printf "                  temporary directory. (mostly useful for debugging)\n\n"
 
+    printf "        - [-P ] default: false\n"
+    printf "                  Provide this flag with no arguments if your system can't use ftp,\n"
+    printf "                  and you'd like to try using http.\n\n"
+
     printf "    Example usage:\n\n\t GToTree -a ncbi_accessions.txt -g genbank_files.txt -f fasta_files.txt -H Bacteria -t -j 4\n\n"
 
     exit
@@ -175,8 +179,9 @@ best_hit_mode='false'
 align_only='false'
 tree_program='FastTree'
 additional_pfam_targets='false'
+http_flag='false'
 
-while getopts :a:g:f:A:H:o:m:tL:p:NT:c:G:Bdn:j: args
+while getopts :a:g:f:A:H:o:m:tL:p:NT:c:G:Bdn:j:P args
 do
     case "${args}"
     in
@@ -198,6 +203,7 @@ do
         d) debug_flag='true';;
         n) num_cpus=${OPTARG};;
         j) num_jobs=${OPTARG};;
+        P) http_flag='true';;
         \?) printf "\n  ${RED}Invalid argument: -${OPTARG}${NC}\n\n    Run 'GToTree' with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
     esac
 done
@@ -617,6 +623,10 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
         printf "      - Debug mode on. Temp directory won't be removed after run.\n" | tee -a $gtotree_log
     fi
 
+    if [ $http_flag == "true" ]; then
+        printf "      - Attempting to use http instead of ftp.\n" | tee -a $gtotree_log
+    fi
+
 fi
 
 ## checking and reporting if additional pfams targeted
@@ -859,7 +869,12 @@ if [ -n "$NCBI_acc_file" ]; then
 
     if grep -q "^GCA" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
         printf "\t\t  ${GREEN}Downloading GenBank assembly summaries...${NC}\n\n" | tee -a $gtotree_log
-        curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+
+        if [ "$http_flag" == 'false' ]; then
+            curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        else
+            curl --connect-timeout 30 --retry 10 https://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        fi
     fi
 
     # making sure file downloaded with no errors
@@ -873,7 +888,13 @@ if [ -n "$NCBI_acc_file" ]; then
 
     if grep -q "^GCF" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
         printf "\n\t\t  ${GREEN}Downloading RefSeq assembly summaries...${NC}\n\n" | tee -a $gtotree_log
-        curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+
+        if [ "$http_flag" == 'false' ]; then
+            curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        else
+            curl --connect-timeout 30 --retry 10 https://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
+        fi
+
         cat ${tmp_dir}/ncbi_RS_assembly_info.tmp >> ${tmp_dir}/ncbi_assembly_info.tmp
     fi
 
@@ -926,9 +947,9 @@ if [ -n "$NCBI_acc_file" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
+        gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag
     else
-        cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
+        cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag
     fi
 
     ## checking if prodigal was used to add to citations list being reported at end
