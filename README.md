@@ -30,7 +30,7 @@ Also included are several newly generated single-copy gene-sets for 13 different
 GToTree utilizes helper scripts written in python, but is primarily implemented in bash. Every attempt is being made to make it portable across all variations of GNU/Unix, including on Macs, so if you run into any issues, it'd be appreciated if you could [report them](https://github.com/AstrobioMike/GToTree/issues) so the problems can be found and fixed!  
 
 <p align="center">
-<a href="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-ToL_tree.pdf"><img src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-Overview-main.png"></a>
+<a href="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-ToL_tree.pdf"><img src="https://github.com/AstrobioMike/AstrobioMike.github.io/blob/master/images/GToTree-Overview.png"></a>
 </p>
 
 See the ["What is GToTree?" wiki page](https://github.com/AstrobioMike/GToTree/wiki/what-is-gtotree%3F) for some more detail on the processing steps pictured above. For practical ways GToTree can be helpful, check out the [Example usage page](https://github.com/AstrobioMike/GToTree/wiki/example-usage). And for detailed information on using GToTree, see the [User guide](https://github.com/AstrobioMike/GToTree/wiki/user-guide).
