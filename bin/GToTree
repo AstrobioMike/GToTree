@@ -2252,9 +2252,9 @@ if [ $align_only == 'false' ]; then
 
 
         if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-            FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> $gtotree_log
+            FastTree -out ${output_dir}/Aligned_SCGs_mod_names.tre ${output_dir}/Aligned_SCGs_mod_names.faa 2> >(tee -a $gtotree_log >&2)
         else
-            FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> $gtotree_log
+            FastTree FastTree -out ${output_dir}/Aligned_SCGs.tre ${output_dir}/Aligned_SCGs.faa 2> >(tee -a $gtotree_log >&2)
         fi
 
         fasttree_used="true" # setting to report citations at end
