@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.4.16"
+VERSION="v1.4.17"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -2252,9 +2252,9 @@ if [ $align_only == 'false' ]; then
 
 
         if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-            FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre | tee -a $gtotree_log
+            FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> $gtotree_log
         else
-            FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre | tee -a $gtotree_log
+            FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> $gtotree_log
         fi
 
         fasttree_used="true" # setting to report citations at end
