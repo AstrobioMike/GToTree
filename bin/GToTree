@@ -238,14 +238,33 @@ if [ $tree_program != "FastTree" ]; then
 fi
 
 
-# checking no duplicates in NCBI accession file
+# checking out NCBI accessions file 
 if [ -f "$NCBI_acc_file" ]; then
+    # checking no duplicates in there
     num_dupes=$(uniq -d "$NCBI_acc_file" | wc -l | sed "s/^ *//" | cut -d " " -f 1)
     if [ ! $num_dupes == 0 ]; then
         printf "\n${RED}  $NCBI_acc_file has duplicate entries, check it out and provide unique accessions only.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
     fi
+
+    # checking no whitespace in there
+    if grep -q " " ${NCBI_acc_file}; then
+        printf "\n${RED}  $NCBI_acc_file has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no tabs in there
+    if grep -q "\t" ${NCBI_acc_file}; then
+        printf "\n${RED}  $NCBI_acc_file has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+
 fi
 
 # checking no duplicate desired labels in mapping file
@@ -690,7 +709,7 @@ mkdir $tmp_dir 2> /dev/null
 
 if [ $? -ne 0 ] ; then
     printf "\n${RED}  Tried to make temporary directory named ${tmp_dir} but failed, this shouldn't happen :(${NC}\n\n" | tee -a $gtotree_log
-    rm uniq_hmm_names.tmp uniq_pfam_targets.tmp
+    rm -rf uniq_hmm_names.tmp uniq_pfam_targets.tmp
     printf "Exiting for now.\n\n" | tee -a $gtotree_log
     exit
 fi
@@ -735,7 +754,11 @@ if [ "$file_to_genome_id_map" != "" ]; then
         spurious_ids_count=$(wc -l ${tmp_dir}/spurious_ids.tmp | sed "s/^ *//" | cut -d " " -f 1)
         
         cp ${tmp_dir}/spurious_ids.tmp Missing_IDs.txt
-        mv uniq_hmm_names.tmp uniq_pfam_targets.tmp ${tmp_dir}/
+        mv uniq_hmm_names.tmp ${tmp_dir}/
+
+        if [ -s "$target_pfams" ]; then
+            mv uniq_pfam_targets.tmp ${tmp_dir}/
+        fi
 
         if [ $debug_flag == 'false' ]; then
              rm -rf $tmp_dir
@@ -743,7 +766,10 @@ if [ "$file_to_genome_id_map" != "" ]; then
         
         printf "\n${RED}  $spurious_ids_count genome ID(s) listed in the mapping file (passed to \"-m\") not found in${NC}\n" | tee -a $gtotree_log
         printf "  ${RED}any of the input genomes :(${NC}\n\n" | tee -a $gtotree_log
-        printf "  Reported in the file \"Missing_IDs.txt\" for you to investigate.\n\n" | tee -a $gtotree_log
+        printf "  Reported in the file \"Missing_IDs.txt\" for you to investigate.\n" | tee -a $gtotree_log
+        printf "  If things look the same at first glance, double-check there are no extra\n" | tee -a $gtotree_log
+        printf "  empty spaces or anything at the ends of the entries in that file.\n\n" | tee -a $gtotree_log
+        
         rm -rf $output_dir
         printf "Exiting for now.\n\n" | tee -a $gtotree_log
         exit
@@ -2252,9 +2278,9 @@ if [ $align_only == 'false' ]; then
 
 
         if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-            FastTree -out ${output_dir}/Aligned_SCGs_mod_names.tre ${output_dir}/Aligned_SCGs_mod_names.faa 2> >(tee -a $gtotree_log >&2)
+            FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre | tee -a $gtotree_log
         else
-            FastTree FastTree -out ${output_dir}/Aligned_SCGs.tre ${output_dir}/Aligned_SCGs.faa 2> >(tee -a $gtotree_log >&2)
+            FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre | tee -a $gtotree_log
         fi
 
         fasttree_used="true" # setting to report citations at end
