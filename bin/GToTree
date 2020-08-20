@@ -62,8 +62,8 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  Provide this flag with no arguments if you'd like to add GTDB lineage\n"
     printf "                  info to the sequence headers for any genomes represented in GTDB.\n"
     printf "                  Can be utilized with '-t' flag also, in that case GToTree will use\n"
-    printf "                  GTDB lineage info where possible, and use NCBI lineage info when accession\n"
-    printf "                  isn't yet represented in GTDB.\n\n"
+    printf "                  GTDB lineage info where possible, and use NCBI lineage info if accession\n"
+    printf "                  isn't represented in GTDB.\n\n"
 
     printf "        - [-L <str>] default: Domain,Phylum,Class,Species,Strain\n"
     printf "                  A comma-separated list of the taxonomic ranks you'd like added to\n"
@@ -611,7 +611,7 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
     fi
 
     if [ $gtdb_id_swap != "false" ]; then
-        printf "      - GTDB will be used to add lineage info to labels where possible (supercedes NCBI if Taxonkit used too).\n" | tee -a $gtotree_log
+        printf "      - GTDB will be used to add lineage info to labels where possible (supersedes NCBI if Taxonkit used too).\n" | tee -a $gtotree_log
         gtdb_used="true"
     fi
 
