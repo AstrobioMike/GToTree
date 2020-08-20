@@ -48,8 +48,10 @@ conda create -y -n gtotree -c conda-forge -c bioconda -c astrobiomike gtotree
 ## Dependencies 
 > **NOTE: The [conda installation](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) takes care of all of these!**
 
-### Required to use at all:
-If you use GToTree, please cite these folks :)  
+**GToTree will print out a `citations.txt` file with citation information specific for your run. Please be sure to cite the developers appropriately :)**
+
+### Default usage:
+If you use GToTree with default settings, please cite these folks :)  
 
 - **[Biopython](https://biopython.org/wiki/Download)** - [citation](https://academic.oup.com/bioinformatics/article/25/11/1422/330687)
 - **[HMMER3](http://hmmer.org/download.html)** v3.2.1 - citation: they note in the [user manual](http://eddylab.org/software/hmmer/Userguide.pdf) to cite [the website](http://hmmer.org/download.html), but there is also [this paper](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1002195)  
@@ -64,7 +66,9 @@ If you use GToTree in a manner that uses these tools, please cite these folks :)
   - *if providing input genomes in fasta format, or GenBank format with no CDS annotations, or NCBI accessions to genomes with no gene calls*
 - **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** v0.3 - [citation](https://www.biorxiv.org/content/early/2019/01/08/513523)
   - *if changing genome labels based on lineage information for input genomes with associated NCBI taxids*
+- **[Genome Taxonomy Database](https://gtdb.ecogenomic.org/)** always current release - [citation](https://www.nature.com/articles/s41587-020-0501-8)
+  - *if changing genome labels based on lineage information for input genomes with associated NCBI taxids, but based on the GTDB*
+- **[IQ-TREE2]()** v2.0.3 - [citation](https://doi.org/10.1093/molbev/msu300)
+  - *if using IQ-TREE2 instead of FastTree*
 - **[GNU Parallel](https://www.gnu.org/software/parallel/)** v20161122 - [citation info](https://www.gnu.org/software/parallel/parallel_design.html#Citation-notice)
   - *if running in parallel*
-
-
