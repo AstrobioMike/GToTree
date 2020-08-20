@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+
+import sys
+import argparse
+
+parser = argparse.ArgumentParser(description='This script is for parsing GTDB\'s assembly metadata file down to the provided accessions.')
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-a", "--assembly_summary", help="GTDB's assembly metadata file", action="store", dest="all_assemblies", required=True)
+required.add_argument("-w", "--wanted_accessions", help="Single-column file with wanted accessions", action="store", dest="wanted_accs", required=True)
+parser.add_argument("-o", "--output_file", help='Wanted summary info only (default: "target-gtdb.tsv")', action="store", dest="output_file", default="target-gtdb.tsv")
+parser.add_argument("-f", "--found_accs_output_file", help='Accessions found in GTDB (default: "gtdb-found-accs.txt")', action="store", dest="found_accs_output_file", default="gtdb-found-accs.txt")
+parser.add_argument("-t", "--gtdb_tax_output_file", help='Target GTDB taxonomy table (default: "target-gtdb-tax.tsv")', action="store", dest="gtdb_tax_output_file", default="target-gtdb-tax.tsv")
+
+
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(1)
+
+args = parser.parse_args()
+
+wanted_dict = {}
+
+with open(args.wanted_accs, "r") as wanted_accs:
+    for line in wanted_accs:
+        root_acc = line.strip().split(".")[0]
+        wanted_dict[str(root_acc)] = line.strip()
+
+out_file = open(args.output_file, "w")
+
+gtdb_found_accs_out_file = open(args.found_accs_output_file, "w")
+# adding header
+gtdb_found_accs_out_file.write("acc_searched\tgtdb_acc_found\tfull_gtdb_acc\n")
+
+
+with open(args.all_assemblies) as assemblies:
+    # writing out header to keep
+    out_file.write(assemblies.readline())
+
+    for line in assemblies:
+        split_line = line.strip().split("\t")
+        
+        acc_with_version = split_line[0][3:]
+        
+        # taking even if not the same version as specified (this info is reported in the final Genomes-summary.tsv output file)
+        if acc_with_version.split(".")[0] in wanted_dict:
+            out_file.write(line)
+            
+            gtdb_found_accs_out_file.write(wanted_dict[acc_with_version.split(".")[0]] + "\t" + acc_with_version + "\t" + split_line[0] + "\n")
+            
+            
+out_file.close()
+gtdb_found_accs_out_file.close()
+
+# making GTDB taxonomy table only
+
+out_gtdb_tax_table = open(args.gtdb_tax_output_file, "w")
+
+# adding header
+out_gtdb_tax_table.write("base_gtdb_acc\tfull_gtdb_acc\tdomain\tphylum\tclass\torder\tfamily\tgenus\tspecies\n")
+
+    
+with open(args.output_file, "r") as assemblies:
+
+    # skipping header
+    next(assemblies)
+    
+    for line in assemblies:
+        line = line.strip().split("\t")
+        full_gtdb_acc = line[0]
+        base_gtdb_acc = full_gtdb_acc[3:]
+        
+        gtdb_tax_list = line[16].split(";")
+        
+        if len(gtdb_tax_list) != 7:
+            print("GTDB entry " + full_gtdb_acc + " doesn't seem to have full lineage info.")
+            
+        out_gtdb_tax_table.write(base_gtdb_acc + "\t" + full_gtdb_acc + "\t" + gtdb_tax_list[0][3:] + "\t" + gtdb_tax_list[1][3:] + "\t" + gtdb_tax_list[2][3:] + "\t" + gtdb_tax_list[3][3:] + "\t" + gtdb_tax_list[4][3:] + "\t" + gtdb_tax_list[5][3:] + "\t" + gtdb_tax_list[6][3:] + "\n")
+
+out_gtdb_tax_table.close()

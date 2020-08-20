@@ -4,7 +4,7 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
-VERSION="v1.4.17"
+VERSION="v1.5"
 
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
@@ -57,6 +57,13 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "        - [-t ] default: false\n"
     printf "                  Provide this flag with no arguments if you'd like to add lineage\n"
     printf "                  info to the sequence headers for any genomes with NCBI taxids.\n\n"
+
+    printf "        - [-x ] default: false\n"
+    printf "                  Provide this flag with no arguments if you'd like to add GTDB lineage\n"
+    printf "                  info to the sequence headers for any genomes represented in GTDB.\n"
+    printf "                  Can be utilized with '-t' flag also, in that case GToTree will use\n"
+    printf "                  GTDB lineage info where possible, and use NCBI lineage info when accession\n"
+    printf "                  isn't yet represented in GTDB.\n\n"
 
     printf "        - [-L <str>] default: Domain,Phylum,Class,Species,Strain\n"
     printf "                  A comma-separated list of the taxonomic ranks you'd like added to\n"
@@ -162,6 +169,7 @@ hmmer_used="false"
 muscle_used="false"
 trimal_used="false"
 taxonkit_used="false"
+gtdb_used="false"
 fasttree_used="false"
 iqtree_used="false"
 universal_SCGs_used="false"
@@ -173,6 +181,7 @@ universal_SCGs_used="false"
 ## setting some defaults
 output_dir="GToTree_output"
 taxonkit_id_swap='false'
+gtdb_id_swap='false'
 debug_flag='false'
 lineage_spec="Domain,Phylum,Class,Species,Strain"
 best_hit_mode='false'
@@ -181,7 +190,7 @@ tree_program='FastTree'
 additional_pfam_targets='false'
 http_flag='false'
 
-while getopts :a:g:f:A:H:o:m:tL:p:NT:c:G:Bdn:j:P args
+while getopts :a:g:f:A:H:o:m:txL:p:NT:c:G:Bdn:j:P args
 do
     case "${args}"
     in
@@ -193,6 +202,7 @@ do
         o) output_dir=${OPTARG};;
         m) file_to_genome_id_map=${OPTARG};;
         t) taxonkit_id_swap='true';;
+        x) gtdb_id_swap='true';;
         L) lineage_spec=${OPTARG};;
         p) target_pfams=${OPTARG};;
         N) align_only='true' ;;
@@ -575,7 +585,7 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTree" ] || [ $align_only == 'true' ]; then
+if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTree" ] || [ $align_only == 'true' ]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
@@ -598,6 +608,11 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
     if [ $taxonkit_id_swap != "false" ]; then
         printf "      - Taxonkit will be used to add lineage info to labels.\n" | tee -a $gtotree_log
         taxonkit_used="true"
+    fi
+
+    if [ $gtdb_id_swap != "false" ]; then
+        printf "      - GTDB will be used to add lineage info to labels where possible (supercedes NCBI if Taxonkit used too).\n" | tee -a $gtotree_log
+        gtdb_used="true"
     fi
 
     if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
@@ -1838,7 +1853,7 @@ printf "\n______________________________________________________________________
 ##############  ADDING MORE INFORMATIVE HEADERS IF SPECIFIED  ###############
 #############################################################################
 ## making copy of alignment file to preserve original
-if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
+if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] ; then
 
     cp ${output_dir}/Aligned_SCGs.faa ${tmp_dir}/aligned_SCGs_mod_names.tmp
 
@@ -2075,9 +2090,159 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ]; then
         fi
     
     else
-        ## if no taxonkit swapping specified, moving user-provided map to final file
-        cp ${tmp_dir}/base_label_swap.tmp ${tmp_dir}/full_id_swap_map.tmp
+        ## if no taxonkit swapping specified, moving user-provided map to final file if it exists
+        if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
+
+            cp ${tmp_dir}/base_label_swap.tmp ${tmp_dir}/full_id_swap_map.tmp
+
+        fi
     fi
+
+    ## now if using gtdb lineage info was requested, adding those to swap file too (superceding if taxonkit was also used), and
+    ## re-labeling genomes that were NOT given a new name in the user-provided mapping file (those solely appended-to will still have lineages added first)
+    if [ $gtdb_id_swap != "false" ]; then
+
+        # downloading gtdb bacteria and archaea info tables
+        printf "\n\t\t  ${GREEN}Downloading GTDB bacteria and archaea info tables...${NC}\n\n" | tee -a $gtotree_log
+
+        curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar122_metadata.tar.gz -o ${tmp_dir}/gtdb_archaea_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
+        curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tar.gz -o ${tmp_dir}/gtdb_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
+        printf "\n\n"
+
+        # making sure file downloaded with no errors
+        if [ -s capture_any_dl_errors.tmp ]; then
+            printf "\n\n  ${RED}Download of GTDB taxonomy info failed :(${NC}\n  Is the internet connection weak maybe?\n\nContinuing, because we've come this far, but labels won't have GTDB lineages incorporated.\n\n" | tee -a $gtotree_log
+            rm -rf ${tmp_dir} ${output_dir} capture_any_dl_errors.tmp
+            touch ${tmp_dir}/gtdb_failed_download.tmp
+        else
+            rm -rf capture_any_dl_errors.tmp
+        fi
+
+        # only moving forward if there were no errors in downloading the GTDB files
+        if [ ! -f ${tmp_dir}/gtdb_failed_download.tmp ]; then
+
+            # unpacking
+              # getting name first (will change with version updates)
+            gtdb_arc_file_name=$(tar -tf ${tmp_dir}/gtdb_archaea_info.tmp.tar.gz)
+            gtdb_bac_file_name=$(tar -tf ${tmp_dir}/gtdb_info.tmp.tar.gz)
+            tar -xzf ${tmp_dir}/gtdb_archaea_info.tmp.tar.gz --directory ${tmp_dir}
+            tar -xzf ${tmp_dir}/gtdb_info.tmp.tar.gz --directory ${tmp_dir}
+
+            mv ${tmp_dir}/${gtdb_arc_file_name} ${tmp_dir}/gtdb_archaea_info.tmp
+            mv ${tmp_dir}/${gtdb_bac_file_name} ${tmp_dir}/gtdb_info.tmp
+
+            # combining tables into one
+            tail -n +2 ${tmp_dir}/gtdb_archaea_info.tmp >> ${tmp_dir}/gtdb_info.tmp
+
+            # getting genomes that have a taxid (these will be all NCBI accs)
+            awk ' BEGIN { FS=OFS="\t" } $2 != "NA" ' ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | cut -f 1 > ${tmp_dir}/potential_ids_for_gtdb_swap.tmp
+
+            # removing those that the user already provided new labels for, if they did
+            if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
+                comm -23 <(sort ${tmp_dir}/potential_ids_for_gtdb_swap.tmp) <(cut -f 1 ${tmp_dir}/base_label_swap.tmp | sort) > ${tmp_dir}/ids_for_gtdb_swap.tmp
+            else
+                sort ${tmp_dir}/potential_ids_for_gtdb_swap.tmp > ${tmp_dir}/ids_for_gtdb_swap.tmp
+            fi
+
+            # parsing down GTDB table to those we are targeting and saving master gtdb table for user
+            gtt-parse-gtdb-assembly-summary-file -o ${tmp_dir}/target-gtdb.tsv -f ${tmp_dir}/gtdb_found_accs.txt -t ${tmp_dir}/target-gtdb-tax.tsv -a ${tmp_dir}/gtdb_info.tmp -w ${tmp_dir}/ids_for_gtdb_swap.tmp
+            mv ${tmp_dir}/target-gtdb.tsv ${output_dir}/run_files/full_gtdb_table_of_targets.tsv
+
+
+            ## creating new labels based on GTDB lineage info
+            for id in $(cat ${tmp_dir}/ids_for_gtdb_swap.tmp)
+            do
+                grep -w -m1 "$id" ${tmp_dir}/target-gtdb-tax.tsv
+            done | cut -f 1,3-9 > ${tmp_dir}/working_gtdb_lineages.tmp
+
+            ## buildig new gtdb-swapped labels based upon user-desired ranks (provided by -L flag)
+            cut -f 1 ${tmp_dir}/working_gtdb_lineages.tmp > ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp
+            echo $lineage_spec | tr "," "\n" > ${tmp_dir}/wanted_ranks.tmp
+
+            if grep -q "Domain" ${tmp_dir}/wanted_ranks.tmp; then
+                paste -d "_" ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp <(cut -f 2 ${tmp_dir}/working_gtdb_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp
+                mv ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp
+            fi
+
+            if grep -q "Phylum" ${tmp_dir}/wanted_ranks.tmp; then
+                paste -d "_" ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp <(cut -f 3 ${tmp_dir}/working_gtdb_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp
+                mv ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp
+            fi
+
+            if grep -q "Class" ${tmp_dir}/wanted_ranks.tmp; then
+                paste -d "_" ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp <(cut -f 4 ${tmp_dir}/working_gtdb_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp
+                mv ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp
+            fi
+
+            if grep -q "Order" ${tmp_dir}/wanted_ranks.tmp; then
+                paste -d "_" ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp <(cut -f 5 ${tmp_dir}/working_gtdb_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp
+                mv ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp
+            fi
+
+            if grep -q "Family" ${tmp_dir}/wanted_ranks.tmp; then
+                paste -d "_" ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp <(cut -f 6 ${tmp_dir}/working_gtdb_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp
+                mv ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp
+            fi
+
+            if grep -q "Genus" ${tmp_dir}/wanted_ranks.tmp; then
+                paste -d "_" ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp <(cut -f 7 ${tmp_dir}/working_gtdb_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp
+                mv ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp
+            fi
+
+            if grep -q "Species" ${tmp_dir}/wanted_ranks.tmp; then
+                paste -d "_" ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp <(cut -f 8 ${tmp_dir}/working_gtdb_lineages.tmp | tr "." "_" | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp
+                mv ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp
+            fi
+
+            mv ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp ${tmp_dir}/new_ids_for_gtdb_swap.tmp
+
+            ## making map for IDs changed with gtdb
+            paste ${tmp_dir}/ids_for_gtdb_swap.tmp ${tmp_dir}/new_ids_for_gtdb_swap.tmp > ${tmp_dir}/final_gtdb_id_swap_map.tmp
+
+            ## i'm not seeing strain level designations in GTDB, so those will be absent on any labels where GTDB taxonomy was added
+            # notifying user if this is the case
+            if grep -q "Strain" ${tmp_dir}/wanted_ranks.tmp; then
+                printf "  ********************************** NOTICE **********************************\n" | tee -a $gtotree_log
+                printf "    Strain-level labels were requested in addition to using GTDB taxonomy\n" | tee -a $gtotree_log
+                printf "    where possible. This is just a note that there will be no strain-level\n" | tee -a $gtotree_log
+                printf "    labels added for those that had GTDB lineage info added.\n\n" | tee -a $gtotree_log
+                printf "  *****************************************************************************\n\n" | tee -a $gtotree_log
+            fi
+
+            ## now, if there are taxonkit swapped labels, we are replacing those that we cover with GTDB in the full_id_swap_map file...
+            if [ -f ${tmp_dir}/final_taxonkit_id_swap_map.tmp ]; then
+                # getting those IDs with taxonkit info
+                cut -f 1 ${tmp_dir}/final_taxonkit_id_swap_map.tmp | sort > ${tmp_dir}/current_taxonkit_ids_to_swap.tmp
+                # getting those IDs with GTDB info
+                cut -f 1 ${tmp_dir}/final_gtdb_id_swap_map.tmp | sort > ${tmp_dir}/current_gtdb_ids_to_swap.tmp
+
+                # getting those with taxonkit (NCBI) lineage info, but no GTDB info (will happen in current release of GTDB doesn't include this particular accession)
+                comm -23 ${tmp_dir}/current_taxonkit_ids_to_swap.tmp ${tmp_dir}/current_gtdb_ids_to_swap.tmp > ${tmp_dir}/taxonkit_ids_to_keep_because_no_GTDB_info.tmp
+                
+                # pulling those out, adding to base label swap file, then adding GTDB swap info
+                for id in $(cat ${tmp_dir}/taxonkit_ids_to_keep_because_no_GTDB_info.tmp)
+                do
+                    grep -w -m 1 "$id" ${tmp_dir}/full_id_swap_map.tmp
+                done > ${tmp_dir}/building_final_lineage_id_swap_map.tmp
+
+                cat ${tmp_dir}/building_final_lineage_id_swap_map.tmp ${tmp_dir}/final_gtdb_id_swap_map.tmp > ${tmp_dir}/final_lineage_id_swap_map.tmp
+
+            else # this is if there were no taxonkit swapping requested
+                cp ${tmp_dir}/final_gtdb_id_swap_map.tmp ${tmp_dir}/final_lineage_id_swap_map.tmp
+
+            fi
+
+            ## adding to the ${tmp_dir}/base_label_swap.tmp if other user-specified IDs were given (with -m flag)
+            if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
+                cat ${tmp_dir}/base_label_swap.tmp ${tmp_dir}/final_lineage_id_swap_map.tmp > ${tmp_dir}/full_id_swap_map.tmp
+            else
+                cp ${tmp_dir}/final_lineage_id_swap_map.tmp ${tmp_dir}/full_id_swap_map.tmp
+            fi
+
+        fi
+
+    fi
+
 
     ### if some need appending, then appending here
     if [ -s ${tmp_dir}/base_labels_need_append.tmp ]; then
@@ -2473,19 +2638,23 @@ printf "Muscle\nEdgar RC. MUSCLE: a multiple sequence alignment method with redu
 printf "TrimAl\nGutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972–1973. doi:10.1093/bioinformatics/btp348\n\n" >> ${output_dir}/citations.txt
 
 if [ $prodigal_used == "true" ]; then
-    printf "Prodigal\nHyatt,D. et al. Gene and translation initiation site prediction in metagenomic sequences. Bioinformatics. 2010; 28, 2223–2230. doi:10.1186/1471-2105-11-119\n\n" >> ${output_dir}/citations.txt
+    printf "Prodigal\nHyatt, D. et al. Gene and translation initiation site prediction in metagenomic sequences. Bioinformatics. 2010; 28, 2223–2230. doi:10.1186/1471-2105-11-119\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $taxonkit_used == "true" ]; then
-    printf "TaxonKit\nShen W. and Xiong J. TaxonKit: a cross-platform and efficient NCBI taxonomy toolkit. bioRxiv. 2019. doi:10.1101/513523\n\n" >> ${output_dir}/citations.txt
+    printf "TaxonKit\nShen W and Xiong J. TaxonKit: a cross-platform and efficient NCBI taxonomy toolkit. bioRxiv. 2019. doi:10.1101/513523\n\n" >> ${output_dir}/citations.txt
+fi
+
+if [ $gtdb_used == "true" ]; then
+    printf "Genome Taxonomy Database (GTDB)\nParks DH et al. A complete domain-to-species taxonomy for Bacteria and Archaea. Nat. Biotech. 2020. doi:10.1038/s41587-020-0501-8\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $fasttree_used == "true" ]; then
-    printf "FastTree 2\nPrice MN. et al. FastTree 2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi:10.1371/journal.pone.0009490\n\n" >> ${output_dir}/citations.txt
+    printf "FastTree 2\nPrice MN et al. FastTree 2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi:10.1371/journal.pone.0009490\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $iqtree_used == "true" ]; then
-    printf "IQ-TREE\nNguyen L.-T. et al. IQ-TREE: a fast and effective stochastic algorithm for estimating maximum likelihood phylogenies. Mol. Biol. Evol. 2015; 32, 268–274. doi:10.1093/molbev/msu300\n\n" >> ${output_dir}/citations.txt
+    printf "IQ-TREE\nNguyen L-T et al. IQ-TREE: a fast and effective stochastic algorithm for estimating maximum likelihood phylogenies. Mol. Biol. Evol. 2015; 32, 268–274. doi:10.1093/molbev/msu300\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $parallel_used == "true" ]; then
@@ -2493,7 +2662,7 @@ if [ $parallel_used == "true" ]; then
 fi
 
 if [ $universal_SCGs_used == "true" ]; then
-    printf "Universal SCG-set\nHug LA. et al. A new view of the tree of life. Nat. Microbiol. 2016; 1, 1–6. doi:10.1038/NMICROBIOL.2016.48\n\n" >> ${output_dir}/citations.txt
+    printf "Universal SCG-set\nHug LA et al. A new view of the tree of life. Nat. Microbiol. 2016; 1, 1–6. doi:10.1038/NMICROBIOL.2016.48\n\n" >> ${output_dir}/citations.txt
 fi
 
 duration=$SECONDS
