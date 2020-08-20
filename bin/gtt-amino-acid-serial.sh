@@ -83,7 +83,7 @@ do
     num_SCG_hits=$(awk ' $1 > 0 ' ${tmp_dir}/${assembly}_uniq_counts.tmp | wc -l | tr -s " " | cut -f2 -d " ")
     num_SCG_redund=$(awk '{ if ($1 == 0) { print $1 } else { print $1 - 1 } }' ${tmp_dir}/${assembly}_uniq_counts.tmp | awk '{ sum += $1 } END { print sum }')
 
-    perc_comp=$(echo "$num_SCG_hits / $hmm_target_genes_total * 100" | bc -l)
+    perc_comp=$(echo "$uniq_SCG_hits / $hmm_target_genes_total * 100" | bc -l)
     perc_comp_rnd=$(printf "%.2f\n" $perc_comp)
     perc_redund=$(echo "$num_SCG_redund / $hmm_target_genes_total * 100" | bc -l)
     perc_redund_rnd=$(printf "%.2f\n" $perc_redund)
