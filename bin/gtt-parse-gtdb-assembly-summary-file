@@ -11,6 +11,7 @@ required.add_argument("-a", "--assembly_summary", help="GTDB's assembly metadata
 required.add_argument("-w", "--wanted_accessions", help="Single-column file with wanted accessions", action="store", dest="wanted_accs", required=True)
 parser.add_argument("-o", "--output_file", help='Wanted summary info only (default: "target-gtdb.tsv")', action="store", dest="output_file", default="target-gtdb.tsv")
 parser.add_argument("-f", "--found_accs_output_file", help='Accessions found in GTDB (default: "gtdb-found-accs.txt")', action="store", dest="found_accs_output_file", default="gtdb-found-accs.txt")
+parser.add_argument("-n", "--not_found_accs_output_file", help='Accessions not found in GTDB (default: "gtdb-not-found-accs.tsv")', action="store", dest="not_found_accs_output_file", default="gtdb-not-found-accs.tsv")
 parser.add_argument("-t", "--gtdb_tax_output_file", help='Target GTDB taxonomy table (default: "target-gtdb-tax.tsv")', action="store", dest="gtdb_tax_output_file", default="target-gtdb-tax.tsv")
 
 
@@ -25,14 +26,17 @@ wanted_dict = {}
 
 with open(args.wanted_accs, "r") as wanted_accs:
     for line in wanted_accs:
-        root_acc = line.strip().split(".")[0]
+        root_acc = line.strip().split(".")[0][4:]
         wanted_dict[str(root_acc)] = line.strip()
 
 out_file = open(args.output_file, "w")
 
+# tracking found so can write out those not found at end too
+found_accs = []
+
 gtdb_found_accs_out_file = open(args.found_accs_output_file, "w")
 # adding header
-gtdb_found_accs_out_file.write("acc_searched\tgtdb_acc_found\tfull_gtdb_acc\n")
+gtdb_found_accs_out_file.write("input_searched\tgtdb_acc_found\tfull_gtdb_acc\n")
 
 
 with open(args.all_assemblies) as assemblies:
@@ -42,26 +46,40 @@ with open(args.all_assemblies) as assemblies:
     for line in assemblies:
         split_line = line.strip().split("\t")
         
-        acc_with_version = split_line[0][3:]
+        acc_with_no_version = split_line[0][7:].split(".")[0]
         
-        # taking even if not the same version as specified (this info is reported in the final Genomes-summary.tsv output file)
-        if acc_with_version.split(".")[0] in wanted_dict:
+        # i believe refseq typically only has 1 version, so taking even if not the same version as specified (this info, what was searched and what was found, is reported in the output "/run_files/gtdb_to_input_accession_map.tsv" file)
+        if acc_with_no_version in wanted_dict:
+
             out_file.write(line)
+            gtdb_found_accs_out_file.write(wanted_dict[acc_with_no_version] + "\t" + split_line[0][3:] + "\t" + split_line[0] + "\n")
             
-            gtdb_found_accs_out_file.write(wanted_dict[acc_with_version.split(".")[0]] + "\t" + acc_with_version + "\t" + split_line[0] + "\n")
-            
+            # adding to found list
+            found_accs.append(wanted_dict[acc_with_no_version])
             
 out_file.close()
 gtdb_found_accs_out_file.close()
 
-# making GTDB taxonomy table only
+## getting and writing out entries that weren't found (and how they were searched)
+wanted_accs = list(wanted_dict.values())
+not_found_accs = list(set(wanted_accs) - set(found_accs))
 
+with open(args.not_found_accs_output_file, "w") as not_found_output_file:
+
+    # writing out header
+    not_found_output_file.write("accession\tsearched_as\n")
+
+    for key in wanted_dict:
+        if wanted_dict[key] in not_found_accs:
+
+            not_found_output_file.write(wanted_dict[key] + "\t" + key + "\n")
+
+# making GTDB taxonomy table only
 out_gtdb_tax_table = open(args.gtdb_tax_output_file, "w")
 
 # adding header
 out_gtdb_tax_table.write("base_gtdb_acc\tfull_gtdb_acc\tdomain\tphylum\tclass\torder\tfamily\tgenus\tspecies\n")
 
-    
 with open(args.output_file, "r") as assemblies:
 
     # skipping header

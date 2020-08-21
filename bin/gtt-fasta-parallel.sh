@@ -3,6 +3,7 @@
 # setting colors to use
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+ORANGE='\033[0;33m'
 NC='\033[0m'
 
 tmp_dir=$2
@@ -100,14 +101,14 @@ if [ ${mult_perc_redund_rnd} -ge 1000 ]; then
     printf "             Est. %% comp: ${perc_comp_rnd}; Est. %% redund: ${RED}${perc_redund_rnd}${NC}\n\n"
 
 
-    printf "  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}  \n"
+    printf "  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n"
     printf "   Estimated redundancy of this genome based on the specified HMMs is ${RED}${perc_redund_rnd}%%${NC}.\n"
     printf "   While there are no \"golden\" cutoff values for these things, typically\n"
     printf "   going over 10%% is getting into the questionable range. You may want to\n"
     printf "   consider taking a closer look and/or removing it from the input genomes.\n\n"
 
     printf "   Reported in \"${output_dir}/run_files/Genomes_with_questionable_redund_estimates.tsv\".\n"
-    printf "  ${RED}****************************************************************************${NC}  \n\n"
+    printf "  ${ORANGE}****************************************************************************${NC}  \n\n"
 
     # writing to table of genomes with questionable redundancy estimates
     printf "$assembly\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${tmp_dir}/Genomes_with_questionable_redundancy_estimates.tmp

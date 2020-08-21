@@ -3,6 +3,7 @@
 # setting colors to use
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+ORANGE='\033[0;33m'
 NC='\033[0m'
 
 tmp_dir=$2
@@ -66,12 +67,12 @@ gtt-genbank-to-AA-seqs -i $file_location -o ${tmp_dir}/${assembly}_genes2.tmp 2>
 # checking that the file had CDS annotations
 if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
 
-    printf "\n  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}  \n"
+    printf "\n  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n"
     printf "   This genbank file doesn't appear to have CDS annotations,\n"
     printf "   so we are identifying coding sequences with prodigal.\n\n"
 
     printf "   Reported in \"${output_dir}/run_files/Genbank_files_with_no_CDSs.txt\".\n"
-    printf "  ${RED}****************************************************************************${NC}  \n\n"
+    printf "  ${ORANGE}****************************************************************************${NC}  \n\n"
 
     echo "$1" >> ${output_dir}/Genbank_files_with_no_CDSs.txt
     rm -rf ${tmp_dir}/${assembly}_genes2.tmp
@@ -140,14 +141,14 @@ if [ ${mult_perc_redund_rnd} -ge 1000 ]; then
     printf "             Est. %% comp: ${perc_comp_rnd}; Est. %% redund: ${RED}${perc_redund_rnd}${NC}\n\n"
 
 
-    printf "  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}  \n"
+    printf "  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n"
     printf "   Estimated redundancy of this genome based on the specified HMMs is ${RED}${perc_redund_rnd}%%${NC}.\n"
     printf "   While there are no \"golden\" cutoff values for these things, typically\n"
     printf "   going over 10%% is getting into the questionable range. You may want to\n"
     printf "   consider taking a closer look and/or removing it from the input genomes.\n\n"
 
     printf "   Reported in \"${output_dir}/run_files/Genomes_with_questionable_redund_estimates.tsv\".\n"
-    printf "  ${RED}****************************************************************************${NC}  \n\n"
+    printf "  ${ORANGE}****************************************************************************${NC}  \n\n"
 
     # writing to table of genomes with questionable redundancy estimates
     printf "$assembly\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${tmp_dir}/Genomes_with_questionable_redundancy_estimates.tmp

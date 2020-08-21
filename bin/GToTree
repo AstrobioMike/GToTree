@@ -3,17 +3,17 @@
 # setting colors to use
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+ORANGE='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.01"
-
+VERSION="v1.5.10"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
     exit
 fi
 
-
 printf "\n\n               GToTree ${VERSION} (github.com/AstrobioMike/GToTree)\n\n"
+
 
 #############################################################################
 ################################  HELP INFO  ################################
@@ -58,7 +58,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  Provide this flag with no arguments if you'd like to add lineage\n"
     printf "                  info to the sequence headers for any genomes with NCBI taxids.\n\n"
 
-    printf "        - [-x ] default: false\n"
+    printf "        - [-D ] default: false\n"
     printf "                  Provide this flag with no arguments if you'd like to add GTDB lineage\n"
     printf "                  info to the sequence headers for any genomes represented in GTDB.\n"
     printf "                  Can be utilized with '-t' flag also, in that case GToTree will use\n"
@@ -128,7 +128,6 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
 fi
 
 
-
 #############################################################################
 ##############  CHECKING FIRST FOR ALL ESSENTIAL DEPENDENCIES  ##############
 #############################################################################
@@ -160,6 +159,7 @@ if ! command -v FastTree > /dev/null; then
     exit
 fi
 
+
 #############################################################################
 ##########  SETTING VARIABLES TO REPORT WHAT SHOULD BE CITED AT END #########
 #############################################################################
@@ -190,7 +190,7 @@ tree_program='FastTree'
 additional_pfam_targets='false'
 http_flag='false'
 
-while getopts :a:g:f:A:H:o:m:txL:p:NT:c:G:Bdn:j:P args
+while getopts :a:g:f:A:H:o:m:tDL:p:NT:c:G:Bdn:j:P args
 do
     case "${args}"
     in
@@ -202,7 +202,7 @@ do
         o) output_dir=${OPTARG};;
         m) file_to_genome_id_map=${OPTARG};;
         t) taxonkit_id_swap='true';;
-        x) gtdb_id_swap='true';;
+        D) gtdb_id_swap='true';;
         L) lineage_spec=${OPTARG};;
         p) target_pfams=${OPTARG};;
         N) align_only='true' ;;
@@ -688,7 +688,7 @@ sleep 3.5
 ######  ADDING NOTICE ABOUT FILTERING BY GENE-LENGTH WITH FEW GENOMES  ######
 #############################################################################
 if [ $total_input_genomes -le 20 ]; then
-    printf "\n  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}  \n" | tee -a $gtotree_log
+    printf "\n  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n" | tee -a $gtotree_log
     printf "    Filtering by gene-length using the median length of a gene set (set with\n" | tee -a $gtotree_log
     printf "    the \"-c\" flag) becomes less reliable with fewer genomes. With $total_input_genomes total\n" | tee -a $gtotree_log
     printf "    input genomes, if a lot of sequences are dropped, consider increasing\n" | tee -a $gtotree_log
@@ -698,7 +698,7 @@ if [ $total_input_genomes -le 20 ]; then
 
     printf "\t        Moving forward with \"-c\" set to $len_cutoff this run.\n" | tee -a $gtotree_log
 
-    printf "  ${RED}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+    printf "  ${ORANGE}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
 
     ### if i want this as manual input can use the following... ###
 
@@ -890,11 +890,11 @@ if [ -n "$NCBI_acc_file" ]; then
             grep "$dupe_acc" ${tmp_dir}/sorted_ncbi_accs.tmp
         done > ${output_dir}/Redundant_input_accessions.txt
 
-        printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n" | tee -a $gtotree_log
+        printf "     ${ORANGE}******************************* ${NC}NOTICE ${ORANGE}*******************************${NC}  \n" | tee -a $gtotree_log
         printf "\t$num_dupe_genomes accession(s) redundant - meaning GenBank and RefSeq accessions\n" | tee -a $gtotree_log
         printf "\twere provided for the same genome. Only RefSeq accession used.\n\n" | tee -a $gtotree_log
         printf "\t  Reported in \"${output_dir}/run_files/Redundant_input_accessions.txt\".\n" | tee -a $gtotree_log
-        printf "     ${RED}**********************************************************************${NC}  \n\n" | tee -a $gtotree_log
+        printf "     ${ORANGE}**********************************************************************${NC}  \n\n" | tee -a $gtotree_log
 
         comm -23 ${tmp_dir}/sorted_ncbi_accs.tmp <(sort ${output_dir}/Redundant_input_accessions.txt) | sort > ${tmp_dir}/sorted_building_new_input_ncbi_accs.tmp
 
@@ -920,7 +920,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
     # making sure file downloaded with no errors
     if [ -s capture_any_dl_errors.tmp ]; then
-        printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is your internet connection weak?\n\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is the internet connection weak?\n\nExiting for now.\n\n" | tee -a $gtotree_log
         rm -rf ${tmp_dir} ${output_dir} capture_any_dl_errors.tmp
         exit
     else
@@ -941,7 +941,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
     # making sure file downloaded with no errors
     if [ -s capture_any_dl_errors.tmp ]; then
-        printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is your internet connection weak?\n\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is the internet connection weak?\n\nExiting for now.\n\n" | tee -a $gtotree_log
         rm -rf ${tmp_dir} ${output_dir} capture_any_dl_errors.tmp
         exit
     else
@@ -963,10 +963,10 @@ if [ -n "$NCBI_acc_file" ]; then
     if [ -s ${tmp_dir}/not_found_accs.tmp ]; then
 
         num_accs_not_found=$(wc -l ${tmp_dir}/not_found_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
-        printf "\n\n     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n" | tee -a $gtotree_log
+        printf "\n\n     ${ORANGE}******************************* ${NC}NOTICE ${ORANGE}*******************************${NC}  \n" | tee -a $gtotree_log
         printf "\t  $num_accs_not_found accession(s) not successfully found at NCBI.\n\n" | tee -a $gtotree_log
         printf "\t     Reported in \"${output_dir}/run_files/NCBI_accessions_not_found.txt\".\n" | tee -a $gtotree_log
-        printf "     ${RED}**********************************************************************${NC}  \n\n" | tee -a $gtotree_log
+        printf "     ${ORANGE}**********************************************************************${NC}  \n\n" | tee -a $gtotree_log
 
         sleep 3
 
@@ -1008,13 +1008,13 @@ if [ -n "$NCBI_acc_file" ]; then
     if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
         num_dupe_genomes=$(wc -l ${output_dir}/Redundant_input_accessions.txt | sed "s/^ *//" | cut -d " " -f 1)
         num_dupe_report=$(($num_dupe_genomes / 2))
-        printf "          ${RED}$num_dupe_report accession(s) redundant.${NC}\n" | tee -a $gtotree_log
+        printf "          ${ORANGE}$num_dupe_report accession(s) redundant.${NC}\n" | tee -a $gtotree_log
         printf "            Reported in \"${output_dir}/run_files/Redundant_input_accessions.txt\".\n\n" | tee -a $gtotree_log
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
         num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "          ${RED}$num_accs_not_found accession(s) not found at NCBI.${NC}\n" | tee -a $gtotree_log
+        printf "          ${ORANGE}$num_accs_not_found accession(s) not found at NCBI.${NC}\n" | tee -a $gtotree_log
         printf "            Reported in \"${output_dir}/run_files/NCBI_accessions_not_found.txt\".\n\n" | tee -a $gtotree_log
     fi
 
@@ -1024,7 +1024,7 @@ if [ -n "$NCBI_acc_file" ]; then
         comm -23 ${tmp_dir}/updated_sorted_ncbi_accs.tmp <(sort ${output_dir}/NCBI_accessions_not_downloaded.txt) | sort > ${tmp_dir}/updated_sorted_ncbi_accs2.tmp
         mv ${tmp_dir}/updated_sorted_ncbi_accs2.tmp ${tmp_dir}/final_included_NCBI_accs.tmp
 
-        printf "          ${RED}$num_accs_not_downloaded NCBI accession(s) did not download successfully.${NC}\n" | tee -a $gtotree_log
+        printf "          ${ORANGE}$num_accs_not_downloaded NCBI accession(s) did not download successfully.${NC}\n" | tee -a $gtotree_log
         printf "            Reported in \"${output_dir}/run_files/NCBI_accessions_not_downloaded.txt\".\n\n" | tee -a $gtotree_log
 
     else
@@ -1416,7 +1416,7 @@ removed_genes=$(wc -l ${tmp_dir}/genes_to_remove.tmp | sed "s/^ *//" | cut -d " 
 # reporting
 if [ $removed_genes != "0" ]; then
 
-    printf "  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}  \n" | tee -a $gtotree_log
+    printf "  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n" | tee -a $gtotree_log
     printf "    $removed_genes gene(s) either had no hits in any genome, or only multiple hits per\n" | tee -a $gtotree_log
     printf "    genome... Just so ya know!!\n\n" | tee -a $gtotree_log
     printf "\t  These included:\n\n" | tee -a $gtotree_log
@@ -1424,7 +1424,7 @@ if [ $removed_genes != "0" ]; then
     printf "\n        Reported in \"${output_dir}/run_files/Genes_with_no_hits_to_any_genomes.txt\".\n\n" | tee -a $gtotree_log
     printf "   You can figure out which of those two scenarios was the cause by checking out\n" | tee -a $gtotree_log
     printf "   \"${output_dir}/SCG_hit_counts.tsv\".\n" | tee -a $gtotree_log
-    printf "  ${RED}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+    printf "  ${ORANGE}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
     mv ${tmp_dir}/genes_to_remove.tmp ${output_dir}/Genes_with_no_hits_to_any_genomes.txt
 
     sleep 3
@@ -1544,12 +1544,12 @@ removed_genes2=$(wc -l ${tmp_dir}/genes_to_remove2.tmp | sed "s/^ *//" | cut -d 
 
 # reporting
 if [ $removed_genes2 != "0" ]; then
-    printf "     ${RED}******************************* ${NC}NOTICE ${RED}*******************************${NC}  \n" | tee -a $gtotree_log
+    printf "     ${ORANGE}******************************* ${NC}NOTICE ${ORANGE}*******************************${NC}  \n" | tee -a $gtotree_log
     printf "\t  $removed_genes2 gene(s) had no hits in any genomes after filtering by length! Just so ya know...\n\n" | tee -a $gtotree_log
     printf "\t    Length-filtered out of existence:\n\n" | tee -a $gtotree_log
     sed 's/^/          /' ${tmp_dir}/genes_to_remove2.tmp | tee -a $gtotree_log
     printf "\n     Reported in \"${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt\".\n" | tee -a $gtotree_log
-    printf "     ${RED}************************************************************************ ${NC}\n\n" | tee -a $gtotree_log
+    printf "     ${ORANGE}************************************************************************ ${NC}\n\n" | tee -a $gtotree_log
 
     mv ${tmp_dir}/genes_to_remove2.tmp ${output_dir}/Genes_with_no_hits_after_length_filter.txt
 fi
@@ -1602,10 +1602,10 @@ comm -23 <(sort ${tmp_dir}/genomes_from_all_sources.tmp) ${tmp_dir}/sorted_genom
 removed_genomes=$(wc -l ${tmp_dir}/sorted_genomes_to_remove.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
 if [ $removed_genomes != "0" ]; then
-    printf "     ${RED}*******************************${NC} NOTICE ${RED}*******************************${NC}  \n" | tee -a $gtotree_log
+    printf "     ${ORANGE}*******************************${NC} NOTICE ${ORANGE}*******************************${NC}  \n" | tee -a $gtotree_log
     printf "\t  $removed_genomes genome(s) removed from analysis due to having too few hits.\n\n" | tee -a $gtotree_log
     printf "        Reported in \"${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv\".\n" | tee -a $gtotree_log
-    printf "     ${RED}********************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+    printf "     ${ORANGE}********************************************************************** ${NC}\n\n" | tee -a $gtotree_log
     sleep 3
 else
     printf "             ${GREEN}No genomes were removed for having too few hits :)${NC}\n\n" | tee -a $gtotree_log
@@ -1943,7 +1943,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
             ## running taxonkit and adding to summary table ##
             cut -f 2 ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | taxonkit lineage | taxonkit reformat -r NA | cut -f3 | tr ";" "\t" > ${tmp_dir}/lineages.tmp
 
-            cat <(printf "domain\tphylum\tclass\torder\tfamily\tgenus\tspecific_name\n") ${tmp_dir}/lineages.tmp > ${tmp_dir}/lineages2.tmp
+            cat <(printf "NCBI_domain\tNCBI_phylum\tNCBI_class\tNCBI_order\tNCBI_family\tNCBI_genus\tNCBI_species\n") ${tmp_dir}/lineages.tmp > ${tmp_dir}/lineages2.tmp
 
             paste ${output_dir}/Genomes_summary_info.tsv ${tmp_dir}/lineages2.tmp > ${output_dir}/All_genomes_summary_info2.tsv
             mv ${output_dir}/All_genomes_summary_info2.tsv ${output_dir}/Genomes_summary_info.tsv
@@ -2076,12 +2076,12 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
             fi
 
         else # this is if there are no taxids to use for taxonkit
-            printf "  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}\n" | tee -a $gtotree_log
+            printf "  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}\n" | tee -a $gtotree_log
             printf "    You specified to use Taxonkit to add lineage info (set with the '-t' flag),\n" | tee -a $gtotree_log
             printf "    but there were no taxids available (which typically come from inputs provided\n" | tee -a $gtotree_log
             printf "    as NCBI accessions or GenBank files that might hold that information).\n\n" | tee -a $gtotree_log
             printf "    In this case no lineage information could be added.\n" | tee -a $gtotree_log
-            printf "  ${RED}***************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+            printf "  ${ORANGE}***************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
 
             # if base label swap map was provided by the user (via the -m flag) then making that the final swap map since no taxonkit lineage info to add
             if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
@@ -2103,7 +2103,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
     if [ $gtdb_id_swap != "false" ]; then
 
         # downloading gtdb bacteria and archaea info tables
-        printf "\n\t\t  ${GREEN}Downloading GTDB bacteria and archaea info tables...${NC}\n\n" | tee -a $gtotree_log
+        printf "\n\t\t  ${GREEN}Downloading GTDB archaea and bacteria info tables...${NC}\n\n" | tee -a $gtotree_log
 
         curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar122_metadata.tar.gz -o ${tmp_dir}/gtdb_archaea_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
         curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tar.gz -o ${tmp_dir}/gtdb_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
@@ -2134,25 +2134,96 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
             # combining tables into one
             tail -n +2 ${tmp_dir}/gtdb_archaea_info.tmp >> ${tmp_dir}/gtdb_info.tmp
 
-            # getting genomes that have a taxid (these will be all NCBI accs)
+            # getting genomes that have a taxid (these should all be NCBI accs, which we may be able to find in GTDB)
             awk ' BEGIN { FS=OFS="\t" } $2 != "NA" ' ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | cut -f 1 > ${tmp_dir}/potential_ids_for_gtdb_swap.tmp
 
-            # removing those that the user already provided new labels for, if they did
-            if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
-                comm -23 <(sort ${tmp_dir}/potential_ids_for_gtdb_swap.tmp) <(cut -f 1 ${tmp_dir}/base_label_swap.tmp | sort) > ${tmp_dir}/ids_for_gtdb_swap.tmp
-            else
-                sort ${tmp_dir}/potential_ids_for_gtdb_swap.tmp > ${tmp_dir}/ids_for_gtdb_swap.tmp
+            # creating subset gtdb table holding all accessions (in case the user providing a mapping file that supersedes re-labeling any of these, but still wants the gtdb taxonomy and other information for the entry)
+            gtt-parse-gtdb-assembly-summary-file -o ${tmp_dir}/target-gtdb.tsv -f ${tmp_dir}/gtdb_found_accs.tsv -n ${tmp_dir}/gtdb-not-found-accs.tsv -t ${tmp_dir}/target-gtdb-tax.tsv -a ${tmp_dir}/gtdb_info.tmp -w ${tmp_dir}/potential_ids_for_gtdb_swap.tmp
+            
+            ## reporting to user how many entries were tried and found at GTDB
+            if [ -s ${tmp_dir}/gtdb-not-found-accs.txt ]; then
+
+                num_entries_found=$(wc -l ${tmp_dir}/gtdb-found-accs.tsv | sed "s/^ *//" | cut -d " " -f 1)
+                num_entries_not_found=$(wc -l ${tmp_dir}/gtdb-not-found-accs.tsv | sed "s/^ *//" | cut -d " " -f 1)
+                printf "\n\n     ${ORANGE}******************************* ${NC}NOTICE ${ORANGE}*******************************${NC}  \n" | tee -a $gtotree_log
+                printf "\t  $num_entries_not_found accession(s) of the searched $num_entries_found were not successfully found in GTDB.\n\n" | tee -a $gtotree_log
+                printf "\t     Reported in \"${output_dir}/run_files/GTDB_accessions_not_found.tsv\".\n" | tee -a $gtotree_log
+                printf "     ${ORANGE}**********************************************************************${NC}  \n\n" | tee -a $gtotree_log
+
+                sleep 3
+
+                cp ${tmp_dir}/not_found_accs.tmp ${output_dir}/NCBI_accessions_not_found.txt
+
+                mv ${tmp_dir}/sorted_got_ncbi_accs.tmp ${tmp_dir}/updated_sorted_ncbi_accs.tmp
+
+                NCBI_remaining_genomes_total=$(wc -l ${tmp_dir}/updated_sorted_ncbi_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
+
             fi
 
-            # parsing down GTDB table to those we are targeting and saving master gtdb table for user
-            gtt-parse-gtdb-assembly-summary-file -o ${tmp_dir}/target-gtdb.tsv -f ${tmp_dir}/gtdb_found_accs.txt -t ${tmp_dir}/target-gtdb-tax.tsv -a ${tmp_dir}/gtdb_info.tmp -w ${tmp_dir}/ids_for_gtdb_swap.tmp
-            mv ${tmp_dir}/target-gtdb.tsv ${output_dir}/run_files/full_gtdb_table_of_targets.tsv
+                # storing IDs for which a GTDB entry was found:
+            cut -f 1 ${tmp_dir}/gtdb_found_accs.tsv | tail -n +2 > ${tmp_dir}/found_ids_for_gtdb_swap.tmp
 
+                # copying keeper files to output dir
+            cp ${tmp_dir}/target-gtdb.tsv ${output_dir}/run_files/GTDB_genomes_summary_info.tsv
+            cp ${tmp_dir}/gtdb_found_accs.tsv ${output_dir}/run_files/GTDB_to_input_accession_map.tsv
+            cp ${tmp_dir}/gtdb-not-found-accs.tsv ${output_dir}/run_files/GTDB_accessions_not_found.tsv
+
+            # now moving on to the swapping, removing those that the user already provided new labels for, if they did
+            if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
+                comm -23 <(sort ${tmp_dir}/found_ids_for_gtdb_swap.tmp) <(cut -f 1 ${tmp_dir}/base_label_swap.tmp | sort) > ${tmp_dir}/ids_for_gtdb_swap.tmp
+            else
+                sort ${tmp_dir}/found_ids_for_gtdb_swap.tmp > ${tmp_dir}/ids_for_gtdb_swap.tmp
+            fi
+
+            ## adding GTDB taxonomy to final genome summary table for those that have it
+                # first need to separate out those that have gtdb info from those that don't
+            for id in $(cat ${tmp_dir}/ids_for_gtdb_swap.tmp)
+            do
+                grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv
+            done > ${tmp_dir}/gtdb_rows_that_need_tax_info_added.tmp
+
+            comm -23 <(cut -f 1 ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | sort) <(sort ${tmp_dir}/ids_for_gtdb_swap.tmp) > ${tmp_dir}/ids_that_need_NAs_added_for_gtdb_info.tmp
+            for id in $(cat ${tmp_dir}/ids_that_need_NAs_added_for_gtdb_info.tmp)
+            do
+                grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv
+            done > ${tmp_dir}/rows_that_need_NAs_added_for_gtdb_info.tmp
+
+                # adding tax info to those that have gtdb info
+            for id in $(cat ${tmp_dir}/ids_for_gtdb_swap.tmp)
+            do
+                grep -w -m 1 ^$id ${output_dir}/run_files/GTDB_to_input_accession_map.tsv
+            done | cut -f 2 > ${tmp_dir}/base_ids_for_gtdb_swap.tmp
+
+            for id in $(cat ${tmp_dir}/base_ids_for_gtdb_swap.tmp)
+            do
+                grep -w -m 1 ^$id ${tmp_dir}/target-gtdb-tax.tsv
+            done | cut -f 2- > ${tmp_dir}/gtdb_tax_to_add_to_rows.tmp
+
+            paste ${tmp_dir}/gtdb_rows_that_need_tax_info_added.tmp ${tmp_dir}/gtdb_tax_to_add_to_rows.tmp > ${tmp_dir}/rows_for_genome_summary_table_with_gtdb_tax_info.tmp
+
+                # adding NAs for these columns for those that don't have gtdb info 
+            for id in $(cat ${tmp_dir}/ids_that_need_NAs_added_for_gtdb_info.tmp)
+            do
+                printf "NA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\n"
+            done > ${tmp_dir}/NAs_for_gtdb_tax_to_add_to_rows.tmp
+
+            paste ${tmp_dir}/rows_that_need_NAs_added_for_gtdb_info.tmp ${tmp_dir}/NAs_for_gtdb_tax_to_add_to_rows.tmp > ${tmp_dir}/rows_for_genome_summary_table_without_gtdb_tax_info.tmp
+
+                # sticking together with an expanded header to make the genome summary output table
+            head -n 1 ${output_dir}/Genomes_summary_info.tsv > ${tmp_dir}/curr_genome_summary_header.tmp
+            paste ${tmp_dir}/curr_genome_summary_header.tmp <(printf "GTDB_accession\tGTDB_domain\tGTDB_phylum\tGTDB_class\tGTDB_order\tGTDB_family\tGTDB_genus\tGTDB_species\n") > ${tmp_dir}/new_genome_summary_header.tmp
+
+            cat ${tmp_dir}/new_genome_summary_header.tmp ${tmp_dir}/rows_for_genome_summary_table_with_gtdb_tax_info.tmp ${tmp_dir}/rows_for_genome_summary_table_without_gtdb_tax_info.tmp > ${output_dir}/Genomes_summary_info.tsv
 
             ## creating new labels based on GTDB lineage info
             for id in $(cat ${tmp_dir}/ids_for_gtdb_swap.tmp)
             do
-                grep -w -m1 "$id" ${tmp_dir}/target-gtdb-tax.tsv
+                grep -w -m 1 "$id" ${tmp_dir}/gtdb_found_accs.tsv | cut -f 2
+            done > ${tmp_dir}/gtdb_found_accs_to_pull_lineage_info_for.tmp
+
+            for id in $(cat ${tmp_dir}/gtdb_found_accs_to_pull_lineage_info_for.tmp)
+            do
+                grep -w -m 1 "^$id" ${tmp_dir}/target-gtdb-tax.tsv
             done | cut -f 1,3-9 > ${tmp_dir}/working_gtdb_lineages.tmp
 
             ## buildig new gtdb-swapped labels based upon user-desired ranks (provided by -L flag)
@@ -2199,14 +2270,14 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
             ## making map for IDs changed with gtdb
             paste ${tmp_dir}/ids_for_gtdb_swap.tmp ${tmp_dir}/new_ids_for_gtdb_swap.tmp > ${tmp_dir}/final_gtdb_id_swap_map.tmp
 
-            ## i'm not seeing strain level designations in GTDB, so those will be absent on any labels where GTDB taxonomy was added
-            # notifying user if this is the case
+            ## there are no strain level designations in GTDB, so those will be absent on any labels where GTDB taxonomy was added if requested by the user
+               # notifying if this is the case
             if grep -q "Strain" ${tmp_dir}/wanted_ranks.tmp; then
-                printf "  ********************************** NOTICE **********************************\n" | tee -a $gtotree_log
+                printf "  ${ORANGE}**********************************${NC} NOTICE ${ORANGE}***********************************${NC}\n" | tee -a $gtotree_log
                 printf "    Strain-level labels were requested in addition to using GTDB taxonomy\n" | tee -a $gtotree_log
                 printf "    where possible. This is just a note that there will be no strain-level\n" | tee -a $gtotree_log
-                printf "    labels added for those that had GTDB lineage info added.\n\n" | tee -a $gtotree_log
-                printf "  *****************************************************************************\n\n" | tee -a $gtotree_log
+                printf "    labels added for those that had GTDB lineage info added.\n" | tee -a $gtotree_log
+                printf "  ${ORANGE}*****************************************************************************${NC}\n\n" | tee -a $gtotree_log
             fi
 
             ## now, if there are taxonkit swapped labels, we are replacing those that we cover with GTDB in the full_id_swap_map file...
@@ -2219,10 +2290,10 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
                 # getting those with taxonkit (NCBI) lineage info, but no GTDB info (will happen in current release of GTDB doesn't include this particular accession)
                 comm -23 ${tmp_dir}/current_taxonkit_ids_to_swap.tmp ${tmp_dir}/current_gtdb_ids_to_swap.tmp > ${tmp_dir}/taxonkit_ids_to_keep_because_no_GTDB_info.tmp
                 
-                # pulling those out, adding to base label swap file, then adding GTDB swap info
+                # pulling those out, adding to base label swap file (with a marker that they are from NCBI since both will be mixed), then adding GTDB swap info
                 for id in $(cat ${tmp_dir}/taxonkit_ids_to_keep_because_no_GTDB_info.tmp)
                 do
-                    grep -w -m 1 "$id" ${tmp_dir}/full_id_swap_map.tmp
+                    grep -w -m 1 "$id" ${tmp_dir}/full_id_swap_map.tmp | sed 's/$/_NCBI/'
                 done > ${tmp_dir}/building_final_lineage_id_swap_map.tmp
 
                 cat ${tmp_dir}/building_final_lineage_id_swap_map.tmp ${tmp_dir}/final_gtdb_id_swap_map.tmp > ${tmp_dir}/final_lineage_id_swap_map.tmp
@@ -2281,7 +2352,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
     fi
 
     ## if final_id_swap_map.tmp exists here, moving forward with swap
-    ## if it does not exist here (which may happen if Taxonkit was specified, but no input sources had any taxids, for example), then not performing id swapping and reporting to user
+    ## if it does not exist here (which may happen if Taxonkit or GTDB was specified, but no input sources had any taxids, for example), then not performing id swapping and reporting to user
 
     if [ -s ${tmp_dir}/final_id_swap_map.tmp ]; then
           ## one last safety screen for colons, commas, semi-colons, and spaces, and if multiple underscores in a row, collapsing to just 1
@@ -2317,10 +2388,250 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
         # now sticking all together into a new summary table that includes any adjusted labels
         cat ${tmp_dir}/new_header.tmp ${tmp_dir}/building_new_genomes_tab2.tmp ${tmp_dir}/building_new_genomes_tab4.tmp > ${output_dir}/Genomes_summary_info.tsv
 
+        #### adding a "label_source" column to final output genome summary tab (NCBI, GTDB, user_map, user_map_append, input)
+            # getting those, if any, that were adjusted by the user input map
+        if [ -s ${tmp_dir}/base_label_swap.tmp ]; then
+            cut -f 1 ${tmp_dir}/base_label_swap.tmp | sort > ${tmp_dir}/user_label_swapped_ids.tmp
+        fi
+
+        if [ -s ${tmp_dir}/base_labels_need_append.tmp ]; then
+            cut -f 1 ${tmp_dir}/base_labels_need_append.tmp | sort > ${tmp_dir}/user_label_appended_ids.tmp
+        fi
+
+            # getting those, if any, that were adjusted by taxonkit/ncbi or GTDB (taxonkit/NCBI ones will need to have the gtdb ones subtracted if both exist, as giving GTDB precedence)
+            # starting with taxonkit
+        if [ -s ${tmp_dir}/final_taxonkit_id_swap_map.tmp ]; then
+            cut -f 1 ${tmp_dir}/final_taxonkit_id_swap_map.tmp | sort > ${tmp_dir}/initial_taxonkit_label_swapped_ids.tmp
+
+                # now getting those, if any, that were adjusted by GTDB that will then need to be removed from the taxonkit list
+            if [ -s ${tmp_dir}/final_gtdb_id_swap_map.tmp ]; then
+                cut -f 1 ${tmp_dir}/final_gtdb_id_swap_map.tmp | sort > ${tmp_dir}/gtdb_label_swapped_ids.tmp
+
+                    # getting those which still need the taxonkit label (and aren't superseded by gtdb due to lack of data on that accession)
+                comm -23 ${tmp_dir}/initial_taxonkit_label_swapped_ids.tmp ${tmp_dir}/gtdb_label_swapped_ids.tmp | sort > ${tmp_dir}/taxonkit_label_swapped_ids.tmp
+
+            else
+                # renaming file that doesn't need to be adjusted due to gtdb labels taking precedence
+                cp ${tmp_dir}/initial_taxonkit_label_swapped_ids.tmp ${tmp_dir}/taxonkit_label_swapped_ids.tmp
+
+            fi
+
+        fi
+
+            # getting those, if any, that were adjusted by GTDB
+                # only doing if NOT already done in the taxonkit loop above
+        if [ ! -s ${tmp_dir}/gtdb_label_swapped_ids.tmp ]; then
+
+            if [ -s ${tmp_dir}/final_gtdb_id_swap_map.tmp ]; then
+                cut -f 1 ${tmp_dir}/final_gtdb_id_swap_map.tmp | sort > ${tmp_dir}/gtdb_label_swapped_ids.tmp
+            fi
+
+        fi
+
+        ### now making new column for each specifying the "label_source" (e.g. NCBI, GTDB, user_map, user_map_append_to_<X>, input) and re-making final output genome summary tab 
+            # for user appended ones, will report "<X>_and_appended", with <X> being either "input", "NCBI", "user_map", or "GTDB"
+
+            # wrapping all with appended since need to treat them differently if label was appended to (specified by the 3rd column in the input mapping file passed to '-m')
+                # next will be the 'else' where they are each dealt with if no user-appended labels are involved
+                    # for each, adding to a file holding all types so at end we can use that to find those that aren't re-labeled by any method (and just have their input labels)
+        if [ -s ${tmp_dir}/user_label_appended_ids.tmp ]; then
+
+                # user-map
+            if [ -s ${tmp_dir}/user_label_swapped_ids.tmp ]; then
+
+                    # adding to file holding all types so at end we can use that to find those that aren't re-labeled by any method (and just have their input labels)
+                cat ${tmp_dir}/user_label_swapped_ids.tmp >> ${tmp_dir}/all_relabeled_ids.tmp
+
+                for id in $(cat ${tmp_dir}/user_label_swapped_ids.tmp)
+                do
+
+                    # if label also in user-appended list
+                    if grep -q $id ${tmp_dir}/user_label_appended_ids.tmp; then
+
+                        grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                        printf "user_map_and_appended\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                    # if label NOT in user-appended list
+                    else
+                        grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                        printf "user_map\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                    fi
+
+                done
+
+            fi
+
+                # taxonkit/NCBI
+            if [ -s ${tmp_dir}/taxonkit_label_swapped_ids.tmp ]; then
+
+                    # adding to file holding all types so at end we can use that to find those that aren't re-labeled by any method (and just have their input labels)
+                cat ${tmp_dir}/taxonkit_label_swapped_ids.tmp >> ${tmp_dir}/all_relabeled_ids.tmp
+                
+                for id in $(cat ${tmp_dir}/taxonkit_label_swapped_ids.tmp)
+                do
+
+                    # if label also in user-appended list
+                    if grep -q $id ${tmp_dir}/user_label_appended_ids.tmp; then
+
+                        grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                        printf "NCBI_and_appended\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                    # if label NOT in user-appended list
+                    else
+                        grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                        printf "NCBI\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                    fi
+
+                done
+
+            fi                    
+
+                # GTDB
+            if [ -s ${tmp_dir}/gtdb_label_swapped_ids.tmp ]; then
+
+                    # adding to file holding all types so at end we can use that to find those that aren't re-labeled by any method (and just have their input labels)
+                cat ${tmp_dir}/gtdb_label_swapped_ids.tmp >> ${tmp_dir}/all_relabeled_ids.tmp
+
+                for id in $(cat ${tmp_dir}/gtdb_label_swapped_ids.tmp)
+                do
+
+                    # if label also in user-appended list
+                    if grep -q $id ${tmp_dir}/user_label_appended_ids.tmp; then
+
+                        grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                        printf "GTDB_and_appended\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                    # if label NOT in user-appended list
+                    else
+                        grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                        printf "GTDB\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                    fi
+
+                done
+
+            fi
+
+                # any getting those that were not re-labeled in any way (user-specified directly, or with any tax info - though may have been appended to)
+                # getting file of those not in any of the above
+
+            comm -23 <(cut -f 1 ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | sort) <(sort ${tmp_dir}/all_relabeled_ids.tmp) > ${tmp_dir}/all_NON_relabeled_ids.tmp
+
+            if [ -s ${tmp_dir}/all_NON_relabeled_ids.tmp ]; then
+
+                for id in $(cat ${tmp_dir}/all_NON_relabeled_ids.tmp)
+                do
+
+                    # if label also in user-appended list
+                    if grep -q $id ${tmp_dir}/user_label_appended_ids.tmp; then
+
+                        grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                        printf "input_and_appended\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                    # if label NOT in user-appended list
+                    else
+                        grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                        printf "input\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                    fi
+
+                done
+
+            fi
+
+        ## now handling all if there is no appending going on (specified by column 3 in input mapping file passed to '-m')
+        else
+
+                # user-map
+            if [ -s ${tmp_dir}/user_label_swapped_ids.tmp ]; then
+
+                    # adding to file holding all types so at end we can use that to find those that aren't re-labeled by any method (and just have their input labels)
+                cat ${tmp_dir}/user_label_swapped_ids.tmp >> ${tmp_dir}/all_relabeled_ids.tmp
+
+                for id in $(cat ${tmp_dir}/user_label_swapped_ids.tmp)
+                do
+                  
+                    grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                    printf "user_map\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                done
+
+            fi
+
+                # taxonkit/NCBI
+            if [ -s ${tmp_dir}/taxonkit_label_swapped_ids.tmp ]; then
+
+                    # adding to file holding all types so at end we can use that to find those that aren't re-labeled by any method (and just have their input labels)
+                cat ${tmp_dir}/taxonkit_label_swapped_ids.tmp >> ${tmp_dir}/all_relabeled_ids.tmp
+                
+                for id in $(cat ${tmp_dir}/taxonkit_label_swapped_ids.tmp)
+                do
+
+                    grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                    printf "NCBI\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                done
+
+            fi                    
+
+                # GTDB
+            if [ -s ${tmp_dir}/gtdb_label_swapped_ids.tmp ]; then
+
+                    # adding to file holding all types so at end we can use that to find those that aren't re-labeled by any method (and just have their input labels)
+                cat ${tmp_dir}/gtdb_label_swapped_ids.tmp >> ${tmp_dir}/all_relabeled_ids.tmp
+
+                for id in $(cat ${tmp_dir}/gtdb_label_swapped_ids.tmp)
+                do
+
+                    grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                    printf "GTDB\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                done
+
+            fi
+
+                # any getting those that were not re-labeled in any way (user-specified directly, or with any tax info)
+                # getting file of those not in any of the above
+
+            comm -23 <(cut -f 1 ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | sort) <(sort ${tmp_dir}/all_relabeled_ids.tmp) > ${tmp_dir}/all_NON_relabeled_ids.tmp
+
+            if [ -s ${tmp_dir}/all_NON_relabeled_ids.tmp ]; then
+
+                for id in $(cat ${tmp_dir}/all_NON_relabeled_ids.tmp)
+                do
+
+                    grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
+                    printf "input\n" >> ${tmp_dir}/building_label_source_column.tmp
+
+                done
+
+            fi
+
+        fi # closing if statement about there being appended labels or not
+
+        ## finally adding additional column to output summary table
+            # getting current header and making new one
+        head -n 1 ${output_dir}/Genomes_summary_info.tsv > ${tmp_dir}/old_genome_summary_tab_header.tmp
+        cut -f 1,2 ${tmp_dir}/old_genome_summary_tab_header.tmp > ${tmp_dir}/new_genome_summary_tab_header_begin.tmp
+        cut -f 3- ${tmp_dir}/old_genome_summary_tab_header.tmp > ${tmp_dir}/new_genome_summary_tab_header_end.tmp
+
+        paste ${tmp_dir}/new_genome_summary_tab_header_begin.tmp <(printf "label_source") ${tmp_dir}/new_genome_summary_tab_header_end.tmp > ${tmp_dir}/new_genome_summary_tab_header.tmp
+
+            # splitting apart table and making new one with label source column added in between
+        cut -f 1,2 ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp > ${tmp_dir}/building_new_genome_summary_tab_with_label_source_begin.tmp
+        cut -f 3- ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp > ${tmp_dir}/building_new_genome_summary_tab_with_label_source_end.tmp
+
+        paste ${tmp_dir}/building_new_genome_summary_tab_with_label_source_begin.tmp ${tmp_dir}/building_label_source_column.tmp ${tmp_dir}/building_new_genome_summary_tab_with_label_source_end.tmp > ${tmp_dir}/new_genome_summary_tab.tmp
+
+            # adding header
+        cat ${tmp_dir}/new_genome_summary_tab_header.tmp ${tmp_dir}/new_genome_summary_tab.tmp > ${output_dir}/Genomes_summary_info.tsv
+
     else
-        printf "  ${RED}********************************** ${NC}NOTICE ${RED}**********************************${NC}\n" | tee -a $gtotree_log
+        printf "  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}\n" | tee -a $gtotree_log
         printf "    You specified to swap labels either with a specific mapping file (passed\n" | tee -a $gtotree_log
-        printf "    to the '-m' flag) and/or by specifying to use Taxonkit to add lineage info\n" | tee -a $gtotree_log
+        printf "    to the '-m' flag) and/or by specifying to use Taxonkit/GTDB to add lineage info\n" | tee -a $gtotree_log
         printf "    (specified with the '-t' flag), but neither of these could be used :(\n\n" | tee -a $gtotree_log
         printf "    Genomes from your mapping file may have been filtered out, and if Taxonkit\n" | tee -a $gtotree_log
         printf "    was specified, there may have been no taxids available (which typically\n" | tee -a $gtotree_log
@@ -2328,7 +2639,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
         printf "    hold that information).\n\n" | tee -a $gtotree_log
 
         printf "    In this case no labels could be swapped.\n" | tee -a $gtotree_log
-        printf "  ${RED}***************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+        printf "  ${ORANGE}***************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
 
         rm -rf ${tmp_dir}/aligned_SCGs_mod_names.tmp
     fi
@@ -2565,55 +2876,45 @@ printf "________________________________________________________________________
 
     if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
         printf "    $num_dupe_report accession(s) redundant.\n" | tee -a $gtotree_log
-        # printf "        Reported in \"${output_dir}/run_files/Redundant_input_accessions.txt\".\n\n" | tee -a $gtotree_log
         mv ${output_dir}/Redundant_input_accessions.txt ${output_dir}/run_files/Redundant_input_accessions.txt
     fi
 
-
     if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
         num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "    ${RED}$num_accs_not_found accession(s) not successfully found at NCBI.${NC}\n" | tee -a $gtotree_log
-        # printf "        Reported in \"${output_dir}/run_files/NCBI_accessions_not_found.txt\".\n\n" | tee -a $gtotree_log
+        printf "    $num_accs_not_found accession(s) not successfully found at NCBI.\n" | tee -a $gtotree_log
         mv ${output_dir}/NCBI_accessions_not_found.txt ${output_dir}/run_files/NCBI_accessions_not_found.txt
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ]; then
         num_accs_not_downloaded=$(wc -l ${output_dir}/NCBI_accessions_not_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "    ${RED}$num_accs_not_downloaded did not download properly.${NC}\n" | tee -a $gtotree_log
-        # printf "        Reported in \"${output_dir}/run_files/NCBI_accessions_not_downloaded.txt\".\n\n" | tee -a $gtotree_log
+        printf "    $num_accs_not_downloaded did not download properly.\n" | tee -a $gtotree_log
         mv ${output_dir}/NCBI_accessions_not_downloaded.txt ${output_dir}/run_files/NCBI_accessions_not_downloaded.txt
     fi
 
     if [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ]; then
-        printf "    ${RED}$removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.${NC}\n" | tee -a $gtotree_log
-        # printf "        Reported in \"${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv\".\n\n" | tee -a $gtotree_log
+        printf "    $removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.\n" | tee -a $gtotree_log
         mv ${output_dir}/Genomes_removed_for_too_few_hits.tsv ${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv
     fi
 
-    if [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ]; then
-        num_genbanks_no_cds=$(wc -l ${output_dir}/Genbank_files_with_no_CDSs.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "    $num_genbanks_no_cds genbank file(s) had no identified coding sequences.\n" | tee -a $gtotree_log
-        # printf "        Reported in \"${output_dir}/run_files/Genbank_files_with_no_CDSs.txt\",\n" | tee -a $gtotree_log
-        # printf "        but processed as though submitted in fasta format.\n\n" | tee -a $gtotree_log
-        mv ${output_dir}/Genbank_files_with_no_CDSs.txt ${output_dir}/run_files/Genbank_files_with_no_CDSs.txt
-    fi
+    # if [ -f ${output_dir}/Genbank_files_with_no_CDSs.txt ]; then
+    #     num_genbanks_no_cds=$(wc -l ${output_dir}/Genbank_files_with_no_CDSs.txt | sed "s/^ *//" | cut -d " " -f 1)
+    #     printf "    $num_genbanks_no_cds genbank file(s) had no identified coding sequences.\n" | tee -a $gtotree_log
+    #     mv ${output_dir}/Genbank_files_with_no_CDSs.txt ${output_dir}/run_files/Genbank_files_with_no_CDSs.txt
+    # fi
 
     if [ -f ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ]; then
         printf "    $removed_genes gene(s) had no hits in any genome.\n" | tee -a $gtotree_log
-        # printf "        Reported in \"${output_dir}/run_files/Genes_with_no_hits_to_any_genomes.txt\".\n\n" | tee -a $gtotree_log
         mv ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ${output_dir}/run_files/Genes_with_no_hits_to_any_genomes.txt
     fi
 
     if [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ]; then
         printf "    $removed_genes2 gene(s) had no hits after filtering by length.\n" | tee -a $gtotree_log
-        # printf "        Reported in \"${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt\".\n\n" | tee -a $gtotree_log
         mv ${output_dir}/Genes_with_no_hits_after_length_filter.txt ${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt
     fi
 
     if [ -f ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ]; then
         num_genomes_high_redund=$(tail -n +2 ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv | wc -l | sed "s/^ *//" | cut -d " " -f 1)
         printf "    $num_genomes_high_redund genome(s) had an estimated redundancy of >= 10%%.\n" | tee -a $gtotree_log
-        # printf "        Reported in \"${output_dir}/run_files/Genomes_with_questionable_redundancy_estimates.tsv\".\n\n" | tee -a $gtotree_log
         mv ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ${output_dir}/run_files/Genomes_with_questionable_redundancy_estimates.tsv
     fi
 
