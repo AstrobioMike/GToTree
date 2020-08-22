@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 ORANGE='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.10"
+VERSION="v1.5.20"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -63,7 +63,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  info to the sequence headers for any genomes represented in GTDB.\n"
     printf "                  Can be utilized with '-t' flag also, in that case GToTree will use\n"
     printf "                  GTDB lineage info where possible, and use NCBI lineage info if accession\n"
-    printf "                  isn't represented in GTDB.\n\n"
+    printf "                  isn't represented in GTDB. (See helper script \`gtt-get-accessions-from-GTDB\`.)\n\n"
 
     printf "        - [-L <str>] default: Domain,Phylum,Class,Species,Strain\n"
     printf "                  A comma-separated list of the taxonomic ranks you'd like added to\n"

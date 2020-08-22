@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-
 from Bio import SeqIO
 import argparse
 import sys
@@ -15,7 +13,7 @@ parser.add_argument("-o", "--output_txt_file", help='Name of output txt file (de
 
 if len(sys.argv)==1:
   parser.print_help(sys.stderr)
-  sys.exit(1)
+  sys.exit(0)
 
 args = parser.parse_args()
 

@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-
 from Bio import SeqIO
 import sys
 import argparse
@@ -16,7 +14,7 @@ parser.add_argument("-o", "--output_fasta_name", help='Output fasta file (defaul
 
 if len(sys.argv)==1:
   parser.print_help(sys.stderr)
-  sys.exit(1)
+  sys.exit(0)
 
 args = parser.parse_args()
 
