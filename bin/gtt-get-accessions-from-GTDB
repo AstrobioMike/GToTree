@@ -135,9 +135,9 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
                     sys.exit(0)
 
                 else:
-                    
+
                     rank = ranks_found_in[0]
-                    
+
             else:
 
                 rank = rank.lower()
@@ -148,11 +148,11 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
             gtdb_sub_tab.to_csv("GTDB-" + taxon + "-" + rank + "-metadata.tsv", sep="\t", index=False)
 
             target_accs = gtdb_sub_tab["ncbi_genbank_assembly_accession"].tolist()
-            
+
             with open("GTDB-" + taxon + "-" + rank + "-accs.txt", "w") as out:
                 for acc in target_accs:
                     out.write(acc + "\n")
-            
+
             wprint("The targeted NCBI accessions were written to: " + color_text("GTDB-" + taxon + "-" + rank + "-accs.txt"))
             print("")
             wprint("A subset GTDB table of these targets was written to: " + color_text("GTDB-" + taxon + "-" + rank + "-metadata.tsv"))
@@ -171,9 +171,9 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
                     sys.exit(0)
 
                 else:
-                    
+
                     rank = ranks_found_in_rep[0]
-                    
+
             else:
 
                 rank = rank.lower()
@@ -184,11 +184,11 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
             gtdb_sub_rep_tab.to_csv("GTDB-" + taxon + "-" + rank + "-refseq-rep-metadata.tsv", sep="\t", index=False)
 
             target_accs = gtdb_sub_rep_tab["ncbi_genbank_assembly_accession"].tolist()
-            
+
             with open("GTDB-" + taxon + "-" + rank + "-refseq-rep-accs.txt", "w") as out:
                 for acc in target_accs:
                     out.write(acc + "\n")
-            
+
             wprint("The targeted NCBI accessions were written to: " + color_text("GTDB-" + taxon + "-" + rank + "-refseq-rep-accs.txt"))
             print("")
             wprint("A subset GTDB table of these targets was written to: " + color_text("GTDB-" + taxon + "-" + rank + "-refseq-rep-metadata.tsv"))
@@ -197,7 +197,7 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
     else:
 
         if not representative_only:
-            
+
             target_accs = gtdb_tab["ncbi_genbank_assembly_accession"].tolist()
 
             with open("GTDB-arc-and-bac-accessions.txt", "w") as out:
@@ -211,7 +211,7 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
             print("")
 
         else:
-            
+
             # already subset, writing out that and accessions list
             gtdb_rep_tab.to_csv("GTDB-arc-and-bac-refseq-rep-metadata.tsv", sep="\t", index=False)
 
@@ -247,24 +247,24 @@ def get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab=None, return_ranks_fou
     else:
 
         ranks = ['domain', 'phylum', 'class', 'order', 'family', 'genus', 'species']
-        
+
         ranks_found_in = []
-        
+
         print("")
         for rank in ranks:
-        
+
             if taxon in gtdb_tab[rank].unique():
 
                 ranks_found_in.append(rank)
-                
+
                 count = len(gtdb_tab[gtdb_tab[rank] == taxon].index)
                 wprint("The rank '" + rank + "' has " + str(count) + " " + taxon + " entries.")
-        
+
         if len(ranks_found_in) == 0:
             wprint(color_text("Input taxon '" + taxon + "' doesn't seem exist at any rank :(", "orange"))
             print("")
             sys.exit(0)
-        
+
         print("")
 
         if representative_only:
@@ -274,11 +274,11 @@ def get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab=None, return_ranks_fou
             wprint(color_text("In considering only RefSeq representative genomes:", "orange"))
             print("")
             for rank in ranks:
-            
+
                 if taxon in gtdb_rep_tab[rank].unique():
 
                     ranks_found_in_rep.append(rank)
-                    
+
                     count = len(gtdb_rep_tab[gtdb_rep_tab[rank] == taxon].index)
                     wprint("The rank '" + rank + "' has " + str(count) + " " + taxon + " representative genome entries.")
                     print("")
@@ -329,7 +329,7 @@ def get_gtdb_tab():
     if not os.path.exists("GTDB-arc-and-bac-metadata.tsv"):
 
         print("")
-        wprint("Downloading and archaeal and bacterial metadata tables from GTDB...")
+        wprint("Downloading archaeal and bacterial metadata tables from GTDB...")
 
         # getting archaea
         arc_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar122_metadata.tar.gz")
@@ -390,7 +390,7 @@ def get_gtdb_tab():
             gtdb_rep_tab = gtdb_tab[gtdb_tab["ncbi_refseq_category"] == "representative genome"]
 
     else:
-        
+
         if args.get_table:
 
             print("")
@@ -401,7 +401,7 @@ def get_gtdb_tab():
         # reading in if already present
         print("")
         wprint("Reading in the GTDB info table...")
-        
+
 
         gtdb_tab = pd.read_csv("GTDB-arc-and-bac-metadata.tsv", sep="\t", low_memory=False)
 
