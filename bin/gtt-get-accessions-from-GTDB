@@ -262,6 +262,7 @@ def get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab=None, return_ranks_fou
 
         if len(ranks_found_in) == 0:
             wprint(color_text("Input taxon '" + taxon + "' doesn't seem exist at any rank :(", "orange"))
+            wprint("Be aware this is case-sensitive.")
             print("")
             sys.exit(0)
 
