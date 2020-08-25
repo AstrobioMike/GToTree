@@ -68,13 +68,13 @@ gtt-genbank-to-AA-seqs -i $file_location -o ${tmp_dir}/${assembly}_genes2.tmp 2>
 if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
 
     printf "\n  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n"
-    printf "   This genbank file doesn't appear to have CDS annotations,\n"
-    printf "   so we are identifying coding sequences with prodigal.\n\n"
+    printf "   This genbank file doesn't appear to have CDS annotations, so we are\n"
+    printf "   identifying coding sequences with prodigal.\n\n"
 
     printf "   Reported in \"${output_dir}/run_files/Genbank_files_with_no_CDSs.txt\".\n"
     printf "  ${ORANGE}****************************************************************************${NC}  \n\n"
 
-    echo "$1" >> ${output_dir}/Genbank_files_with_no_CDSs.txt
+    echo "$1" >> ${output_dir}/run_files/Genbank_files_with_no_CDSs.txt
     rm -rf ${tmp_dir}/${assembly}_genes2.tmp
 
     # pulling out full nucleotide fasta from genbank file

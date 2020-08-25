@@ -17,7 +17,7 @@ additional_pfam_targets=$9
 
 num=0
 
-rm -rf ${output_dir}/Genbank_files_with_no_CDSs.txt # deleting if file exists
+rm -rf ${output_dir}/run_files/Genbank_files_with_no_CDSs.txt # deleting if file exists
 
 # looping through the lines of the provided [-g] file (this loop operates on one genome at a time)
 while IFS=$'\t' read -r -a file
@@ -72,13 +72,13 @@ do
     if [ ! -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
 
         printf "  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n"
-        printf "\t  This genbank file doesn't appear to have CDS annotations,\n"
-        printf "\t  so we are identifying coding sequences with prodigal.\n\n"
+        printf "\t  This genbank file doesn't appear to have CDS annotations, so we are\n"
+        printf "\t  identifying coding sequences with prodigal.\n\n"
 
         printf "\t    Reported in \"${output_dir}/run_files/Genbank_files_with_no_CDSs.txt\".\n"
         printf "  ${ORANGE}****************************************************************************${NC}  \n\n"
 
-        echo "$file" >> ${output_dir}/Genbank_files_with_no_CDSs.txt
+        echo "$file" >> ${output_dir}/run_files/Genbank_files_with_no_CDSs.txt
         rm -rf ${tmp_dir}/${assembly}_genes2.tmp
 
         # pulling out full nucleotide fasta from genbank file

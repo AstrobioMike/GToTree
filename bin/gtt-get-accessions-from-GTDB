@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 """
-This is a helper program of GToTree to facilitate accessing and using taxonomy and genomes
-from the Genome Taxonomy Database (gtdb.ecogenomic.org/).
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
+to facilitate accessing and using taxonomy and genomesfrom the glorious Genome Taxonomy 
+Database (gtdb.ecogenomic.org/).
 
 For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
 """
@@ -17,8 +18,12 @@ import argparse
 
 parser = argparse.ArgumentParser(description="This is a helper program to facilitate using taxonomy \
                                               and genomes from the Genome Taxonomy Database (gtdb.ecogenomic.org) with GToTree.\
-                                              It primarily returns NCBI accessions and summary tables based on GTDB taxonomy.\
-                                              For examples, please visit the GToTree wiki here: github.com/AstrobioMike/GToTree/wiki/example-usage")
+                                              It primary returns NCBI accessions and GTDB summary tables based on GTDB-taxonomy\
+                                              searches. It also currently has filtering capabilities built-in for specifying only\
+                                              GTDB representative species or RefSeq representative genomes (see help menu and links\
+                                              therein for explanations of what these are). For examples, please visit the GToTree\
+                                              wiki here: github.com/AstrobioMike/GToTree/wiki/example-usage",
+                                 epilog="Ex. usage: gtt-get-accessions-from-GTDB -t Archaea --GTDB-representatives-only\n")
 
 parser.add_argument("-t", "--target-taxon", help="Target taxon (enter 'all' for all)", action="store", dest="target_taxon")
 parser.add_argument("-r", "--target-rank", help='Target rank', action="store", dest="target_rank")
@@ -30,8 +35,12 @@ parser.add_argument("--get-rank-counts", action="store_true", help="Provide just
                                            unique taxa there are for each rank.")
 parser.add_argument("--get-taxon-counts", action="store_true", help="Provide this flag along with a specified taxon to the `-t` flag \
                                                                      to see how many of that taxon are in the database.")
-parser.add_argument("--representative-only", action="store_true", help="Provide this flag along with a specified taxon to the `-t` flag \
-                                                                        to pull accessions only for genomes classified as 'representative'. \
+parser.add_argument("--GTDB-representatives-only", action="store_true", help="Provide this flag along with a specified taxon to the `-t` flag \
+                                                                        to pull accessions only for genomes designated as GTDB species \
+                                                                        representatives (see e.g.: https://gtdb.ecogenomic.org/faq#gtdb_species_clusters).")
+parser.add_argument("--RefSeq-representatives-only", action="store_true", help="Provide this flag along with a specified taxon to the `-t` flag \
+                                                                        to pull accessions only for genomes designated as RefSeq representative \
+                                                                        genomes (see e.g.: https://www.ncbi.nlm.nih.gov/refseq/about/prokaryotes/#representative_genomes).\
                                                                         (Useful for subsetting a view across a broad level of diversity.)")
 
 
@@ -49,46 +58,59 @@ def main():
         get_gtdb_tab()
         sys.exit(0)
 
+    ## some checks to prevent things that either should be provided together, or should be mutually exclusive
     if args.get_taxon_counts and not args.target_taxon:
         print("")
-        wprint(color_text("A specific taxon needs to also be provided to the `-t` flag in order to use `--get-taxon-counts`.", "orange"))
+        wprint(color_text("A specific taxon needs to also be provided to the `-t` flag in order to use `--get-taxon-counts`.", "yellow"))
         print("")
         wprint("  E.g.: gtt-get-accessions-from-GTDB --get-taxon-counts -t Alteromonas")
         print("")
         sys.exit(0)
 
+    if args.GTDB_representatives_only and args.RefSeq_representatives_only:
+        print("")
+        wprint(color_text("Only one of `--GTDB-representatives-only` or `--RefSeq-representatives-only` can be provided.", "yellow"))
+        print("")
+        sys.exit(0)
+
+    ## moving on
     gtdb_tab = get_gtdb_tab()
 
-    if args.representative_only:
+    if args.GTDB_representatives_only:
+        gtdb_rep_tab = gtdb_tab[gtdb_tab["gtdb_representative"] == "t"]
+        representatives_source = "GTDB"
+
+    if args.RefSeq_representatives_only:
         gtdb_rep_tab = gtdb_tab[gtdb_tab["ncbi_refseq_category"] == "representative genome"]
+        representatives_source = "RefSeq"
 
     if args.get_rank_counts:
-        if args.representative_only:
-            get_unique_taxa_counts_of_all_ranks(gtdb_tab, gtdb_rep_tab, representative_only=True)
+        if args.GTDB_representatives_only or args.RefSeq_representatives_only:
+            get_unique_taxa_counts_of_all_ranks(gtdb_tab, gtdb_rep_tab, representatives_source=representatives_source)
             sys.exit(0)
         else:
             get_unique_taxa_counts_of_all_ranks(gtdb_tab)
             sys.exit(0)
 
     if args.get_taxon_counts:
-        if args.representative_only:
-            get_unique_taxon_counts(args.target_taxon, gtdb_tab, gtdb_rep_tab, representative_only=True)
+        if args.GTDB_representatives_only or args.RefSeq_representatives_only:
+            get_unique_taxon_counts(args.target_taxon, gtdb_tab, gtdb_rep_tab, representatives_source=representatives_source)
             sys.exit(0)
         else:
             get_unique_taxon_counts(args.target_taxon, gtdb_tab)
             sys.exit(0)
 
     if args.target_taxon and not args.target_rank:
-        if args.representative_only:
-            get_accessions(args.target_taxon, gtdb_tab, gtdb_rep_tab, representative_only=True)
+        if args.GTDB_representatives_only or args.RefSeq_representatives_only:
+            get_accessions(args.target_taxon, gtdb_tab, gtdb_rep_tab, representatives_source=representatives_source)
             sys.exit(0)
         else:
             get_accessions(args.target_taxon, gtdb_tab)
             sys.exit(0)
 
     if args.target_taxon and args.target_rank:
-        if args.representative_only:
-            get_accessions(args.target_taxon, gtdb_tab, gtdb_rep_tab, rank=args.target_rank, representative_only=True)
+        if args.GTDB_representatives_only or args.RefSeq_representatives_only:
+            get_accessions(args.target_taxon, gtdb_tab, gtdb_rep_tab, rank=args.target_rank, representatives_source=representatives_source)
             sys.exit(0)
         else:
             get_accessions(args.target_taxon, gtdb_tab, rank=args.target_rank)
@@ -98,7 +120,7 @@ def main():
 # setting some colors
 tty_colors = {
     'green' : '\033[0;32m%s\033[0m',
-    'orange' : '\033[0;33m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
     'red' : '\033[0;31m%s\033[0m'
 }
 
@@ -118,11 +140,11 @@ def wprint(text):
 
 
 # get accessions
-def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative_only=False):
+def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representatives_source=None):
 
     if taxon != "all":
 
-        if not representative_only:
+        if not representatives_source:
 
             ranks_found_in = get_unique_taxon_counts(taxon, gtdb_tab, return_ranks_found_in=True)
 
@@ -130,7 +152,7 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
 
                 if len(ranks_found_in) > 1:
                     wprint(color_text("Since '" + str(taxon) + "' occurs at more than 1 rank, we'll need to specify \
-                           which rank is wanted as well before we pull the accessions. This can be specified with the `-r` flag.", "orange"))
+                           which rank is wanted as well before we pull the accessions. This can be specified with the `-r` flag.", "yellow"))
                     print("")
                     sys.exit(0)
 
@@ -145,28 +167,33 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
             # subsetting table and writing out that and accessions list
             gtdb_sub_tab = gtdb_tab[gtdb_tab[rank] == taxon]
 
-            gtdb_sub_tab.to_csv("GTDB-" + taxon + "-" + rank + "-metadata.tsv", sep="\t", index=False)
+            tab_out_filename = "GTDB-" + taxon + "-" + rank + "-metadata.tsv"
+            acc_out_filename = "GTDB-" + taxon + "-" + rank + "-accs.txt"
+
+            gtdb_sub_tab.to_csv(tab_out_filename, sep="\t", index=False)
 
             target_accs = gtdb_sub_tab["ncbi_genbank_assembly_accession"].tolist()
 
-            with open("GTDB-" + taxon + "-" + rank + "-accs.txt", "w") as out:
+            with open(acc_out_filename, "w") as out:
                 for acc in target_accs:
                     out.write(acc + "\n")
 
-            wprint("The targeted NCBI accessions were written to: " + color_text("GTDB-" + taxon + "-" + rank + "-accs.txt"))
+            wprint("The targeted NCBI accessions were written to:")
+            wprint("  " + color_text(acc_out_filename))
             print("")
-            wprint("A subset GTDB table of these targets was written to: " + color_text("GTDB-" + taxon + "-" + rank + "-metadata.tsv"))
+            wprint("A subset GTDB table of these targets was written to:")
+            wprint("  " + color_text(tab_out_filename))
             print("")
 
         else:
 
-            ranks_found_in_rep = get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab, return_ranks_found_in=True, representative_only=True)
+            ranks_found_in_rep = get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab, return_ranks_found_in=True, representatives_source=representatives_source)
 
             if not rank:
 
                 if len(ranks_found_in_rep) > 1:
                     wprint(color_text("Since '" + str(taxon) + "' occurs at more than 1 rank, we'll need to specify \
-                           which rank is wanted as well before we pull the accessions. This can be specified with the `-r` flag.", "orange"))
+                           which rank is wanted as well before we pull the accessions. This can be specified with the `-r` flag.", "yellow"))
                     print("")
                     sys.exit(0)
 
@@ -181,22 +208,27 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
             # subsetting table and writing out that and accessions list
             gtdb_sub_rep_tab = gtdb_rep_tab[gtdb_rep_tab[rank] == taxon]
 
-            gtdb_sub_rep_tab.to_csv("GTDB-" + taxon + "-" + rank + "-refseq-rep-metadata.tsv", sep="\t", index=False)
+            tab_out_filename = "GTDB-" + taxon + "-" + rank + "-" + representatives_source + "-rep-metadata.tsv"
+            acc_out_filename = "GTDB-" + taxon + "-" + rank + "-" + representatives_source + "-rep-accs.txt"
+
+            gtdb_sub_rep_tab.to_csv(tab_out_filename, sep="\t", index=False)
 
             target_accs = gtdb_sub_rep_tab["ncbi_genbank_assembly_accession"].tolist()
 
-            with open("GTDB-" + taxon + "-" + rank + "-refseq-rep-accs.txt", "w") as out:
+            with open(acc_out_filename, "w") as out:
                 for acc in target_accs:
                     out.write(acc + "\n")
 
-            wprint("The targeted NCBI accessions were written to: " + color_text("GTDB-" + taxon + "-" + rank + "-refseq-rep-accs.txt"))
+            wprint("The targeted NCBI accessions were written to:")
+            wprint("  " + color_text(acc_out_filename))
             print("")
-            wprint("A subset GTDB table of these targets was written to: " + color_text("GTDB-" + taxon + "-" + rank + "-refseq-rep-metadata.tsv"))
+            wprint("A subset GTDB table of these targets was written to:")
+            wprint("  " + color_text(tab_out_filename))
             print("")
 
     else:
 
-        if not representative_only:
+        if not representatives_source:
 
             target_accs = gtdb_tab["ncbi_genbank_assembly_accession"].tolist()
 
@@ -229,19 +261,19 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
 
 
 # get counts of specific taxa
-def get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab=None, return_ranks_found_in=False, representative_only=False):
+def get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab=None, return_ranks_found_in=False, representatives_source=None):
 
     if taxon == "all":
         count = len(gtdb_tab.index)
         print("")
-        wprint("There are " + str(count) + " total genomes in the database.")
+        wprint("  There are " + str(count) + " total genomes in the database.")
         print("")
 
-        if representative_only:
+        if representatives_source:
             count = len(gtdb_rep_tab.index)
-            wprint(color_text("In considering only RefSeq representative genomes:", "orange"))
+            wprint(color_text("In considering only " + representatives_source + " representative genomes:", "yellow"))
             print("")
-            wprint("There are " + str(count) + " total representative genomes in the database.")
+            wprint("  There are " + str(count) + " total representative genomes in the database.")
             print("")
 
     else:
@@ -258,21 +290,21 @@ def get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab=None, return_ranks_fou
                 ranks_found_in.append(rank)
 
                 count = len(gtdb_tab[gtdb_tab[rank] == taxon].index)
-                wprint("The rank '" + rank + "' has " + str(count) + " " + taxon + " entries.")
+                wprint("  The rank '" + rank + "' has " + str(count) + " " + taxon + " entries.")
 
         if len(ranks_found_in) == 0:
-            wprint(color_text("Input taxon '" + taxon + "' doesn't seem exist at any rank :(", "orange"))
-            wprint("Be aware this is case-sensitive.")
+            wprint(color_text("Input taxon '" + taxon + "' doesn't seem exist at any rank :(", "yellow"))
+            wprint("Be aware, to be on the safe side, our searching is case-sensitive.")
             print("")
             sys.exit(0)
 
         print("")
 
-        if representative_only:
+        if representatives_source:
 
             ranks_found_in_rep = []
 
-            wprint(color_text("In considering only RefSeq representative genomes:", "orange"))
+            wprint(color_text("In considering only " + representatives_source + " representative genomes:", "yellow"))
             print("")
             for rank in ranks:
 
@@ -281,11 +313,11 @@ def get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab=None, return_ranks_fou
                     ranks_found_in_rep.append(rank)
 
                     count = len(gtdb_rep_tab[gtdb_rep_tab[rank] == taxon].index)
-                    wprint("The rank '" + rank + "' has " + str(count) + " " + taxon + " representative genome entries.")
+                    wprint("  The rank '" + rank + "' has " + str(count) + " " + taxon + " representative genome entries.")
                     print("")
 
             if len(ranks_found_in_rep) == 0:
-                wprint(color_text("Input taxon '" + taxon + "' doesn't seem exist at any rank as a representative genome :(", "orange"))
+                wprint(color_text("Input taxon '" + taxon + "' doesn't seem exist at any rank as a representative genome :(", "yellow"))
                 print("")
                 sys.exit(0)
 
@@ -297,10 +329,8 @@ def get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab=None, return_ranks_fou
                 return(ranks_found_in)
 
 
-
-
 # get counts of unique taxa at each rank
-def get_unique_taxa_counts_of_all_ranks(gtdb_tab, gtdb_rep_tab=None, representative_only=False):
+def get_unique_taxa_counts_of_all_ranks(gtdb_tab, gtdb_rep_tab=None, representatives_source=None):
 
     ranks = ['domain', 'phylum', 'class', 'order', 'family', 'genus', 'species']
 
@@ -310,8 +340,10 @@ def get_unique_taxa_counts_of_all_ranks(gtdb_tab, gtdb_rep_tab=None, representat
 
     print("")
 
-    if representative_only:
-        wprint(color_text("In considering only RefSeq representative genomes:", "orange"))
+    # below only needed for RefSeq, because if it is GTDB, it is equivalent (i.e., they have 1 rep genome for each unique rank in their system)
+    if representatives_source == "RefSeq":
+
+        wprint(color_text("In considering only " + representatives_source + " representative genomes:", "yellow"))
         print("")
 
         print("    {:<10} {:}".format("Rank", "Num. Unique Rep. Taxa"))
@@ -358,7 +390,7 @@ def get_gtdb_tab():
             tax_list = row["gtdb_taxonomy"].split(";")
 
             if len(tax_list) != 7:
-                wprint(color_text("GTDB entry " + curr_acc + " doesn't seem to have 7-column lineage info. Something is likely wrong :(", "orange"))
+                wprint(color_text("GTDB entry " + curr_acc + " doesn't seem to have 7-column lineage info. Something is likely wrong :(", "yellow"))
                 print("")
                 wprint("Aborting for now.")
                 print("")
@@ -383,12 +415,12 @@ def get_gtdb_tab():
 
         # writing out, so if we do more than one search we don't need to re-download
         print("")
-        wprint("Writing combined table with split-taxonomy columns to: " + color_text("GTDB-arc-and-bac-metadata.tsv") + "...")
+        wprint("Writing combined table with split-taxonomy columns to:")
+        wprint(color_text("  GTDB-arc-and-bac-metadata.tsv"))
+        print("")
+        wprint(color_text("This file will be used for any additional queries. Feel free to keep or delete it when done :)", "yellow"))
 
         gtdb_tab.to_csv("GTDB-arc-and-bac-metadata.tsv", index=False, sep="\t")
-
-        if args.representative_only:
-            gtdb_rep_tab = gtdb_tab[gtdb_tab["ncbi_refseq_category"] == "representative genome"]
 
     else:
 
@@ -401,7 +433,7 @@ def get_gtdb_tab():
 
         # reading in if already present
         print("")
-        wprint("Reading in the GTDB info table...")
+        wprint(color_text("Reading in the GTDB info table...", "yellow"))
 
 
         gtdb_tab = pd.read_csv("GTDB-arc-and-bac-metadata.tsv", sep="\t", low_memory=False)

@@ -7,7 +7,8 @@ ORANGE='\033[0;33m'
 NC='\033[0m'
 VERSION="v1.5.22"
 
-printf "\n\n               GToTree ${VERSION} (github.com/AstrobioMike/GToTree)\n\n"
+printf "\n\n                                  GToTree ${VERSION}\n"
+printf "                         (github.com/AstrobioMike/GToTree)\n\n"
 
 #############################################################################
 ################################  HELP INFO  ################################

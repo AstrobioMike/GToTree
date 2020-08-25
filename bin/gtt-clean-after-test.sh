@@ -1,1 +1,1 @@
-rm -rf *gt*.tmpdir GToTree_test/ Missing_IDs.txt GToTree_test-gtotree-runlog.txt
+rm -rf *gt*.tmpdir GToTree_test/
