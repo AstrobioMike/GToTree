@@ -30,7 +30,7 @@ parser.add_argument("-r", "--target-rank", help='Target rank', action="store", d
 parser.add_argument("--get-table", action="store_true", help="Provide just this flag alone to download and parse a GTDB metadata \
                                            table (currently R05-RS95). Archaea and Bacteria tables pulled from here \
                                            (https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/) \
-                                           and combined, and GTDB taxonomy column split for easier manual searching if wanted.")
+                                           and combined, and the GTDB taxonomy column split for easier manual searching if wanted.")
 parser.add_argument("--get-rank-counts", action="store_true", help="Provide just this flag alone to see counts of how many \
                                            unique taxa there are for each rank.")
 parser.add_argument("--get-taxon-counts", action="store_true", help="Provide this flag along with a specified taxon to the `-t` flag \
@@ -58,7 +58,7 @@ def main():
         get_gtdb_tab()
         sys.exit(0)
 
-    ## some checks to prevent things that either should be provided together, or should be mutually exclusive
+    ## some checks on things that either should be provided together, or should be mutually exclusive, are provided
     if args.get_taxon_counts and not args.target_taxon:
         print("")
         wprint(color_text("A specific taxon needs to also be provided to the `-t` flag in order to use `--get-taxon-counts`.", "yellow"))

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-version = "v1.5.3"
+version = "v1.5.30"
 import os
 import sys
 import argparse
@@ -19,7 +19,7 @@ from functools import partial
 from math import ceil
 from glob import glob
 
-print("\n\n                                GToTree " + version)
+print("\n\n                                 GToTree " + version)
 print("                        (github.com/AstrobioMike/GToTree)\n")
 print(" ------------------------------------------------------------------------------- \n")
 
@@ -29,8 +29,8 @@ parser = argparse.ArgumentParser(description="This program takes a list of NCBI 
 required = parser.add_argument_group('required arguments')
 
 required.add_argument("-a", "--target-accessions", help="fasta file", action="store", required=True)
-parser.add_argument("-o", "--output", help='Name of output txt file (default: "output.txt")', action="store", default="output.txt")
-parser.add_argument("-n", "--num-cpus", help='Number of cpus to use (default: 1)', action="store", default=1, type=int)
+parser.add_argument("-o", "--output-directory", help='Name of desired output directory. If it exists already, will attempt to re-start a previous run (default: "gtt-gen-SCG-HMMs-output"', action="store", default="gtt-gen-SCG-HMMs-output", dest="output_dir")
+parser.add_argument("-n", "--num-cpus", help='Number of cpus to use on parallelizable steps (default: 1).', action="store", default=1, type=int)
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -42,23 +42,23 @@ args = parser.parse_args()
 
 def main():
 
-    tmp_dir, rerun = setup_temp_dir(args.target_accessions)
+    tmp_dir, output_dir, rerun = setup_output_dir(args.target_accessions, args.output_dir)
 
     target_accs, needed_dbs = get_target_accs(args.target_accessions)
     
-    ncbi_tab, accs_not_found = get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, rerun)
+    ncbi_tab, accs_not_found = get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, output_dir, rerun)
 
-    remaining_accs, download_failed, prodigal_failed = get_amino_acids(ncbi_tab, tmp_dir, args.num_cpus, rerun)
+    remaining_accs = get_amino_acids(ncbi_tab, tmp_dir, output_dir, args.num_cpus, rerun)
 
     filtered_pfam_IDs = get_and_filter_pfam_hmms(tmp_dir, rerun)
 
     run_hmmsearch(tmp_dir, args.num_cpus, rerun)
 
-    final_pfam_count = filter_HMM_hits(remaining_accs, filtered_pfam_IDs, tmp_dir, rerun)
+    wanted_pfam_count = filter_HMM_hits(remaining_accs, filtered_pfam_IDs, tmp_dir, output_dir, rerun)
 
-    filter_final_HMM_set(final_pfam_count, tmp_dir, rerun)
+    filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun)
 
-    report_missed_accessions(accs_not_found, download_failed, prodigal_failed, rerun)
+    report_missed_accessions(output_dir, rerun)
 
 ################################################################################
 
@@ -85,28 +85,36 @@ def wprint(text):
           subsequent_indent="  ", break_on_hyphens=False))
 
 
-def setup_temp_dir(input_accessions_file):
+def setup_output_dir(input_accessions_file, output_dir):
     """ setup re-usable temp dir, and use to check if restarting a run """
 
-    tmp_dir = "gtt-gen-SCGs-working-dir/"
+    output_dir = output_dir.rstrip("/") + "/"
 
-    if not os.path.exists(tmp_dir):
+    tmp_dir = output_dir + "tmp-dir/"
+
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
         os.mkdir(tmp_dir)
 
         # making copy of input accession file to be able to check if the same on a restart
-        shutil.copy(input_accessions_file, tmp_dir + "/input-accessions.txt")
+        shutil.copy(input_accessions_file, tmp_dir + "input-accessions.txt")
 
         rerun = False
 
     else:
 
-        if filecmp.cmp(input_accessions_file, tmp_dir + "/input-accessions.txt"):
-            rerun = True
+        if os.path.exists(tmp_dir + "input-accessions.txt"):
 
-        else:
-            rerun = False
+            if filecmp.cmp(input_accessions_file, tmp_dir + "input-accessions.txt"):
+                rerun = True
 
-    return(tmp_dir, rerun)
+            else:
+                rerun = False
+                
+                # making copy of input accession file to be able to check if the same on a restart
+                shutil.copy(input_accessions_file, tmp_dir + "input-accessions.txt")
+
+    return(tmp_dir, output_dir, rerun)
 
 
 def get_target_accs(input_file):
@@ -145,7 +153,7 @@ def get_target_accs(input_file):
     return(list(target_accs), needed_dbs)
 
 
-def get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, rerun):
+def get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, output_dir, rerun):
     """downloading needed NCBI assembly summary files to construct download links"""
 
     # checking if can use from previous run
@@ -198,14 +206,21 @@ def get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, rerun):
 
     if len(accs_not_found) != 0:
 
+        with open(output_dir + "Missed-accessions.tsv", "w") as out:
+            out.write("accession\twhy_missing\n")
+
+            for acc in accs_not_found:
+                out.write(acc + "\t" + "not found" + "\n")
+
         print("")
-        wprint(color_text(str(len(accs_not_found)) + " accession(s) not found in NCBI assembly tables.", "yellow"))
-        wprint("Reported in \"Missed-accessions.tsv\".")
+        print(color_text("    " + str(len(accs_not_found)) + " accession(s) not found in NCBI assembly tables.", "yellow"))
+        print("      Reported in:")
+        print("        " + output_dir + "Missed-accessions.tsv")
 
     return(ncbi_tab, accs_not_found)
 
 
-def get_amino_acids(ncbi_tab, tmp_dir, num_cpus, rerun):
+def get_amino_acids(ncbi_tab, tmp_dir, output_dir, num_cpus, rerun):
     """ controller for getting amino acids """
 
     # checking if can use from a previous run
@@ -236,13 +251,6 @@ def get_amino_acids(ncbi_tab, tmp_dir, num_cpus, rerun):
         print("")
         wprint("Getting target genome amino-acid sequences...")
 
-        # we append to this file in the loop and in parallel, so making sure it's not there at the start
-        try:
-            os.remove(tmp_dir + "all-genes.faa")
-
-        except:
-            pass
-
         if num_cpus == 1:
 
             remaining_accs, download_failed, prodigal_failed = dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir)
@@ -251,20 +259,54 @@ def get_amino_acids(ncbi_tab, tmp_dir, num_cpus, rerun):
 
             remaining_accs, download_failed, prodigal_failed = parallelize_get_amino_acids(ncbi_tab, dl_genomes_and_get_amino_acids, num_cpus, tmp_dir)
 
-        # writing out so can re-start if needed
+        # writing out so can re-start if needed (and adding to ongoing report file "Missed-accessions.tsv")
         with open(tmp_dir + "remaining_accs.txt", "w") as out:
-            out.write("\n".join(remaining_accs))
-            out.write("\n")
+            if len(remaining_accs) > 0:
+                out.write("\n".join(remaining_accs))
+                out.write("\n")
+            else:
+                pass
 
         with open(tmp_dir + "download_failed.txt", "w") as out:
-            out.write("\n".join(download_failed))
-            out.write("\n")
+            if len(download_failed) > 0:
+                out.write("\n".join(download_failed))
+                out.write("\n")
+
+                if not os.path.exists(output_dir + "Missed-accessions.tsv"):
+                    with open(output_dir + "Missed-accessions.tsv") as out:
+                        out.write("accession\twhy_missing\n")
+                with open(output_dir + "Missed-accessions.tsv") as out:
+                    for acc in download_failed:
+                        out.write(acc + "\t" + "download failed" + "\n")
+
+            else:
+                pass
 
         with open(tmp_dir + "prodigal_failed.txt", "w") as out:
-            out.write("\n".join(prodigal_failed))
-            out.write("\n")
+            if len(prodigal_failed) > 0:
+                out.write("\n".join(prodigal_failed))
+                out.write("\n")
 
-    return(remaining_accs, download_failed, prodigal_failed)
+                if not os.path.exists(output_dir + "Missed-accessions.tsv"):
+                    with open(output_dir + "Missed-accessions.tsv") as out:
+                        out.write("accession\twhy_missing\n")
+                with open(output_dir + "Missed-accessions.tsv") as out:
+                    for acc in prodigal_failed:
+                        out.write(acc + "\t" + "prodigal failed" + "\n")
+
+            else:
+                pass
+
+        # here combining all target seqs into one and removing intermediate files
+        all_individual_AA_files = glob(tmp_dir + "*-to-combine.faa")
+
+        with open(tmp_dir + "all-genes.faa", "wb") as all_seqs:
+            for file in all_individual_AA_files:
+                with open(file, "rb") as sub_seqs:
+                    shutil.copyfileobj(sub_seqs, all_seqs)
+                os.remove(file)
+
+    return(remaining_accs)
 
 
 def dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir):
@@ -286,11 +328,22 @@ def dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir):
         base_name = os.path.basename(curr_base_url)
         AA_url = curr_base_url + "/" + base_name + AA_suffix
 
+
+        # # attempting to download amino-acid file first
+        # curr_AA_gz = urllib.request.urlopen(AA_url)
+
+        # # checking downloaded ok:
+        # if curr_AA_gz.msg == "OK":
+
+        #     # decompressing
+        #     curr_AA = gzip.decompress(curr_AA_gz.read()).decode("UTF-8", "ignore")        
         # attempting to download amino-acid file first
         try:
 
             curr_AA_gz = urllib.request.urlopen(AA_url)
             curr_AA = gzip.decompress(curr_AA_gz.read()).decode("UTF-8", "ignore")
+            # curr_AA_gz = requests.get(AA_url)
+            # curr_AA = gzip.decompress(curr_AA_gz.content)
             curr_AA = io.StringIO(curr_AA)
 
         except:
@@ -329,16 +382,20 @@ def dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir):
             curr_AA = tmp_AA_file
 
         # moving forward with processing amino acid file (includes renaming headers and sticking all together)
+            # I initially had these all writing to the same "master" output file holding all amino acid sequences,
+            # but that started showing odd behavior when being run in parallel with many cpus (occassionally some seqs weren't showing up),
+            # so now they are each individually written to their own file, and then combined afterwards
+
         n = 0 # iterator for keeping headers unique while labeling them with source accession
 
-        with open(tmp_dir + "all-genes.faa", "a") as all_AA_seqs:
+        with open(tmp_dir + curr_acc + "-to-combine.faa", "w") as curr_out:
 
             for seq_record in SeqIO.parse(curr_AA, "fasta"):
 
                 n += 1
 
-                all_AA_seqs.write(">" + curr_acc + "_" + str(n) + "\n")
-                all_AA_seqs.write(str(seq_record.seq + "\n").replace("*", "")) # removing stop-codon stars from prodigal files
+                curr_out.write(">" + curr_acc + "_" + str(n) + "\n")
+                curr_out.write(str(seq_record.seq + "\n").replace("*", "")) # removing stop-codon stars from prodigal files
 
         remaining_accs.append(curr_acc)
 
@@ -358,7 +415,7 @@ def parallelize_get_amino_acids(df, func, num_cpus, tmp_dir):
     df_split = np.array_split(df, num_cpus)
 
     pool = mp.Pool(num_cpus)
-    function_call = partial(func, tmp_dir=tmp_dir) # allows providing additional constant argument to pool.map next
+    function_call = partial(func, tmp_dir=tmp_dir) # allows providing additional constant argument "tmp_dir" to pool.map next
     output = pool.map(function_call, df_split)
     pool.close()
     pool.join()
@@ -373,13 +430,13 @@ def parallelize_get_amino_acids(df, func, num_cpus, tmp_dir):
     return(remaining_accs, download_failed, prodigal_failed)
 
 
-def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_file="all-pfams.hmm", filtered_pfam_IDs_file="filtered-pfam-IDs.txt", filtered_pfams_file="filtered-pfams.hmm"):
+def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm", filtered_pfam_IDs_file="filtered-pfam-IDs.txt", filtered_pfams_hmm_file="filtered-pfams.hmm"):
     """ getting all latest PFams and filtering based on coverage """
     
-    if rerun == True and os.path.exists(tmp_dir + full_pfams_file):
+    if rerun == True and os.path.exists(tmp_dir + filtered_pfam_IDs_file) and os.path.exists(tmp_dir + filtered_pfams_hmm_file):
 
         print("")
-        wprint("PFams already filtered based on average coverage of the underlying proteins detected from previous run...")
+        wprint("PFams that were already filtered based on average coverage of the underlying proteins were detected from a previous run...")
 
         filtered_pfam_IDs = []
 
@@ -396,7 +453,7 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_file="all-pfams.hmm", fi
             pfam_hmms_gz = urllib.request.urlopen("ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz")
             pfam_hmms = gzip.decompress(pfam_hmms_gz.read()).decode("UTF-8", "ignore")
             
-            with open(tmp_dir + full_pfams_file, "w") as out:
+            with open(tmp_dir + full_pfams_hmm_file, "w") as out:
                 out.write(pfam_hmms)
         
         except: 
@@ -425,8 +482,8 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_file="all-pfams.hmm", fi
             out.write("\n".join(filtered_pfam_IDs))
             out.write("\n")
             
-        with open(tmp_dir + filtered_pfams_file, "w") as out:
-            pfam_filter_run = subprocess.run(["hmmfetch", "-f", tmp_dir + full_pfams_file, tmp_dir + filtered_pfam_IDs_file], stdout=out)
+        with open(tmp_dir + filtered_pfams_hmm_file, "w") as out:
+            pfam_filter_run = subprocess.run(["hmmfetch", "-f", tmp_dir + full_pfams_hmm_file, tmp_dir + filtered_pfam_IDs_file], stdout=out)
 
         if pfam_filter_run.returncode != 0:
             print("")
@@ -462,13 +519,14 @@ def run_hmmsearch(tmp_dir, num_cpus, rerun, input_seqs="all-genes.faa", filtered
 def hmmsearch(input_seqs, filtered_pfams_hmm_file, output_table):
     """ main hmmsearch function """
     
-    hmmsearch = subprocess.run(["hmmsearch", "--cut_ga", "--cpu", "2", "--tblout", output_table, filtered_pfams_hmm_file, input_seqs], stdout=subprocess.DEVNULL)
+    hmmsearch = subprocess.run(["hmmsearch", "--cut_ga", "--cpu", "1", "--tblout", output_table, filtered_pfams_hmm_file, input_seqs], stdout=subprocess.DEVNULL)
 
 
 def parallelize_hmmsearch(tmp_dir, input_seqs, filtered_pfams_hmm_file, num_cpus, func):
-    """ main hmmsearch function """
+    """ function to parallelize main hmmsearch function """
 
     # splitting sequence file into blocks to run in parallel
+      # tested splitting the HMMs instead, came out pretty even in my limited testing
     # getting number of lines
     with open(tmp_dir + input_seqs) as seqs:
         for i, l in enumerate(seqs):
@@ -500,29 +558,29 @@ def parallelize_hmmsearch(tmp_dir, input_seqs, filtered_pfams_hmm_file, num_cpus
             with open(file + ".tab", "rb") as subtab:
                 shutil.copyfileobj(subtab, out)
 
-    # removing split files and results
-    files_to_remove = glob("shit/sub-*")
+    # removing split files and results now that all are combined
+    files_to_remove = glob(tmp_dir + "sub-*")
     for file in files_to_remove:
         os.remove(file)
 
 
-def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, tmp_dir, rerun, pfam_hits_file="pfam-hits.tab", wanted_pfams_file="Wanted-PFam-IDs.txt"):
+def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, tmp_dir, output_dir, rerun, pfam_hits_file="pfam-hits.tab", wanted_pfams_file="Wanted-PFam-IDs.txt"):
     """ filtering pfam hit table """
 
-    if rerun == True and os.path.exists(wanted_pfams_file):
+    if rerun == True and os.path.exists(output_dir + wanted_pfams_file):
 
         print("")
         wprint("Filtered-PFam hmmsearch results table was already parsed down, using previous results...")
 
         wanted_pfams = []
-        with open(wanted_pfams_file) as pfams:
+        with open(output_dir + wanted_pfams_file) as pfams:
             for pfam in pfams:
                 wanted_pfams.append(pfam.strip())
 
     else:
 
         print("")
-        wprint("Parsing hit table to find which PFams had exactly 1 hit in >= 90%% of the included genomes...")
+        wprint("Parsing hit table to find which PFams had exactly 1 hit in >= 90% of the included genomes...")
 
         array = np.zeros( (len(target_genome_accs), len(filtered_pfam_IDs)), dtype=int)
         count_tab = pd.DataFrame(array, index=target_genome_accs, columns=filtered_pfam_IDs)
@@ -550,37 +608,43 @@ def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, tmp_dir, rerun, pfam_
         
             if sum(count_tab[pfam] == 1) / len(target_genome_accs) * 100 >= 90:
                 wanted_pfams.append(pfam)
-                
-        with open(wanted_pfams_file, "w") as out:
+        
+        # writing out wanted pfams and full count table    
+        with open(output_dir + wanted_pfams_file, "w") as out:
             out.write("\n".join(wanted_pfams))
             out.write("\n")
+
+        count_tab.to_csv(output_dir + "PFam-HMM-hit-counts.tsv", sep="\t", header=True, index=True)
+
+        print("    PFam HMM hit-count table written to:")
+        print("      " + output_dir + "PFam-HMM-hit-counts.tsv\n")
 
     return(len(wanted_pfams))
 
 
-def filter_final_HMM_set(final_pfam_count, tmp_dir, rerun, full_pfams_file="all-pfams.hmm", wanted_pfams_file="Wanted-PFam-IDs.txt"):
+def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered_pfams_hmm_file="filtered-pfams.hmm", wanted_pfams_file="Wanted-PFam-IDs.txt"):
     """ filter final HMM set """
 
-    final_HMM_out_file = "Wanted-" + str(final_pfam_count) + "-SCG-targets.hmm"
+    wanted_HMM_out_file = "Wanted-" + str(wanted_pfam_count) + "-SCG-targets.hmm"
     
-    if rerun == True and os.path.exists(final_HMM_out_file):
+    if rerun == True and os.path.exists(output_dir + wanted_HMM_out_file):
 
         print(color_text("\n -------------------------------------------------------------------------------\n"))
         
-        wprint("It seems all is done already, you should remove the " + tmp_dir + " directory if you'd like to start over :)")
+        wprint("It seems all is done already, you should specify a non-existent output directory if you'd like to start over :)")
         print("")
-        wprint("The previous run generated:")
-        wprint(color_text("  " + final_HMM_out_file))
+        print("  The previous run generated:")
+        print(color_text("    " + output_dir + wanted_HMM_out_file))
         print("")
 
     else:
 
         print("")
-        wprint("Filtering for the final SCGs' HMMs holding " + str(final_pfam_count) + " targets...")
+        wprint("Filtering for the final SCGs' HMMs holding " + str(wanted_pfam_count) + " targets...")
 
 
-        with open(final_HMM_out_file, "w") as out:
-            pfam_filter_run = subprocess.run(["hmmfetch", "-f", tmp_dir + full_pfams_file, wanted_pfams_file], stdout=out)
+        with open(output_dir + wanted_HMM_out_file, "w") as out:
+            pfam_filter_run = subprocess.run(["hmmfetch", "-f", tmp_dir + filtered_pfams_hmm_file, output_dir + wanted_pfams_file], stdout=out)
 
         if pfam_filter_run.returncode != 0:
             print("")
@@ -590,41 +654,19 @@ def filter_final_HMM_set(final_pfam_count, tmp_dir, rerun, full_pfams_file="all-
 
         print(color_text("\n -------------------------------------------------------------------------------\n"))
 
-        wprint("Final new SCG-HMMs written to:")
-        wprint(color_text("  " + final_HMM_out_file))
+        print("  New SCG-HMMs written to:")
+        print(color_text("    " + output_dir + wanted_HMM_out_file))
         print("")
 
 
-def report_missed_accessions(accs_not_found, download_failed, prodigal_failed, rerun):
-    """ filter final HMM set """
-    
-    if rerun == True and os.path.exists("Missed-accessions.tsv"):
-        pass
-    
-    else:
+def report_missed_accessions(output_dir, rerun):
+    """ filter final HMM set """    
 
-        if len(accs_not_found + download_failed + prodigal_failed) > 0:
-
-            with open("Missed-accessions.tsv", "w") as out:
-                
-                out.write("accession\twhy_missing\n")
-
-                if len(accs_not_found) > 0:
-                    for acc in accs_not_found:
-                        out.write(acc + "\t" + "not found\n")
-
-                if len(download_failed) > 0:
-                    for acc in download_failed:
-                        out.write(acc + "\t" + "download failed\n")
-
-                if len(prodigal_failed):
-                    for acc in prodigal_failed:
-                        out.write(acc + "\t" + "prodigal failed\n")
+    if os.path.exists(output_dir + "Missed-accessions.tsv"):
 
         wprint("Any input accessions that didn't make it through are reported in:")
-        wprint(color_text("  Missed-accessions.tsv"))
+        wprint(color_text("  " + output_dir + "Missed-accessions.tsv", "yellow"))
         print("")
-
 
 if __name__ == "__main__":
     main()
