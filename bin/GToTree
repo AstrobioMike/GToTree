@@ -1935,6 +1935,8 @@ printf "\n______________________________________________________________________
 ## making copy of alignment file to preserve original
 if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] ; then
 
+    echo $lineage_spec | tr "," "\n" > ${tmp_dir}/wanted_ranks.tmp
+
     cp ${output_dir}/Aligned_SCGs.faa ${tmp_dir}/aligned_SCGs_mod_names.tmp
 
     printf "\n ############################################################################## \n" | tee -a $gtotree_log
@@ -2045,7 +2047,6 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
             ## builing new taxonkit-swapped labels based upon user-desired ranks (provided by -L flag)
             cut -f1 ${tmp_dir}/working_taxonkit_lineages.tmp > ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp
-            echo $lineage_spec | tr "," "\n" > ${tmp_dir}/wanted_ranks.tmp
 
             if grep -q "Domain" ${tmp_dir}/wanted_ranks.tmp; then
                 paste -d "_" ${tmp_dir}/building_new_ids_for_taxonkit_swap.tmp <(cut -f 2 ${tmp_dir}/working_taxonkit_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_taxonkit_swap2.tmp
@@ -2222,12 +2223,15 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
             
             ## there are no strain level designations in GTDB, so those will be absent on any labels where GTDB taxonomy was added if requested by the user
                # notifying if this is the case
-            if grep -q "Strain" ${tmp_dir}/wanted_ranks.tmp; then
-                printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
-                printf "    Strain-level labels were requested in addition to using GTDB taxonomy\n" | tee -a $gtotree_log
-                printf "    where possible. This is just a note that there will be no strain-level\n" | tee -a $gtotree_log
-                printf "    labels added for those that had GTDB lineage info added.\n" | tee -a $gtotree_log
-                printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+            
+            if [ -n ${tmp_dir}/wanted_ranks.tmp ];
+                if grep -q "Strain" ${tmp_dir}/wanted_ranks.tmp; then
+                    printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
+                    printf "    Strain-level labels were requested in addition to using GTDB taxonomy\n" | tee -a $gtotree_log
+                    printf "    where possible. This is just a note that there will be no strain-level\n" | tee -a $gtotree_log
+                    printf "    labels added for those that had GTDB lineage info added.\n" | tee -a $gtotree_log
+                    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+                fi
             fi
 
             ## reporting to user how many entries were tried and found at GTDB
@@ -2314,7 +2318,6 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
             ## buildig new gtdb-swapped labels based upon user-desired ranks (provided by -L flag)
             cut -f 1 ${tmp_dir}/working_gtdb_lineages.tmp > ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp
-            echo $lineage_spec | tr "," "\n" > ${tmp_dir}/wanted_ranks.tmp
 
             if grep -q "Domain" ${tmp_dir}/wanted_ranks.tmp; then
                 paste -d "_" ${tmp_dir}/building_new_ids_for_gtdb_swap.tmp <(cut -f 2 ${tmp_dir}/working_gtdb_lineages.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]") > ${tmp_dir}/building_new_ids_for_gtdb_swap2.tmp
