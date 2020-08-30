@@ -2224,7 +2224,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
             ## there are no strain level designations in GTDB, so those will be absent on any labels where GTDB taxonomy was added if requested by the user
                # notifying if this is the case
             
-            if [ -n ${tmp_dir}/wanted_ranks.tmp ];
+            if [ -n ${tmp_dir}/wanted_ranks.tmp ]; then
                 if grep -q "Strain" ${tmp_dir}/wanted_ranks.tmp; then
                     printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
                     printf "    Strain-level labels were requested in addition to using GTDB taxonomy\n" | tee -a $gtotree_log
