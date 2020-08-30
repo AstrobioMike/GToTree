@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+"""
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
+to facilitate generating single-copy gene HMMs. 
+
+For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
+For details on the process, please see: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets
+"""
+
 version = "v1.5.30"
 import os
 import sys
@@ -21,7 +29,7 @@ from glob import glob
 
 print("\n\n                                 GToTree " + version)
 print("                        (github.com/AstrobioMike/GToTree)\n")
-print(" ------------------------------------------------------------------------------- \n")
+print(" ------------------------------------------------------------------------------- ")
 
 parser = argparse.ArgumentParser(description="This program takes a list of NCBI accessions and generates a set of single-copy gene HMMs.\
                                               Please see the wiki here for details on the process: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets")
@@ -29,8 +37,10 @@ parser = argparse.ArgumentParser(description="This program takes a list of NCBI 
 required = parser.add_argument_group('required arguments')
 
 required.add_argument("-a", "--target-accessions", help="fasta file", action="store", required=True)
-parser.add_argument("-o", "--output-directory", help='Name of desired output directory. If it exists already, will attempt to re-start a previous run (default: "gtt-gen-SCG-HMMs-output"', action="store", default="gtt-gen-SCG-HMMs-output", dest="output_dir")
+parser.add_argument("-o", "--output-directory", help='Name of desired output directory (default: "gtt-gen-SCG-HMMs-output"', action="store", default="gtt-gen-SCG-HMMs-output", dest="output_dir")
 parser.add_argument("-n", "--num-cpus", help='Number of cpus to use on parallelizable steps (default: 1).', action="store", default=1, type=int)
+parser.add_argument("--rerun", help="Specify this flag if you'd like to try to restart a prior run from any currently existing files.", action="store_true")
+parser.add_argument("--keep-working-dir", help="Specify this flag if you'd like to keep the working directory.", action="store_true")
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -42,7 +52,7 @@ args = parser.parse_args()
 
 def main():
 
-    tmp_dir, output_dir, rerun = setup_output_dir(args.target_accessions, args.output_dir)
+    tmp_dir, output_dir, rerun = setup_output_dir(args.target_accessions, args.output_dir, args.rerun)
 
     target_accs, needed_dbs = get_target_accs(args.target_accessions)
     
@@ -60,6 +70,11 @@ def main():
 
     report_missed_accessions(output_dir, rerun)
 
+    note_gtt_store_SCG_HMMs()
+
+    if not args.keep_working_dir:
+        shutil.rmtree(tmp_dir)
+        
 ################################################################################
 
 # setting some colors
@@ -85,34 +100,59 @@ def wprint(text):
           subsequent_indent="  ", break_on_hyphens=False))
 
 
-def setup_output_dir(input_accessions_file, output_dir):
+def setup_output_dir(input_accessions_file, output_dir, rerun):
     """ setup re-usable temp dir, and use to check if restarting a run """
 
     output_dir = output_dir.rstrip("/") + "/"
 
     tmp_dir = output_dir + "tmp-dir/"
 
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-        os.mkdir(tmp_dir)
+    if os.path.exists(output_dir):
 
-        # making copy of input accession file to be able to check if the same on a restart
-        shutil.copy(input_accessions_file, tmp_dir + "input-accessions.txt")
+        if not rerun:
+            if os.path.exists(output_dir):
+                print("")
+                wprint(color_text("It seems the output directory '" + str(output_dir) + "' already exists.", "yellow"))
+                wprint("We don't want to accidentally overwrite anything, if you'd like to intentionally work with this directory again, add the `--rerun` flag.")
+                print("\nExiting for now.\n")
+                sys.exit(0)
 
-        rerun = False
+        else:
+            # making sure input accessions match before allowing rerun:
+            if os.path.exists(tmp_dir + "input-accessions.txt"):
+
+                if not filecmp.cmp(input_accessions_file, tmp_dir + "input-accessions.txt"):
+
+                    print("")
+                    wprint(color_text("It seems the input accessions don't match those of the previous run, and we shouldn't attempt a `--rerun` in these situations :(", "yellow"))
+                    print("  We should maybe try with a new output directory.\n")
+                    print("Exiting for now.\n")
+                    sys.exit(0)
+
+            else:
+
+                print("")
+                wprint("It seems there were no stored input accessions from the previous run, the `--rerun` flag will be ignored.")
+
+                if not os.path.exists(tmp_dir):
+                    os.mkdir(tmp_dir)
+
+                shutil.copy(input_accessions_file, tmp_dir + "input-accessions.txt")                
+
+                # setting rerun to false since the input accessions weren't there to be checked
+                rerun=False
 
     else:
 
-        if os.path.exists(tmp_dir + "input-accessions.txt"):
+        if rerun:
+            print("")
+            wprint("It seems there is no data available from a previous run, the `--rerun` flag will be ignored.")
+            rerun=False
 
-            if filecmp.cmp(input_accessions_file, tmp_dir + "input-accessions.txt"):
-                rerun = True
-
-            else:
-                rerun = False
-                
-                # making copy of input accession file to be able to check if the same on a restart
-                shutil.copy(input_accessions_file, tmp_dir + "input-accessions.txt")
+        os.mkdir(output_dir)
+        os.mkdir(tmp_dir)
+        # making copy of input accession file to be able to check if the same on a restart
+        shutil.copy(input_accessions_file, tmp_dir + "input-accessions.txt")
 
     return(tmp_dir, output_dir, rerun)
 
@@ -430,19 +470,22 @@ def parallelize_get_amino_acids(df, func, num_cpus, tmp_dir):
     return(remaining_accs, download_failed, prodigal_failed)
 
 
-def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm", filtered_pfam_IDs_file="filtered-pfam-IDs.txt", filtered_pfams_hmm_file="filtered-pfams.hmm"):
+def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm", filtered_pfam_IDs_file="filtered-pfam-IDs.txt", filtered_pfams_info_file="filtered-pfams-info.tsv", filtered_pfams_hmm_file="filtered-pfams.hmm"):
     """ getting all latest PFams and filtering based on coverage """
     
-    if rerun == True and os.path.exists(tmp_dir + filtered_pfam_IDs_file) and os.path.exists(tmp_dir + filtered_pfams_hmm_file):
+    if rerun == True and os.path.exists(tmp_dir + filtered_pfam_IDs_file) and os.path.exists(tmp_dir + filtered_pfams_info_file) and os.path.exists(tmp_dir + filtered_pfams_hmm_file):
 
         print("")
         wprint("PFams that were already filtered based on average coverage of the underlying proteins were detected from a previous run...")
 
         filtered_pfam_IDs = []
 
-        with open(tmp_dir + filtered_pfam_IDs_file) as pfams:
-            for pfam in pfams:
-                filtered_pfam_IDs.append(pfam.strip())
+        with open(tmp_dir + filtered_pfams_info_file) as pfams_info:
+            for line in pfams_info:
+                if line.startswith("PFam_ID"):
+                    continue
+ 
+                filtered_pfam_IDs.append(line.strip().split("\t")[0])
 
     else:
 
@@ -464,7 +507,7 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm"
 
         try:
             pfam_hmm_info_gz = urllib.request.urlopen("ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/database_files/pfamA.txt.gz")
-            pfam_hmm_info_tab = pd.read_csv(pfam_hmm_info_gz, sep="\t", compression="gzip", header=None, low_memory=False, usecols=[0,27,35])
+            pfam_hmm_info_tab = pd.read_csv(pfam_hmm_info_gz, sep="\t", compression="gzip", header=None, low_memory=False, usecols=[0,1,3,27,35])
 
         except:
             print("")
@@ -472,16 +515,21 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm"
             print("Exiting for now.\n")
             sys.exit(0)
 
+        # creating list of length-coverage filtered pfams and writing out base info table we're keeping and ID file for giving to hmmfetch
         filtered_pfam_IDs = []
 
-        for index, row in pfam_hmm_info_tab.iterrows():
-            if row[35] > 50:
-                filtered_pfam_IDs.append(str(row[0]) + "." + str(row[27]))
-                
-        with open(tmp_dir + filtered_pfam_IDs_file, "w") as out:
-            out.write("\n".join(filtered_pfam_IDs))
-            out.write("\n")
-            
+        with open(tmp_dir + filtered_pfams_info_file, "w") as out:
+            with open(tmp_dir + filtered_pfam_IDs_file, "w") as out_IDs:
+
+                out.write("PFam_ID" + "\t" + "short_name" + "\t" + "name" + "\n")
+
+                for index, row in pfam_hmm_info_tab.iterrows():
+                    if row[35] > 50:
+                        ID_with_version = str(row[0]) + "." + str(row[27])
+                        filtered_pfam_IDs.append(ID_with_version)
+                        out.write(ID_with_version + "\t" + str(row[1]) + "\t" + str(row[3]) + "\n")
+                        out_IDs.write(ID_with_version + "\n")
+        
         with open(tmp_dir + filtered_pfams_hmm_file, "w") as out:
             pfam_filter_run = subprocess.run(["hmmfetch", "-f", tmp_dir + full_pfams_hmm_file, tmp_dir + filtered_pfam_IDs_file], stdout=out)
 
@@ -564,18 +612,20 @@ def parallelize_hmmsearch(tmp_dir, input_seqs, filtered_pfams_hmm_file, num_cpus
         os.remove(file)
 
 
-def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, tmp_dir, output_dir, rerun, pfam_hits_file="pfam-hits.tab", wanted_pfams_file="Wanted-PFam-IDs.txt"):
+def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, tmp_dir, output_dir, rerun, pfam_hits_file="pfam-hits.tab", wanted_pfams_info_file="Wanted-PFams-info.tsv", filtered_pfams_info_file="filtered-pfams-info.tsv", wanted_pfam_IDs_file="wanted-PFam-IDs.txt"):
     """ filtering pfam hit table """
 
-    if rerun == True and os.path.exists(output_dir + wanted_pfams_file):
+    if rerun == True and os.path.exists(output_dir + wanted_pfams_info_file) and os.path.exists(output_dir + "PFam-HMM-hit-counts.tsv") and os.path.exists(tmp_dir + wanted_pfam_IDs_file):
 
         print("")
         wprint("Filtered-PFam hmmsearch results table was already parsed down, using previous results...")
 
         wanted_pfams = []
-        with open(output_dir + wanted_pfams_file) as pfams:
-            for pfam in pfams:
-                wanted_pfams.append(pfam.strip())
+        with open(output_dir + wanted_pfams_info_file) as pfams_info:
+            for line in pfams_info:
+                if line.startswith("PFam_ID"):
+                    continue
+                wanted_pfams.append(line.strip().split("\t")[0])
 
     else:
 
@@ -608,32 +658,49 @@ def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, tmp_dir, output_dir, 
         
             if sum(count_tab[pfam] == 1) / len(target_genome_accs) * 100 >= 90:
                 wanted_pfams.append(pfam)
-        
-        # writing out wanted pfams and full count table    
-        with open(output_dir + wanted_pfams_file, "w") as out:
+
+        # writing out because they are needed for the hmmfetch program
+        with open(tmp_dir + wanted_pfam_IDs_file, "w") as out:
             out.write("\n".join(wanted_pfams))
             out.write("\n")
+        
+        # generating and writing out wanted PFams info table
+        filtered_pfams_info_tab = pd.read_csv(tmp_dir + filtered_pfams_info_file, header=0, sep="\t")
+        wanted_pfams_info_tab = filtered_pfams_info_tab[filtered_pfams_info_tab.PFam_ID.isin(wanted_pfams)]
+        wanted_pfams_info_tab.to_csv(output_dir + wanted_pfams_info_file, sep="\t", header=True, index=False)
 
+        print("    Wanted PFam info table written to:")
+        print("      " + output_dir + "Wanted-PFams-info.tsv\n")
+
+        # writing out full count table
         count_tab.to_csv(output_dir + "PFam-HMM-hit-counts.tsv", sep="\t", header=True, index=True)
 
         print("    PFam HMM hit-count table written to:")
-        print("      " + output_dir + "PFam-HMM-hit-counts.tsv\n")
+        print("      " + output_dir + "PFam-HMM-hit-counts.tsv")
+
 
     return(len(wanted_pfams))
 
 
-def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered_pfams_hmm_file="filtered-pfams.hmm", wanted_pfams_file="Wanted-PFam-IDs.txt"):
+def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered_pfams_hmm_file="filtered-pfams.hmm", wanted_pfam_IDs_file="wanted-PFam-IDs.txt"):
     """ filter final HMM set """
 
-    wanted_HMM_out_file = "Wanted-" + str(wanted_pfam_count) + "-SCG-targets.hmm"
+    # if output_dir was provided, going to use that as prefix to final output hmm file
+    if args.output_dir:
+        wanted_HMM_out_file = args.output_dir + ".hmm"
+
+    # otherwise using numbers
+    else:
+        wanted_HMM_out_file = "Wanted-" + str(wanted_pfam_count) + "-SCG-targets.hmm"
+
     
     if rerun == True and os.path.exists(output_dir + wanted_HMM_out_file):
 
         print(color_text("\n -------------------------------------------------------------------------------\n"))
         
-        wprint("It seems all is done already, you should specify a non-existent output directory if you'd like to start over :)")
+        wprint("It seems all is done already, you should specify a non-existent output directory or a different input accessions file if you'd like to do something different :)")
         print("")
-        print("  The previous run generated:")
+        print("  The previous run generated the following SCG-HMMs file holding " + str(wanted_pfam_count) + " target genes:")
         print(color_text("    " + output_dir + wanted_HMM_out_file))
         print("")
 
@@ -644,7 +711,7 @@ def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered
 
 
         with open(output_dir + wanted_HMM_out_file, "w") as out:
-            pfam_filter_run = subprocess.run(["hmmfetch", "-f", tmp_dir + filtered_pfams_hmm_file, output_dir + wanted_pfams_file], stdout=out)
+            pfam_filter_run = subprocess.run(["hmmfetch", "-f", tmp_dir + filtered_pfams_hmm_file, tmp_dir + wanted_pfam_IDs_file], stdout=out)
 
         if pfam_filter_run.returncode != 0:
             print("")
@@ -654,7 +721,7 @@ def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered
 
         print(color_text("\n -------------------------------------------------------------------------------\n"))
 
-        print("  New SCG-HMMs written to:")
+        print("  New SCG-HMMs holding " + str(wanted_pfam_count) + " target genes written to:")
         print(color_text("    " + output_dir + wanted_HMM_out_file))
         print("")
 
@@ -667,6 +734,16 @@ def report_missed_accessions(output_dir, rerun):
         wprint("Any input accessions that didn't make it through are reported in:")
         wprint(color_text("  " + output_dir + "Missed-accessions.tsv", "yellow"))
         print("")
+
+
+def note_gtt_store_SCG_HMMs():
+    try:
+        gtt_hmm_dir = os.environ['GToTree_HMM_dir']
+        wprint("If you'd like to add this new SCG-HMM set to the stored GToTree ones, you can do so with the `gtt-store-SCG-HMMs` program :)")
+        print("")
+    except:
+        pass
+
 
 if __name__ == "__main__":
     main()

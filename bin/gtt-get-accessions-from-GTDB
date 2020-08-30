@@ -2,7 +2,7 @@
 
 """
 This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
-to facilitate accessing and using taxonomy and genomesfrom the glorious Genome Taxonomy 
+to facilitate accessing and using taxonomy and genomes from the glorious Genome Taxonomy 
 Database (gtdb.ecogenomic.org/).
 
 For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
@@ -15,6 +15,8 @@ import tarfile
 import pandas as pd
 import textwrap
 import argparse
+import shutil
+import filecmp
 
 parser = argparse.ArgumentParser(description="This is a helper program to facilitate using taxonomy \
                                               and genomes from the Genome Taxonomy Database (gtdb.ecogenomic.org) with GToTree.\
@@ -28,9 +30,9 @@ parser = argparse.ArgumentParser(description="This is a helper program to facili
 parser.add_argument("-t", "--target-taxon", help="Target taxon (enter 'all' for all)", action="store", dest="target_taxon")
 parser.add_argument("-r", "--target-rank", help='Target rank', action="store", dest="target_rank")
 parser.add_argument("--get-table", action="store_true", help="Provide just this flag alone to download and parse a GTDB metadata \
-                                           table (currently R05-RS95). Archaea and Bacteria tables pulled from here \
-                                           (https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/) \
-                                           and combined, and the GTDB taxonomy column split for easier manual searching if wanted.")
+                                           table. Archaea and Bacteria tables pulled from here \
+                                           (https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/) and combined, and the \
+                                           GTDB taxonomy column is split for easier manual searching if wanted.")
 parser.add_argument("--get-rank-counts", action="store_true", help="Provide just this flag alone to see counts of how many \
                                            unique taxa there are for each rank.")
 parser.add_argument("--get-taxon-counts", action="store_true", help="Provide this flag along with a specified taxon to the `-t` flag \
@@ -52,13 +54,15 @@ if len(sys.argv)==1:
 args = parser.parse_args()
 
 
+################################################################################
+
 def main():
 
     if args.get_table:
         get_gtdb_tab()
         sys.exit(0)
 
-    ## some checks on things that either should be provided together, or should be mutually exclusive, are provided
+    ## some checks to prevent things that either should be provided together, or should be mutually exclusive
     if args.get_taxon_counts and not args.target_taxon:
         print("")
         wprint(color_text("A specific taxon needs to also be provided to the `-t` flag in order to use `--get-taxon-counts`.", "yellow"))
@@ -116,6 +120,8 @@ def main():
             get_accessions(args.target_taxon, gtdb_tab, rank=args.target_rank)
             sys.exit(0)
 
+################################################################################
+
 
 # setting some colors
 tty_colors = {
@@ -133,14 +139,13 @@ def color_text(text, color='green'):
         return text
 
 
-# print wrapper
 def wprint(text):
     print(textwrap.fill(text, width=80, initial_indent="  ", 
           subsequent_indent="  ", break_on_hyphens=False))
 
 
-# get accessions
 def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representatives_source=None):
+    """ get accessions based on specified taxon, if the provided taxon is in more than one rank, will require specified rank """
 
     if taxon != "all":
 
@@ -260,8 +265,8 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
             print("")
 
 
-# get counts of specific taxa
 def get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab=None, return_ranks_found_in=False, representatives_source=None):
+    """ get counts of specific taxa """
 
     if taxon == "all":
         count = len(gtdb_tab.index)
@@ -329,8 +334,8 @@ def get_unique_taxon_counts(taxon, gtdb_tab, gtdb_rep_tab=None, return_ranks_fou
                 return(ranks_found_in)
 
 
-# get counts of unique taxa at each rank
 def get_unique_taxa_counts_of_all_ranks(gtdb_tab, gtdb_rep_tab=None, representatives_source=None):
+    """ get counts of unique taxa at each rank """
 
     ranks = ['domain', 'phylum', 'class', 'order', 'family', 'genus', 'species']
 
@@ -353,90 +358,198 @@ def get_unique_taxa_counts_of_all_ranks(gtdb_tab, gtdb_rep_tab=None, representat
         print("")
 
 
-# creates (if doesn't yet exist) or reads in file with gtdb info
-def get_gtdb_tab():
+def gen_gtdb_tab(location):
+    """ downloads and parses the GTDB info tables """
 
-    ## creating or reading in file with gtdb info ##
+    # getting archaea
+    arc_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar122_metadata.tar.gz")
+    arc_tab = pd.read_csv(arc_tar_gz, sep="\t", compression="gzip", error_bad_lines=False, header=0, low_memory=False)
+    arc_tab.rename(columns={arc_tab.columns[0]:"accession"}, inplace=True)
+    arc_tab.dropna(inplace=True, how="all")
 
-    # creating if it doesn't exist
-    if not os.path.exists("GTDB-arc-and-bac-metadata.tsv"):
+    # getting bacteria
+    bac_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tar.gz")
+    bac_tab = pd.read_csv(bac_tar_gz, sep="\t", compression="gzip", error_bad_lines=False, header=0, low_memory=False)
+    bac_tab.rename(columns={bac_tab.columns[0]:"accession"}, inplace=True)
+    bac_tab.dropna(inplace=True, how="all")
 
-        print("")
-        wprint("Downloading archaeal and bacterial metadata tables from GTDB...")
+    # combining
+    gtdb_tab = pd.concat([arc_tab, bac_tab])
 
-        # getting archaea
-        arc_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar122_metadata.tar.gz")
-        arc_tab = pd.read_csv(arc_tar_gz, sep="\t", compression="gzip", error_bad_lines=False, header=0, low_memory=False)
-        arc_tab.rename(columns={arc_tab.columns[0]:"accession"}, inplace=True)
-        arc_tab.dropna(inplace=True, how="all")
+    # splitting gtdb taxonomy column into 7 and dropping the single column
+    domain, phylum, rclass, order, family, genus, species = [], [], [], [], [], [], []
 
-        # getting bacteria
-        bac_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tar.gz")
-        bac_tab = pd.read_csv(bac_tar_gz, sep="\t", compression="gzip", error_bad_lines=False, header=0, low_memory=False)
-        bac_tab.rename(columns={bac_tab.columns[0]:"accession"}, inplace=True)
-        bac_tab.dropna(inplace=True, how="all")
+    for index, row in gtdb_tab.iterrows():
+        curr_acc = row["accession"]
+        tax_list = row["gtdb_taxonomy"].split(";")
 
-        print("")
-        wprint("Combining tables and splitting taxonomy column...")
-
-        # combining
-        gtdb_tab = pd.concat([arc_tab, bac_tab])
-
-        # splitting gtdb taxonomy column into 7 and dropping the single column
-        domain, phylum, rclass, order, family, genus, species = [], [], [], [], [], [], []
-
-        for index, row in gtdb_tab.iterrows():
-            curr_acc = row["accession"]
-            tax_list = row["gtdb_taxonomy"].split(";")
-
-            if len(tax_list) != 7:
-                wprint(color_text("GTDB entry " + curr_acc + " doesn't seem to have 7-column lineage info. Something is likely wrong :(", "yellow"))
-                print("")
-                wprint("Aborting for now.")
-                print("")
-                sys.exit(0)
-
-            else:
-                domain.append(tax_list[0][3:])
-                phylum.append(tax_list[1][3:])
-                rclass.append(tax_list[2][3:])
-                order.append(tax_list[3][3:])
-                family.append(tax_list[4][3:])
-                genus.append(tax_list[5][3:])
-                species.append(tax_list[6][3:])
-
-        gtdb_tab.insert(1, "species", species)
-        gtdb_tab.insert(1, "genus", genus)
-        gtdb_tab.insert(1, "family", family)
-        gtdb_tab.insert(1, "order", order)
-        gtdb_tab.insert(1, "class", rclass)
-        gtdb_tab.insert(1, "phylum", phylum)
-        gtdb_tab.insert(1, "domain", domain)
-
-        # writing out, so if we do more than one search we don't need to re-download
-        print("")
-        wprint("Writing combined table with split-taxonomy columns to:")
-        wprint(color_text("  GTDB-arc-and-bac-metadata.tsv"))
-        print("")
-        wprint(color_text("This file will be used for any additional queries. Feel free to keep or delete it when done :)", "yellow"))
-
-        gtdb_tab.to_csv("GTDB-arc-and-bac-metadata.tsv", index=False, sep="\t")
-
-    else:
-
-        if args.get_table:
-
+        if len(tax_list) != 7:
+            wprint(color_text("GTDB entry " + curr_acc + " doesn't seem to have 7-column lineage info. Something is likely wrong :(", "yellow"))
             print("")
-            wprint("The combined table " + color_text("GTDB-arc-and-bac-metadata.tsv") + " is already here :)")
+            wprint("If this continues to happen, please file an issue at github.com/AstrobioMike/GToTree/issues")
+            print("")
+            wprint("Aborting for now.")
             print("")
             sys.exit(0)
 
-        # reading in if already present
+        else:
+            domain.append(tax_list[0][3:])
+            phylum.append(tax_list[1][3:])
+            rclass.append(tax_list[2][3:])
+            order.append(tax_list[3][3:])
+            family.append(tax_list[4][3:])
+            genus.append(tax_list[5][3:])
+            species.append(tax_list[6][3:])
+
+    gtdb_tab.insert(1, "species", species)
+    gtdb_tab.insert(1, "genus", genus)
+    gtdb_tab.insert(1, "family", family)
+    gtdb_tab.insert(1, "order", order)
+    gtdb_tab.insert(1, "class", rclass)
+    gtdb_tab.insert(1, "phylum", phylum)
+    gtdb_tab.insert(1, "domain", domain)
+
+    # writing out
+    gtdb_tab.to_csv(location + "GTDB-arc-and-bac-metadata.tsv", index=False, sep="\t")
+
+    gtdb_version_info = urllib.request.urlretrieve("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/VERSION", location + "GTDB-version-info.txt")
+
+    return(gtdb_tab)
+
+def report_gtdb_version_info(location):
+    """ reporting GTDB version info """
+    version_info = []
+    with open(location + "GTDB-version-info.txt") as version_info_file:
+        for line in version_info_file:
+            line = line.strip()
+            if line != "":
+                version_info.append(line)
+
+    gtdb_version = version_info[0]
+    gtdb_release_date = version_info[1]
+
+    print("    Using GTDB " + gtdb_version + ": " + gtdb_release_date + "\n")
+
+
+def check_stored_gtdb_up_to_date(location):
+    """ checks if the stored gtdb metadata table is the latest """
+
+    # getting latest version info from GTDB
+    gtdb_latest_version_info = urllib.request.urlretrieve("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/VERSION", location + "GTDB-latest-version-info.txt")
+
+    # comparing vs old
+    if filecmp.cmp(location + "GTDB-latest-version-info.txt", location + "GTDB-version-info.txt"):
+        os.remove(location + "GTDB-latest-version-info.txt")
+
+    else:
         print("")
-        wprint(color_text("Reading in the GTDB info table...", "yellow"))
+        wprint(color_text("A newer version of the GTDB is available, updating stored table...", "yellow"))
+
+        gen_gtdb_tab(location)
+        os.remove(location + "GTDB-latest-version-info.txt")
 
 
-        gtdb_tab = pd.read_csv("GTDB-arc-and-bac-metadata.tsv", sep="\t", low_memory=False)
+def get_gtdb_tab():
+    """ reads in file with gtdb info """
+
+    # checking if there is a GTDB_dir (should be if conda install of GToTree was done)
+    try:
+        GTDB_dir = os.environ['GTDB_dir']
+    except:
+        GTDB_dir = False
+
+    # working there if there is one
+    if GTDB_dir:
+
+        if os.path.exists(GTDB_dir + "GTDB-arc-and-bac-metadata.tsv") and os.path.exists(GTDB_dir + "GTDB-version-info.txt"):
+
+            # making sure the stored version is the latest available from GTDB
+            check_stored_gtdb_up_to_date(GTDB_dir)
+
+            # copying if just table wanted
+            if args.get_table:
+                if not os.path.exists("GTDB-arc-and-bac-metadata.tsv"):
+
+                    # reporting version info
+                    report_gtdb_version_info(GTDB_dir)
+
+                    shutil.copy(GTDB_dir + "GTDB-arc-and-bac-metadata.tsv", "GTDB-arc-and-bac-metadata.tsv")
+                    print("")
+                    # reporting version info
+                    report_gtdb_version_info(GTDB_dir)
+                    wprint("GTDB table copied to:")
+                    print(color_text("    GTDB-arc-and-bac-metadata.tsv\n"))
+                    sys.exit(0)
+
+                else:
+                    print("")
+                    wprint("The GTDB table " + color_text("GTDB-arc-and-bac-metadata.tsv") + " is already here :)")
+                    print("")
+                    sys.exit(0)
+
+            # reading in if using program beyond just grabbing table
+            print("")
+            wprint(color_text("Reading in the GTDB info table...", "yellow"))
+
+            # reporting version info
+            report_gtdb_version_info(GTDB_dir)
+
+            gtdb_tab = pd.read_csv(GTDB_dir + "GTDB-arc-and-bac-metadata.tsv", sep="\t", low_memory=False)
+
+
+        # generating when table doesn't exist yet
+        else:
+            print("")
+            wprint(color_text("Downloading and parsing archaeal and bacterial metadata tables from GTDB (only needs to be done once)...", "yellow"))
+
+            gtdb_tab = gen_gtdb_tab(GTDB_dir)
+
+            # reporting version info
+            report_gtdb_version_info(GTDB_dir)
+
+            # copying to current directory if user just wants the table
+            if args.get_table:
+                shutil.copy(GTDB_dir + "GTDB-arc-and-bac-metadata.tsv", "GTDB-arc-and-bac-metadata.tsv")
+                print("")
+                wprint("GTDB table written to:")
+                print(color_text("    GTDB-arc-and-bac-metadata.tsv\n"))
+                sys.exit(0)
+
+    # if there is no GTDB_dir environmental variable (i.e. if not conda-installed)
+    else:
+        # checking if table and version info already exist in current directory
+        if os.path.exists("GTDB-arc-and-bac-metadata.tsv") and os.path.exists("GTDB-version-info.txt"):
+
+            # making sure the stored version is the latest available from GTDB
+            check_stored_gtdb_up_to_date("./")
+
+            if args.get_table:
+                print("")
+                wprint("The GTDB table " + color_text("GTDB-arc-and-bac-metadata.tsv") + " is already here :)")
+                print("")
+                sys.exit(0)
+
+            # reading in if already present
+            print("")
+            wprint(color_text("Reading in the GTDB info table...", "yellow"))
+            report_gtdb_version_info("./")
+
+            gtdb_tab = pd.read_csv("GTDB-arc-and-bac-metadata.tsv", sep="\t", low_memory=False)
+
+        # if doesn't already exist in current working directory
+        else:
+
+            print("")
+            wprint(color_text("Downloading and parsing archaeal and bacterial metadata tables from GTDB...", "yellow"))
+
+            gtdb_tab = gen_gtdb_tab("./")
+            report_gtdb_version_info("./")
+
+            if args.get_table:
+                print("")
+                wprint("GTDB table written to:")
+                print(color_text("    GTDB-arc-and-bac-metadata.tsv\n"))
+                sys.exit(0)
 
     return(gtdb_tab)
 

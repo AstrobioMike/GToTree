@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import argparse
+import textwrap
+import shutil
+import time
+from glob import glob
+
+parser = argparse.ArgumentParser(description="This program adds a single-copy-gene-HMMs file to the stored GToTree location.")
+
+required = parser.add_argument_group('required arguments')
+required.add_argument("hmm_file", metavar='hmm_file', type=str, help="HMM file to be added", action="store")
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(0)
+
+args = parser.parse_args()
+
+def main():
+
+    check_input()
+
+    HMM_dir = get_HMM_dir()
+
+    copy_if_safe(HMM_dir)
+
+    report_available_HMMs(HMM_dir)
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+# print wrapper
+def wprint(text):
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+def check_input():
+    if not os.path.exists(args.hmm_file):
+        print("")
+        wprint(color_text("Seems there is no file called '" + str(args.hmm_file) + "' here :(", "yellow"))
+        print("")
+        print("Exiting for now.\n")
+        sys.exit(0)
+
+
+def get_HMM_dir():
+
+    # should be stored here if conda install of GToTree was performed
+    try:
+        HMM_dir = os.environ['GToTree_HMM_dir']
+    except:
+        HMM_dir = False
+
+    if not HMM_dir:
+        print("")
+        wprint(color_text("Seems there is no stored GToTree HMM directory :(", "yellow"))
+        print("  Installing GToTree with conda would take care of it if interested.\n")
+        print("Exiting for now.\n")
+        sys.exit(0)
+
+    print("")
+    print("  GToTree stored SCG-HMMs are located in:")
+    print("    " + HMM_dir + "\n")
+
+    return(HMM_dir)
+
+def copy_if_safe(path):
+    contents = os.listdir(path)
+
+    hmm_file = os.path.basename(args.hmm_file)
+
+    if hmm_file in contents:
+
+        wprint(color_text("Seems there is already a file named '" + str(args.hmm_file) + "' stored in the GToTree HMM directory.", "yellow"))
+        print("")
+        print("Exiting for now.\n")
+        sys.exit(0)
+
+    else:
+        shutil.copy(args.hmm_file, path + hmm_file)
+        wprint("The file '" + color_text(str(hmm_file)) + "' now happily lives with the rest of the SCG-HMMs stored with GToTree :)")
+        print("")
+
+def report_available_HMMs(path):
+
+    time.sleep(1)
+
+
+    files = [os.path.basename(x) for x in glob(path + "*.hmm")]
+
+    files.sort()
+
+    files_and_counts = {}
+
+    for file in files:
+        if file.endswith(".hmm"):
+            count = 0
+            with open(path + file, "r") as f:
+                for line in f:
+                    if line.startswith("ACC"):
+                        count += 1
+            files_and_counts[file] = count
+
+    print("      The " + str(len(files)) + " currently stored SCG-HMMs include:\n")
+
+    for key, value in files_and_counts.items():
+        print("\t  {:<27} {:>15}".format(key, "(" + str(value) + " genes)"))
+
+    print("")
+
+
+if __name__ == "__main__":
+    main()
