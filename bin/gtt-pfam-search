@@ -3,9 +3,9 @@
 # setting colors to use
 GREEN='\033[0;32m'
 RED='\033[0;31m'
-ORANGE='\033[0;33m'
+YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.30"
+VERSION="v1.5.31"
 
 printf "\n\n                                  GToTree ${VERSION}\n"
 printf "                         (github.com/AstrobioMike/GToTree)\n\n"
@@ -434,11 +434,11 @@ if [ -n "$NCBI_acc_file" ]; then
             grep "$dupe_acc" ${tmp_dir}/sorted_ncbi_accs.tmp
         done > ${output_dir}/Redundant_input_accessions.txt
 
-        printf "     ${ORANGE}******************************* ${NC}NOTICE ${ORANGE}*******************************${NC}  \n" | tee -a $gtt_pfam_search_log
+        printf "     ${YELLOW}******************************* ${NC}NOTICE ${YELLOW}*******************************${NC}  \n" | tee -a $gtt_pfam_search_log
         printf "\t$num_dupe_genomes accession(s) redundant - meaning GenBank and RefSeq accessions\n" | tee -a $gtt_pfam_search_log
         printf "\twere provided for the same genome. Only RefSeq accession used.\n\n" | tee -a $gtt_pfam_search_log
         printf "\t  Reported in \"${output_dir}/Redundant_input_accessions.txt\".\n" | tee -a $gtt_pfam_search_log
-        printf "     ${ORANGE}**********************************************************************${NC}  \n\n" | tee -a $gtt_pfam_search_log
+        printf "     ${YELLOW}**********************************************************************${NC}  \n\n" | tee -a $gtt_pfam_search_log
 
         comm -23 ${tmp_dir}/sorted_ncbi_accs.tmp <(sort ${output_dir}/Redundant_input_accessions.txt) | sort > ${tmp_dir}/sorted_building_new_input_ncbi_accs.tmp
 
@@ -503,10 +503,10 @@ if [ -n "$NCBI_acc_file" ]; then
     if [ -s ${tmp_dir}/not_found_accs.tmp ]; then
 
         num_accs_not_found=$(wc -l ${tmp_dir}/not_found_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
-        printf "\n\n     ${ORANGE}******************************* ${NC}NOTICE ${ORANGE}*******************************${NC}  \n" | tee -a $gtt_pfam_search_log
+        printf "\n\n     ${YELLOW}******************************* ${NC}NOTICE ${YELLOW}*******************************${NC}  \n" | tee -a $gtt_pfam_search_log
         printf "\t  $num_accs_not_found accession(s) not successfully found at NCBI.\n\n" | tee -a $gtt_pfam_search_log
         printf "\t     Reported in \"${output_dir}/NCBI_accessions_not_found.txt\".\n" | tee -a $gtt_pfam_search_log
-        printf "     ${ORANGE}**********************************************************************${NC}  \n\n" | tee -a $gtt_pfam_search_log
+        printf "     ${YELLOW}**********************************************************************${NC}  \n\n" | tee -a $gtt_pfam_search_log
 
         sleep 3
 
@@ -558,10 +558,10 @@ if [ -n "$NCBI_acc_file" ]; then
 
                 gunzip ${tmp_dir}/${assembly}_genome.tmp.gz
 
-                printf "  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n"
+                printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n"
                 printf "   $assembly doesn't appear to have gene annotations.\n\n"
                 printf "   Downloaded the genome and identifying CDSs with prodigal.\n"
-                printf "  ${ORANGE}****************************************************************************${NC}  \n\n"
+                printf "  ${YELLOW}****************************************************************************${NC}  \n\n"
 
                 printf "      Getting coding seqs...\n\n"
                 prodigal -c -q -i ${tmp_dir}/${assembly}_genome.tmp -a ${tmp_dir}/${assembly}_genes1.tmp > /dev/null
@@ -623,10 +623,10 @@ if [ -n "$NCBI_acc_file" ]; then
             done
 
         else 
-            printf "     ${ORANGE}******************************* ${NC}NOTICE ${ORANGE}*******************************${NC}  \n"
+            printf "     ${YELLOW}******************************* ${NC}NOTICE ${YELLOW}*******************************${NC}  \n"
             printf "\t  $assembly's genes nor genome downloaded properly :(\n\n"
             printf "\t    Reported in \"${output_dir}/NCBI_accessions_not_downloaded.txt\"\n"
-            printf "     ${ORANGE}************************************************************************ ${NC}\n"
+            printf "     ${YELLOW}************************************************************************ ${NC}\n"
             rm -rf ${tmp_dir}/${assembly}_report1.tmp ${tmp_dir}/${assembly}_genes.tmp.gz
             sleep 3
             echo $assembly >> ${output_dir}/NCBI_accessions_not_downloaded.txt
@@ -702,12 +702,12 @@ if [ -n "$genbank_list_file" ]; then
         # checking that the file had CDS annotations, if not running prodigal
         if [ ! -s ${tmp_dir}/${assembly}_genes.tmp ]; then
 
-            printf "  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n"
+            printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n"
             printf "\t  This genbank file doesn't appear to have CDS annotations,\n"
             printf "\t  so we are identifying coding sequences with prodigal.\n\n"
 
             printf "\t    Reported in \"${output_dir}/Genbank_files_with_no_CDSs.txt\".\n"
-            printf "  ${ORANGE}****************************************************************************${NC}  \n\n"
+            printf "  ${YELLOW}****************************************************************************${NC}  \n\n"
 
             echo "$file" >> ${output_dir}/Genbank_files_with_no_CDSs.txt
             rm -rf ${tmp_dir}/${assembly}_genes.tmp
@@ -1075,13 +1075,13 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
 
     if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
         num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "    ${ORANGE}$num_accs_not_found accession(s) not successfully found at NCBI.${NC}\n" | tee -a $gtotree_log
+        printf "    ${YELLOW}$num_accs_not_found accession(s) not successfully found at NCBI.${NC}\n" | tee -a $gtotree_log
         printf "        Reported in \"${output_dir}/NCBI_accessions_not_found.txt\".\n\n" | tee -a $gtotree_log
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ]; then
         num_accs_not_downloaded=$(wc -l ${output_dir}/NCBI_accessions_not_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "    ${ORANGE}$num_accs_not_downloaded did not download properly.${NC}\n" | tee -a $gtotree_log
+        printf "    ${YELLOW}$num_accs_not_downloaded did not download properly.${NC}\n" | tee -a $gtotree_log
         printf "        Reported in \"${output_dir}/NCBI_accessions_not_downloaded.txt\".\n\n" | tee -a $gtotree_log
     fi
 

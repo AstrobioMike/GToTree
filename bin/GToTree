@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.30"
+VERSION="v1.5.31"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -1881,11 +1881,7 @@ duration=$SECONDS
 printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
 printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
 
-# putting a string of 5 X's in between each gene
-paste ${tmp_dir}/*_all_aligned.faa > ${tmp_dir}/cat.tmp
-grep ">" ${tmp_dir}/cat.tmp | cut -f1 > ${tmp_dir}/headers.tmp
-grep -v ">" ${tmp_dir}/cat.tmp | sed -e $'s/\t/XXXXX/g' > ${tmp_dir}/seqs.tmp
-paste -d "\n" ${tmp_dir}/headers.tmp ${tmp_dir}/seqs.tmp > ${output_dir}/Aligned_SCGs.faa
+gtt-cat-alignments -t $tmp_dir -o $output_dir
 
 # creating partitions file of gene coordinates for those that want might want it for mixed models with something like iqtree
 curr_start=1
