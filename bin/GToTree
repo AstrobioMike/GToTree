@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.31"
+VERSION="v1.5.32"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -144,7 +144,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  Note that I've occassionally noticed NCBI not being happy with over ~50\n"
     printf "                  downloads being attempted concurrently. So if using a \`-j\` setting around\n"
     printf "                  there or higher, and GToTree is saying a lot of input accessions were not\n"
-    printf "                  successfully downloaded, consider trying with fewer.\n"
+    printf "                  successfully downloaded, consider trying with fewer.\n\n"
 
     printf "        - [-P ] default: false\n"
     printf "                  Provide this flag with no arguments if your system can't use ftp,\n"
@@ -309,8 +309,95 @@ if [ -f "$NCBI_acc_file" ]; then
         exit
     fi
 
+fi
+
+
+# checking out input fasta files file 
+if [ -f "$fasta_files" ]; then
+    # checking no duplicates in there
+    num_dupes=$(uniq -d "$fasta_files" | wc -l | sed "s/^ *//" | cut -d " " -f 1)
+    if [ ! $num_dupes == 0 ]; then
+        printf "\n${RED}  $fasta_files has duplicate entries, check it out and provide unique accessions only.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no whitespace in there
+    if grep -q " " ${fasta_files}; then
+        printf "\n${RED}  $fasta_files has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no tabs in there
+    if grep -q "\t" ${fasta_files}; then
+        printf "\n${RED}  $fasta_files has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
 
 fi
+
+
+# checking out input amino-acid files file 
+if [ -f "$amino_acid_files" ]; then
+    # checking no duplicates in there
+    num_dupes=$(uniq -d "$amino_acid_files" | wc -l | sed "s/^ *//" | cut -d " " -f 1)
+    if [ ! $num_dupes == 0 ]; then
+        printf "\n${RED}  $fasta_files has duplicate entries, check it out and provide unique accessions only.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no whitespace in there
+    if grep -q " " ${amino_acid_files}; then
+        printf "\n${RED}  $amino_acid_files has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no tabs in there
+    if grep -q "\t" ${amino_acid_files}; then
+        printf "\n${RED}  $amino_acid_files has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+fi
+
+
+# checking out input genbank files file 
+if [ -f "$genbank_list_file" ]; then
+    # checking no duplicates in there
+    num_dupes=$(uniq -d "$genbank_list_file" | wc -l | sed "s/^ *//" | cut -d " " -f 1)
+    if [ ! $num_dupes == 0 ]; then
+        printf "\n${RED}  $genbank_list_file has duplicate entries, check it out and provide unique accessions only.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no whitespace in there
+    if grep -q " " ${genbank_list_file}; then
+        printf "\n${RED}  $genbank_list_file has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no tabs in there
+    if grep -q "\t" ${genbank_list_file}; then
+        printf "\n${RED}  $genbank_list_file has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+fi
+
 
 # checking no duplicate desired labels in mapping file
 if [ -f "$file_to_genome_id_map" ]; then
