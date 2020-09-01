@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.32"
+VERSION="v1.5.33"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -286,7 +286,7 @@ fi
 # checking out NCBI accessions file 
 if [ -f "$NCBI_acc_file" ]; then
     # checking no duplicates in there
-    num_dupes=$(uniq -d "$NCBI_acc_file" | wc -l | sed "s/^ *//" | cut -d " " -f 1)
+    num_dupes=$(sort "$NCBI_acc_file" | uniq -d | wc -l | sed "s/^ *//" | cut -d " " -f 1)
     if [ ! $num_dupes == 0 ]; then
         printf "\n${RED}  $NCBI_acc_file has duplicate entries, check it out and provide unique accessions only.${NC}\n"
         printf "\nExiting for now.\n\n"
@@ -315,9 +315,9 @@ fi
 # checking out input fasta files file 
 if [ -f "$fasta_files" ]; then
     # checking no duplicates in there
-    num_dupes=$(uniq -d "$fasta_files" | wc -l | sed "s/^ *//" | cut -d " " -f 1)
+    num_dupes=$(sort "$fasta_files" | uniq -d | wc -l | sed "s/^ *//" | cut -d " " -f 1)
     if [ ! $num_dupes == 0 ]; then
-        printf "\n${RED}  $fasta_files has duplicate entries, check it out and provide unique accessions only.${NC}\n"
+        printf "\n${RED}  $fasta_files has duplicate entries, check it out and provide unique entries only.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
     fi
@@ -344,9 +344,9 @@ fi
 # checking out input amino-acid files file 
 if [ -f "$amino_acid_files" ]; then
     # checking no duplicates in there
-    num_dupes=$(uniq -d "$amino_acid_files" | wc -l | sed "s/^ *//" | cut -d " " -f 1)
+    num_dupes=$(sort "$amino_acid_files" | uniq -d | wc -l | sed "s/^ *//" | cut -d " " -f 1)
     if [ ! $num_dupes == 0 ]; then
-        printf "\n${RED}  $fasta_files has duplicate entries, check it out and provide unique accessions only.${NC}\n"
+        printf "\n${RED}  $fasta_files has duplicate entries, check it out and provide unique entries only.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
     fi
@@ -373,9 +373,9 @@ fi
 # checking out input genbank files file 
 if [ -f "$genbank_list_file" ]; then
     # checking no duplicates in there
-    num_dupes=$(uniq -d "$genbank_list_file" | wc -l | sed "s/^ *//" | cut -d " " -f 1)
+    num_dupes=$(sort "$genbank_list_file" | uniq -d | wc -l | sed "s/^ *//" | cut -d " " -f 1)
     if [ ! $num_dupes == 0 ]; then
-        printf "\n${RED}  $genbank_list_file has duplicate entries, check it out and provide unique accessions only.${NC}\n"
+        printf "\n${RED}  $genbank_list_file has duplicate entries, check it out and provide unique entries only.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
     fi
