@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
 """
-This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
-to facilitate generating single-copy gene HMMs. 
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki)
+to facilitate generating single-copy gene HMMs.
 
 For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
 For details on the process, please see: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets
 """
 
-version = "v1.5.35"
+version = "v1.5.36"
 import os
 import sys
 import argparse
@@ -31,7 +31,7 @@ print("\n\n                                 GToTree " + version)
 print("                        (github.com/AstrobioMike/GToTree)\n")
 print(" ------------------------------------------------------------------------------- ")
 
-parser = argparse.ArgumentParser(description="This program takes a list of NCBI accessions and generates a set of single-copy gene HMMs.\
+parser = argparse.ArgumentParser(description="This program takes a list of NCBI accessions and generates a set of single-copy gene HMMs based on PFams.\
                                               Please see the wiki here for details on the process: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets")
 
 required = parser.add_argument_group('required arguments')
@@ -57,7 +57,7 @@ def main():
     num_cpus = check_cpus(args.num_cpus)
 
     target_accs, needed_dbs = get_target_accs(args.target_accessions)
-    
+
     ncbi_tab, accs_not_found = get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, output_dir, rerun)
 
     remaining_accs = get_amino_acids(ncbi_tab, tmp_dir, output_dir, num_cpus, rerun)
@@ -76,7 +76,7 @@ def main():
 
     if not args.keep_working_dir:
         shutil.rmtree(tmp_dir)
-        
+
 ################################################################################
 
 # setting some colors
@@ -103,18 +103,7 @@ def wprint(text):
 
 
 def check_cpus(num_cpus):
-    """ 
-    This function serves 2 purposes right now: 
-    1. Checking the requested number of cpus isn't greater than the system has
-
-    2. Dealing with a problem I haven't solved out yet:
-        I can't figure out how to get things to stop hanging when running with multiprocessing with greater
-        than like 15 threads. I've seen several places suggesting that the pool.join() method i'm using isn't ideal
-        with "large" amounts of data, and that it's hard to know when it will be a problem, but I can't figure out
-        another way either :( 
-
-        So for now, if the user requested more than 12 threads, we're going to just use 12 and report it to them
-    """
+    """ checks the number of requested cpus doesn't excede what's available """
 
     available_cpus = os.cpu_count()
 
@@ -122,19 +111,10 @@ def check_cpus(num_cpus):
 
         print("")
         wprint(color_text("The number of cpus specified (" + str(num_cpus) + ") is greater than what it seems is available on the current system (" + str(available_cpus) + ").", "yellow"))
-        wprint("To be on the safer side we are going to utilize " + str(available_cpus - 1) + " moving forward :)")
+        wprint("To be on the safer side, we are going to utilize " + str(available_cpus - 1) + " moving forward :)")
         print("")
 
         num_cpus = available_cpus - 1
-
-    if num_cpus > 12:
-
-        print("")
-        wprint(color_text("So this is embarrassing. We were going to use " + str(num_cpus) + " cpus, which would've been cool and all, but unfortunately I haven't figured out how to properly handle python's multiprocessing library under all scenarios yet apparently, and this program seems to get tripped up when more than ~15 processes are started :(", "yellow"))
-        wprint("So we are going to use 12 cpus instead at the parallelizable steps, and if you are a python guru and/or have experience with this issue (the problem involves pool.join() I think...), please feel free to help me out :)")
-        print("")
-
-        num_cpus = 12
 
     return(num_cpus)
 
@@ -176,7 +156,7 @@ def setup_output_dir(input_accessions_file, output_dir, rerun):
                 if not os.path.exists(tmp_dir):
                     os.mkdir(tmp_dir)
 
-                shutil.copy(input_accessions_file, tmp_dir + "input-accessions.txt")                
+                shutil.copy(input_accessions_file, tmp_dir + "input-accessions.txt")
 
                 # setting rerun to false since the input accessions weren't there to be checked
                 rerun=False
@@ -222,13 +202,13 @@ def get_target_accs(input_file):
 
     if "GCA" and not "GCF" in types:
         needed_dbs = "GCA"
-        
+
     elif "GCF" and not "GCA" in types:
         needed_dbs = "GCF"
-        
+
     else:
         needed_dbs = "both"
-        
+
     return(list(target_accs), needed_dbs)
 
 
@@ -237,7 +217,7 @@ def get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, output_dir, rerun):
 
     # checking if can use from previous run
     if rerun == True and os.path.exists(tmp_dir + "ncbi-assembly-info.tsv"):
-        
+
         print("")
         wprint("NCBI assembly summary files from previous run found and loaded...")
 
@@ -246,7 +226,7 @@ def get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, output_dir, rerun):
 
         with open(tmp_dir + "not-found-accs.txt") as accs:
             for acc in accs:
-                accs_not_found.append(acc.strip())        
+                accs_not_found.append(acc.strip())
 
     else:
 
@@ -333,8 +313,16 @@ def get_amino_acids(ncbi_tab, tmp_dir, output_dir, num_cpus, rerun):
         if num_cpus == 1:
 
             remaining_accs, download_failed, prodigal_failed = dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir)
-        
+
         else:
+
+            # Running this step in parallel with greater than ~15 cpus can often cause it to hang in my testing.
+            # After some poking around and a short consult with the wonderful Evan Bolyen, it is likely this is an
+            # I/O problem. So setting this to a max of 12 cpus to be on the safer side
+            # (higher amounts of cpus do  work on the parallel hmmsearch step later)
+
+            if num_cpus > 12:
+                num_cpus = 12
 
             remaining_accs, download_failed, prodigal_failed = parallelize_get_amino_acids(ncbi_tab, dl_genomes_and_get_amino_acids, num_cpus, tmp_dir)
 
@@ -421,7 +409,7 @@ def dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir):
             try:
 
                 nt_url = curr_base_url + "/" + base_name + nt_suffix
-                
+
                 curr_nt_gz = urllib.request.urlopen(nt_url)
                 curr_nt = gzip.decompress(curr_nt_gz.read()).decode("UTF-8", "ignore")
 
@@ -442,7 +430,7 @@ def dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir):
             if prodigal_call.returncode != 0:
                 prodigal_failed.append(curr_acc)
                 os.remove(tmp_nt_file)
-                
+
                 continue
 
             os.remove(tmp_nt_file)
@@ -501,7 +489,7 @@ def parallelize_get_amino_acids(df, func, num_cpus, tmp_dir):
 
 def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm", filtered_pfam_IDs_file="filtered-pfam-IDs.txt", filtered_pfams_info_file="filtered-pfams-info.tsv", filtered_pfams_hmm_file="filtered-pfams.hmm"):
     """ getting all latest PFams and filtering based on coverage """
-    
+
     if rerun == True and os.path.exists(tmp_dir + filtered_pfam_IDs_file) and os.path.exists(tmp_dir + filtered_pfams_info_file) and os.path.exists(tmp_dir + filtered_pfams_hmm_file):
 
         print("")
@@ -513,7 +501,7 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm"
             for line in pfams_info:
                 if line.startswith("PFam_ID"):
                     continue
- 
+
                 filtered_pfam_IDs.append(line.strip().split("\t")[0])
 
     else:
@@ -524,11 +512,11 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm"
         try:
             pfam_hmms_gz = urllib.request.urlopen("ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz")
             pfam_hmms = gzip.decompress(pfam_hmms_gz.read()).decode("UTF-8", "ignore")
-            
+
             with open(tmp_dir + full_pfams_hmm_file, "w") as out:
                 out.write(pfam_hmms)
-        
-        except: 
+
+        except:
             print("")
             wprint(color_text("Downloading the master PFam HMM file failed :(", "yellow"))
             print("Exiting for now.\n")
@@ -558,7 +546,7 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm"
                         filtered_pfam_IDs.append(ID_with_version)
                         out.write(ID_with_version + "\t" + str(row[1]) + "\t" + str(row[3]) + "\n")
                         out_IDs.write(ID_with_version + "\n")
-        
+
         with open(tmp_dir + filtered_pfams_hmm_file, "w") as out:
             pfam_filter_run = subprocess.run(["hmmfetch", "-f", tmp_dir + full_pfams_hmm_file, tmp_dir + filtered_pfam_IDs_file], stdout=out)
 
@@ -595,7 +583,7 @@ def run_hmmsearch(tmp_dir, num_cpus, rerun, input_seqs="all-genes.faa", filtered
 
 def hmmsearch(input_seqs, filtered_pfams_hmm_file, output_table):
     """ main hmmsearch function """
-    
+
     hmmsearch = subprocess.run(["hmmsearch", "--cut_ga", "--cpu", "1", "--tblout", output_table, filtered_pfams_hmm_file, input_seqs], stdout=subprocess.DEVNULL)
 
 
@@ -624,7 +612,7 @@ def parallelize_hmmsearch(tmp_dir, input_seqs, filtered_pfams_hmm_file, num_cpus
 
     for file in split_files:
         args_tuple_list.append((file, tmp_dir + filtered_pfams_hmm_file, file + ".tab"))
-    
+
     pool = mp.Pool(num_cpus)
     pool.starmap(hmmsearch, args_tuple_list)
     pool.close()
@@ -663,28 +651,28 @@ def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, tmp_dir, output_dir, 
 
         array = np.zeros( (len(target_genome_accs), len(filtered_pfam_IDs)), dtype=int)
         count_tab = pd.DataFrame(array, index=target_genome_accs, columns=filtered_pfam_IDs)
-        
+
         # num = 0 # just a counter to see progress
         with open(tmp_dir + pfam_hits_file, "r") as hits:
             for line in hits:
                 # num += 1
                 # if num % 1000 == 0:
                 #     print(num)
-                
+
                 if line.startswith("#"):
                     continue
-                    
+
                 line_list = line.strip().split()
                 curr_acc_list = line_list[0].split("_")[:2]
                 curr_acc = "_".join(curr_acc_list)
                 curr_pfam = line_list[3]
-                
+
                 count_tab.loc[curr_acc, curr_pfam] = count_tab.loc[curr_acc, curr_pfam] + 1
-                
+
         wanted_pfams = []
 
         for pfam in count_tab.columns.tolist():
-        
+
             if sum(count_tab[pfam] == 1) / len(target_genome_accs) * 100 >= 90:
                 wanted_pfams.append(pfam)
 
@@ -692,7 +680,7 @@ def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, tmp_dir, output_dir, 
         with open(tmp_dir + wanted_pfam_IDs_file, "w") as out:
             out.write("\n".join(wanted_pfams))
             out.write("\n")
-        
+
         # generating and writing out wanted PFams info table
         filtered_pfams_info_tab = pd.read_csv(tmp_dir + filtered_pfams_info_file, header=0, sep="\t")
         wanted_pfams_info_tab = filtered_pfams_info_tab[filtered_pfams_info_tab.PFam_ID.isin(wanted_pfams)]
@@ -722,11 +710,10 @@ def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered
     else:
         wanted_HMM_out_file = "Wanted-" + str(wanted_pfam_count) + "-SCG-targets.hmm"
 
-    
     if rerun == True and os.path.exists(output_dir + wanted_HMM_out_file):
 
         print(color_text("\n -------------------------------------------------------------------------------\n"))
-        
+
         wprint("It seems all is done already, you should specify a non-existent output directory or a different input accessions file if you'd like to do something different :)")
         print("")
         print("  The previous run generated the following SCG-HMMs file holding " + str(wanted_pfam_count) + " target genes:")
@@ -756,7 +743,7 @@ def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered
 
 
 def report_missed_accessions(output_dir, rerun):
-    """ filter final HMM set """    
+    """ filter final HMM set """
 
     if os.path.exists(output_dir + "Missed-accessions.tsv"):
 
