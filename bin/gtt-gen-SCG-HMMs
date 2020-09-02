@@ -8,7 +8,7 @@ For examples, please visit the GToTree wiki here: https://github.com/AstrobioMik
 For details on the process, please see: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets
 """
 
-version = "v1.5.33"
+version = "v1.5.34"
 import os
 import sys
 import argparse
@@ -54,15 +54,17 @@ def main():
 
     tmp_dir, output_dir, rerun = setup_output_dir(args.target_accessions, args.output_dir, args.rerun)
 
+    num_cpus = check_cpus(args.num_cpus)
+
     target_accs, needed_dbs = get_target_accs(args.target_accessions)
     
     ncbi_tab, accs_not_found = get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, output_dir, rerun)
 
-    remaining_accs = get_amino_acids(ncbi_tab, tmp_dir, output_dir, args.num_cpus, rerun)
+    remaining_accs = get_amino_acids(ncbi_tab, tmp_dir, output_dir, num_cpus, rerun)
 
     filtered_pfam_IDs = get_and_filter_pfam_hmms(tmp_dir, rerun)
 
-    run_hmmsearch(tmp_dir, args.num_cpus, rerun)
+    run_hmmsearch(tmp_dir, num_cpus, rerun)
 
     wanted_pfam_count = filter_HMM_hits(remaining_accs, filtered_pfam_IDs, tmp_dir, output_dir, rerun)
 
@@ -98,6 +100,43 @@ def wprint(text):
 
     print(textwrap.fill(text, width=80, initial_indent="  ", 
           subsequent_indent="  ", break_on_hyphens=False))
+
+
+def check_cpus(num_cpus):
+    """ 
+    This function serves 2 purposes right now: 
+    1. Checking the requested number of cpus isn't greater than the system has
+
+    2. Dealing with a problem I haven't solved out yet:
+        I can't figure out how to get things to stop hanging when running with multiprocessing with greater
+        than like 15 threads. I've seen several places suggesting that the pool.join() method i'm using isn't ideal
+        with "large" amounts of data, and that it's hard to know when it will be a problem, but I can't figure out
+        another way either :( 
+
+        So for now, if the user requested more than 12 threads, we're going to just use 12 and report it to them
+    """
+
+    available_cpus = os.cpu_count()
+
+    if num_cpus > available_cpus:
+
+        print("")
+        wprint(color_text("The number of cpus specified (" + str(num_cpus) + ") is greater than what it seems is available on the current system (" + str(available_cpus) + ").", "yellow"))
+        wprint("To be on the safer side we are going to utilize " + str(available_cpus - 1) + " moving forward :)")
+        print("")
+
+        num_cpus = available_cpus - 1
+
+    if num_cpus > 12:
+
+        print("")
+        wprint(color_text("So this is embarrassing. We were going to use " + str(num_cpus) + " cpus, which would've been cool and all, but unfortunately I haven't figured out how to properly handle python's multiprocessing library under all scenarios yet apparently, and this program seems to get tripped up when more than ~15 processes are started :(", "yellow"))
+        wprint("So we are going to use 12 cpus instead at the parallelizable steps, and if you are a python guru and/or have experience with this issue (the problem involves pool.join() I think...), please feel free to help me out :)")
+        print("")
+
+        num_cpus = 12
+
+    return(num_cpus)
 
 
 def setup_output_dir(input_accessions_file, output_dir, rerun):
@@ -368,22 +407,12 @@ def dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir):
         base_name = os.path.basename(curr_base_url)
         AA_url = curr_base_url + "/" + base_name + AA_suffix
 
-
-        # # attempting to download amino-acid file first
-        # curr_AA_gz = urllib.request.urlopen(AA_url)
-
-        # # checking downloaded ok:
-        # if curr_AA_gz.msg == "OK":
-
-        #     # decompressing
-        #     curr_AA = gzip.decompress(curr_AA_gz.read()).decode("UTF-8", "ignore")        
         # attempting to download amino-acid file first
         try:
 
             curr_AA_gz = urllib.request.urlopen(AA_url)
             curr_AA = gzip.decompress(curr_AA_gz.read()).decode("UTF-8", "ignore")
-            # curr_AA_gz = requests.get(AA_url)
-            # curr_AA = gzip.decompress(curr_AA_gz.content)
+
             curr_AA = io.StringIO(curr_AA)
 
         except:
