@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.34"
+VERSION="v1.5.35"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -302,7 +302,7 @@ if [ -f "$NCBI_acc_file" ]; then
     fi
 
     # checking no tabs in there
-    if grep -q "\t" ${NCBI_acc_file}; then
+    if grep -q $'\t' ${NCBI_acc_file}; then
         printf "\n${RED}  $NCBI_acc_file has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
         printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
         printf "\nExiting for now.\n\n"
@@ -331,7 +331,7 @@ if [ -f "$fasta_files" ]; then
     fi
 
     # checking no tabs in there
-    if grep -q "\t" ${fasta_files}; then
+    if grep -q $'\t' ${fasta_files}; then
         printf "\n${RED}  $fasta_files has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
         printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
         printf "\nExiting for now.\n\n"
@@ -360,7 +360,7 @@ if [ -f "$amino_acid_files" ]; then
     fi
 
     # checking no tabs in there
-    if grep -q "\t" ${amino_acid_files}; then
+    if grep -q $'\t' ${amino_acid_files}; then
         printf "\n${RED}  $amino_acid_files has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
         printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
         printf "\nExiting for now.\n\n"
@@ -389,7 +389,7 @@ if [ -f "$genbank_list_file" ]; then
     fi
 
     # checking no tabs in there
-    if grep -q "\t" ${genbank_list_file}; then
+    if grep -q $'\t' ${genbank_list_file}; then
         printf "\n${RED}  $genbank_list_file has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
         printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
         printf "\nExiting for now.\n\n"
