@@ -20,7 +20,7 @@ import filecmp
 
 parser = argparse.ArgumentParser(description="This is a helper program to facilitate using taxonomy \
                                               and genomes from the Genome Taxonomy Database (gtdb.ecogenomic.org) with GToTree.\
-                                              It primary returns NCBI accessions and GTDB summary tables based on GTDB-taxonomy\
+                                              It primarily returns NCBI accessions and GTDB summary tables based on GTDB-taxonomy\
                                               searches. It also currently has filtering capabilities built-in for specifying only\
                                               GTDB representative species or RefSeq representative genomes (see help menu and links\
                                               therein for explanations of what these are). For examples, please visit the GToTree\
