@@ -14,7 +14,7 @@ hmm_target_genes_total=$6
 output_dir=$7
 best_hit_mode=$8
 additional_pfam_targets=$9
-http_flag=$10
+http_flag=${10}
 
 num=0
 
@@ -72,12 +72,16 @@ do
     # attempting to download genes for assembly
     curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genes2.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
-    if [ -s ${tmp_dir}/${assembly}_genes2.tmp.gz ]; then
+    # if http, then it pulls down a file still, it just isn't gzipped
+    # if ftp, no file is pulled down
+    # so to cover both cases, just making this need to be present and gzipped
+    if $(file ${tmp_dir}/${assembly}_genes2.tmp.gz | grep -q gzip); then
         gunzip ${tmp_dir}/${assembly}_genes2.tmp.gz
         # renaming headers to avoid problems with odd characters and how hmmer parses and such
         gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
 
     else # trying to get assembly if there were no gene annotations available
+        rm -rf ${tmp_dir}/${assembly}_genes2.tmp.gz
         curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
 
         if [ -s ${tmp_dir}/${assembly}_genome.tmp.gz ]; then

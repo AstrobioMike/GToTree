@@ -8,7 +8,7 @@ For examples, please visit the GToTree wiki here: https://github.com/AstrobioMik
 For details on the process, please see: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets
 """
 
-version = "v1.5.36"
+version = "v1.5.37"
 import os
 import sys
 import argparse
@@ -37,10 +37,11 @@ parser = argparse.ArgumentParser(description="This program takes a list of NCBI 
 required = parser.add_argument_group('required arguments')
 
 required.add_argument("-a", "--target-accessions", help="fasta file", action="store", required=True)
-parser.add_argument("-o", "--output-directory", help='Name of desired output directory (default: "gtt-gen-SCG-HMMs-output"', action="store", default="gtt-gen-SCG-HMMs-output", dest="output_dir")
-parser.add_argument("-n", "--num-cpus", help='Number of cpus to use on parallelizable steps (default: 1).', action="store", default=1, type=int)
-parser.add_argument("--rerun", help="Specify this flag if you'd like to try to restart a prior run from any currently existing files.", action="store_true")
-parser.add_argument("--keep-working-dir", help="Specify this flag if you'd like to keep the working directory.", action="store_true")
+parser.add_argument("-o", "--output-directory", help='Name of desired output directory (default: "gtt-gen-SCG-HMMs-output")', action="store", default="gtt-gen-SCG-HMMs-output", dest="output_dir")
+parser.add_argument("-n", "--num-cpus", help='Number of cpus to use on parallelizable steps (default: 1)', action="store", default=1, type=int)
+parser.add_argument("-p", "--percent-single-copy", help='The percent of target genomes that need to have exactly 1 copy identified for an HMM to be included, needs to be between 1 and 100 (default: 90)', action="store", default=90, type=int)
+parser.add_argument("--rerun", help="Specify this flag if you'd like to try to restart a prior run from any currently existing files", action="store_true")
+parser.add_argument("--keep-working-dir", help="Specify this flag if you'd like to keep the working directory", action="store_true")
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -51,6 +52,8 @@ args = parser.parse_args()
 ################################################################################
 
 def main():
+
+    percent_single_copy = check_input_percent(args.percent_single_copy)
 
     tmp_dir, output_dir, rerun = setup_output_dir(args.target_accessions, args.output_dir, args.rerun)
 
@@ -66,7 +69,7 @@ def main():
 
     run_hmmsearch(tmp_dir, num_cpus, rerun)
 
-    wanted_pfam_count = filter_HMM_hits(remaining_accs, filtered_pfam_IDs, tmp_dir, output_dir, rerun)
+    wanted_pfam_count = filter_HMM_hits(remaining_accs, filtered_pfam_IDs, percent_single_copy, tmp_dir, output_dir, rerun)
 
     filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun)
 
@@ -102,6 +105,18 @@ def wprint(text):
           subsequent_indent="  ", break_on_hyphens=False))
 
 
+def check_input_percent(input_percent):
+    """ checks that the input percent is within 0 and 100) """
+
+    if not 0 < input_percent <= 100:
+        print("")
+        wprint(color_text("The --percent-single-copy (-p) parameter needs to be between 1–100.", "yellow"))
+        print("  See `gtt-gen-SCG-HMMs -h` for usage info.")
+        print("\nExiting for now.\n")
+        sys.exit(1)
+
+    return(input_percent)
+
 def check_cpus(num_cpus):
     """ checks the number of requested cpus doesn't excede what's available """
 
@@ -134,7 +149,7 @@ def setup_output_dir(input_accessions_file, output_dir, rerun):
                 wprint(color_text("It seems the output directory '" + str(output_dir) + "' already exists.", "yellow"))
                 wprint("We don't want to accidentally overwrite anything, if you'd like to intentionally work with this directory again, add the `--rerun` flag.")
                 print("\nExiting for now.\n")
-                sys.exit(0)
+                sys.exit(1)
 
         else:
             # making sure input accessions match before allowing rerun:
@@ -146,7 +161,7 @@ def setup_output_dir(input_accessions_file, output_dir, rerun):
                     wprint(color_text("It seems the input accessions don't match those of the previous run, and we shouldn't attempt a `--rerun` in these situations :(", "yellow"))
                     print("  We should maybe try with a new output directory.\n")
                     print("Exiting for now.\n")
-                    sys.exit(0)
+                    sys.exit(1)
 
             else:
 
@@ -629,7 +644,7 @@ def parallelize_hmmsearch(tmp_dir, input_seqs, filtered_pfams_hmm_file, num_cpus
         os.remove(file)
 
 
-def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, tmp_dir, output_dir, rerun, pfam_hits_file="pfam-hits.tab", wanted_pfams_info_file="Wanted-PFams-info.tsv", filtered_pfams_info_file="filtered-pfams-info.tsv", wanted_pfam_IDs_file="wanted-PFam-IDs.txt"):
+def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, percent_single_copy, tmp_dir, output_dir, rerun, pfam_hits_file="pfam-hits.tab", wanted_pfams_info_file="Wanted-PFams-info.tsv", filtered_pfams_info_file="filtered-pfams-info.tsv", wanted_pfam_IDs_file="wanted-PFam-IDs.txt"):
     """ filtering pfam hit table """
 
     if rerun == True and os.path.exists(output_dir + wanted_pfams_info_file) and os.path.exists(output_dir + "PFam-HMM-hit-counts.tsv") and os.path.exists(tmp_dir + wanted_pfam_IDs_file):
@@ -647,17 +662,13 @@ def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, tmp_dir, output_dir, 
     else:
 
         print("")
-        wprint("Parsing hit table to find which PFams had exactly 1 hit in >= 90% of the included genomes...")
+        wprint("Parsing hit table to find which PFams had exactly 1 hit in >= " + str(percent_single_copy) + "% of the included genomes...")
 
         array = np.zeros( (len(target_genome_accs), len(filtered_pfam_IDs)), dtype=int)
         count_tab = pd.DataFrame(array, index=target_genome_accs, columns=filtered_pfam_IDs)
 
-        # num = 0 # just a counter to see progress
         with open(tmp_dir + pfam_hits_file, "r") as hits:
             for line in hits:
-                # num += 1
-                # if num % 1000 == 0:
-                #     print(num)
 
                 if line.startswith("#"):
                     continue

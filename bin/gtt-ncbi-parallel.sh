@@ -60,9 +60,18 @@ fi
 printf "   --------------------------------------------------------------------------   \n\n"
 printf "     Genome: ${GREEN}$assembly${NC}\n"
 
+printf "\n"
+printf "$http_flag"
+printf "\n"
+
+
+printf "\n"
+printf "curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genes2.tmp.gz \"${base_link}/${end_path}_protein.faa.gz\""
+printf "\n"
+
 curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genes2.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
-if [ -s ${tmp_dir}/${assembly}_genes2.tmp.gz ]; then
+if $(file ${tmp_dir}/${assembly}_genes2.tmp.gz | grep -q gzip); then
     gunzip ${tmp_dir}/${assembly}_genes2.tmp.gz
     # renaming headers to avoid problems with odd characters and how hmmer parses and such
     gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp

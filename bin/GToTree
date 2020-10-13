@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.36"
+VERSION="v1.5.37"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -708,7 +708,7 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.75" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTree" ] || [ $align_only == 'true' ]; then
+if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.5" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTree" ] || [ $align_only == 'true' ]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
@@ -741,10 +741,6 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
     if [ $taxonkit_id_swap != "false" ] && [ $gtdb_id_swap != "false" ]; then
         printf "      - GTDB taxonomic info will be added to labels where possible.\n" | tee -a $gtotree_log
         printf "      - NCBI taxonomic info will be added where possible when GTDB is not.\n" | tee -a $gtotree_log
-        # printf "      - GTDB taxonomic info will be added to labels where possible (\`-D\` flag). This\n" | tee -a $gtotree_log
-        # printf "          supersedes the requested NCBI taxonomic info (\`-t\` flag). So only when GTDB\n" | tee -a $gtotree_log
-        # printf "          taxonomy is not available for a given input genome, but NCBI taxonomy is,\n" | tee -a $gtotree_log
-        # printf "          will NCBI taxonomy info be added (with \"_NCBI\" appended to it).\n" | tee -a $gtotree_log
         taxonkit_used="true"
         gtdb_used="true"
     fi    
