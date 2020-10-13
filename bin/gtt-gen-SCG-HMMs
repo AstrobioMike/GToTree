@@ -713,11 +713,11 @@ def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, percent_single_copy, 
 def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered_pfams_hmm_file="filtered-pfams.hmm", wanted_pfam_IDs_file="wanted-PFam-IDs.txt"):
     """ filter final HMM set """
 
-    # if output_dir was provided, going to use that as prefix to final output hmm file
-    if args.output_dir:
-        wanted_HMM_out_file = args.output_dir + ".hmm"
+    # if specific output_dir was provided by user, going to use that as prefix to final output hmm file
+    if args.output_dir != "gtt-gen-SCG-HMMs-output":
+        wanted_HMM_out_file = str(output_dir).rstrip("/") + ".hmm"
 
-    # otherwise using numbers
+    # otherwise using just numbers
     else:
         wanted_HMM_out_file = "Wanted-" + str(wanted_pfam_count) + "-SCG-targets.hmm"
 
