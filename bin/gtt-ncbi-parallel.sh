@@ -60,15 +60,6 @@ fi
 printf "   --------------------------------------------------------------------------   \n\n"
 printf "     Genome: ${GREEN}$assembly${NC}\n"
 
-printf "\n"
-printf "$http_flag"
-printf "\n"
-
-
-printf "\n"
-printf "curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genes2.tmp.gz \"${base_link}/${end_path}_protein.faa.gz\""
-printf "\n"
-
 curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genes2.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
 if $(file ${tmp_dir}/${assembly}_genes2.tmp.gz | grep -q gzip); then
