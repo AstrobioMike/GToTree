@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.38"
+VERSION="v1.5.39"
 
 printf "\n\n                                  GToTree ${VERSION}\n"
 printf "                         (github.com/AstrobioMike/GToTree)\n\n"
@@ -369,7 +369,9 @@ base_link="https://pfam.xfam.org/family/"
 
 for target in $(cat ${tmp_dir}/uniq_pfam_targets.tmp)
 do
-    curl --silent --retry 10 -o ${tmp_dir}/${target}.hmm "${base_link}${target}/hmm"
+
+    # --insecure flag added on 29-Nov-2020, due to pfam certificate being invalid (https://github.com/AstrobioMike/GToTree/issues/28)
+    curl --insecure --silent --retry 10 -o ${tmp_dir}/${target}.hmm "${base_link}${target}/hmm"
 
     if [ -s ${tmp_dir}/${target}.hmm ]; then
         # getting accession pulled (to account for current version on Pfam as compared to what was searched)
