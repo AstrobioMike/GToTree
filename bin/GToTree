@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.39"
+VERSION="v1.5.40"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -2915,9 +2915,9 @@ if [ $align_only == 'false' ]; then
 
 
         if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-            FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre | tee -a $gtotree_log
+            FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> >(tee -a $gtotree_log >&2)
         else
-            FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre | tee -a $gtotree_log
+            FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> >(tee -a $gtotree_log >&2)
         fi
 
         fasttree_used="true" # setting to report citations at end
@@ -2936,9 +2936,9 @@ if [ $align_only == 'false' ]; then
 
 
         if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-            iqtree -s ${output_dir}/Aligned_SCGs_mod_names.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out
+            iqtree -s ${output_dir}/Aligned_SCGs_mod_names.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out | tee -a $gtotree_log
         else
-            iqtree -s ${output_dir}/Aligned_SCGs.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out
+            iqtree -s ${output_dir}/Aligned_SCGs.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out | tee -a $gtotree_log
         fi
 
         mkdir ${output_dir}/iqtree_out/
@@ -2987,18 +2987,19 @@ else
 fi
 
 # reporting primary output files
+output_file_prefix=$(basename ${output_dir})
 
 if [ $align_only == 'false' ]; then
 
     if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
 
         printf "    Tree written to:\n" | tee -a $gtotree_log
-        printf "        ${GREEN}${output_dir}/${output_dir}.tre${NC}\n\n" | tee -a $gtotree_log
-        mv ${output_dir}/Aligned_SCGs_mod_names.tre ${output_dir}/${output_dir}.tre
+        printf "        ${GREEN}${output_dir}/${output_file_prefix}.tre${NC}\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/Aligned_SCGs_mod_names.tre ${output_dir}/${output_file_prefix}.tre
     else
         printf "    Tree written to:\n" | tee -a $gtotree_log
-        printf "        ${GREEN}${output_dir}/${output_dir}.tre${NC}\n\n" | tee -a $gtotree_log
-        mv ${output_dir}/Aligned_SCGs.tre ${output_dir}/${output_dir}.tre
+        printf "        ${GREEN}${output_dir}/${output_file_prefix}.tre${NC}\n\n" | tee -a $gtotree_log
+        mv ${output_dir}/Aligned_SCGs.tre ${output_dir}/${output_file_prefix}.tre
     fi
 
 fi
