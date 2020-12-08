@@ -5,9 +5,8 @@
 <br>
 <br>
 
-<a href="https://zenodo.org/badge/latestdoi/161007784"><img align="right" src="https://zenodo.org/badge/161007784.svg" alt="DOI"></a>
+<a href="https://doi.org/10.5281/zenodo.2532021"><img align="right" src="https://zenodo.org/badge/DOI/10.5281/zenodo.2532021.svg" alt="DOI"></a>
 <br>
-
 ---
 
 # GToTree: a user-friendly workflow for phylogenomics
