@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.40"
+VERSION="v1.5.41"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -146,6 +146,14 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  there or higher, and GToTree is saying a lot of input accessions were not\n"
     printf "                  successfully downloaded, consider trying with fewer.\n\n"
 
+    printf "        - [-X ] default: false\n"
+    printf "                  If working with greater than 5,000 target genomes, GToTree will by default\n"
+    printf "                  pass some options to 'muscle' to increase the speed of the alignments (see\n" 
+    printf "                  github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes\n"
+    printf "                  for more details and the note just above there on using representative genomes).\n"
+    printf "                  Anyway, provide this option with no arguments if you don't want to speed up\n"
+    printf "                  the alignments.\n\n"
+
     printf "        - [-P ] default: false\n"
     printf "                  Provide this flag with no arguments if your system can't use ftp,\n"
     printf "                  and you'd like to try using http.\n\n"
@@ -223,6 +231,7 @@ best_hit_mode='false'
 align_only='false'
 tree_program='FastTree'
 additional_pfam_targets='false'
+override_faster_alignment='false'
 http_flag='false'
 
 while getopts :a:g:f:A:H:o:m:tDL:p:NT:c:G:Bdn:j:P args
@@ -248,6 +257,7 @@ do
         d) debug_flag='true';;
         n) num_cpus=${OPTARG};;
         j) num_jobs=${OPTARG};;
+        X) override_faster_alignment='true';;
         P) http_flag='true';;
         \?) printf "\n  ${RED}Invalid argument: -${OPTARG}${NC}\n\n    Run 'GToTree' with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
     esac
@@ -673,6 +683,34 @@ total_input_genomes=$(($NCBI_input_genomes_total + $genbank_genomes_total + $fas
 printf "\n                             ${GREEN}Total input genomes: $total_input_genomes${NC}\n" | tee -a $gtotree_log
 
 
+#############################################################################
+###########  ADDING NOTICE ABOUT SPEED AND THOUSANDS OF GENOMES  ############
+#############################################################################
+if [ $total_input_genomes -ge 5000 ] && [ $override_faster_alignment == 'false' ]; then
+    printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
+    printf "    We seem to be aiming to work with $total_input_genomes total genomes. This is quite a\n" | tee -a $gtotree_log
+    printf "    bit, and the time the individual gene alignments take can quickly become\n" | tee -a $gtotree_log
+    printf "    prohibitive with many thousands of genomes like this. By default, GToTree\n\n" | tee -a $gtotree_log
+    printf "    is going to pass some options to 'muscle' that help speed up the alignments\n" | tee -a $gtotree_log
+    printf "    for this run (since we have so many here). If you don't want this to\n" | tee -a $gtotree_log
+    printf "    happen, you should cancel this run now with 'ctrl + c', and add the '-X' \n" | tee -a $gtotree_log
+    printf "    flag to the GToTree call.\n\n" | tee -a $gtotree_log
+
+    printf "    More info can be found here:\n" | tee -a $gtotree_log
+    printf "      github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes\n\n" | tee -a $gtotree_log
+
+    printf "    And while we're chatting, you may also want to consider\n" | tee -a $gtotree_log
+    printf "    using \"representative\" genomes, if you're not already. More info on that can be found here:\n" | tee -a $gtotree_log
+    printf "      github.com/AstrobioMike/GToTree/wiki/things-to-consider#consider-using-representative-genomes\n\n" | tee -a $gtotree_log
+
+    printf "    We will wait 30 seconds before continuing with our regularly scheduled program :)\n"
+
+    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+
+    sleep 30
+
+fi
+
 
 #############################################################################
 ###############  CHECKING AND REPORTING SPECIFIED HMM SOURCE  ###############
@@ -840,8 +878,7 @@ if [ $total_input_genomes -ge 12500 ]; then
     printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
     printf "    The alignment and treeing steps, particularly the alignments, can become\n" | tee -a $gtotree_log
     printf "    prohibitively memory-intensive with many input genomes. With $total_input_genomes total\n" | tee -a $gtotree_log
-    printf "    input genomes, and with the muscle aligner general-use settings applied\n" | tee -a $gtotree_log
-    printf "    here, this job may not be feasible :( \n\n" | tee -a $gtotree_log
+    printf "    input genomes, this job may not be feasible :( \n\n" | tee -a $gtotree_log
     
     printf "    Often it is useful to slim down how many genomes of closely related\n" | tee -a $gtotree_log
     printf "    organisms we are including when looking across a broad level of\n" | tee -a $gtotree_log
@@ -850,7 +887,8 @@ if [ $total_input_genomes -ge 12500 ]; then
 
     printf "    Have you considered using \"representative\" genomes only (either from\n" | tee -a $gtotree_log
     printf "    NCBI or GTDB)? Those both provide helpful systems for reducing some\n" | tee -a $gtotree_log
-    printf "    redundancy when working at a broad level with many organisms.\n" | tee -a $gtotree_log
+    printf "    redundancy when working at a broad level with many organisms. See\n" | tee -a $gtotree_log
+    printf "    github.com/AstrobioMike/GToTree/wiki/things-to-consider#consider-using-representative-genomes\n"
     
     printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
 
@@ -1211,7 +1249,6 @@ if [ -n "$NCBI_acc_file" ]; then
     cat ${tmp_dir}/final_included_NCBI_accs.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
 
 fi
-
 
 
 
@@ -1816,7 +1853,12 @@ if [ $num_jobs == "1" ]; then
         gtt-parse-fasta-by-headers -i ${tmp_dir}/${SCG}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${SCG}_hits_filtered.faa --inverse
 
         # aligning
-        muscle -in ${tmp_dir}/${SCG}_hits_filtered.faa -diags -maxiters 4 -out ${tmp_dir}/aligned.tmp
+        if [ $total_input_genomes -ge 5000 ] && [ $override_faster_alignment == 'false' ]; then
+            muscle -in ${tmp_dir}/${SCG}_hits_filtered.faa -diags -maxiters 2 -sv -out ${tmp_dir}/aligned.tmp
+        else
+            muscle -in ${tmp_dir}/${SCG}_hits_filtered.faa -diags1 -maxiters 4 -out ${tmp_dir}/aligned.tmp
+        fi
+
         # trimming
         trimal -in ${tmp_dir}/aligned.tmp -out ${tmp_dir}/trimmed.faa.tmp -automated1
 
@@ -1863,8 +1905,15 @@ if [ $num_jobs == "1" ]; then
     done
 
 else
-    # writing out variables needed for script because i don't know how to send them properly
-    cat ${tmp_dir}/final_genes_list.tmp | parallel -j $num_jobs gtt-align-and-trim-parallel.sh {} $tmp_dir
+
+    # running in parallel
+    if [ $total_input_genomes -ge 5000 ] && [ $override_faster_alignment == 'false' ]; then
+        faster_alignment='true'    
+    else
+        faster_alignment='false'
+    fi
+
+    cat ${tmp_dir}/final_genes_list.tmp | parallel -j $num_jobs gtt-align-and-trim-parallel.sh {} $tmp_dir $faster_alignment
 
 fi
 
