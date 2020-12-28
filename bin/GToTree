@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.43"
+VERSION="v1.5.44"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -1015,8 +1015,7 @@ fi
 touch ${tmp_dir}/genomes_from_all_sources.tmp
 
 # starting the SCG-counts per genome tab which will have the following as its header:
-paste <(printf "assembly_id") <(printf %s "$(cat ${tmp_dir}/uniq_hmm_names.tmp | tr "\n" "\t")") > ${output_dir}/SCG_hit_counts.tsv
-
+paste <(printf "assembly_id") <(printf %s "$(cat ${tmp_dir}/uniq_hmm_names.tmp | tr "\n" "\t" | sed 's/.$//')") > ${output_dir}/SCG_hit_counts.tsv
 
 #############################################################################
 ########################  KEEPING TRACK OF RUN TIME  ########################
