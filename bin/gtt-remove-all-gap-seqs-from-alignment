@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+
+from Bio import SeqIO
+import sys
+import argparse
+
+parser = argparse.ArgumentParser(description='This script will remove sequences that are entirely gap characters ("-") from an alignment fasta file, specific for use in GToTree.')
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-i", "--input_fasta", help="Starting fasta file", action="store", dest="input_fasta", required=True)
+parser.add_argument("-o", "--output_fasta", help='Output fasta file (default: "No-gap-seqs-aln.faa").', dest="output_fasta", default="No-gap-seqs-aln.faa")
+
+if len(sys.argv)==1:
+  parser.print_help(sys.stderr)
+  sys.exit(0)
+
+args = parser.parse_args()
+
+with open(args.input_fasta, "r") as in_fasta:
+    with open(args.output_fasta, "w") as out:
+        for seq_record in SeqIO.parse(in_fasta, "fasta"):
+            if seq_record.seq != len(seq_record.seq) * "-":
+                out.write(">" + str(seq_record.id) + "\n" + str(seq_record.seq) + "\n")
