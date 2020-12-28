@@ -3,8 +3,9 @@
 import sys
 from glob import glob
 import argparse
+import os.path
 
-parser = argparse.ArgumentParser(description='This script is a helper script to concatenate fasta-formatted multiple sequence alignment files.')
+parser = argparse.ArgumentParser(description='This script is a helper script to concatenate fasta-formatted multiple sequence alignment files, and generate partitions file.')
 
 required = parser.add_argument_group('required arguments')
 
@@ -50,3 +51,21 @@ with open(output_dir + "Aligned_SCGs.faa", "w") as out:
     for header, seqs in dict_of_genomes.items():
         out.write(">" + header + "\n")
         out.write("XXXXX".join(seqs) + "\n")
+
+# making partitions file
+    # getting list of gene names in order they were cat'd together
+gene_list = [os.path.basename(x)[:-16] for x in list_of_alignment_files]
+
+   # all are same length, so just need one genome entry, then to count the bases per element in dict values list, and add 5 for the XXXXX spacers
+   # getting all alignment lengths
+
+alignment_lengths_list = [len(x) for x in list(dict_of_genomes.values())[0]]
+
+curr_start = 1
+curr_stop = 0
+
+with open(output_dir + "Partitions.txt", "w") as out:
+    for i in range(0,len(gene_list)):
+        curr_stop = curr_start + alignment_lengths_list[i]
+        out.write("AA, " + str(gene_list[i]) + " = " + str(curr_start) + "-" + str(curr_stop) + "\n")
+        curr_start = curr_stop + 5

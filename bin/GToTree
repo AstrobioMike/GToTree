@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.41"
+VERSION="v1.5.42"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -123,6 +123,9 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "        - [-N ] default: false\n"
     printf "                  No tree. Generate alignment only.\n\n"
 
+    printf "        - [-k ] default: false\n"
+    printf "                  Keep individual protein alignment files.\n\n"
+
     printf "        - [-T <str>] default: FastTree\n"
     printf "                  Which program to use for tree generation. Currently supported are\n"
     printf "                  \"FastTree\" and \"IQ-TREE\". As of now, these run with default settings\n"
@@ -229,12 +232,13 @@ debug_flag='false'
 lineage_spec="Domain,Phylum,Class,Species,Strain"
 best_hit_mode='false'
 align_only='false'
+keep_individual_alignments='false'
 tree_program='FastTree'
 additional_pfam_targets='false'
 override_faster_alignment='false'
 http_flag='false'
 
-while getopts :a:g:f:A:H:o:m:tDL:p:NT:c:G:Bdn:j:P args
+while getopts :a:g:f:A:H:o:m:tDL:p:NkT:c:G:Bdn:j:P args
 do
     case "${args}"
     in
@@ -249,7 +253,8 @@ do
         D) gtdb_id_swap='true';;
         L) lineage_spec=${OPTARG};;
         p) target_pfams=${OPTARG};;
-        N) align_only='true' ;;
+        N) align_only='true';;
+        k) keep_individual_alignments='true';;
         T) tree_program=${OPTARG};;
         c) len_cutoff=${OPTARG};;
         G) gen_cutoff=${OPTARG};;
@@ -746,7 +751,7 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.5" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTree" ] || [ $align_only == 'true' ]; then
+if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.5" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTree" ] || [ $align_only == 'true' ] || [ $keep_individual_alignments == 'true' ]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
@@ -802,6 +807,10 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
             printf "      - Tree generation program (\"-T\") has been set to $tree_program.\n" | tee -a $gtotree_log
         fi
 
+    fi
+
+    if [ $keep_individual_alignments == 'true' ]; then
+        printf "      - Individual protein alignment files will be retained, due to the \"-k\" flag being provided.\n" | tee -a $gtotree_log
     fi
 
     if [ $gen_cutoff != "0.5" ]; then
@@ -2015,43 +2024,8 @@ duration=$SECONDS
 printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
 printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
 
+# this concatenates the alignments and generates the partitions file for mixed model alignments
 gtt-cat-alignments -t $tmp_dir -o $output_dir
-
-# creating partitions file of gene coordinates for those that want might want it for mixed models with something like iqtree
-curr_start=1
-curr_stop=0
-n=1
-num_to_do=$(ls ${tmp_dir}/*_all_aligned.faa | wc -l)
-
-for gene_file in $(ls ${tmp_dir}/*_all_aligned.faa)
-
-do
-    if [ $n == 1 ]; then
-        n=$(($n + 1))
-        gene_base=$(basename $gene_file)
-        gene=${gene_base%%_all_aligned.faa}
-        len_tmp=$(head -n 2 $gene_file | grep -v ">" | wc -c)
-        len_tmp=$(echo "$len_tmp - 1" | bc)
-
-        printf "AA, $gene = 1-${len_tmp}\n"
-
-        curr_start=$(echo "$len_tmp + 6" | bc)
-
-    else
-        n=$(($n + 1))
-        gene_base=$(basename $gene_file)
-        gene=${gene_base%%_all_aligned.faa}
-        len_tmp=$(head -n 2 $gene_file | grep -v ">" | wc -c)
-        len_tmp=$(echo "$len_tmp - 1" | bc)
-
-        curr_stop=$(echo "$curr_start + $len_tmp - 1" | bc)
-
-        printf "AA, $gene = ${curr_start}-${curr_stop}\n"
-
-        curr_start=$(echo "$curr_stop + 6" | bc)
-    fi
-
-done > ${output_dir}/Partitions.txt
 
 # storing genomes that made it through workflow to report at end
 genomes_retained=$(wc -l ${tmp_dir}/final_genomes_from_all_sources.tmp | sed "s/^ *//" | cut -d " " -f 1)
@@ -2940,9 +2914,22 @@ fi
 #############################################################################
 #############  CLEARING OUT TMP FILES UNLESS -d FLAG PROVIDED  ##############
 #############################################################################
+# keeping individual alignment files if -k was provided
+if [ $keep_individual_alignments == 'true' ]; then
+    mkdir ${output_dir}/run_files/individual_alignments
+
+    for file in ${tmp_dir}/*_all_aligned.faa
+    do
+        new_path="${output_dir}/run_files/individual_alignments/$(basename $(echo ${file%%_all_aligned.faa}))_aln.faa"
+        mv ${file} ${new_path}
+    done
+
+fi
+
 if [ $debug_flag == 'false' ]; then
     rm -rf $tmp_dir
 fi
+
 
 #############################################################################
 ##############################   MAKING TREE  ###############################
@@ -3060,6 +3047,11 @@ if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
 else
     printf "    Alignment written to:\n" | tee -a $gtotree_log
     printf "        ${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\n\n" | tee -a $gtotree_log
+fi
+
+if [ $keep_individual_alignments == 'true' ]; then
+    printf "    Individual protein alignments stored in:\n" | tee -a $gtotree_log
+    printf "        ${GREEN}${output_dir}/run_files/individual_alignments/${NC}\n\n" | tee -a $gtotree_log
 fi
 
 printf "    Main genomes summary table with comp./redund. estimates written to:\n" | tee -a $gtotree_log
