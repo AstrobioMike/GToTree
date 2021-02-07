@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.45"
+VERSION="v1.5.46"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -268,6 +268,20 @@ do
     esac
 done
 
+#############################################################################
+##### CHECKING IF -L ARGUMENT PROVIDED THAT ALSO -t or -D WERE PROVIDED #####
+#############################################################################
+
+# checking if `-L` argument was set that also `-t` or `-D` were provided, otherwise no tax info is added
+if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
+    if [ $taxonkit_id_swap != "true" ] && [ $gtdb_id_swap != "true" ]; then
+        printf "\n  ${RED}You specified to add lineage info to headers with the \`-L ...\` argument, but\n"
+        printf "  neither the \`-t\` nor \`-D\` flags were provided to indicate which taxonomy to use :(${NC}\n\n"
+        printf "  See \`GToTree -h\` for more info.\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+fi
 
 # checking if taxonkit is available if it was specified
 if [ $taxonkit_id_swap != "false" ]; then
