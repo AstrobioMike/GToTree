@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.47"
+VERSION="v1.5.48"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -143,7 +143,9 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "        - [-j <int> ] default: 1\n"
     printf "                  The number of jobs you'd like to run in parallel during steps\n"
     printf "                  that are parallelizable. This includes things like downloading input\n"
-    printf "                  accession genomes and running parallel alignments, but not the tree step.\n"
+    printf "                  accession genomes and running parallel alignments, and portions of the\n"
+    printf "                  tree step if using FastTree on a Linux system (e.g. see FastTree docs\n"
+    printf "                  here: http://www.microbesonline.org/fasttree/#OpenMP).\n\n"
     printf "                  Note that I've occassionally noticed NCBI not being happy with over ~50\n"
     printf "                  downloads being attempted concurrently. So if using a \`-j\` setting around\n"
     printf "                  there or higher, and GToTree is saying a lot of input accessions were not\n"
@@ -2963,10 +2965,40 @@ if [ $align_only == 'false' ]; then
         printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
 
 
+        # if headers were modified
         if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-            FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> >(tee -a $gtotree_log >&2)
+            
+            # if multithreaded and on a system where FastTreeMP is also installed (conda not installing parallel version currently in other systems than linux)
+            if command -v FastTreeMP && [ ${num_jobs} != 1 ]; then
+
+                # setting env variable for FastTreeMP
+                export OMP_NUM_THREADS=${num_jobs}
+                # running FastTreeMP
+                FastTreeMP ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> >(tee -a $gtotree_log >&2)
+
+            else
+
+                FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> >(tee -a $gtotree_log >&2)
+
+            fi
+
+        # if headers were not modified
         else
-            FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> >(tee -a $gtotree_log >&2)
+
+            # if multithreaded and on a system where FastTreeMP is also installed (conda not installing parallel version currently in other systems than linux)
+            if command -v FastTreeMP > dev/null && [ ${num_jobs} != 1 ]; then
+
+                # setting env variable for FastTreeMP
+                export OMP_NUM_THREADS=${num_jobs}
+                # running FastTreeMP
+                FastTreeMP ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> >(tee -a $gtotree_log >&2)
+
+            else
+
+                FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> >(tee -a $gtotree_log >&2)
+
+            fi
+
         fi
 
         fasttree_used="true" # setting to report citations at end
@@ -3148,33 +3180,47 @@ printf "        ${GREEN}${output_dir}/gtotree-runlog.txt${NC}\n\n" | tee -a $gto
 printf "    Programs used and their citations have been written to:\n" | tee -a $gtotree_log
 printf "        ${GREEN}${output_dir}/citations.txt${NC}\n\n" | tee -a $gtotree_log
 
-printf "GToTree\nLee MD. GToTree: a user-friendly workflow for phylogenomics. Bioinformatics. 2019; (March):1-3. doi:10.1093/bioinformatics/btz188\n\n" >> ${output_dir}/citations.txt
-printf "HMMER3\nEddy SR. Accelerated profile HMM searches. PLoS Comput. Biol. 2011; (7)10. doi:10.1371/journal.pcbi.1002195\n\n" >> ${output_dir}/citations.txt
-printf "Muscle\nEdgar RC. MUSCLE: a multiple sequence alignment method with reduced time and space complexity. BMC Bioinformatics. 2004; 5, 113. doi:10.1093/nar/gkh340\n\n" >> ${output_dir}/citations.txt
-printf "TrimAl\nGutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972–1973. doi:10.1093/bioinformatics/btp348\n\n" >> ${output_dir}/citations.txt
+
+printf "GToTree ${VERSION}\nLee MD. GToTree: a user-friendly workflow for phylogenomics. Bioinformatics. 2019; (March):1-3. doi:10.1093/bioinformatics/btz188\n\n" >> ${output_dir}/citations.txt
+
+hmm_version=$(hmmsearch -h | head -n 2 | tail -n 1 | tr -s " " "\t" | cut -f 3)
+printf "HMMER3 v${hmm_version}\nEddy SR. Accelerated profile HMM searches. PLoS Comput. Biol. 2011; (7)10. doi:10.1371/journal.pcbi.1002195\n\n" >> ${output_dir}/citations.txt
+
+muscle_version=$(muscle -version | tr -s " " "\t" | cut -f 2)
+printf "Muscle ${muscle_version}\nEdgar RC. MUSCLE: a multiple sequence alignment method with reduced time and space complexity. BMC Bioinformatics. 2004; 5, 113. doi:10.1093/nar/gkh340\n\n" >> ${output_dir}/citations.txt
+
+trimal_version=$(trimal --version | grep "trim" | tr -s " " "\t" | cut -f 2)
+printf "TrimAl ${trimal_version}\nGutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972–1973. doi:10.1093/bioinformatics/btp348\n\n" >> ${output_dir}/citations.txt
 
 if [ $prodigal_used == "true" ]; then
-    printf "Prodigal\nHyatt, D. et al. Gene and translation initiation site prediction in metagenomic sequences. Bioinformatics. 2010; 28, 2223–2230. doi:10.1186/1471-2105-11-119\n\n" >> ${output_dir}/citations.txt
+    prodigal_version=$(prodigal -v 2>&1 | grep Prodigal | tr -s " " "\t" | cut -f 2 | tr -d ":" | sed 's/V/v/')
+    printf "Prodigal ${prodigal_version}\nHyatt, D. et al. Gene and translation initiation site prediction in metagenomic sequences. Bioinformatics. 2010; 28, 2223–2230. doi:10.1186/1471-2105-11-119\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $taxonkit_used == "true" ]; then
-    printf "TaxonKit\nShen W and Xiong J. TaxonKit: a cross-platform and efficient NCBI taxonomy toolkit. bioRxiv. 2019. doi:10.1101/513523\n\n" >> ${output_dir}/citations.txt
+    taxonkit_version=$(taxonkit -h | grep Version | tr -s " " "\t" | cut -f 2)
+    printf "TaxonKit v${taxonkit_version}\nShen W and Xiong J. TaxonKit: a cross-platform and efficient NCBI taxonomy toolkit. bioRxiv. 2019. doi:10.1101/513523\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $gtdb_used == "true" ]; then
-    printf "Genome Taxonomy Database (GTDB)\nParks DH et al. A complete domain-to-species taxonomy for Bacteria and Archaea. Nat. Biotech. 2020. doi:10.1038/s41587-020-0501-8\n\n" >> ${output_dir}/citations.txt
+    gtdb_version=$(head -n 1 ${GTDB_dir}GTDB-version-info.txt)
+    gtdb_release_date=$(tail -n 1 ${GTDB_dir}GTDB-version-info.txt)
+    printf "Genome Taxonomy Database (GTDB) ${gtdb_version}; ${gtdb_release_date}\nParks DH et al. A complete domain-to-species taxonomy for Bacteria and Archaea. Nat. Biotech. 2020. doi:10.1038/s41587-020-0501-8\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $fasttree_used == "true" ]; then
-    printf "FastTree 2\nPrice MN et al. FastTree 2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi:10.1371/journal.pone.0009490\n\n" >> ${output_dir}/citations.txt
+    fasttree_version=$(fasttree -expert 2>&1 | head -n 1 | tr -s " " "\t" | cut -f 5)
+    printf "FastTree 2 v${fasttree_version}\nPrice MN et al. FastTree 2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi:10.1371/journal.pone.0009490\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $iqtree_used == "true" ]; then
-    printf "IQ-TREE\nNguyen L-T et al. IQ-TREE: a fast and effective stochastic algorithm for estimating maximum likelihood phylogenies. Mol. Biol. Evol. 2015; 32, 268–274. doi:10.1093/molbev/msu300\n\n" >> ${output_dir}/citations.txt
+    iqtree_version=$(iqtree -V | head -n 1 | tr -s " " "\t" | cut -f 4)
+    printf "IQ-TREE v${iqtree_version}\nNguyen L-T et al. IQ-TREE: a fast and effective stochastic algorithm for estimating maximum likelihood phylogenies. Mol. Biol. Evol. 2015; 32, 268–274. doi:10.1093/molbev/msu300\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $parallel_used == "true" ]; then
-    printf "GNU Parallel\nTange O. GNU Parallel 2018. doi:10.5281/zenodo.1146014\n\n" >> ${output_dir}/citations.txt
+    parallel_version=$(parallel --version | head -n 1 | tr -s " " "\t" | cut -f 3)
+    printf "GNU Parallel v${parallel_version}\nTange O. GNU Parallel 2018. doi:10.5281/zenodo.1146014\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $universal_SCGs_used == "true" ]; then
