@@ -126,14 +126,20 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "        - [-k ] default: false\n"
     printf "                  Keep individual protein alignment files.\n\n"
 
-    printf "        - [-T <str>] default: FastTree\n"
+    printf "        - [-T <str>] default: FastTreeMP if available, FastTree if not\n"
     printf "                  Which program to use for tree generation. Currently supported are\n"
-    printf "                  \"FastTree\" and \"IQ-TREE\". As of now, these run with default settings\n"
-    printf "                  only (and IQ-TREE includes \"-mset WAG,LG\". To run either with more\n" 
-    printf "                  specific options (and there is a lot of room for variation here), you\n"
-    printf "                  can use the output alignment file from GToTree (and partitions file if\n"
-    printf "                  wanted for mixed-model specification) as input into a dedicated treeing\n"
-    printf "                  program.\n\n"
+    printf "                  \"FastTree\", \"FastTreeMP\", and \"IQ-TREE\". As of now, these run\n"
+    printf "                  with default settings only (and IQ-TREE includes \"-mset WAG,LG\"). To\n" 
+    printf "                  run either with more specific options (and there is a lot of room for\n"
+    printf "                  variation here), you can use the output alignment file from GToTree (and\n"
+    printf "                  partitions file if wanted for mixed-model specification) as input into\n"
+    printf "                  a dedicated treeing program.\n"
+    printf "                  Note on FastTreeMP (http://www.microbesonline.org/fasttree/#OpenMP). FastTreeMP\n"
+    printf "                  parallelizes some steps of the treeing step. Currently, conda installs\n"
+    printf "                  FastTreeMP with FastTree on linux systems, but not on Mac OSX systems.\n"
+    printf "                  So if using the conda installation, you may not have FastTreeMP if on a Mac,\n"
+    printf "                  in which case FastTree will be used instead – this will be reported when the\n"
+    printf "                  program starts, and be in the log file.\n\n"
 
     printf "        - [-n <int> ] default: 2\n"
     printf "                  The number of cpus you'd like to use during the HMM search. (Given\n"
@@ -235,7 +241,7 @@ lineage_spec="Domain,Phylum,Class,Species,Strain"
 best_hit_mode='false'
 align_only='false'
 keep_individual_alignments='false'
-tree_program='FastTree'
+tree_program='FastTreeMP'
 additional_pfam_targets='false'
 override_faster_alignment='false'
 http_flag='false'
@@ -294,25 +300,38 @@ if [ $taxonkit_id_swap != "false" ]; then
     fi
 fi
 
-# checking iqtree is available if it was specified, and checking tree program properly specified
-if [ $tree_program != "FastTree" ]; then
-    if [ $tree_program == "IQ-TREE" ]; then    
-        if ! command -v iqtree > /dev/null; then
-            printf "\n  ${RED}You specified to use IQ-TREE, but 'iqtree' not found in your PATH :(${NC}\n"
-            printf "\nExiting for now.\n\n"
-            exit
-        fi
-    else
-        printf "\n  ${RED}You specified to use $tree_program, but that is not one of the options :(${NC}\n"
-        printf "\n  Currently available options are 'FastTree' (the default), or 'IQ-TREE'.\n\n"
 
-        printf "  You can also run GToTree in alignment-only mode by adding the \"-N\" flag,\n"
-        printf "  and then take your concatenated alignment to another tree program :)\n"
+# checking specified tree program is one of the expected ones
+if [ $tree_program != "FastTreeMP" ] && [ $tree_program != "FastTree" ] && [ $tree_program != "IQ-TREE" ]; then
+
+    printf "\n  ${RED}You specified to use $tree_program as the treeing program, but that is not one of the options :(${NC}\n"
+    printf "\n  Currently available options are 'FastTreeMP' (the default), 'FastTree', or 'IQ-TREE'.\n\n"
+
+    printf "  You can also run GToTree in alignment-only mode by adding the \"-N\" flag,\n"
+    printf "  and then take your concatenated alignment to another tree program :)\n"
+    printf "\nExiting for now.\n\n"
+    exit
+
+fi
+
+# checking FastTreeMP is available if specified
+wanting_but_missing_FastTreeMP="null"
+if [ $tree_program == "FastTreeMP" ]; then
+    if ! command -v FastTreeMP > /dev/null; then
+        # keeping track so can report in log that regular FastTree was used
+        wanting_but_missing_FastTreeMP="true"
+        tree_program="FastTree"
+    fi
+fi
+
+# checking iqtree is available if it was specified
+if [ $tree_program == "IQ-TREE" ]; then    
+    if ! command -v iqtree > /dev/null; then
+        printf "\n  ${RED}You specified to use IQ-TREE, but 'iqtree' not found in your PATH :(${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
     fi
 fi
-
 
 # checking out NCBI accessions file 
 if [ -f "$NCBI_acc_file" ]; then
@@ -767,7 +786,7 @@ fi
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.5" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTree" ] || [ $align_only == 'true' ] || [ $keep_individual_alignments == 'true' ]; then
+if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.5" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTreeMP" ] || [ $wanting_but_missing_FastTreeMP == "true" ] || [ $align_only == 'true' ] || [ $keep_individual_alignments == 'true' ]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
@@ -819,7 +838,12 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
 
     if [ $align_only == 'false' ]; then
 
-        if [ $tree_program != "FastTree" ]; then
+        if [ $wanting_but_missing_FastTreeMP == "true" ]; then
+            printf "      - FastTreeMP not available on system, so using non-parallel FastTree instead.\n"
+            tree_program="FastTree"
+        fi
+
+        if [ $tree_program != "FastTreeMP" ] && [ $wanting_but_missing_FastTreeMP != "true" ]; then
             printf "      - Tree generation program (\"-T\") has been set to $tree_program.\n" | tee -a $gtotree_log
         fi
 
@@ -2952,6 +2976,36 @@ fi
 
 if [ $align_only == 'false' ]; then
 
+    if [ $tree_program == 'FastTreeMP' ]; then
+
+        printf "\n ############################################################################## \n" | tee -a $gtotree_log
+        printf " ####                         Running FastTreeMP                           ####\n" | tee -a $gtotree_log
+        printf " ############################################################################## \n\n" | tee -a $gtotree_log
+
+        curr_time=$(date +"%I:%M %p")
+        duration=$SECONDS
+
+        printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
+        printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+
+        # setting env variable for FastTreeMP
+        export OMP_NUM_THREADS=${num_jobs}
+
+        # if headers were modified
+        if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
+
+            FastTreeMP ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> >(tee -a $gtotree_log >&2)
+
+        else
+
+            FastTreeMP ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> >(tee -a $gtotree_log >&2)
+
+        fi
+
+        fasttree_used="true" # setting to report citations at end
+
+    fi
+
     if [ $tree_program == 'FastTree' ]; then
 
         printf "\n ############################################################################## \n" | tee -a $gtotree_log
@@ -2967,43 +3021,22 @@ if [ $align_only == 'false' ]; then
 
         # if headers were modified
         if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-            
-            # if multithreaded and on a system where FastTreeMP is also installed (conda not installing parallel version currently in other systems than linux)
-            if command -v FastTreeMP && [ ${num_jobs} != 1 ]; then
 
-                # setting env variable for FastTreeMP
-                export OMP_NUM_THREADS=${num_jobs}
-                # running FastTreeMP
-                FastTreeMP ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> >(tee -a $gtotree_log >&2)
-
-            else
-
-                FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> >(tee -a $gtotree_log >&2)
-
-            fi
+            FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> >(tee -a $gtotree_log >&2)
 
         # if headers were not modified
         else
 
-            # if multithreaded and on a system where FastTreeMP is also installed (conda not installing parallel version currently in other systems than linux)
-            if command -v FastTreeMP > dev/null && [ ${num_jobs} != 1 ]; then
-
-                # setting env variable for FastTreeMP
-                export OMP_NUM_THREADS=${num_jobs}
-                # running FastTreeMP
-                FastTreeMP ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> >(tee -a $gtotree_log >&2)
-
-            else
-
-                FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> >(tee -a $gtotree_log >&2)
-
-            fi
+            FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> >(tee -a $gtotree_log >&2)
 
         fi
 
         fasttree_used="true" # setting to report citations at end
 
-    else
+    fi
+
+
+    if [ $tree_program == 'IQ-TREE' ]; then
 
         printf "\n ############################################################################## \n" | tee -a $gtotree_log
         printf " ####                          Running IQ-TREE                            ####\n" | tee -a $gtotree_log
