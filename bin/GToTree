@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.48"
+VERSION="v1.5.50"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -2331,6 +2331,9 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
         curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar122_metadata.tar.gz -o ${tmp_dir}/gtdb_archaea_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
         curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tar.gz -o ${tmp_dir}/gtdb_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
+        
+        # and getting version info downloaded
+        curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/VERSION -o ${tmp_dir}/GTDB-version-info.txt
         printf "\n\n"
 
         # making sure file downloaded with no errors
@@ -2340,6 +2343,11 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
             touch ${tmp_dir}/gtdb_failed_download.tmp
         else
             rm -rf capture_any_dl_errors.tmp
+
+            # setting variables for reporting version in citations file
+            gtdb_version=$(head -n 1 ${tmp_dir}/GTDB-version-info.txt)
+            gtdb_release_date=$(tail -n 1 ${tmp_dir}/GTDB-version-info.txt)
+
         fi
 
         # only moving forward if there were no errors in downloading the GTDB files
@@ -3236,8 +3244,6 @@ if [ $taxonkit_used == "true" ]; then
 fi
 
 if [ $gtdb_used == "true" ]; then
-    gtdb_version=$(head -n 1 ${GTDB_dir}GTDB-version-info.txt)
-    gtdb_release_date=$(tail -n 1 ${GTDB_dir}GTDB-version-info.txt)
     printf "Genome Taxonomy Database (GTDB) ${gtdb_version}; ${gtdb_release_date}\nParks DH et al. A complete domain-to-species taxonomy for Bacteria and Archaea. Nat. Biotech. 2020. doi:10.1038/s41587-020-0501-8\n\n" >> ${output_dir}/citations.txt
 fi
 
