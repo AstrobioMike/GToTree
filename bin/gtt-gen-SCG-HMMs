@@ -8,7 +8,7 @@ For examples, please visit the GToTree wiki here: https://github.com/AstrobioMik
 For details on the process, please see: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets
 """
 
-version = "v1.5.51"
+version = "v1.5.52"
 import os
 import sys
 import argparse
@@ -684,7 +684,7 @@ def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, percent_single_copy, 
 
         for pfam in count_tab.columns.tolist():
 
-            if sum(count_tab[pfam] == 1) / len(target_genome_accs) * 100 >= 90:
+            if sum(count_tab[pfam] == 1) / len(target_genome_accs) * 100 >= percent_single_copy:
                 wanted_pfams.append(pfam)
 
         # writing out because they are needed for the hmmfetch program
