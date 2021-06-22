@@ -1,0 +1,127 @@
+#!/usr/bin/env python
+
+"""
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
+to facilitate subsetting accessions pulled from the GTDB database (with 'gtt-get-accessions-from-GTDB').
+
+It is intended to help when wanting a tree to span a breadth of diversity we know about, while also helping
+to reduce over-representation of certain Classes. 
+
+If a specific class makes up > 5% (by default) of the total number of accessions, it will randomly subset 
+that class down to 25% of what it was. So if there are 1,000 total accessions, and Gammaproteobacteria have 
+100 entries, the program will randomly select 25 Gammaproteobacteria accessions only.
+"""
+
+
+import sys
+import argparse
+import textwrap
+import pandas as pd
+
+
+parser = argparse.ArgumentParser(description='This script is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki)\
+                                              to facilitate subsetting accessions pulled from the GTDB database (with\
+                                              \'gtt-get-accessions-from-GTDB\' – the input file is the "*metadata.tsv" from that program).\
+                                              It is intended to help when wanting a tree to span the breadth\
+                                              of diversity we know about, while also helping to reduce over-representation of certain Classes.\
+                                              If a specific Class makes up > 5% (by default) of the total number of target genomes, the script\
+                                              will randomly subset that class down to 25% of what it was. So if there are 1,000 total target genomes,\
+                                              and Gammaproteobacteria make up 100 entries, the program will randomly select 25 Gammaproteobacteria\
+                                              to include. It outputs a new subset accessions file ready for use with the main GToTree program.',
+                                epilog = "Ex. usage: gtt-subset-GTDB-classes -i GTDB-arc-and-bac-refseq-rep-metadata.tsv")
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-i", "--GTDB-table", help="GTDB metadata table produced with 'gtt-get-accessions-from-GTDB'", action="store", required=True)
+parser.add_argument("-o", "--output-accessions", help='output accessions (default: "subset-accessions.txt")', action="store", dest="output_file", default="subset-accessions.txt")
+
+parser.add_argument("-p", "--cutoff-fraction", help='Fraction of total target genomes that any given Class must contribute in order for that class to be randomly subset (default: 0.05)', action="store", default=0.05)
+parser.add_argument("-f", "--fraction-to-subset", help='Fraction those that are filtered should be randomly subset down to (default: 0.25)', action="store", dest="filter_fraction", default=0.25)
+
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(0)
+
+args = parser.parse_args()
+
+
+############################################################
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+def wprint(text):
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+################################################################################
+
+# going to randomly subset if a class makes up more than 5% of total
+class_dict = {}
+
+# reading lineage table into pandas dataframe
+lineage_df = pd.read_csv(args.GTDB_table, delimiter="\t", usecols = range(8))
+
+starting_size = len(lineage_df.index)
+
+# counting how many times each class shows up
+for index, row in lineage_df.iterrows():
+    if row["class"] not in class_dict:
+        class_dict[row["class"]] = 1
+    else:
+        class_dict[row["class"]] += 1
+
+# getting 5% cutoff of total number of entries
+cutoff = int(starting_size * args.cutoff_fraction)
+
+# getting which classes are above this threshold
+classes_to_subset = []
+
+for key in class_dict:
+    if class_dict[key] >= cutoff:
+        classes_to_subset.append(key)
+
+# function to subset master table
+def subset_table(class_to_subset, input_tab):
+    curr_class = class_to_subset
+
+    sub_master_df_to_keep = input_tab.loc[input_tab["class"] != curr_class]
+
+    curr_class_df = input_tab.loc[input_tab["class"] == curr_class]
+
+    random_sub_df = curr_class_df.sample(n=int(len(curr_class_df.index) * args.filter_fraction))
+
+    new_df = pd.concat([sub_master_df_to_keep, random_sub_df])
+
+    return new_df
+
+# subsetting each class
+for rank in classes_to_subset:
+    lineage_df = subset_table(rank, lineage_df)
+
+# removing "RS_" and "GB_" prefixes and writing out output accs
+with open(args.output_file, "w") as out:
+    for acc in lineage_df.accession:
+        out.write(acc[3:] + "\n")
+
+filtered_size = len(lineage_df.index)
+
+print("")
+wprint(color_text(str("{:,}".format(starting_size)) + " initial entries were subset down to " + str("{:,}".format(filtered_size)) + "\n", "yellow"))
+print("\n    Subset classes included: \n\t\t\t\t" + "\n\t\t\t\t".join(classes_to_subset) + "\n")
+print()
+wprint("Subset accessions file written to:")
+print(color_text("    " + str(args.output_file)) + "\n")
