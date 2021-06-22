@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
 """
-This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki)
 to facilitate subsetting accessions pulled from the GTDB database (with 'gtt-get-accessions-from-GTDB').
 
 It is intended to help when wanting a tree to span a breadth of diversity we know about, while also helping
-to reduce over-representation of certain Classes. 
+to reduce over-representation of certain Classes.
 
-If a specific class makes up > 5% (by default) of the total number of accessions, it will randomly subset 
-that class down to 25% of what it was. So if there are 1,000 total accessions, and Gammaproteobacteria have 
-100 entries, the program will randomly select 25 Gammaproteobacteria accessions only.
+If a specific class makes up > 0.05% (by default) of the total number of accessions, it will randomly subset
+that class down to 5% of what it was. So if there are 40,000 total target genomes, and Gammaproteobacteria have
+8,000 of them (20% of the total), the program will randomly select 80 Gammaproteobacteria to include (1% of 8,000).
 """
 
 
@@ -24,10 +24,10 @@ parser = argparse.ArgumentParser(description='This script is a helper program of
                                               \'gtt-get-accessions-from-GTDB\' – the input file is the "*metadata.tsv" from that program).\
                                               It is intended to help when wanting a tree to span the breadth\
                                               of diversity we know about, while also helping to reduce over-representation of certain Classes.\
-                                              If a specific Class makes up > 5% (by default) of the total number of target genomes, the script\
-                                              will randomly subset that class down to 25% of what it was. So if there are 1,000 total target genomes,\
-                                              and Gammaproteobacteria make up 100 entries, the program will randomly select 25 Gammaproteobacteria\
-                                              to include. It outputs a new subset accessions file ready for use with the main GToTree program.',
+                                              If a specific Class makes up > 0.05% (by default) of the total number of target genomes, this program\
+                                              will randomly subset that class down to 1% of what it was. So if there are 40,000 total target genomes,\
+                                              and Gammaproteobacteria make up 8,000 of them (20% of the total), the program will randomly select 80 Gammaproteobacteria\
+                                              to include (1% of 8,000). It outputs a new subset accessions file ready for use with the main GToTree program.',
                                 epilog = "Ex. usage: gtt-subset-GTDB-classes -i GTDB-arc-and-bac-refseq-rep-metadata.tsv")
 
 required = parser.add_argument_group('required arguments')
@@ -35,8 +35,8 @@ required = parser.add_argument_group('required arguments')
 required.add_argument("-i", "--GTDB-table", help="GTDB metadata table produced with 'gtt-get-accessions-from-GTDB'", action="store", required=True)
 parser.add_argument("-o", "--output-accessions", help='output accessions (default: "subset-accessions.txt")', action="store", dest="output_file", default="subset-accessions.txt")
 
-parser.add_argument("-p", "--cutoff-fraction", help='Fraction of total target genomes that any given Class must contribute in order for that class to be randomly subset (default: 0.05)', action="store", default=0.05)
-parser.add_argument("-f", "--fraction-to-subset", help='Fraction those that are filtered should be randomly subset down to (default: 0.25)', action="store", dest="filter_fraction", default=0.25)
+parser.add_argument("-p", "--cutoff-fraction", help='Fraction of total target genomes that any given Class must contribute in order for that class to be randomly subset (default: 0.0005)', action="store", default=0.0005)
+parser.add_argument("-f", "--fraction-to-subset", help='Fraction those that are filtered should be randomly subset down to (default: 0.01)', action="store", dest="filter_fraction", default=0.01)
 
 
 if len(sys.argv)==1:
@@ -64,7 +64,7 @@ def color_text(text, color='green'):
         return text
 
 def wprint(text):
-    print(textwrap.fill(text, width=80, initial_indent="  ", 
+    print(textwrap.fill(text, width=80, initial_indent="  ",
           subsequent_indent="  ", break_on_hyphens=False))
 
 ################################################################################
@@ -84,8 +84,8 @@ for index, row in lineage_df.iterrows():
     else:
         class_dict[row["class"]] += 1
 
-# getting 5% cutoff of total number of entries
-cutoff = int(starting_size * args.cutoff_fraction)
+# getting cutoff threshold of total number of entries
+cutoff = int(starting_size * float(args.cutoff_fraction))
 
 # getting which classes are above this threshold
 classes_to_subset = []
@@ -102,7 +102,7 @@ def subset_table(class_to_subset, input_tab):
 
     curr_class_df = input_tab.loc[input_tab["class"] == curr_class]
 
-    random_sub_df = curr_class_df.sample(n=int(len(curr_class_df.index) * args.filter_fraction))
+    random_sub_df = curr_class_df.sample(n=int(len(curr_class_df.index) * float(args.filter_fraction)))
 
     new_df = pd.concat([sub_master_df_to_keep, random_sub_df])
 
@@ -121,7 +121,7 @@ filtered_size = len(lineage_df.index)
 
 print("")
 wprint(color_text(str("{:,}".format(starting_size)) + " initial entries were subset down to " + str("{:,}".format(filtered_size)) + "\n", "yellow"))
-print("\n    Subset classes included: \n\t\t\t\t" + "\n\t\t\t\t".join(classes_to_subset) + "\n")
-print()
-wprint("Subset accessions file written to:")
+# print("\n    Subset classes included: \n\t\t\t\t" + "\n\t\t\t\t".join(classes_to_subset) + "\n")
+print("")
+wprint("Subset accessions file for GToTree written to:")
 print(color_text("    " + str(args.output_file)) + "\n")

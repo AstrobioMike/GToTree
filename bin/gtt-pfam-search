@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.5.53"
+VERSION="v1.5.54"
 
 printf "\n\n                                  GToTree ${VERSION}\n"
 printf "                         (github.com/AstrobioMike/GToTree)\n\n"
