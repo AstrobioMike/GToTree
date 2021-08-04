@@ -5,11 +5,15 @@ This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wik
 to facilitate subsetting accessions pulled from the GTDB database (with 'gtt-get-accessions-from-GTDB').
 
 It is intended to help when wanting a tree to span a breadth of diversity we know about, while also helping
-to reduce over-representation of certain Classes.
+to reduce over-representation of certain taxa.
 
-If a specific class makes up > 0.05% (by default) of the total number of accessions, it will randomly subset
+There are two primary methods to use it:
+
+1) If a specific class makes up > 0.05% (by default) of the total number of accessions, it will randomly subset
 that class down to 5% of what it was. So if there are 40,000 total target genomes, and Gammaproteobacteria have
 8,000 of them (20% of the total), the program will randomly select 80 Gammaproteobacteria to include (1% of 8,000).
+
+2) Select 1 random genome from each Order.
 """
 
 
@@ -23,11 +27,14 @@ parser = argparse.ArgumentParser(description='This script is a helper program of
                                               to facilitate subsetting accessions pulled from the GTDB database (with\
                                               \'gtt-get-accessions-from-GTDB\' – the input file is the "*metadata.tsv" from that program).\
                                               It is intended to help when wanting a tree to span the breadth\
-                                              of diversity we know about, while also helping to reduce over-representation of certain Classes.\
-                                              If a specific Class makes up > 0.05% (by default) of the total number of target genomes, this program\
+                                              of diversity we know about, while also helping to reduce over-representation of certain taxa. \
+                                              There are 2 primary methods for using it: \
+                                              1) If a specific Class makes up > 0.05% (by default) of the total number of target genomes, the script\
                                               will randomly subset that class down to 1% of what it was. So if there are 40,000 total target genomes,\
                                               and Gammaproteobacteria make up 8,000 of them (20% of the total), the program will randomly select 80 Gammaproteobacteria\
-                                              to include (1% of 8,000). It outputs a new subset accessions file ready for use with the main GToTree program.',
+                                              to include (1% of 8,000). \
+                                              2) Select 1 random genome from each Order. \
+                                              It ultimately outputs a new subset accessions file ready for use with the main GToTree program.',
                                 epilog = "Ex. usage: gtt-subset-GTDB-classes -i GTDB-arc-and-bac-refseq-rep-metadata.tsv")
 
 required = parser.add_argument_group('required arguments')
@@ -38,6 +45,7 @@ parser.add_argument("-o", "--output-accessions", help='output accessions (defaul
 parser.add_argument("-p", "--cutoff-fraction", help='Fraction of total target genomes that any given Class must contribute in order for that class to be randomly subset (default: 0.0005)', action="store", default=0.0005)
 parser.add_argument("-f", "--fraction-to-subset", help='Fraction those that are filtered should be randomly subset down to (default: 0.01)', action="store", dest="filter_fraction", default=0.01)
 
+parser.add_argument("--get-Order-representatives-only", action="store_true", help = "Provide this flag to simply get 1 random genome from each Order in GTDB.", dest = "order_only")
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -67,7 +75,39 @@ def wprint(text):
     print(textwrap.fill(text, width=80, initial_indent="  ",
           subsequent_indent="  ", break_on_hyphens=False))
 
+
+# function to subset master table to one for each order
+def order_subset_table(order_to_subset, input_tab):
+
+    sub_master_df_to_keep = input_tab.loc[input_tab["order"] != order_to_subset]
+
+    curr_order_df = input_tab.loc[input_tab["order"] == order_to_subset]
+
+    random_sub_df = curr_order_df.sample(n = 1, random_state = 1)
+
+    new_df = pd.concat([sub_master_df_to_keep, random_sub_df])
+
+    return new_df
+
+
+# function to subset master table
+def subset_table(class_to_subset, input_tab):
+
+    curr_class = class_to_subset
+
+    sub_master_df_to_keep = input_tab.loc[input_tab["class"] != curr_class]
+
+    curr_class_df = input_tab.loc[input_tab["class"] == curr_class]
+
+    random_sub_df = curr_class_df.sample(n=int(len(curr_class_df.index) * float(args.filter_fraction)))
+
+    new_df = pd.concat([sub_master_df_to_keep, random_sub_df])
+
+    return new_df
+
+
 ################################################################################
+
 
 # going to randomly subset if a class makes up more than 5% of total
 class_dict = {}
@@ -76,6 +116,34 @@ class_dict = {}
 lineage_df = pd.read_csv(args.GTDB_table, delimiter="\t", usecols = range(8))
 
 starting_size = len(lineage_df.index)
+
+# just giving 1 of each order if requested
+if args.order_only:
+
+    # getting list of all unique orders
+    unique_orders = lineage_df.order.unique()
+
+    # getting one of each order
+    for entry in unique_orders:
+
+        lineage_df = order_subset_table(entry, lineage_df)
+
+    filtered_size = len(lineage_df.index)
+
+    # removing "RS_" and "GB_" prefixes and writing out output accs
+    with open(args.output_file, "w") as out:
+        for acc in lineage_df.accession:
+            out.write(acc[3:] + "\n")
+
+    # reporting and exiting
+    print("")
+    wprint(color_text(str("{:,}".format(starting_size)) + " initial entries were subset down to " + str("{:,}".format(filtered_size)) + "\n", "yellow"))
+    print("")
+    wprint("Subset accessions file for GToTree written to:")
+    print(color_text("    " + str(args.output_file)) + "\n")
+
+    exit()
+
 
 # counting how many times each class shows up
 for index, row in lineage_df.iterrows():
@@ -94,20 +162,6 @@ for key in class_dict:
     if class_dict[key] >= cutoff:
         classes_to_subset.append(key)
 
-# function to subset master table
-def subset_table(class_to_subset, input_tab):
-    curr_class = class_to_subset
-
-    sub_master_df_to_keep = input_tab.loc[input_tab["class"] != curr_class]
-
-    curr_class_df = input_tab.loc[input_tab["class"] == curr_class]
-
-    random_sub_df = curr_class_df.sample(n=int(len(curr_class_df.index) * float(args.filter_fraction)))
-
-    new_df = pd.concat([sub_master_df_to_keep, random_sub_df])
-
-    return new_df
-
 # subsetting each class
 for rank in classes_to_subset:
     lineage_df = subset_table(rank, lineage_df)
@@ -123,5 +177,5 @@ print("")
 wprint(color_text(str("{:,}".format(starting_size)) + " initial entries were subset down to " + str("{:,}".format(filtered_size)) + "\n", "yellow"))
 # print("\n    Subset classes included: \n\t\t\t\t" + "\n\t\t\t\t".join(classes_to_subset) + "\n")
 print("")
-wprint("Subset accessions file for GToTree written to:")
+wprint("Subset accessions written to file:")
 print(color_text("    " + str(args.output_file)) + "\n")
