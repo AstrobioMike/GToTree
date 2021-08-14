@@ -282,9 +282,9 @@ do
     esac
 done
 
-#############################################################################
-##### CHECKING IF -L ARGUMENT PROVIDED THAT ALSO -t or -D WERE PROVIDED #####
-#############################################################################
+##################################
+##### SOME PRE-FLIGHT CHECKS #####
+##################################
 
 # checking if `-L` argument was set that also `-t` or `-D` were provided, otherwise no tax info is added
 if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
@@ -339,8 +339,29 @@ if [ $tree_program == "IQ-TREE" ]; then
     fi
 fi
 
+##########################################################################
+##### CHECKING INPUT FILES, INCLUDING IF THEY HAVE CRLF LINE ENDINGS #####
+##########################################################################
+
 # checking out NCBI accessions file 
 if [ -f "$NCBI_acc_file" ]; then
+
+    # checking if file has windows CRLF line-terminators, and running dos2unix if so
+    dos2unix < ${NCBI_acc_file} | cmp - ${NCBI_acc_file} > /dev/null
+
+    if [ $? -ne 0 ] ; then
+        dos2unix -n ${NCBI_acc_file} ${NCBI_acc_file}-unix 2> /dev/null
+
+        printf "\n${YELLOW}    Input file \"${NCBI_acc_file}\" had some Windows-formatting that likely\n"
+        printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
+        printf "    \"${NCBI_acc_file}-unix\", and will be using that.${NC}\n\n"
+
+        sleep 2
+
+        NCBI_acc_file="${NCBI_acc_file}-unix"
+
+    fi
+
     # checking no duplicates in there
     num_dupes=$(sort "$NCBI_acc_file" | uniq -d | wc -l | sed "s/^ *//" | cut -d " " -f 1)
     if [ ! $num_dupes == 0 ]; then
@@ -370,6 +391,23 @@ fi
 
 # checking out input fasta files file 
 if [ -f "$fasta_files" ]; then
+
+    # checking if file has windows CRLF line-terminators, and running dos2unix if so
+    dos2unix < ${fasta_files} | cmp - ${fasta_files} > /dev/null
+
+    if [ $? -ne 0 ] ; then
+        dos2unix -n ${fasta_files} ${fasta_files}-unix 2> /dev/null
+
+        printf "\n${YELLOW}    Input file \"${fasta_files}\" had some Windows-formatting that likely\n"
+        printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
+        printf "    \"${fasta_files}-unix\", and will be using that.${NC}\n\n"
+
+        sleep 2
+
+        fasta_files="${fasta_files}-unix"
+
+    fi
+
     # checking no duplicates in there
     num_dupes=$(sort "$fasta_files" | uniq -d | wc -l | sed "s/^ *//" | cut -d " " -f 1)
     if [ ! $num_dupes == 0 ]; then
@@ -399,10 +437,27 @@ fi
 
 # checking out input amino-acid files file 
 if [ -f "$amino_acid_files" ]; then
+
+    # checking if file has windows CRLF line-terminators, and running dos2unix if so
+    dos2unix < ${amino_acid_files} | cmp - ${amino_acid_files} > /dev/null
+
+    if [ $? -ne 0 ] ; then
+        dos2unix -n ${amino_acid_files} ${amino_acid_files}-unix 2> /dev/null
+
+        printf "\n${YELLOW}    Input file \"${amino_acid_files}\" had some Windows-formatting that likely\n"
+        printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
+        printf "    \"${amino_acid_files}-unix\", and will be using that.${NC}\n\n"
+
+        sleep 2
+
+        amino_acid_files="${amino_acid_files}-unix"
+
+    fi
+
     # checking no duplicates in there
     num_dupes=$(sort "$amino_acid_files" | uniq -d | wc -l | sed "s/^ *//" | cut -d " " -f 1)
     if [ ! $num_dupes == 0 ]; then
-        printf "\n${RED}  $fasta_files has duplicate entries, check it out and provide unique entries only.${NC}\n"
+        printf "\n${RED}  $amino_acid_files has duplicate entries, check it out and provide unique entries only.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
     fi
@@ -428,6 +483,23 @@ fi
 
 # checking out input genbank files file 
 if [ -f "$genbank_list_file" ]; then
+
+    # checking if file has windows CRLF line-terminators, and running dos2unix if so
+    dos2unix < ${genbank_list_file} | cmp - ${genbank_list_file} > /dev/null
+
+    if [ $? -ne 0 ] ; then
+        dos2unix -n ${genbank_list_file} ${genbank_list_file}-unix 2> /dev/null
+
+        printf "\n${YELLOW}    Input file \"${genbank_list_file}\" had some Windows-formatting that likely\n"
+        printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
+        printf "    \"${genbank_list_file}-unix\", and will be using that.${NC}\n\n"
+
+        sleep 2
+
+        genbank_list_file="${genbank_list_file}-unix"
+
+    fi
+
     # checking no duplicates in there
     num_dupes=$(sort "$genbank_list_file" | uniq -d | wc -l | sed "s/^ *//" | cut -d " " -f 1)
     if [ ! $num_dupes == 0 ]; then
@@ -455,8 +527,26 @@ if [ -f "$genbank_list_file" ]; then
 fi
 
 
-# checking no duplicate desired labels in mapping file
+### checking on mapping file
 if [ -f "$file_to_genome_id_map" ]; then
+
+    # checking if file has windows CRLF line-terminators, and running dos2unix if so
+    dos2unix < ${file_to_genome_id_map} | cmp - ${file_to_genome_id_map} > /dev/null
+
+    if [ $? -ne 0 ] ; then
+        dos2unix -n ${file_to_genome_id_map} ${file_to_genome_id_map}-unix 2> /dev/null
+
+        printf "\n${YELLOW}    Input file \"${file_to_genome_id_map}\" had some Windows-formatting that likely\n"
+        printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
+        printf "    \"${file_to_genome_id_map}-unix\", and will be using that.${NC}\n\n"
+
+        sleep 2
+
+        file_to_genome_id_map="${file_to_genome_id_map}-unix"
+
+    fi
+
+    # looking for duplicate desired labels in mapping file
     num_dupes=$(cut -f 2,3 "$file_to_genome_id_map" | tr "\t" "_" | sort | uniq -d | wc -l)
     if [ ! $num_dupes == 0 ]; then
         printf "\n${RED}  $file_to_genome_id_map appears to have duplicate labels in there.${NC}\n" 
@@ -544,8 +634,7 @@ fi
 
 if [ ! -n "$hmm_file" ]; then
     printf "\n  ${RED}You need to provide the HMM file of the target genes you want to tree!${NC}\n"
-    printf "  If you've set up the environment variable 'GToTree_HMM_dir', you can view\n"
-    printf "  the available gene-sets packaged with GToTree by running 'gtt-hmms' by\n"
+    printf "  You can view the available gene-sets packaged with GToTree by running 'gtt-hmms' by\n"
     printf "  itself with no arguments.\n"
 
     printf "\nExiting for now.\n\n"
