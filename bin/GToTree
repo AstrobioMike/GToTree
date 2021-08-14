@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.6.00"
+VERSION="v1.6.10"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -169,6 +169,10 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  Provide this flag with no arguments if your system can't use ftp,\n"
     printf "                  and you'd like to try using http.\n\n"
 
+    printf "        - [-F ] default: false\n"
+    printf "                  Provide this flag with no arguments if you'd like to force\n"
+    printf "                  overwriting the output directory if it exists.\n\n"
+
     printf "        - [-d ] default: false\n"
     printf "                  Provide this flag with no arguments if you'd like to keep the\n"
     printf "                  temporary directory. (Mostly useful for debugging.)\n\n"
@@ -237,6 +241,7 @@ output_dir="GToTree_output"
 taxonkit_id_swap='false'
 gtdb_id_swap='false'
 debug_flag='false'
+overwrite_output_dir='false'
 lineage_spec="Domain,Phylum,Class,Species,Strain"
 best_hit_mode='false'
 align_only='false'
@@ -246,7 +251,7 @@ additional_pfam_targets='false'
 override_faster_alignment='false'
 http_flag='false'
 
-while getopts :a:g:f:A:H:o:m:tDL:p:NkT:c:G:Bdn:j:P args
+while getopts :a:g:f:A:H:o:m:tDL:p:NkT:c:G:BFdn:j:P args
 do
     case "${args}"
     in
@@ -267,6 +272,7 @@ do
         c) len_cutoff=${OPTARG};;
         G) gen_cutoff=${OPTARG};;
         B) best_hit_mode='true';;
+        F) overwrite_output_dir='true';;
         d) debug_flag='true';;
         n) num_cpus=${OPTARG};;
         j) num_jobs=${OPTARG};;
@@ -570,19 +576,28 @@ fi
 
 
 #############################################################################
-##########  ATTEMPTING TO CREATE OUTPUT DIR AND EXITING IF FAILS  ###########
+####################  ATTEMPTING TO CREATE OUTPUT DIR  ######################
 #############################################################################
 
-mkdir $output_dir 2> /dev/null
+## will not overwrite unless `-F` flag was provided
+if [ $overwrite_output_dir == "true" ]; then
 
-if [ $? -ne 0 ] ; then
-    printf "  ${RED}Output directory \"${output_dir}\" already exists, either remove or rename\n  that one, or specify a different output directory to the \"-o\" option.${NC}\n\n"
-    printf "Exiting for now.\n\n"
-    exit
+    rm -rf $output_dir
+    mkdir $output_dir
+
 else
-    rm -rf $output_dir # removing here so if we abort in a later step (the gene-filtering warning in particular), the output_dir isn't created yet
-fi
 
+    mkdir $output_dir 2> /dev/null
+
+    if [ $? -ne 0 ] ; then
+        printf "  ${RED}Output directory \"${output_dir}\" already exists, either remove or rename\n  that one, specify a different output directory to the \"-o\" option,\n  or add the \"-F\" flag to force overwriting it.${NC}\n\n"
+        printf "Exiting for now.\n\n"
+        exit
+    else
+        rm -rf $output_dir # removing here so if we abort in a later step before getting down to business (like the gene-filtering warning), the output_dir isn't created yet
+    fi
+
+fi
 
 #############################################################################
 ########################### STARTING LOG FILE ###############################
