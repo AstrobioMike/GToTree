@@ -66,6 +66,6 @@ curr_stop = 0
 
 with open(output_dir + "Partitions.txt", "w") as out:
     for i in range(0,len(gene_list)):
-        curr_stop = curr_start + alignment_lengths_list[i]
+        curr_stop = curr_start + alignment_lengths_list[i] - 1
         out.write("AA, " + str(gene_list[i]) + " = " + str(curr_start) + "-" + str(curr_stop) + "\n")
-        curr_start = curr_stop + 5
+        curr_start = curr_stop + 6
