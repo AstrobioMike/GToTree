@@ -14,9 +14,9 @@ gtt-parse-fasta-by-headers -i ${tmp_dir}/${1}_hits_filtered.tmp -w ${tmp_dir}/so
 
 # aligning
 if [ $faster_alignment == 'true' ]; then
-    muscle -in ${tmp_dir}/${1}_hits_filtered.faa -diags -maxiters 2 -sv -out ${tmp_dir}/${1}_aligned.tmp &> /dev/null
+    muscle -super5 ${tmp_dir}/${1}_hits_filtered.faa -output ${tmp_dir}/${1}_aligned.tmp &> /dev/null
 else
-    muscle -in ${tmp_dir}/${1}_hits_filtered.faa -diags1 -maxiters 4 -out ${tmp_dir}/${1}_aligned.tmp &> /dev/null
+    muscle -align ${tmp_dir}/${1}_hits_filtered.faa -output ${tmp_dir}/${1}_aligned.tmp &> /dev/null
 fi
 
 # trimming

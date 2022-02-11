@@ -43,7 +43,21 @@ parser.add_argument("--GTDB-representatives-only", action="store_true", help="Pr
 parser.add_argument("--RefSeq-representatives-only", action="store_true", help="Provide this flag along with a specified taxon to the `-t` flag \
                                                                         to pull accessions only for genomes designated as RefSeq representative \
                                                                         genomes (see e.g.: https://www.ncbi.nlm.nih.gov/refseq/about/prokaryotes/#representative_genomes).\
-                                                                        (Useful for subsetting a view across a broad level of diversity.)")
+                                                                        (Useful for subsetting a view across a broad level of diversity, see \
+                                                                        also `gtt-subset-GTDB-accessions`.)")
+
+parser.add_argument("--do-not-check-GTDB-version", action="store_true", help="By default, this program checks if it is using the latest version of \
+                                                                        the GTDB database. Provide this flag to prevent this from occurring, using \
+                                                                        the version already present.")
+
+parser.add_argument("--store-GTDB-metadata-in-current-working-dir", action="store_true", help="By default, GToTree uses a system-wide variable \
+                                                                        to know where to put and search the GTDB metadata. Provide this flag to \
+                                                                        ignore that and store the master table in the current working directory.")
+
+
+
+
+
 
 
 if len(sys.argv)==1:
@@ -59,7 +73,7 @@ args = parser.parse_args()
 def main():
 
     if args.get_table:
-        get_gtdb_tab()
+        get_gtdb_tab(args.do_not_check_GTDB_version, args.store_GTDB_metadata_in_current_working_dir)
         sys.exit(0)
 
     ## some checks to prevent things that either should be provided together, or should be mutually exclusive
@@ -78,7 +92,7 @@ def main():
         sys.exit(0)
 
     ## moving on
-    gtdb_tab = get_gtdb_tab()
+    gtdb_tab = get_gtdb_tab(args.do_not_check_GTDB_version, args.store_GTDB_metadata_in_current_working_dir)
 
     if args.GTDB_representatives_only:
         gtdb_rep_tab = gtdb_tab[gtdb_tab["gtdb_representative"] == "t"]
@@ -363,13 +377,13 @@ def gen_gtdb_tab(location):
 
     # getting archaea
     arc_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar122_metadata.tar.gz")
-    arc_tab = pd.read_csv(arc_tar_gz, sep="\t", compression="gzip", error_bad_lines=False, header=0, low_memory=False)
+    arc_tab = pd.read_csv(arc_tar_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     arc_tab.rename(columns={arc_tab.columns[0]:"accession"}, inplace=True)
     arc_tab.dropna(inplace=True, how="all")
 
     # getting bacteria
     bac_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tar.gz")
-    bac_tab = pd.read_csv(bac_tar_gz, sep="\t", compression="gzip", error_bad_lines=False, header=0, low_memory=False)
+    bac_tab = pd.read_csv(bac_tar_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     bac_tab.rename(columns={bac_tab.columns[0]:"accession"}, inplace=True)
     bac_tab.dropna(inplace=True, how="all")
 
@@ -449,7 +463,7 @@ def check_stored_gtdb_up_to_date(location):
         os.remove(location + "GTDB-latest-version-info.txt")
 
 
-def get_gtdb_tab():
+def get_gtdb_tab(prevent_database_version_check, store_db_metadata_in_current_working_dir):
     """ reads in file with gtdb info """
 
     # checking if there is a GTDB_dir (should be if conda install of GToTree was done)
@@ -458,13 +472,15 @@ def get_gtdb_tab():
     except:
         GTDB_dir = False
 
+
     # working there if there is one
-    if GTDB_dir:
+    if GTDB_dir and store_db_metadata_in_current_working_dir == False:
 
         if os.path.exists(GTDB_dir + "GTDB-arc-and-bac-metadata.tsv") and os.path.exists(GTDB_dir + "GTDB-version-info.txt"):
 
-            # making sure the stored version is the latest available from GTDB
-            check_stored_gtdb_up_to_date(GTDB_dir)
+            # making sure the stored version is the latest available from GTDB (unless the do not check flag was provided)
+            if prevent_database_version_check == False:
+                check_stored_gtdb_up_to_date(GTDB_dir)
 
             # copying if just table wanted
             if args.get_table:
@@ -520,8 +536,9 @@ def get_gtdb_tab():
         # checking if table and version info already exist in current directory
         if os.path.exists("GTDB-arc-and-bac-metadata.tsv") and os.path.exists("GTDB-version-info.txt"):
 
-            # making sure the stored version is the latest available from GTDB
-            check_stored_gtdb_up_to_date("./")
+            # making sure the stored version is the latest available from GTDB (unless the do not check flag was provided)
+            if prevent_database_version_check == False:
+                check_stored_gtdb_up_to_date("./")
 
             if args.get_table:
                 print("")
