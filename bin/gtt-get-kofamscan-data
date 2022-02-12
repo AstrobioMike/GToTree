@@ -1,0 +1,172 @@
+#!/usr/bin/env python
+
+"""
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
+to download and setup the KOFamScan (https://github.com/takaram/kofam_scan) data files for use. 
+
+For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
+"""
+
+import sys
+import os
+import urllib.request
+import argparse
+import shutil
+import textwrap
+import filecmp
+import tarfile
+import gzip
+
+parser = argparse.ArgumentParser(description="This is a helper program to setup the KOFamScan (github.com/takaram/kofam_scan) \
+                                              data files for use.", \
+                                 epilog="Ex. usage: gtt-get-kofamscan-data\n")
+
+args = parser.parse_args()
+
+
+################################################################################
+
+def main():
+
+    KO_data_dir = check_location_var_is_set()
+
+    data_present = check_if_data_present(KO_data_dir)
+
+    if data_present:
+        print("\n\tAlready here!\n\n")
+        exit()
+
+    else:
+        print("\n\tWe need to download!!\n\n")
+        get_kofamscan_data(KO_data_dir)
+
+
+################################################################################
+
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def check_location_var_is_set():
+
+    # making sure there is a KO_data_dir env variable
+    try:
+        KO_data_dir = os.environ['KO_data_dir']
+    except:
+        wprint(color_text("The environment variable 'KO_data_dir'  does not seem to be set :(", "yellow"))
+        wprint("This shouldn't happen, check on things with `gtt-list-data-locations`.")
+        print("")
+        sys.exit(0)
+
+    return(KO_data_dir)
+
+
+def check_stored_data_up_to_date(location):
+    """ checks if the stored kofamscan data is the latest """
+
+    # getting latest version README
+    kofamscan_current_readme = urllib.request.urlretrieve("ftp://ftp.genome.jp/pub/db/kofam/README", location + "README-latest")
+
+    # comparing vs one that's present already
+    if filecmp.cmp(location + "README-latest", location + "README"):
+        os.remove(location + "README-latest")
+
+        return(True)
+
+    else:
+        os.remove(location + "README-latest")
+        print("")
+        wprint(color_text("A newer version of the KOFamScan data is available, updating...", "yellow"))
+
+        return(False)
+
+
+def check_if_data_present(location):
+
+    # seeing if present already, and if so, if those are up-to-date
+    # if this function returns True, then data is present and up-to-date
+    # if it returns False, then we need to download things
+    README_path = str(location) + "/README"
+    ko_list_path = str(location) + "/ko_list"
+    hmms_dir_path = str(location) + "/profiles/"
+
+    if not os.path.isfile(README_path) or not os.path.isfile(ko_list_path) or not os.path.isdir(hmms_dir_path):
+
+        if os.path.exists(README_path):
+            os.remove(README_path)
+        if os.path.exists(ko_list_path):
+            os.remove(ko_list_path)
+        if os.path.isdir(hmms_dir_path):
+            shutil.rmtree(hmms_dir_path)
+
+        return(False)
+
+    else:
+
+        # if here, checking if it is up-to-date (returns True/False), if present and up to date, returning True
+        if check_stored_data_up_to_date(location):
+            return(True)
+
+        else:
+
+            # removing current files
+            if os.path.exists(README_path):
+                os.remove(README_path)
+            if os.path.exists(ko_list_path):
+                os.remove(ko_list_path)
+            if os.path.isdir(hmms_dir_path):
+                shutil.rmtree(hmms_dir_path)
+
+            return(False)
+
+
+def get_kofamscan_data(location):
+    """ downloads the needed kofamscan data """
+
+    README_path = str(location) + "/README"
+    ko_list_gz_path = str(location) + "/ko_list.gz"
+    ko_list_path = str(location) + "/ko_list"
+    hmms_tar_path = str(location) + "/profiles.tar.gz"
+
+    urllib.request.urlretrieve("ftp://ftp.genome.jp/pub/db/kofam/README", README_path)
+    urllib.request.urlretrieve("ftp://ftp.genome.jp/pub/db/kofam/ko_list.gz", ko_list_gz_path)
+    urllib.request.urlretrieve("ftp://ftp.genome.jp/pub/db/kofam/profiles.tar.gz", hmms_tar_path)
+
+    # decompressing ko_list file
+    with gzip.open(ko_list_gz_path, 'rb') as f_in:
+        with open(ko_list_path, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+
+    # removing gzipped ko_list
+    os.remove(ko_list_gz_path)
+
+    # unpacking profiles
+    with tarfile.open(hmms_tar_path) as tarball:
+        tarball.extractall(location)
+
+    # removing tarball
+    os.remove(hmms_tar_path)
+
+
+################################################################################
+
+if __name__ == "__main__":
+    main()
