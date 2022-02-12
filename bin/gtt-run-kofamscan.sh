@@ -12,10 +12,9 @@ curr_genome_output_dir="${output_dir}/KO_searching/individual_genome_results/${a
 mkdir -p ${curr_genome_output_dir}
 
 output_results_table_file="${curr_genome_output_dir}/kofamscan-results.tsv"
-output_counts_tmp_file="${curr_genome_output_dir}/KO-counts.tmp"
-output_counts_file="${curr_genome_output_dir}/KO-counts.tsv"
 tmp_ko_working_dir="${tmp_dir}/kofamscan/${assembly_id}/"
 tmp_unique_ko_hits="${tmp_ko_working_dir}/unique-KOs.txt"
+output_counts_file="${tmp_ko_working_dir}/KO-counts.txt"
 
 # running scan
 exec_annotation -p ${target_KO_hmms_dir} -k ${target_KOs_table_file} --cpu 1 -f mapper --no-report-unannotated --tmp-dir ${tmp_ko_working_dir} -o ${output_results_table_file} ${genes_file}
@@ -47,15 +46,10 @@ else
 fi
 
 # creating count file that can be stuck together at end
-rm -rf ${output_counts_tmp_file}
+rm -rf ${output_counts_file}
 
 for ko in $(cat ${unique_target_KOs}); do
 
-    printf "\n\n${ko}\n\n"
-
-    grep -w -c ${ko} ${output_results_table_file} >> ${output_counts_tmp_file}
+    grep -w -c ${ko} ${output_results_table_file} >> ${output_counts_file}
 
 done
-
-# combining with KOs
-paste ${unique_target_KOs} ${output_counts_tmp_file} > ${output_counts_file}
