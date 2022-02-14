@@ -1,0 +1,308 @@
+#!/usr/bin/env python
+
+"""
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
+to check and set required environmental variables. 
+
+For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
+"""
+
+import sys
+import os
+import argparse
+import textwrap
+import subprocess
+import shutil
+
+parser = argparse.ArgumentParser(description = "This is a helper program to check and set required environmental variables.", \
+                                 epilog="Ex. usage: gtt-data-locations check\n")
+
+
+parser.add_argument('task', choices = ['check', 'set'], help = 'check or set required environmental variables')
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(0)
+
+args = parser.parse_args()
+
+
+################################################################################
+
+def main():
+
+
+    if args.task == 'check':
+
+        check_and_report_env_variables()
+
+    if args.task == 'set':
+
+        paths_dict = set_env_variables()
+
+        modify_conda_activate_startup_script(paths_dict)
+
+        notify_to_reactivate_conda()
+
+
+################################################################################
+
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### classes for errors
+class PathDoesNotExist(Exception):
+    pass
+
+class PathNotWritable(Exception):
+    pass
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def check_and_report_env_variables():
+
+    # gtotree hmms dir
+    SCG_hmms_dir_path, SCG_hmms_dir_path_writable = check_location_var_is_set_and_writable("GToTree_HMM_dir")
+
+    # taxonkit
+    taxonkit_dir_path, taxonkit_dir_path_writable = check_location_var_is_set_and_writable("TAXONKIT_DB")
+
+    # gtdb
+    gtdb_dir_path, gtdb_dir_path_writable = check_location_var_is_set_and_writable("GTDB_dir")
+
+    # KO data
+    ko_dir_path, ko_dir_path_writable = check_location_var_is_set_and_writable("KO_data_dir")
+
+    print(color_text("\n    GToTree environment variables are set as follows:\n", "yellow"))
+
+    print("\t  {:<28} {:>10}".format("\033[4mvariable\033[0m", "\033[4mpath\033[0m"))
+    print("\t  {:<20} {:>10}".format("GToTree_HMM_dir", SCG_hmms_dir_path))
+    print("\t  {:<20} {:>10}".format("TAXONKIT_DB", taxonkit_dir_path))
+    print("\t  {:<20} {:>10}".format("GTDB_dir", gtdb_dir_path))
+    print("\t  {:<20} {:>10}".format("KO_data_dir", ko_dir_path))
+    print()
+
+
+    # reporting if any are not writable
+    writable_dict = {"GToTree_HMM_dir" : SCG_hmms_dir_path_writable,
+                     "TAXONKIT_DB" : taxonkit_dir_path_writable,
+                     "GTDB_dir" : gtdb_dir_path_writable,
+                     "KO_data_dir" : ko_dir_path_writable}
+
+    for entry in writable_dict.keys():
+
+        if not writable_dict[entry]:
+
+            print()
+            wprint(color_text("The path set for the '" + str(entry) + "' variable is not writable. This may cause problems, so you might want to put it somewhere else (with `gtt-data-locations set`).", "red"))
+            print()
+
+
+def check_location_var_is_set_and_writable(variable):
+
+    # making sure there is an env variable
+    try:
+        path = os.environ[variable]
+
+    except:
+        print()
+        wprint(color_text("The environment variable '" + str(variable) + "'' does not seem to be set :(", "yellow"))
+        wprint("Try to set it with `gtt-data-locations set`.")
+        print("")
+        sys.exit(0)
+
+    # making sure path is writable for the user
+    path_writable = os.access(path, os.W_OK)
+
+    return(path, path_writable)
+
+
+def get_variable_path(variable):
+
+    # getting current if there is one
+    try:
+        path = os.environ[variable]
+
+    except:
+        path = False
+
+    return(path)
+
+
+def set_variable_path(variable, curr_path):
+
+    # if current path exists, making sure user wants to change it 
+    if curr_path:
+
+        print("\n  --------------------------------------------------------------------------------")
+        print(color_text("\n  The current path set for '" + str(variable) + "' is:\n", "yellow"))
+        print("    " + str(curr_path) + "\n")
+
+        while True:
+            try:
+                want_to_change = input('  Would you like to change it? (y/n): ')
+
+                if want_to_change != "y" and want_to_change != "n":
+                    raise ValueError
+
+                break
+
+            except ValueError:
+                print(color_text("\n    Must respond with 'y' or 'n'.\n", "red"))
+
+        if want_to_change == "n":
+
+            print("\n  --------------------------------------------------------------------------------")
+
+            return(curr_path)
+
+    else:
+
+        print("\n  --------------------------------------------------------------------------------")
+        print(color_text("\n  There is no current path set for '" + str(variable) + "'.", "yellow"))
+
+
+
+    # setting the path
+    while True:
+        try:
+
+            new_path = input(color_text("\n  Enter the wanted full path for the '" + str(variable) + "' variable: ", "yellow"))
+            new_path = os.path.join(new_path, "")
+
+            # creating if it doesn't exist yet
+            if not os.path.isdir(new_path):
+
+                try:
+                    os.makedirs(new_path)
+                except:
+                    raise PathNotWritable
+
+            # making sure it is writable
+            if not os.access(new_path, os.W_OK):
+                raise PathNotWritable
+
+            break
+
+        except PathNotWritable:
+            print(color_text("\n    That location is not writable for you (press `ctrl + c` if wanting to exit).\n", "red"))
+
+    print("\n  --------------------------------------------------------------------------------\n")
+
+    return(new_path)
+
+
+def set_env_variables():
+
+    paths_dict = {"GToTree_HMM_dir" : "",
+                 "TAXONKIT_DB" : "",
+                 "GTDB_dir" : "",
+                 "KO_data_dir" : ""}
+
+    for entry in paths_dict.keys():
+
+        # getting all current paths (if any)
+        paths_dict[entry] = get_variable_path(entry)
+
+        paths_dict[entry] = set_variable_path(entry, paths_dict[entry])
+
+    return(paths_dict)
+
+
+def modify_conda_activate_startup_script(paths_dict):
+    """ 
+    adjust it so it holds the appropriate environment variables so when opened in the future,
+    the variables are loaded properly
+    """
+
+    # here is the file in the conda env: ls ${CONDA_PREFIX}/etc/conda/activate.d/gtotree.sh
+    # probably easiest to pass the arguments to a shell script from in here to do it
+      # rather than figuring out how to change the lines with python, though maybe not
+      # can go line-by-line, if starts with 'export <target_variable>', then i can change that line as appropriate
+      # would only mean looping through 4 times...
+      # if no line found, then just add it
+      # or can just go through and remove them, found or not, and add it...
+
+
+    ## should add some system in case they can't write in the conda area like Felix brought up
+    # i put a check in that if it can't write there, we store the variables in the user home directory somewhere
+      # and during a run, if that file exists, then we source that file
+      # would need to be checked and done at the start of this script too... what a mess
+        # i can put in the default conda startup script a check for this other file, and if it exists then source it
+        # at conda env launch
+
+    path_to_startup_script = os.path.join(os.environ["CONDA_PREFIX"], "etc/conda/activate.d/gtotree.sh")
+    
+    new_one_tmp = os.path.join(os.environ["CONDA_PREFIX"], "etc/conda/activate.d/gtotree.sh.tmp")
+
+    # reading file lines into list
+    with open(path_to_startup_script) as initial_file:
+
+        initial_lines = [line.strip() for line in initial_file.readlines()]
+
+    # getting which ones we want to keep (unchanged)
+    # starting new list of lines, for now holding only the ones we don't want to keep
+    new_lines = []
+
+    for line in initial_lines:
+
+        try:
+            curr_var = line.split(" ")[1].split('=')[0]
+
+        except:
+            new_lines.append(line)
+            continue
+
+        if curr_var not in paths_dict.keys():
+
+            new_lines.append(line)
+
+    # adding new export lines for set variables
+    for entry in paths_dict.keys():
+
+        string_to_add = "export " + str(entry) + "=" + str(os.path.join(paths_dict[entry]))
+
+        new_lines.append(string_to_add)
+
+    # writing to new file
+    with open(new_one_tmp, "w") as outfile:
+
+        outfile.write('\n'.join(new_lines))
+        outfile.write("\n")
+
+    # replacing original
+    shutil.move(new_one_tmp, path_to_startup_script)
+
+
+def notify_to_reactivate_conda():
+
+    print(color_text("\n  --------------------------------------------------------------------------------", "green"))
+    print(color_text("  --------------------------------------------------------------------------------", "green"))
+    wprint(color_text("Environment variables have been updated. But for the changes to take effect, be sure to reactivate the conda environment, e.g.:", "yellow"))
+    print("\n        `conda activate gtotree`\n")
+    wprint(color_text("Then you can double-check with `gtt-data-locations check`.", "yellow"))
+    print(color_text("  --------------------------------------------------------------------------------", "green"))
+    print(color_text("  --------------------------------------------------------------------------------\n", "green"))
+
+################################################################################
+
+if __name__ == "__main__":
+    main()
