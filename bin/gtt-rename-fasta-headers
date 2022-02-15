@@ -27,4 +27,4 @@ with open(args.output_fasta, "w") as output_file:
 	  	  for header, seq in SimpleFastaParser(input_file):
 
 	  	  	  n = n + 1
-	  	  	  output_file.write(">" + str(args.wanted_name) + "\n" + seq + "\n")
+	  	  	  output_file.write(">" + str(args.wanted_name) + "_" + str(n) + "\n" + seq + "\n")
