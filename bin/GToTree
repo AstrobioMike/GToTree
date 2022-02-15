@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.6.20"
+VERSION="v1.6.30"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -110,10 +110,19 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  GToTree will use the best hit. See here for more discussion:\n"
     printf "                  github.com/AstrobioMike/GToTree/wiki/things-to-consider\n\n"
 
-    printf "\n      ${YELLOW}Additional PFam searching:${NC}\n\n"
+    printf "\n      ${YELLOW}KO searching:${NC}\n\n"
 
-    printf "        - [-p <file>] single-column file of additional PFam targets to search for.\n"
-    printf "                  Table of hit counts, fasta of hit sequences, and files compatible\n"
+    printf "        - [-K <file>] single-column file of KO targets to search each genome for\n"
+    printf "                  Table of hit counts, fastas of hit sequences, and files compatible\n"
+    printf "                  with the iToL web-based tree-viewer will be generated for each\n"
+    printf "                  target. See visualization of gene presence/absence example at\n"
+    printf "                  github.com/AstrobioMike/GToTree/wiki/example-usage for example.\n\n"
+
+
+    printf "\n      ${YELLOW}Pfam searching:${NC}\n\n"
+
+    printf "        - [-p <file>] single-column file of Pfam targets to search each genome for\n"
+    printf "                  Table of hit counts, fastas of hit sequences, and files compatible\n"
     printf "                  with the iToL web-based tree-viewer will be generated for each\n"
     printf "                  target. See visualization of gene presence/absence example at\n"
     printf "                  github.com/AstrobioMike/GToTree/wiki/example-usage for example.\n\n"
@@ -231,6 +240,8 @@ gtdb_used="false"
 fasttree_used="false"
 iqtree_used="false"
 universal_SCGs_used="false"
+pfam_db_used="false"
+kofamscan_used="false"
 
 
 #############################################################################
@@ -248,10 +259,11 @@ align_only='false'
 keep_individual_alignments='false'
 tree_program='FastTreeMP'
 additional_pfam_targets='false'
+ko_targets='false'
 override_faster_alignment='false'
 http_flag='false'
 
-while getopts :a:g:f:A:H:o:m:tDL:p:NkT:c:G:BFdn:j:P args
+while getopts :a:g:f:A:H:o:m:tDL:K:p:NkT:c:G:BFdn:j:P args
 do
     case "${args}"
     in
@@ -265,6 +277,7 @@ do
         t) taxonkit_id_swap='true';;
         D) gtdb_id_swap='true';;
         L) lineage_spec=${OPTARG};;
+        K) target_KOs=${OPTARG};;
         p) target_pfams=${OPTARG};;
         N) align_only='true';;
         k) keep_individual_alignments='true';;
@@ -285,6 +298,7 @@ done
 ##################################
 ##### SOME PRE-FLIGHT CHECKS #####
 ##################################
+
 
 # checking if `-L` argument was set that also `-t` or `-D` were provided, otherwise no tax info is added
 if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
@@ -339,6 +353,18 @@ if [ $tree_program == "IQ-TREE" ]; then
     fi
 fi
 
+
+### if KO targets were provided, checking that KO data is present already, and downloading if it isn't
+if [ "$target_KOs" != "" ]; then
+    gtt-get-kofamscan-data
+fi
+
+### if ncbi taxonomy info wanted, checking that ncbi tax data is present already, and downloading if it isn't
+if [ $taxonkit_id_swap != "false" ]; then
+    gtt-get-ncbi-tax-data
+fi
+
+
 ##########################################################################
 ##### CHECKING INPUT FILES, INCLUDING IF THEY HAVE CRLF LINE ENDINGS #####
 ##########################################################################
@@ -354,7 +380,7 @@ if [ -f "$NCBI_acc_file" ]; then
 
         printf "\n${YELLOW}    Input file \"${NCBI_acc_file}\" had some Windows-formatting that likely\n"
         printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
-        printf "    \"${NCBI_acc_file}-unix\", and will be using that.${NC}\n\n"
+        printf "    \"${NCBI_acc_file}-unix\", and we will be using that.${NC}\n\n"
 
         sleep 2
 
@@ -400,7 +426,7 @@ if [ -f "$fasta_files" ]; then
 
         printf "\n${YELLOW}    Input file \"${fasta_files}\" had some Windows-formatting that likely\n"
         printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
-        printf "    \"${fasta_files}-unix\", and will be using that.${NC}\n\n"
+        printf "    \"${fasta_files}-unix\", and we will be using that.${NC}\n\n"
 
         sleep 2
 
@@ -446,7 +472,7 @@ if [ -f "$amino_acid_files" ]; then
 
         printf "\n${YELLOW}    Input file \"${amino_acid_files}\" had some Windows-formatting that likely\n"
         printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
-        printf "    \"${amino_acid_files}-unix\", and will be using that.${NC}\n\n"
+        printf "    \"${amino_acid_files}-unix\", and we will be using that.${NC}\n\n"
 
         sleep 2
 
@@ -492,7 +518,7 @@ if [ -f "$genbank_list_file" ]; then
 
         printf "\n${YELLOW}    Input file \"${genbank_list_file}\" had some Windows-formatting that likely\n"
         printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
-        printf "    \"${genbank_list_file}-unix\", and will be using that.${NC}\n\n"
+        printf "    \"${genbank_list_file}-unix\", and we will be using that.${NC}\n\n"
 
         sleep 2
 
@@ -538,7 +564,7 @@ if [ -f "$file_to_genome_id_map" ]; then
 
         printf "\n${YELLOW}    Input file \"${file_to_genome_id_map}\" had some Windows-formatting that likely\n"
         printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
-        printf "    \"${file_to_genome_id_map}-unix\", and will be using that.${NC}\n\n"
+        printf "    \"${file_to_genome_id_map}-unix\", and we will be using that.${NC}\n\n"
 
         sleep 2
 
@@ -555,6 +581,7 @@ if [ -f "$file_to_genome_id_map" ]; then
         exit
     fi
 fi
+
 
 # checking numeric inputs and setting defaults if not provided
 if [ -z $len_cutoff ]; then
@@ -700,7 +727,7 @@ gtotree_log=${output_dir}-gtotree-runlog.txt
 
 printf "\n\n               GToTree ${VERSION} (github.com/AstrobioMike/GToTree)\n\n" > $gtotree_log
 
-printf "\n ---------------------------------  RUN INFO  --------------------------------- \n\n" | tee -a $gtotree_log
+printf "\n ---------------------------------  RUN INFO  --------------------------------- \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 # storing the command as entered for the log file
 command_call="$(printf %q "$BASH_SOURCE")$(printf ' %q' "$@")"
@@ -710,17 +737,17 @@ command_call=$(printf "$command_call" | sed 's/\\,/,/g')
 printf "    Command entered:\n" >> $gtotree_log
 printf "    $command_call\n\n" >> $gtotree_log
 
-printf "\n    Input genome sources include:\n" | tee -a $gtotree_log
+printf "${YELLOW}\n    Input genome sources include:\n${NC}" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 ### checking/reporting those provided as NCBI accessions
 if [ "$NCBI_acc_file" != "" ]; then
 
     if [ -f "$NCBI_acc_file" ]; then
         NCBI_input_genomes_total=$(wc -l $NCBI_acc_file | sed "s/^ *//" | cut -d " " -f 1)
-        printf "      - NCBI accessions listed in $NCBI_acc_file ($NCBI_input_genomes_total genomes)\n" | tee -a $gtotree_log
+        printf "      - NCBI accessions listed in $NCBI_acc_file ($NCBI_input_genomes_total genomes)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     else
-        printf "\n${RED}      You specified $NCBI_acc_file as a source of NCBI genomes to use, but that file cannot be found :(${NC}\n" | tee -a $gtotree_log
-        printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\n${RED}      You specified $NCBI_acc_file as a source of NCBI genomes to use, but that file cannot be found :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         exit
     fi
 
@@ -735,19 +762,19 @@ if [ "$genbank_list_file" != "" ];then
         for file in $(cat $genbank_list_file)
         do
           if [ ! -s $file ]; then
-            printf "\n${RED}      Some genbank files specified in $genbank_list_file cannot be found :(${NC}\n\n" | tee -a $gtotree_log
-            printf "  Double-check the provided locations and where they should be, here's one of the problems:\n" | tee -a $gtotree_log
-            printf "            $file\n" | tee -a $gtotree_log
-            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+            printf "\n${RED}      Some genbank files specified in $genbank_list_file cannot be found :(${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "  Double-check the provided locations and where they should be, here's one of the problems:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "            $file\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             exit
           fi
         done
 
         genbank_genomes_total=$(wc -l $genbank_list_file | sed "s/^ *//" | cut -d " " -f 1)
-        printf "      - Genbank files listed in $genbank_list_file ($genbank_genomes_total genomes)\n" | tee -a $gtotree_log
+        printf "      - Genbank files listed in $genbank_list_file ($genbank_genomes_total genomes)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     else
-        printf "\n${RED}      You specified $genbank_list_file as a source of GenBank files to use, but that file cannot be found or is empty :(${NC}\n" | tee -a $gtotree_log
-        printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\n${RED}      You specified $genbank_list_file as a source of GenBank files to use, but that file cannot be found or is empty :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         exit
     fi
 
@@ -759,8 +786,8 @@ fi
 ### checking/reporting those provided as fasta files
 if [ "$fasta_files" != "" ]; then
     if ! command -v prodigal > /dev/null; then
-        printf "\n  ${RED}Prodigal is required when providing fasta files.${NC}\n" | tee -a $gtotree_log
-        printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\n  ${RED}Prodigal is required when providing fasta files.${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         exit
     fi
 
@@ -770,19 +797,19 @@ if [ "$fasta_files" != "" ]; then
         for file in $(cat $fasta_files)
         do
             if [ ! -s $file ]; then
-                printf "\n${RED}      Some fasta files specified in $fasta_files cannot be found :(${NC}\n\n" | tee -a $gtotree_log
-                printf "  Double-check the provided locations and where they should be, here's one of the problems:\n" | tee -a $gtotree_log
-                printf "            $file\n" | tee -a $gtotree_log
-                printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+                printf "\n${RED}      Some fasta files specified in $fasta_files cannot be found :(${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                printf "  Double-check the provided locations and where they should be, here's one of the problems:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                printf "            $file\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
                 exit
             fi
         done
 
         fasta_genomes_total=$(wc -l $fasta_files | sed "s/^ *//" | cut -d " " -f 1)
-        printf "      - Fasta files listed in $fasta_files ($fasta_genomes_total genomes)\n" | tee -a $gtotree_log
+        printf "      - Fasta files listed in $fasta_files ($fasta_genomes_total genomes)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     else
-        printf "\n${RED}      You specified $fasta_files as a source of fasta files to use, but that file cannot be found or is empty :(${NC}\n" | tee -a $gtotree_log
-        printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\n${RED}      You specified $fasta_files as a source of fasta files to use, but that file cannot be found or is empty :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         exit
     fi
 
@@ -800,19 +827,19 @@ if [ "$amino_acid_files" != "" ]; then
         for file in $(cat $amino_acid_files)
         do
             if [ ! -s $file ]; then
-                printf "\n${RED}      Some amino acid files specified in $amino_acid_files cannot be found :(${NC}\n\n" | tee -a $gtotree_log
-                printf "  Double-check the provided locations and where they should be, here's one of the problems:\n" | tee -a $gtotree_log
-                printf "            $file\n" | tee -a $gtotree_log
-                printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+                printf "\n${RED}      Some amino acid files specified in $amino_acid_files cannot be found :(${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                printf "  Double-check the provided locations and where they should be, here's one of the problems:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                printf "            $file\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
                 exit
             fi
         done
 
         amino_acid_genomes_total=$(wc -l $amino_acid_files | sed "s/^ *//" | cut -d " " -f 1)
-        printf "      - Amino acid files listed in $amino_acid_files ($amino_acid_genomes_total genomes)\n" | tee -a $gtotree_log
+        printf "      - Amino-acid files listed in $amino_acid_files ($amino_acid_genomes_total genomes)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     else
-        printf "\n${RED}      You specified $amino_acid_files as a source of fasta files to use, but that file cannot be found or is empty :(${NC}\n" | tee -a $gtotree_log
-        printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\n${RED}      You specified $amino_acid_files as a source of fasta files to use, but that file cannot be found or is empty :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         exit
     fi
 
@@ -824,32 +851,32 @@ fi
 
 ### reporting total number of planned genomes
 total_input_genomes=$(($NCBI_input_genomes_total + $genbank_genomes_total + $fasta_genomes_total + $amino_acid_genomes_total))
-printf "\n                             ${GREEN}Total input genomes: $total_input_genomes${NC}\n" | tee -a $gtotree_log
+printf "\n                             ${GREEN}Total input genomes: $total_input_genomes${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
 #############################################################################
 ###########  ADDING NOTICE ABOUT SPEED AND THOUSANDS OF GENOMES  ############
 #############################################################################
 if [ $total_input_genomes -ge 1000 ] && [ $override_faster_alignment == 'false' ]; then
-    printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
-    printf "    We seem to be aiming to work with $total_input_genomes total genomes. This is quite a\n" | tee -a $gtotree_log
-    printf "    bit, and the time the individual gene alignments take can quickly become\n" | tee -a $gtotree_log
-    printf "    prohibitive with many thousands of genomes like this. By default, GToTree\n\n" | tee -a $gtotree_log
-    printf "    is going use the 'super5' muscle algorithm to help speed up the alignments\n" | tee -a $gtotree_log
-    printf "    for this run (since we have so many here). If you don't want this to\n" | tee -a $gtotree_log
-    printf "    happen, you should cancel this run now with 'ctrl + c', and add the '-X' \n" | tee -a $gtotree_log
-    printf "    flag to the GToTree call.\n\n" | tee -a $gtotree_log
+    printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    We seem to be aiming to work with $total_input_genomes total genomes. This is quite a\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    bit, and the time the individual gene alignments take can quickly become\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    prohibitive with many thousands of genomes like this. By default, GToTree\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    is going use the 'super5' muscle algorithm to help speed up the alignments\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    for this run (since we have so many here). If you don't want this to\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    happen, you should cancel this run now with 'ctrl + c', and add the '-X' \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    flag to the GToTree call.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "    More info can be found here:\n" | tee -a $gtotree_log
-    printf "      github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes\n\n" | tee -a $gtotree_log
+    printf "    More info can be found here:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "      github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "    And while we're chatting, you may also want to consider\n" | tee -a $gtotree_log
-    printf "    using \"representative\" genomes, if you're not already. More info on that can be found here:\n" | tee -a $gtotree_log
-    printf "      github.com/AstrobioMike/GToTree/wiki/things-to-consider#consider-using-representative-genomes\n\n" | tee -a $gtotree_log
+    printf "    And while we're chatting, you may also want to consider\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    using \"representative\" genomes, if you're not already. More info on that can be found here:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "      github.com/AstrobioMike/GToTree/wiki/things-to-consider#consider-using-representative-genomes\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     printf "    We will wait 30 seconds before continuing with our regularly scheduled program :)\n"
 
-    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     sleep 30
 
@@ -859,142 +886,318 @@ fi
 #############################################################################
 ###############  CHECKING AND REPORTING SPECIFIED HMM SOURCE  ###############
 #############################################################################
-printf "\n    HMM source to be used:\n" | tee -a $gtotree_log
+printf "${YELLOW}\n    HMM source to be used:\n${NC}" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 if [ $hmm_file == "Universal" ]; then
     hmm_file="Universal_Hug_et_al"
     universal_SCGs_used="true"
 fi
 
+# adding ".hmm" suffix if not present
+if [[ $hmm_file != *.hmm ]]; then
+    hmm_file=${hmm_file}.hmm
+fi
+
 if [ -f "$hmm_file" ]; then
+    # this is if the user provided a path to the HMM file directly
     grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
     hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
-    printf "      - $hmm_file ($hmm_target_genes_total targets)\n" | tee -a $gtotree_log
-elif [ -f "${GToTree_HMM_dir}/${hmm_file}.hmm" ]; then
-    hmm_file="${GToTree_HMM_dir}/${hmm_file}.hmm"
-    grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
-    hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
-    printf "      - $(basename ${hmm_file} | sed 's/\.hmm//') ($hmm_target_genes_total targets)\n" | tee -a $gtotree_log
-elif [ -f "${GToTree_HMM_dir}/${hmm_file}" ]; then
-    hmm_file="${GToTree_HMM_dir}/${hmm_file}"
-    grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
-    hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
-    printf "      - $(basename ${hmm_file}) ($hmm_target_genes_total targets)\n" | tee -a $gtotree_log
-else
-    printf "\n${RED}      You specified $hmm_file as your HMM file to use, but that file cannot be found :(${NC}\n" | tee -a $gtotree_log
-    printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+    printf "      - $hmm_file ($hmm_target_genes_total targets)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+# if not a direct path by user, we are expecting it to be in the GToTree stored HMMs directory
+# here we are making sure the variable holds something 
+elif [ -z ${GToTree_HMM_dir} ]; then
+    # reporting it is not set
+    printf "\n${RED}      The 'GToTree_HMM_dir' variable is not set :( Use \`gtt-data-locations\` to check and configure.\n${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     exit
+
+# now making sure directory exists or that we can create it if not
+elif [ ! -d ${GToTree_HMM_dir} ]; then
+    
+    # attempting to create
+    mkdir -p ${GToTree_HMM_dir} > /dev/null
+    if [ $? -ne 0 ]; then
+        printf "\n${RED}      The 'GToTree_HMM_dir' location does not exist and can't be created :( Use \`gtt-data-locations\` to check and configure.\n${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        exit
+    fi
+
+# making sure it is writable
+elif [ ! -w ${GToTree_HMM_dir} ]; then
+    printf "\n${RED}      The 'GToTree_HMM_dir' location is not writable for you :( Use \`gtt-data-locations\` to check and configure.\n${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    exit
+
+# now moving on to setting or getting the hmm file
+# if it is not currently present there, we will download it and store it there
+elif [ -f "${GToTree_HMM_dir}${hmm_file}" ]; then
+
+    hmm_file=${GToTree_HMM_dir}${hmm_file}
+
+    grep "^NAME" $hmm_file | tr -s " " | cut -f2 -d " " > uniq_hmm_names.tmp
+    hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
+    printf "      - $(basename ${hmm_file} | sed 's/\.hmm//') ($hmm_target_genes_total targets)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+elif [ ! -f "${GToTree_HMM_dir}/${hmm_file}" ]; then
+
+    # we need to try to download the file
+
+    # checking info table is there, downloading if not
+    if [ ! -f "${GToTree_HMM_dir}/hmm-sources-and-info.tsv" ]; then
+
+        # downloading to there if not already present
+        curl --silent --retry 10 -L -o ${GToTree_HMM_dir}/hmm-sources-and-info.tsv https://figshare.com/ndownloader/files/34066016
+
+    fi
+
+    # searching for what was requested
+    if grep -q -w "^${hmm_file}" ${GToTree_HMM_dir}/hmm-sources-and-info.tsv ; then
+        wanted_hmm_link=$(grep -w "^${hmm_file}" ${GToTree_HMM_dir}/hmm-sources-and-info.tsv | cut -f 5)
+    fi
+
+    # if it was found, moving forward
+    if [ ! -z ${wanted_hmm_link} ]; then
+
+        base_hmm_file_name=${hmm_file}
+        hmm_file=${GToTree_HMM_dir}${hmm_file}
+
+        # downloading
+        curl --silent --retry 10 -L -o ${hmm_file} ${wanted_hmm_link}
+
+        # reporting info
+        grep "^NAME" ${hmm_file} | tr -s " " | cut -f 2 -d " " > uniq_hmm_names.tmp
+        hmm_target_genes_total=$(wc -l uniq_hmm_names.tmp | sed "s/^ *//" | cut -d " " -f 1)
+        printf "      - $(basename ${hmm_file}) ($hmm_target_genes_total targets)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+    else 
+
+        printf "\n${RED}      You specified $hmm_file as the HMM file to use, but that file cannot be found :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "      You can see the available gene-sets packaged with GToTree by running \`gtt-hmms\`\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        exit
+
+    fi
+
 fi
 
 
 #############################################################################
 ##############  EXPLICITLY STATING IF DEFAULT BEHAVIOR CHANGED  #############
 #############################################################################
-if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || [ $gen_cutoff != "0.5" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || [ $tree_program != "FastTreeMP" ] || [ $wanting_but_missing_FastTreeMP == "true" ] || [ $align_only == 'true' ] || [ $keep_individual_alignments == 'true' ]; then
+if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || \
+   [ $taxonkit_id_swap != "false" ] || [ $gtdb_id_swap != "false" ] || [ $len_cutoff != "0.2" ] || \
+   [ $gen_cutoff != "0.5" ] || [ $debug_flag == "true" ] || [ $best_hit_mode == "true" ] || \
+   [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || \
+   [ $tree_program != "FastTreeMP" ] || [ $wanting_but_missing_FastTreeMP == "true" ] || \
+   [ $align_only == 'true' ] || [ $keep_individual_alignments == 'true' ] || \
+   [ ! -z $target_pfams ] || [ ! -z $target_KOs ]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
-            printf "\n${RED}      You specified $file_to_genome_id_map, but that file cannot be found or is empty :(${NC}\n" | tee -a $gtotree_log
-            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+            printf "\n${RED}      You specified $file_to_genome_id_map, but that file cannot be found or is empty :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             exit
         fi
     fi
 
-    printf "\n\n    Options set:\n" | tee -a $gtotree_log
+    printf "${YELLOW}\n    Options set:\n${NC}" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     if [ $output_dir != "GToTree_output" ]; then
-        printf "      - The output directory has been set to \"$output_dir/\".\n" | tee -a $gtotree_log
+        printf "      - The output directory has been set to \"$output_dir/\"\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ "$file_to_genome_id_map" != "" ]; then
-        printf "      - The file \"$file_to_genome_id_map\" will be used to modify labels of the specified genomes.\n" | tee -a $gtotree_log
+        printf "      - The file \"$file_to_genome_id_map\" will be used to modify labels of the specified genomes\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $taxonkit_id_swap != "false" ] && [ $gtdb_id_swap == "false" ]; then
-        printf "      - Taxonkit will be used to add NCBI taxonomy info to labels where possible.\n" | tee -a $gtotree_log
+        printf "      - Taxonkit will be used to add NCBI taxonomy info to labels where possible\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         taxonkit_used="true"
     fi
 
     if [ $gtdb_id_swap != "false" ] && [ $taxonkit_id_swap == "false" ]; then
-        printf "      - GTDB taxonomic info will be added to labels where possible.\n" | tee -a $gtotree_log
+        printf "      - GTDB taxonomic info will be added to labels where possible\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         gtdb_used="true"
     fi
 
     if [ $taxonkit_id_swap != "false" ] && [ $gtdb_id_swap != "false" ]; then
-        printf "      - GTDB taxonomic info will be added to labels where possible.\n" | tee -a $gtotree_log
-        printf "      - NCBI taxonomic info will be added where possible when GTDB is not.\n" | tee -a $gtotree_log
+        printf "      - GTDB taxonomic info will be added to labels where possible\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "      - NCBI taxonomic info will be added where possible when GTDB is not\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         taxonkit_used="true"
         gtdb_used="true"
     fi    
 
     if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
         lineage_mod_report=$(echo $lineage_spec | sed 's/,/, /g')
-        printf "      - Lineage information added to labels will be $lineage_mod_report.\n" | tee -a $gtotree_log
+        printf "      - Lineage information added to labels will be $lineage_mod_report\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $len_cutoff != "0.2" ]; then
-        printf "      - Gene-length filtering cutoff threshold (\"-c\") has been set to $len_cutoff.\n" | tee -a $gtotree_log
+        printf "      - Gene-length filtering cutoff threshold (\"-c\") has been set to $len_cutoff\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $align_only == 'true' ]; then
-        printf "      - Only generating alignment, no tree, as \"-N\" option has been provided.\n" | tee -a $gtotree_log
+        printf "      - Only generating alignment, no tree, as \"-N\" option has been provided\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $align_only == 'false' ]; then
 
         if [ $wanting_but_missing_FastTreeMP == "true" ]; then
-            printf "      - FastTreeMP not available on system, so using non-parallel FastTree instead.\n"
+            printf "      - FastTreeMP not available on system, so using non-parallel FastTree instead\n"
             tree_program="FastTree"
         fi
 
         if [ $tree_program != "FastTreeMP" ] && [ $wanting_but_missing_FastTreeMP != "true" ]; then
-            printf "      - Tree generation program (\"-T\") has been set to $tree_program.\n" | tee -a $gtotree_log
+            printf "      - Tree generation program (\"-T\") has been set to $tree_program\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         fi
 
     fi
 
     if [ $keep_individual_alignments == 'true' ]; then
-        printf "      - Individual protein alignment files will be retained, due to the \"-k\" flag being provided.\n" | tee -a $gtotree_log
+        printf "      - Individual protein alignment files will be retained, due to the \"-k\" flag being provided\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $gen_cutoff != "0.5" ]; then
-        printf "      - Genome minimum gene-copy threshold (\"-G\") has been set to $gen_cutoff.\n" | tee -a $gtotree_log
+        printf "      - Genome minimum gene-copy threshold (\"-G\") has been set to $gen_cutoff\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $num_cpus != "2" ]; then
-        printf "      - Number of cpus to use during hmm search (\"-n\") has been set to $num_cpus.\n" | tee -a $gtotree_log
+        printf "      - Number of cpus to use during hmm search (\"-n\") has been set to $num_cpus\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $num_jobs != "1" ]; then
-        printf "      - Number of jobs to run during parallelizable steps has been set to $num_jobs.\n" | tee -a $gtotree_log
+        printf "      - Number of jobs to run during parallelizable steps has been set to $num_jobs\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         parallel_used="true"
     fi
 
     if [ $best_hit_mode == "true" ]; then
-        printf "      - Running in \"best-hit\" mode.\n" | tee -a $gtotree_log
+        printf "      - Running in \"best-hit\" mode\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $debug_flag == "true" ]; then
-        printf "      - Debug mode on. Temp directory won't be removed after run.\n" | tee -a $gtotree_log
+        printf "      - Debug mode on. Temp directory won't be removed after run\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $http_flag == "true" ]; then
-        printf "      - Attempting to use http instead of ftp.\n" | tee -a $gtotree_log
+        printf "      - Attempting to use http instead of ftp\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
 fi
 
-## checking and reporting if additional pfams targeted
+#### checking and reporting if KOs targeted ####
+if [ "$target_KOs" != "" ]; then
+
+    if [ -s "$target_KOs" ]; then
+        uniq ${target_KOs} > uniq_ko_targets.tmp
+        ko_target_genes_total=$(wc -l uniq_ko_targets.tmp | sed "s/^ *//" | cut -d " " -f 1)
+        printf "      - KOs will be searched from: $target_KOs ($ko_target_genes_total targets)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        ko_targets="true"
+        # setting variable to track citation
+        kofamscan_used="true"
+
+    else
+        printf "\n${RED}      You specified $target_KOs as your target Pfams to sesarch, but that file cannot be found :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        exit
+    fi
+
+    # checking if file has windows CRLF line-terminators, and running dos2unix if so
+    dos2unix < ${target_KOs} | cmp - ${target_KOs} > /dev/null
+
+    if [ $? -ne 0 ] ; then
+        dos2unix -n ${target_KOs} ${target_KOs}-unix 2> /dev/null
+
+        printf "\n${YELLOW}    Input file \"${target_KOs}\" had some Windows-formatting that likely\n"
+        printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
+        printf "    \"${target_KOs}-unix\", and we will be using that.${NC}\n\n"
+
+        sleep 2
+
+        target_KOs="${target_KOs}-unix"
+
+    fi
+
+    # checking no duplicates in there
+    num_dupes=$(sort "$target_KOs" | uniq -d | wc -l | sed "s/^ *//" | cut -d " " -f 1)
+    if [ ! $num_dupes == 0 ]; then
+        printf "\n${RED}  $target_KOs has duplicate entries, check it out and provide unique accessions only.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no whitespace in there
+    if grep -q " " ${target_KOs}; then
+        printf "\n${RED}  $target_KOs has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no tabs in there
+    if grep -q $'\t' ${target_KOs}; then
+        printf "\n${RED}  $target_KOs has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+fi
+
+
+#### checking and reporting if pfams targeted ####
 if [ "$target_pfams" != "" ]; then
 
     if [ -s "$target_pfams" ]; then
         uniq ${target_pfams} > uniq_pfam_targets.tmp
         pfam_target_genes_total=$(wc -l uniq_pfam_targets.tmp | sed "s/^ *//" | cut -d " " -f 1)
-        printf "      - Additional PFams will be searched from: $target_pfams ($pfam_target_genes_total targets)\n" | tee -a $gtotree_log
+        printf "      - Pfams will be searched from: $target_pfams ($pfam_target_genes_total targets)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         additional_pfam_targets="true"
+        # setting variable to track citation
+        pfam_db_used="true"
     else
-        printf "\n${RED}      You specified $target_pfams as your target Pfams to sesarch, but that file cannot be found :(${NC}\n" | tee -a $gtotree_log
-        printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\n${RED}      You specified $target_pfams as your target Pfams to sesarch, but that file cannot be found :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        exit
+    fi
+
+    # checking if file has windows CRLF line-terminators, and running dos2unix if so
+    dos2unix < ${target_pfams} | cmp - ${target_pfams} > /dev/null
+
+    if [ $? -ne 0 ] ; then
+        dos2unix -n ${target_pfams} ${target_pfams}-unix 2> /dev/null
+
+        printf "\n${YELLOW}    Input file \"${target_pfams}\" had some Windows-formatting that likely\n"
+        printf "    would have caused problems. It has been converted it with \`dos2unix\` into file\n"
+        printf "    \"${target_pfams}-unix\", and we will be using that.${NC}\n\n"
+
+        sleep 2
+
+        target_pfams="${target_pfams}-unix"
+
+    fi
+
+    # checking no duplicates in there
+    num_dupes=$(sort "$target_pfams" | uniq -d | wc -l | sed "s/^ *//" | cut -d " " -f 1)
+    if [ ! $num_dupes == 0 ]; then
+        printf "\n${RED}  $target_pfams has duplicate entries, check it out and provide unique accessions only.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no whitespace in there
+    if grep -q " " ${target_pfams}; then
+        printf "\n${RED}  $target_pfams has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    # checking no tabs in there
+    if grep -q $'\t' ${target_pfams}; then
+        printf "\n${RED}  $target_pfams has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
+        printf "\nExiting for now.\n\n"
         exit
     fi
 
@@ -1009,17 +1212,17 @@ sleep 3.5
 ######  ADDING NOTICE ABOUT FILTERING BY GENE-LENGTH WITH FEW GENOMES  ######
 #############################################################################
 if [ $total_input_genomes -le 20 ]; then
-    printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
-    printf "    Filtering by gene-length using the median length of a gene set (set with\n" | tee -a $gtotree_log
-    printf "    the \`-c\` flag) becomes less reliable with fewer genomes. With $total_input_genomes total\n" | tee -a $gtotree_log
-    printf "    input genomes, if a lot of sequences are dropped, consider increasing\n" | tee -a $gtotree_log
-    printf "    the parameter and/or visually inspecting the alignments.\n\n" | tee -a $gtotree_log
-    printf "    More info can be found here:\n" | tee -a $gtotree_log
-    printf "      github.com/AstrobioMike/GToTree/wiki/Things-to-consider\n\n" | tee -a $gtotree_log
+    printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    Filtering by gene-length using the median length of a gene set (set with\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    the \`-c\` flag) becomes less reliable with fewer genomes. With $total_input_genomes total\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    input genomes, if a lot of sequences are dropped, consider increasing\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    the parameter and/or visually inspecting the alignments.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    More info can be found here:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "      github.com/AstrobioMike/GToTree/wiki/Things-to-consider\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "\t        Moving forward with \"-c\" set to $len_cutoff this run.\n" | tee -a $gtotree_log
+    printf "\t        Moving forward with \"-c\" set to $len_cutoff this run.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     sleep 3
 fi
@@ -1028,24 +1231,24 @@ fi
 ########  ADDING NOTICE ABOUT COMPUTATIONAL LOAD WITH MANY GENOMES  #########
 #############################################################################
 if [ $total_input_genomes -ge 12500 ]; then
-    printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
-    printf "    The alignment and treeing steps, particularly the alignments, can become\n" | tee -a $gtotree_log
-    printf "    prohibitively memory-intensive with many input genomes. With $total_input_genomes total\n" | tee -a $gtotree_log
-    printf "    input genomes, this job may not be feasible :( \n\n" | tee -a $gtotree_log
+    printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    The alignment and treeing steps, particularly the alignments, can become\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    prohibitively memory-intensive with many input genomes. With $total_input_genomes total\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    input genomes, this job may not be feasible :( \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     
-    printf "    Often it is useful to slim down how many genomes of closely related\n" | tee -a $gtotree_log
-    printf "    organisms we are including when looking across a broad level of\n" | tee -a $gtotree_log
-    printf "    diversity, as having many closely organisms usually isn't helpful or\n" | tee -a $gtotree_log
-    printf "    informative at broad levels.\n\n" | tee -a $gtotree_log
+    printf "    Often it is useful to slim down how many genomes of closely related\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    organisms we are including when looking across a broad level of\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    diversity, as having many closely organisms usually isn't helpful or\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    informative at broad levels.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "    Have you considered using \"representative\" genomes only (either from\n" | tee -a $gtotree_log
-    printf "    NCBI or GTDB)? Those both provide helpful systems for reducing some\n" | tee -a $gtotree_log
-    printf "    redundancy when working at a broad level with many organisms. See\n" | tee -a $gtotree_log
+    printf "    Have you considered using \"representative\" genomes only (either from\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    NCBI or GTDB)? Those both provide helpful systems for reducing some\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    redundancy when working at a broad level with many organisms. See\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    github.com/AstrobioMike/GToTree/wiki/things-to-consider#consider-using-representative-genomes\n"
     
-    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "      ${YELLOW}Press any key to continue, or press \`ctrl + c\` to cancel this run...${NC}\n\n" | tee -a $gtotree_log
+    printf "      ${YELLOW}Press any key to continue, or press \`ctrl + c\` to cancel this run...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     # temporarily changing IFS so can tell the difference between input spacebar vs return key
     orig_IFS=$IFS
@@ -1055,7 +1258,7 @@ if [ $total_input_genomes -ge 12500 ]; then
     
     if [[ $key_var == "" ]]; then
         IFS=${orig_IFS}
-        printf "\n                         You're the boss! Movin' on :)\n\n" | tee -a $gtotree_log
+        printf "\n                         You're the boss! Movin' on :)\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         sleep 3
     else
         IFS=${orig_IFS}
@@ -1067,6 +1270,7 @@ if [ $total_input_genomes -ge 12500 ]; then
     
 fi
 
+
 #############################################################################
 ###############  CREATE A TEMP DIRECTORY AND EXITING IF FAILS  ##############
 #############################################################################
@@ -1075,9 +1279,9 @@ tmp_dir=$(date +%s).gtotree.tmpdir
 mkdir $tmp_dir 2> /dev/null
 
 if [ $? -ne 0 ] ; then
-    printf "\n${RED}  Tried to make temporary directory named ${tmp_dir} but failed, this shouldn't happen :(${NC}\n\n" | tee -a $gtotree_log
+    printf "\n${RED}  Tried to make temporary directory named ${tmp_dir} but failed, this shouldn't happen :(${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     rm -rf uniq_hmm_names.tmp uniq_pfam_targets.tmp
-    printf "Exiting for now.\n\n" | tee -a $gtotree_log
+    printf "Exiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     exit
 fi
 
@@ -1131,14 +1335,14 @@ if [ "$file_to_genome_id_map" != "" ]; then
              rm -rf $tmp_dir
         fi
         
-        printf "\n${RED}  $spurious_ids_count genome ID(s) listed in the mapping file (passed to \"-m\") not found in${NC}\n" | tee -a $gtotree_log
-        printf "  ${RED}any of the input genomes :(${NC}\n\n" | tee -a $gtotree_log
-        printf "  Reported in the file \"Missing_IDs.txt\" for you to investigate.\n" | tee -a $gtotree_log
-        printf "  If things look the same at first glance, double-check there are no extra\n" | tee -a $gtotree_log
-        printf "  empty spaces or anything at the ends of the entries in that file.\n\n" | tee -a $gtotree_log
+        printf "\n${RED}  $spurious_ids_count genome ID(s) listed in the mapping file (passed to \"-m\") not found in${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "  ${RED}any of the input genomes :(${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "  Reported in the file \"Missing_IDs.txt\" for you to investigate.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "  If things look the same at first glance, double-check there are no extra\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "  empty spaces or anything at the ends of the entries in that file.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         
         rm -rf $output_dir
-        printf "Exiting for now.\n\n" | tee -a $gtotree_log
+        printf "Exiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         exit
     fi
 fi
@@ -1150,9 +1354,12 @@ mkdir ${output_dir}/run_files/
 # moving files into temp directory now that all is well
 mv uniq_hmm_names.tmp ${tmp_dir}/uniq_hmm_names.tmp
 
+if [ "$ko_targets" != "false" ]; then
+    mv uniq_ko_targets.tmp ${tmp_dir}/uniq_ko_targets.tmp
+fi
+
 if [ "$additional_pfam_targets" != 'false' ]; then
     mv uniq_pfam_targets.tmp ${tmp_dir}/uniq_pfam_targets.tmp
-    mkdir ${output_dir}/additional_pfam_search_results/
 fi
 
 # starting an all genomes file to keep track of those from all sources
@@ -1169,52 +1376,42 @@ SECONDS=0
 
 
 #############################################################################
+######  GETTING AND BUILDING NEEDED KO STUFF IF USER WANTS KO SCANNING  #####
+#############################################################################
+if [ "$ko_targets" != 'false' ]; then
+
+    printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ####                     Setting up HMMs for KO targets                   ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+    # making output dirs
+    mkdir -p ${output_dir}/KO_search_results/target_KO_profiles/
+    mkdir -p ${output_dir}/KO_search_results/KO_hit_seqs/
+    mkdir -p ${output_dir}/KO_search_results/iToL_files/
+    mkdir -p ${output_dir}/KO_search_results/individual_genome_results/
+
+    gtt-parse-kofamscan-targets.sh ${target_KOs} ${output_dir}
+
+fi
+
+
+#############################################################################
 ##########  GETTING AND BUILDING ADDITIONAL TARGET PFAM HMM IF SET  #########
 #############################################################################
 if [ "$additional_pfam_targets" != 'false' ]; then
 
-    printf "\n ############################################################################## \n" | tee -a $gtotree_log
-    printf " ####              Downloading HMMs for additional PFam targets            ####\n" | tee -a $gtotree_log
-    printf " ############################################################################## \n\n" | tee -a $gtotree_log
+    printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ####              Downloading HMMs for additional Pfam targets            ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    base_link="https://pfam.xfam.org/family/"
+    # making output dirs
+    mkdir -p ${output_dir}/Pfam_search_results/target_Pfam_profiles/
+    mkdir -p ${output_dir}/Pfam_search_results/Pfam_hit_seqs/
+    mkdir -p ${output_dir}/Pfam_search_results/iToL_files/
+    mkdir -p ${output_dir}/Pfam_search_results/individual_genome_results/
+    mkdir -p ${output_dir}/Pfam_search_results/info/
 
-    for target in $(cat ${tmp_dir}/uniq_pfam_targets.tmp)
-    do
-
-        # --insecure flag added on 29-Nov-2020, due to pfam certificate being invalid (https://github.com/AstrobioMike/GToTree/issues/28)
-        curl --insecure --silent --retry 10 -o ${tmp_dir}/${target}.hmm "${base_link}${target}/hmm"
-
-        if [ -s ${tmp_dir}/${target}.hmm ]; then
-            # getting accession pulled (to account for current version on Pfam as compared to what was searched)
-            actual_target=$(grep -m1 "^ACC" ${tmp_dir}/${target}.hmm | tr -s " " "\t" | cut -f 2)
-            printf "$actual_target\n" >> ${tmp_dir}/actual_pfam_targets.tmp
-
-            if [ $target != $actual_target ]; then
-                mv ${tmp_dir}/${target}.hmm ${tmp_dir}/${actual_target}.hmm
-            fi
-
-            cat ${tmp_dir}/${actual_target}.hmm >> ${tmp_dir}/all_targets.hmm
-
-        else # aborting if any of the pfam targets couldn't be pulled successfully
-            printf "\n  ${RED}One of the target Pfams could not be successfully downloaded :(${NC}\n"
-            printf "\n  The problem child was ${target}.\n\n"
-            printf "\nExiting for now.\n\n"
-
-            rm -rf ${output_dir}
-            # removing temp directory unless debug mode on
-            if [ $debug_flag == 'false' ]; then
-                 rm -rf $tmp_dir
-            fi
-
-            exit
-
-        fi
-
-    done
-
-    # starting the main results table which will have the following as its header:
-    paste <(printf "assembly_id\tdownloaded_accession\tTotal_gene_count") <(printf %s "$(cat ${tmp_dir}/actual_pfam_targets.tmp | tr "\n" "\t")") > ${output_dir}/additional_pfam_search_results/Additional_Pfam_hit_counts.tsv
+    gtt-get-additional-pfam-targets.sh ${tmp_dir} ${output_dir}
 
 fi
 
@@ -1224,9 +1421,9 @@ fi
 if [ -n "$NCBI_acc_file" ]; then
 
 
-    printf "\n ############################################################################## \n" | tee -a $gtotree_log
-    printf " ####          Working on the genomes provided as NCBI accessions          ####\n" | tee -a $gtotree_log
-    printf " ############################################################################## \n\n" | tee -a $gtotree_log
+    printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ####          Working on the genomes provided as NCBI accessions          ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     # storing sorted ncbi accession file
     sort $NCBI_acc_file > ${tmp_dir}/sorted_ncbi_accs.tmp
@@ -1243,11 +1440,11 @@ if [ -n "$NCBI_acc_file" ]; then
             grep "$dupe_acc" ${tmp_dir}/sorted_ncbi_accs.tmp
         done > ${output_dir}/Redundant_input_accessions.txt
 
-        printf "     ${YELLOW}******************************* ${NC}NOTICE ${YELLOW}*******************************${NC}  \n" | tee -a $gtotree_log
-        printf "\t$num_dupe_genomes accession(s) redundant - meaning GenBank and RefSeq accessions\n" | tee -a $gtotree_log
-        printf "\twere provided for the same genome. Only RefSeq accession used.\n\n" | tee -a $gtotree_log
-        printf "\t  Reported in \"${output_dir}/run_files/Redundant_input_accessions.txt\".\n" | tee -a $gtotree_log
-        printf "     ${YELLOW}**********************************************************************${NC}  \n\n" | tee -a $gtotree_log
+        printf "     ${YELLOW}******************************* ${NC}NOTICE ${YELLOW}*******************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\t$num_dupe_genomes accession(s) redundant - meaning GenBank and RefSeq accessions\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\twere provided for the same genome. Only RefSeq accession used.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\t  Reported in \"${output_dir}/run_files/Redundant_input_accessions.txt\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "     ${YELLOW}**********************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         comm -23 ${tmp_dir}/sorted_ncbi_accs.tmp <(sort ${output_dir}/Redundant_input_accessions.txt) | sort > ${tmp_dir}/sorted_building_new_input_ncbi_accs.tmp
 
@@ -1262,7 +1459,7 @@ if [ -n "$NCBI_acc_file" ]; then
     # downloading genbank files and/or refseq assembly summary files as needed
 
     if grep -q "^GCA" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
-        printf "\t\t  ${GREEN}Downloading GenBank assembly summaries...${NC}\n\n" | tee -a $gtotree_log
+        printf "\t\t  ${GREEN}Downloading GenBank assembly summaries...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         if [ "$http_flag" == 'false' ]; then
             curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
@@ -1273,7 +1470,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
     # making sure file downloaded with no errors
     if [ -s capture_any_dl_errors.tmp ]; then
-        printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is the internet connection weak?\n\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is the internet connection weak?\n\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         rm -rf ${tmp_dir} ${output_dir} capture_any_dl_errors.tmp
         exit
     else
@@ -1281,7 +1478,7 @@ if [ -n "$NCBI_acc_file" ]; then
     fi
 
     if grep -q "^GCF" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
-        printf "\n\t\t  ${GREEN}Downloading RefSeq assembly summaries...${NC}\n\n" | tee -a $gtotree_log
+        printf "\n\t\t  ${GREEN}Downloading RefSeq assembly summaries...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         if [ "$http_flag" == 'false' ]; then
             curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
@@ -1294,7 +1491,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
     # making sure file downloaded with no errors
     if [ -s capture_any_dl_errors.tmp ]; then
-        printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is the internet connection weak?\n\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is the internet connection weak?\n\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         rm -rf ${tmp_dir} ${output_dir} capture_any_dl_errors.tmp
         exit
     else
@@ -1316,10 +1513,10 @@ if [ -n "$NCBI_acc_file" ]; then
     if [ -s ${tmp_dir}/not_found_accs.tmp ]; then
 
         num_accs_not_found=$(wc -l ${tmp_dir}/not_found_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
-        printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
-        printf "    $num_accs_not_found accession(s) not successfully found at NCBI.\n\n" | tee -a $gtotree_log
-        printf "    Reported in \"${output_dir}/run_files/NCBI_accessions_not_found.txt\".\n" | tee -a $gtotree_log
-        printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+        printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    $num_accs_not_found accession(s) not successfully found at NCBI.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    Reported in \"${output_dir}/run_files/NCBI_accessions_not_found.txt\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         sleep 3
 
@@ -1332,7 +1529,7 @@ if [ -n "$NCBI_acc_file" ]; then
     else
         mv ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp ${tmp_dir}/updated_sorted_ncbi_accs.tmp
         NCBI_remaining_genomes_total=$(wc -l ${tmp_dir}/updated_sorted_ncbi_accs.tmp | sed "s/^ *//" | cut -d " " -f 1)
-        printf "\n\n\t        ${GREEN}All $NCBI_remaining_genomes_total input accessions successfully found.${NC}\n\n" | tee -a $gtotree_log
+        printf "\n\n\t        ${GREEN}All $NCBI_remaining_genomes_total input accessions successfully found.${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     fi
 
@@ -1341,9 +1538,9 @@ if [ -n "$NCBI_acc_file" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag
+        gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
     else
-        cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag
+        cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
     fi
 
     ## checking if prodigal was used to add to citations list being reported at end
@@ -1351,24 +1548,24 @@ if [ -n "$NCBI_acc_file" ]; then
         prodigal_used="true"
     fi
 
-    printf "________________________________________________________________________________\n\n" | tee -a $gtotree_log
+    printf "________________________________________________________________________________\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
     ## reporting any accessions not successfully found or downloaded, and updating files
-    printf "\n     ******************************* ${GREEN}UPDATE${NC} *******************************  \n" | tee -a $gtotree_log
-    printf "        Of the input genomes provided by NCBI accession:\n\n" | tee -a $gtotree_log
+    printf "\n     ******************************* ${GREEN}UPDATE${NC} *******************************  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "        Of the input genomes provided by NCBI accession:\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
         num_dupe_genomes=$(wc -l ${output_dir}/Redundant_input_accessions.txt | sed "s/^ *//" | cut -d " " -f 1)
         num_dupe_report=$(($num_dupe_genomes / 2))
-        printf "          ${YELLOW}$num_dupe_report accession(s) redundant.${NC}\n" | tee -a $gtotree_log
-        printf "          Reported in \"${output_dir}/run_files/Redundant_input_accessions.txt\".\n\n" | tee -a $gtotree_log
+        printf "          ${YELLOW}$num_dupe_report accession(s) redundant.${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "          Reported in \"${output_dir}/run_files/Redundant_input_accessions.txt\".\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
         num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "          ${YELLOW}$num_accs_not_found accession(s) not found at NCBI.${NC}\n" | tee -a $gtotree_log
-        printf "          Reported in \"${output_dir}/run_files/NCBI_accessions_not_found.txt\".\n\n" | tee -a $gtotree_log
+        printf "          ${YELLOW}$num_accs_not_found accession(s) not found at NCBI.${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "          Reported in \"${output_dir}/run_files/NCBI_accessions_not_found.txt\".\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ]; then
@@ -1377,8 +1574,8 @@ if [ -n "$NCBI_acc_file" ]; then
         comm -23 ${tmp_dir}/updated_sorted_ncbi_accs.tmp <(sort ${output_dir}/NCBI_accessions_not_downloaded.txt) | sort > ${tmp_dir}/updated_sorted_ncbi_accs2.tmp
         mv ${tmp_dir}/updated_sorted_ncbi_accs2.tmp ${tmp_dir}/final_included_NCBI_accs.tmp
 
-        printf "          ${YELLOW}$num_accs_not_downloaded NCBI accession(s) did not download successfully.${NC}\n" | tee -a $gtotree_log
-        printf "          Reported in \"${output_dir}/run_files/NCBI_accessions_not_downloaded.txt\".\n\n" | tee -a $gtotree_log
+        printf "          ${YELLOW}$num_accs_not_downloaded NCBI accession(s) did not download successfully.${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "          Reported in \"${output_dir}/run_files/NCBI_accessions_not_downloaded.txt\".\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     else
         mv ${tmp_dir}/updated_sorted_ncbi_accs.tmp ${tmp_dir}/final_included_NCBI_accs.tmp
@@ -1388,14 +1585,14 @@ if [ -n "$NCBI_acc_file" ]; then
 
     if [ -f ${output_dir}/NCBI_accessions_not_found.txt ] || [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ] || [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
 
-        printf "        $num_retained_ncbi_input_genomes of the total $NCBI_input_genomes_total input accessions had their genomes successfully\n" | tee -a $gtotree_log
-        printf "        downloaded and searched.\n" | tee -a $gtotree_log
+        printf "        $num_retained_ncbi_input_genomes of the total $NCBI_input_genomes_total input accessions had their genomes successfully\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "        downloaded and searched.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     else
-        printf "                ${GREEN}All $num_retained_ncbi_input_genomes successfully downloaded and searched :)${NC}\n" | tee -a $gtotree_log
+        printf "                ${GREEN}All $num_retained_ncbi_input_genomes successfully downloaded and searched :)${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
-    printf "     ********************************************************************** \n\n" | tee -a $gtotree_log
+    printf "     ********************************************************************** \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     # adding to genomes from all sources file
     cat ${tmp_dir}/final_included_NCBI_accs.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
@@ -1409,15 +1606,15 @@ fi
 #############################################################################
 if [ -n "$genbank_list_file" ]; then
 
-    printf "\n ############################################################################## \n" | tee -a $gtotree_log
-    printf " ####           Working on the genomes provided as GenBank files           ####\n" | tee -a $gtotree_log
-    printf " ############################################################################## \n\n" | tee -a $gtotree_log
+    printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ####           Working on the genomes provided as GenBank files           ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     curr_time=$(date +"%I:%M %p")
     duration=$SECONDS
 
-    printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-    printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+    printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     # setting a counter to track how far along we are
     num=0
@@ -1427,7 +1624,7 @@ if [ -n "$genbank_list_file" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-genbank-serial.sh $genbank_list_file $tmp_dir $hmm_file $genbank_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
+        gtt-genbank-serial.sh $genbank_list_file $tmp_dir $hmm_file $genbank_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
 
         ### kill backstop ###
         # if there was a problem with the serial genbank genome processing, killing main program here and reporting
@@ -1435,27 +1632,27 @@ if [ -n "$genbank_list_file" ]; then
 
             problem_assembly=$(head -n 1 ${tmp_dir}/kill_genbank_serial.prodigal)
 
-            printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
-            printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+            printf "\n\n ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ##############################################################################${NC} \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
-            printf "    Something went wrong with prodigal trying to call genes on the fasta\n" | tee -a $gtotree_log
-            printf "    file generated from assembly ${GREEN}${problem_assembly}${NC}.\n" | tee -a $gtotree_log
-            printf "    GToTree is not sure it should move forward when something odd is going\n" | tee -a $gtotree_log
-            printf "    on like this :(\n\n" | tee -a $gtotree_log
+            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    Something went wrong with prodigal trying to call genes on the fasta\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    file generated from assembly ${GREEN}${problem_assembly}${NC}.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    GToTree is not sure it should move forward when something odd is going\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    on like this :(\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "    It is possible this is just because this assembly is shorter than\n" | tee -a $gtotree_log
-            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee -a $gtotree_log
-            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee -a $gtotree_log
-            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee -a $gtotree_log
-            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee -a $gtotree_log
-            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee -a $gtotree_log
-            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+            printf "    It is possible this is just because this assembly is shorter than\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+            printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
             # removing tmp directory unless debug set
             if [ $debug_flag == 'false' ]; then
@@ -1467,7 +1664,7 @@ if [ -n "$genbank_list_file" ]; then
         fi
 
     else
-        cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
+        cat $genbank_list_file | parallel -j $num_jobs gtt-genbank-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
 
 
         ### kill backstop ###
@@ -1476,28 +1673,28 @@ if [ -n "$genbank_list_file" ]; then
 
             problem_assembly=$(head -n 1 ${tmp_dir}/kill_genbank_parallel.prodigal)
 
-            printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
-            printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+            printf "\n\n ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ##############################################################################${NC} \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
-            printf "    Something went wrong with prodigal trying to call genes on the fasta\n" | tee -a $gtotree_log
-            printf "    file generated from assembly ${GREEN}${problem_assembly}${NC}.\n" | tee -a $gtotree_log
-            printf "    GToTree is not sure it should move forward when something odd is going\n" | tee -a $gtotree_log
-            printf "    on like this :(\n\n" | tee -a $gtotree_log
+            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    Something went wrong with prodigal trying to call genes on the fasta\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    file generated from assembly ${GREEN}${problem_assembly}${NC}.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    GToTree is not sure it should move forward when something odd is going\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    on like this :(\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
-            printf "    It is possible this is just because this assembly is shorter than\n" | tee -a $gtotree_log
-            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee -a $gtotree_log
-            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee -a $gtotree_log
-            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee -a $gtotree_log
-            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee -a $gtotree_log
-            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee -a $gtotree_log
-            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+            printf "    It is possible this is just because this assembly is shorter than\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+            printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
             # removing tmp directory unless debug set
             if [ $debug_flag == 'false' ]; then
@@ -1520,7 +1717,7 @@ if [ -n "$genbank_list_file" ]; then
         prodigal_used="true"
     fi
 
-    printf "________________________________________________________________________________\n\n" | tee -a $gtotree_log
+    printf "________________________________________________________________________________\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 fi
 
@@ -1530,15 +1727,15 @@ fi
 #############################################################################
 if [ -n "$fasta_files" ]; then
 
-    printf "\n ############################################################################## \n" | tee -a $gtotree_log
-    printf " ####            Working on the genomes provided as fasta files            ####\n" | tee -a $gtotree_log
-    printf " ############################################################################## \n\n" | tee -a $gtotree_log
+    printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ####            Working on the genomes provided as fasta files            ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     curr_time=$(date +"%I:%M %p")
     duration=$SECONDS
 
-    printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-    printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+    printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     # setting a counter to track how far along we are
     num=0
@@ -1549,7 +1746,7 @@ if [ -n "$fasta_files" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
+        gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
 
         ### kill backstop ###
         # if there was a problem with the serial fasta genome processing, killing main program here and reporting
@@ -1557,26 +1754,26 @@ if [ -n "$fasta_files" ]; then
 
             problem_assembly=$(head -n 1 ${tmp_dir}/kill_fasta_serial.prodigal)
 
-            printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
-            printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+            printf "\n\n ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ##############################################################################${NC} \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
-            printf "    Something went wrong with prodigal trying to call genes on assembly\n" | tee -a $gtotree_log
-            printf "    ${GREEN}${problem_assembly}${NC}. GToTree is not sure it should\n" | tee -a $gtotree_log
-            printf "    move forward when something odd is going on like this :(\n\n" | tee -a $gtotree_log
+            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    Something went wrong with prodigal trying to call genes on assembly\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    ${GREEN}${problem_assembly}${NC}. GToTree is not sure it should\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    move forward when something odd is going on like this :(\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "    It is possible this is just because this assembly is shorter than\n" | tee -a $gtotree_log
-            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee -a $gtotree_log
-            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee -a $gtotree_log
-            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee -a $gtotree_log
-            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee -a $gtotree_log
-            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee -a $gtotree_log
-            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+            printf "    It is possible this is just because this assembly is shorter than\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+            printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
             # removing tmp directory unless debug set
             if [ $debug_flag == 'false' ]; then
@@ -1588,7 +1785,7 @@ if [ -n "$fasta_files" ]; then
         fi
 
     else
-        cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
+        cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
 
         ### kill backstop ###
         # if there was a problem with the parallel fasta genome processing, killing main program here and reporting
@@ -1596,26 +1793,26 @@ if [ -n "$fasta_files" ]; then
 
             problem_assembly=$(head -n 1 ${tmp_dir}/kill_fasta_parallel.prodigal)
 
-            printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
-            printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+            printf "\n\n ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ##############################################################################${NC} \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
-            printf "    Something went wrong with prodigal trying to call genes on assembly\n" | tee -a $gtotree_log
-            printf "    ${GREEN}${problem_assembly}${NC}. GToTree is not sure it should\n" | tee -a $gtotree_log
-            printf "    move forward when something odd is going on like this :(\n\n" | tee -a $gtotree_log
+            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    Something went wrong with prodigal trying to call genes on assembly\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    ${GREEN}${problem_assembly}${NC}. GToTree is not sure it should\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    move forward when something odd is going on like this :(\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "    It is possible this is just because this assembly is shorter than\n" | tee -a $gtotree_log
-            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee -a $gtotree_log
-            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee -a $gtotree_log
-            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee -a $gtotree_log
-            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee -a $gtotree_log
-            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee -a $gtotree_log
-            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+            printf "    It is possible this is just because this assembly is shorter than\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    out due to not having enough of the target genes (set with '-G').\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+            printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
             # removing tmp directory unless debug set
             if [ $debug_flag == 'false' ]; then
@@ -1635,7 +1832,7 @@ if [ -n "$fasta_files" ]; then
     prodigal_used="true"
 
 
-    printf "_______________________________________________________________________________\n\n" | tee -a $gtotree_log
+    printf "_______________________________________________________________________________\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 fi
 
@@ -1645,15 +1842,15 @@ fi
 #############################################################################
 if [ -n "$amino_acid_files" ]; then
 
-    printf "\n ############################################################################## \n" | tee -a $gtotree_log
-    printf " ####         Working on the genomes provided as amino acid files          ####\n" | tee -a $gtotree_log
-    printf " ############################################################################## \n\n" | tee -a $gtotree_log
+    printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ####         Working on the genomes provided as amino acid files          ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     curr_time=$(date +"%I:%M %p")
     duration=$SECONDS
 
-    printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-    printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+    printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     # setting a counter to track how far along we are
     num=0
@@ -1664,7 +1861,7 @@ if [ -n "$amino_acid_files" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-amino-acid-serial.sh $amino_acid_files $tmp_dir $hmm_file $amino_acid_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
+        gtt-amino-acid-serial.sh $amino_acid_files $tmp_dir $hmm_file $amino_acid_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
 
         ### kill backstop ###
         # if there was a problem with the serial fasta genome processing, killing main program here and reporting
@@ -1672,19 +1869,19 @@ if [ -n "$amino_acid_files" ]; then
 
             problem_assembly=$(head -n 1 ${tmp_dir}/kill_amino_acid_serial.problem)
 
-            printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
-            printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+            printf "\n\n ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ##############################################################################${NC} \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
-            printf "    Something went wrong with amino acid input file ${GREEN}${problem_assembly}${NC}.\n" | tee -a $gtotree_log
-            printf "    Is it in standard fasta format? GToTree is not sure it should move forward\n" | tee -a $gtotree_log
-            printf "    when something odd is going on like this :(\n" | tee -a $gtotree_log
-            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    Something went wrong with amino acid input file ${GREEN}${problem_assembly}${NC}.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    Is it in standard fasta format? GToTree is not sure it should move forward\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    when something odd is going on like this :(\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+            printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
             # removing tmp directory unless debug set
             if [ $debug_flag == 'false' ]; then
@@ -1696,7 +1893,7 @@ if [ -n "$amino_acid_files" ]; then
         fi
 
     else
-        cat $amino_acid_files | parallel -j $num_jobs gtt-amino-acid-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets
+        cat $amino_acid_files | parallel -j $num_jobs gtt-amino-acid-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
 
         ### kill backstop ###
         # if there was a problem with the parallel fasta genome processing, killing main program here and reporting
@@ -1704,19 +1901,19 @@ if [ -n "$amino_acid_files" ]; then
 
             problem_assembly=$(head -n 1 ${tmp_dir}/kill_amino_acid_parallel.problem)
 
-            printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
-            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
-            printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
-            printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+            printf "\n\n ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ##############################################################################${NC} \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf " ${RED}############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
-            printf "    Something went wrong with amino acid input file ${GREEN}${problem_assembly}${NC}.\n" | tee -a $gtotree_log
-            printf "    Is it in standard fasta format? GToTree is not sure it should move forward\n" | tee -a $gtotree_log
-            printf "    when something odd is going on like this :(\n" | tee -a $gtotree_log
-            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+            printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    Something went wrong with amino acid input file ${GREEN}${problem_assembly}${NC}.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    Is it in standard fasta format? GToTree is not sure it should move forward\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    when something odd is going on like this :(\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+            printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
             # removing tmp directory unless debug set
             if [ $debug_flag == 'false' ]; then
@@ -1732,7 +1929,7 @@ if [ -n "$amino_acid_files" ]; then
     # adding retained genomes to genomes from all sources file
     cat ${tmp_dir}/amino_acid_genomes_list.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp
 
-    printf "_______________________________________________________________________________\n\n" | tee -a $gtotree_log
+    printf "_______________________________________________________________________________\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 fi
 
@@ -1740,17 +1937,17 @@ fi
 #############################################################################
 #############################  FILTERING GENES  #############################
 #############################################################################
-printf "\n ############################################################################## \n" | tee -a $gtotree_log
-printf " ####                     Filtering genes by length                        ####\n" | tee -a $gtotree_log
-printf " ############################################################################## \n\n" | tee -a $gtotree_log
+printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf " ####                     Filtering genes by length                        ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-printf "     Keeping those with lengths within ${mult_len_cut}%% of the median for the gene set.\n\n" | tee -a $gtotree_log
+printf "     Keeping those with lengths within ${mult_len_cut}%% of the median for the gene set.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 curr_time=$(date +"%I:%M %p")
 duration=$SECONDS
 
-printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 ### first checking that all genes have some sequences, if not, removing from gene list ###
 for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
@@ -1761,9 +1958,26 @@ do
 done > ${tmp_dir}/SCG_targets_with_no_retained_seqs.tmp
 
 # removing those genes, if any:
-comm -23 <(sort ${tmp_dir}/uniq_hmm_names.tmp) <(sort ${tmp_dir}/SCG_targets_with_no_retained_seqs.tmp) > ${tmp_dir}/updated_genes_list.tmp
+comm -23 <(sort ${tmp_dir}/uniq_hmm_names.tmp) <(sort ${tmp_dir}/SCG_targets_with_no_retained_seqs.tmp) > ${tmp_dir}/updated_genes_list_a.tmp
 
-removed_genes=$(wc -l ${tmp_dir}/SCG_targets_with_no_retained_seqs.tmp | sed "s/^ *//" | cut -d " " -f 1)
+### checking if any have just 1 and removing them from gene list ###
+for SCG in $(cat ${tmp_dir}/updated_genes_list_a.tmp)
+do
+
+    curr_count=$(grep -c ">" ${tmp_dir}/${SCG}_hits.faa)
+
+    if [ ${curr_count} -lt 2 ]; then
+        echo "$SCG"
+    fi
+
+done > ${tmp_dir}/SCG_targets_with_only_one_seq.tmp
+
+# removing those, if any:
+comm -23 <(sort ${tmp_dir}/updated_genes_list_a.tmp) <(sort ${tmp_dir}/SCG_targets_with_only_one_seq.tmp) > ${tmp_dir}/updated_genes_list.tmp
+
+# combining removed list
+cat ${tmp_dir}/SCG_targets_with_no_retained_seqs.tmp ${tmp_dir}/SCG_targets_with_only_one_seq.tmp > ${tmp_dir}/removed_SCG_targets.tmp
+removed_genes=$(wc -l ${tmp_dir}/removed_SCG_targets.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
 # reporting
 if [ $removed_genes != "0" ]; then
@@ -1771,28 +1985,28 @@ if [ $removed_genes != "0" ]; then
 ## reporting varies depending on if run in best-hit mode (-B) or not
     if [ $best_hit_mode != "true" ]; then
 
-        printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
-        printf "    $removed_genes gene(s) either had no hits in any genome, or only multiple hits per\n" | tee -a $gtotree_log
-        printf "    genome... Just so ya know!!\n\n" | tee -a $gtotree_log
-        printf "        These included:\n\n" | tee -a $gtotree_log
-        sed 's/^/                     /' ${tmp_dir}/SCG_targets_with_no_retained_seqs.tmp | tee -a $gtotree_log
-        printf "\n    Reported in \"${output_dir}/run_files/Target_genes_not_found_or_not_retained.txt\".\n\n" | tee -a $gtotree_log
-        printf "   If interested, you can figure out which of those two scenarios was the cause by\n" | tee -a $gtotree_log
-        printf "   checking out \"${output_dir}/SCG_hit_counts.tsv\".\n" | tee -a $gtotree_log
-        printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
-        cp ${tmp_dir}/SCG_targets_with_no_retained_seqs.tmp ${output_dir}/Target_genes_not_found_or_not_retained.txt
+        printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    $removed_genes gene(s) either had no hits in any genome, a hit in only one genome, or\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    only multiple hits per genome... Just so ya know!!\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "        These included:\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        sed 's/^/                     /' ${tmp_dir}/removed_SCG_targets.tmp | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\n    Reported in \"${output_dir}/run_files/Target-genes-not-found-or-retained.txt\".\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "   If interested, you can figure out which of those scenarios was the cause by\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "   checking out \"${output_dir}/SCG_hit_counts.tsv\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        cp ${tmp_dir}/removed_SCG_targets.tmp ${output_dir}/run_files/Target-genes-not-found-or-retained.txt
 
         sleep 3
 
     else
 
-        printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
-        printf "    $removed_genes gene(s) had no hits in any genome... Just so ya know!!\n\n" | tee -a $gtotree_log
-        printf "        These included:\n\n" | tee -a $gtotree_log
-        sed 's/^/                     /' ${tmp_dir}/SCG_targets_with_no_retained_seqs.tmp | tee -a $gtotree_log
-        printf "\n    Reported in \"${output_dir}/run_files/Target_genes_not_found.txt\".\n" | tee -a $gtotree_log
-        printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
-        cp ${tmp_dir}/SCG_targets_with_no_retained_seqs.tmp ${output_dir}/Target_genes_not_found.txt
+        printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    $removed_genes gene(s) had no hits in any genome, or a hit in only one genome... Just so ya know!!\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "        These included:\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        sed 's/^/                     /' ${tmp_dir}/removed_SCG_targets.tmp | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\n    Reported in \"${output_dir}/run_files/Target-genes-not-found-or-retained.txt\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        cp ${tmp_dir}/removed_SCG_targets.tmp ${output_dir}/run_files/Target-genes-not-found-or-retained.txt
 
         sleep 3
 
@@ -1810,44 +2024,44 @@ if [ $len_updated_genes_list == "0" ]; then
 ## reporting varies depending on if run in best-hit mode (-B) or not
     if [ $best_hit_mode != "true" ]; then
 
-        printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
-        printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
-        printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
-        printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
-        printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+        printf "\n\n ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ##############################################################################${NC} \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ${RED}############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-        printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
-        printf "    After filtering out genes that had either 0 hits in any genome OR only\n" | tee -a $gtotree_log
-        printf "    multiple hits, no genes remained. This typically shouldn't happen unless\n" | tee -a $gtotree_log
-        printf "    maybe there were very few genes being targeted, or very few genomes. You\n" | tee -a $gtotree_log
-        printf "    can consider running GToTree in \"best-hit\" mode (by providing the '-B'\n" | tee -a $gtotree_log
-        printf "    flag with no arguments), which will retain genes from genomes with multiple\n" | tee -a $gtotree_log
-        printf "    hits - but keep in mind that is less conservative. This is also a good time\n" | tee -a $gtotree_log
-        printf "    to make sure nothing weird is going on.\n\n" | tee -a $gtotree_log
+        printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    After filtering out genes that had either 0 hits in any genome OR only\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    multiple hits, no genes remained. This typically shouldn't happen unless\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    maybe there were very few genes being targeted, or very few genomes. You\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    can consider running GToTree in \"best-hit\" mode (by providing the '-B'\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    flag with no arguments), which will retain genes from genomes with multiple\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    hits - but keep in mind that is less conservative. This is also a good time\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    to make sure nothing weird is going on.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-        printf "    You can see the number of target-gene hits per genome by checking out \n" | tee -a $gtotree_log
-        printf "    \"${output_dir}/SCG_hit_counts.tsv\".\n" | tee -a $gtotree_log
-        printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+        printf "    You can see the number of target-gene hits per genome by checking out \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    \"${output_dir}/SCG_hit_counts.tsv\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-        printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     else
 
-        printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
-        printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
-        printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
-        printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
-        printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+        printf "\n\n ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ##############################################################################${NC} \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ${RED}############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-        printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
-        printf "    After filtering out genes that had either 0 hits in any genome, no genes remained.\n" | tee -a $gtotree_log
-        printf "    This typically shouldn't happen unless maybe there were very few genes being targeted,\n" | tee -a $gtotree_log
-        printf "    or very few genomes being run. If it is not clear what is causing the problem,\n" | tee -a $gtotree_log
-        printf "    please feel free to post an issue at the GToTree github:\n" | tee -a $gtotree_log
-        printf "    https://github.com/AstrobioMike/GToTree/issues\n" | tee -a $gtotree_log
-        printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+        printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    After filtering out genes that had 0 hits in any genome, no genes remained.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    This typically shouldn't happen unless maybe there were very few genes being targeted,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    or very few genomes being run. If it is not clear what is causing the problem,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    please feel free to post an issue at the GToTree github:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    https://github.com/AstrobioMike/GToTree/issues\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-        printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+        printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     fi
 
@@ -1863,7 +2077,6 @@ if [ $len_updated_genes_list == "0" ]; then
 fi
 
 
-
 ### filtering out sequences that are too long or too short ###
 # running in parallel if set, otherwise running in serial
 if [ $num_jobs == "1" ]; then
@@ -1871,8 +2084,8 @@ if [ $num_jobs == "1" ]; then
     for SCG in $(cat ${tmp_dir}/updated_genes_list.tmp)
     do
 
-        printf "   --------------------------------------------------------------------------   \n" | tee -a $gtotree_log
-        printf "\n    Filtering ${GREEN}$SCG${NC} sequences by length...\n" | tee -a $gtotree_log
+        printf "   --------------------------------------------------------------------------   \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\n    Filtering ${GREEN}$SCG${NC} sequences by length...\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         gtt-count-bases-per-seq -i ${tmp_dir}/${SCG}_hits.faa -o ${tmp_dir}/${SCG}-num_bps.tmp
         cut -f 2 ${tmp_dir}/${SCG}-num_bps.tmp > ${tmp_dir}/${SCG}-lengths.tmp
@@ -1908,21 +2121,21 @@ len_final_genes_list=$(wc -l ${tmp_dir}/final_genes_list.tmp | sed "s/^ *//" | c
 
 if [ $len_final_genes_list == "0" ]; then
 
-    printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
-    printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
-    printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
-    printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
-    printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+    printf "\n\n ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ##############################################################################${NC} \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ${RED}############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
-    printf "    After filtering genes by length (set with the '-c' flag to $len_cutoff this\n" | tee -a $gtotree_log
-    printf "    run), no genes remained. This typically shouldn't happen unless maybe there\n" | tee -a $gtotree_log
-    printf "    were very few genes being targeted. You can consider increasing the '-c'\n" | tee -a $gtotree_log
-    printf "    cutoff threshold, but this is also a good time to make sure nothing weird\n" | tee -a $gtotree_log
-    printf "    is going on.\n" | tee -a $gtotree_log
-    printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+    printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    After filtering genes by length (set with the '-c' flag to $len_cutoff this\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    run), no genes remained. This typically shouldn't happen unless maybe there\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    were very few genes being targeted. You can consider increasing the '-c'\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    cutoff threshold, but this is also a good time to make sure nothing weird\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    is going on.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+    printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     # removing tmp directory unless debug set
     if [ $debug_flag == 'false' ]; then
@@ -1939,36 +2152,36 @@ removed_genes2=$(wc -l ${tmp_dir}/genes_to_remove2.tmp | sed "s/^ *//" | cut -d 
 
 # reporting
 if [ $removed_genes2 != "0" ]; then
-    printf "     ${YELLOW}******************************* ${NC}NOTICE ${YELLOW}*******************************${NC}  \n" | tee -a $gtotree_log
-    printf "\t  $removed_genes2 gene(s) had no hits in any genomes after filtering by length! Just so ya know...\n\n" | tee -a $gtotree_log
-    printf "\t    Length-filtered out of existence:\n\n" | tee -a $gtotree_log
-    sed 's/^/          /' ${tmp_dir}/genes_to_remove2.tmp | tee -a $gtotree_log
-    printf "\n     Reported in \"${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt\".\n" | tee -a $gtotree_log
-    printf "     ${YELLOW}************************************************************************ ${NC}\n\n" | tee -a $gtotree_log
+    printf "     ${YELLOW}******************************* ${NC}NOTICE ${YELLOW}*******************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "\t  $removed_genes2 gene(s) had no hits in any genomes after filtering by length! Just so ya know...\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "\t    Length-filtered out of existence:\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    sed 's/^/          /' ${tmp_dir}/genes_to_remove2.tmp | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "\n     Reported in \"${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "     ${YELLOW}************************************************************************ ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     cp ${tmp_dir}/genes_to_remove2.tmp ${output_dir}/Genes_with_no_hits_after_length_filter.txt
 fi
 
 new_hmm_target_genes_total=$(wc -l ${tmp_dir}/final_genes_list.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
-printf "________________________________________________________________________________ \n\n\n" | tee -a $gtotree_log
+printf "________________________________________________________________________________ \n\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
 #############################################################################
 ############################  FILTERING GENOMES  ############################
 #############################################################################
 ### removing genomes with hits to fewer than 50% (by default) of the total SCGs targeted ###
-printf "\n ############################################################################## \n" | tee -a $gtotree_log
-printf " ####                Filtering genomes with too few hits                   ####\n" | tee -a $gtotree_log
-printf " ############################################################################## \n\n" | tee -a $gtotree_log
+printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf " ####                Filtering genomes with too few hits                   ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-printf "     Removing those with fewer than ${mult_gen_cut}%% of the total SCGs targeted.\n\n" | tee -a $gtotree_log
+printf "     Removing those with fewer than ${mult_gen_cut}%% of the total SCGs targeted.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 curr_time=$(date +"%I:%M %p")
 duration=$SECONDS
 
-printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
 # setting cutoff threshold (need to have this many hits or genome is removed)
@@ -2004,20 +2217,20 @@ removed_genomes=$(wc -l ${tmp_dir}/sorted_genomes_to_remove.tmp | sed "s/^ *//" 
 
 if [ $removed_genomes != "0" ]; then
 
-    printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
-    printf "    $removed_genomes genome(s) removed from analysis due to having too few hits.\n\n" | tee -a $gtotree_log
-    printf "    Reported in \"${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv\".\n" | tee -a $gtotree_log
-    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+    printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    $removed_genomes genome(s) removed from analysis due to having too few hits.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    Reported in \"${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     sleep 3
 else
-    printf "             ${GREEN}No genomes were removed for having too few hits :)${NC}\n\n" | tee -a $gtotree_log
+    printf "             ${GREEN}No genomes were removed for having too few hits :)${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     rm ${output_dir}/Genomes_removed_for_too_few_hits.tsv
     sleep 3
 fi
 
-printf "________________________________________________________________________________\n\n\n" | tee -a $gtotree_log
+printf "________________________________________________________________________________\n\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
 ### check there is more than 1 genome remaining, and exiting if not ###
@@ -2025,22 +2238,22 @@ num_final_genomes_from_all_sources=$(wc -l ${tmp_dir}/final_genomes_from_all_sou
 
 if [ $num_final_genomes_from_all_sources -lt 3 ]; then
 
-    printf "\n\n ${RED}############################################################################## \n" | tee -a $gtotree_log
-    printf " ${RED}############################################################################## \n" | tee -a $gtotree_log
-    printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee -a $gtotree_log
-    printf " ##############################################################################${NC} \n" | tee -a $gtotree_log
-    printf " ${RED}############################################################################## \n\n" | tee -a $gtotree_log
+    printf "\n\n ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ${RED}############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ####${NC}             GToTree is exiting without completing :(                 ${RED}####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ##############################################################################${NC} \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ${RED}############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee -a $gtotree_log
-    printf "    After filtering out genomes with too few hits to the target genes (set\n" | tee -a $gtotree_log
-    printf "    with the '-G' flag), fewer than 3 genomes remained. This typically\n" | tee -a $gtotree_log
-    printf "    shouldn't happen unless maybe there were very few genomes at the start,\n" | tee -a $gtotree_log
-    printf "    and/or very few target genes being searched. If it is not clear what is\n" | tee -a $gtotree_log
-    printf "    causing the problem, please feel free to post an issue at the GToTree github:\n" | tee -a $gtotree_log
-    printf "    https://github.com/AstrobioMike/GToTree/issues\n" | tee -a $gtotree_log
-    printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+    printf "  ${RED}************************** ${NC}REASON FOR TERMINATION ${RED}**************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    After filtering out genomes with too few hits to the target genes (set\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    with the '-G' flag), fewer than 3 genomes remained. This typically\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    shouldn't happen unless maybe there were very few genomes at the start,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    and/or very few target genes being searched. If it is not clear what is\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    causing the problem, please feel free to post an issue at the GToTree github:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    https://github.com/AstrobioMike/GToTree/issues\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "  ${RED}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "\nExiting for now.\n\n" | tee -a $gtotree_log
+    printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     # removing tmp directory unless debug set
     if [ $debug_flag == 'false' ]; then
@@ -2058,15 +2271,15 @@ fi
 #############################################################################
 #############  ALIGNING, TRIMMING, AND INSERTING GAP-SEQUENCES  #############
 #############################################################################
-printf "\n ############################################################################## \n" | tee -a $gtotree_log
-printf " ####          Aligning, trimming, and inserting gap-sequences             ####\n" | tee -a $gtotree_log
-printf " ############################################################################## \n\n" | tee -a $gtotree_log
+printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf " ####          Aligning, trimming, and inserting gap-sequences             ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 curr_time=$(date +"%I:%M %p")
 duration=$SECONDS
 
-printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n" | tee -a $gtotree_log
+printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
 ### running in parallel if set, otherwise running in serial ###
@@ -2081,9 +2294,9 @@ if [ $num_jobs == "1" ]; then
 
         num=$((num+1))
 
-        printf "\n\n\n   --------------------------------------------------------------------------   \n" | tee -a $gtotree_log
-        printf "\t    Aligning and cleaning gene ${GREEN}$SCG${NC}; Number $num of $new_hmm_target_genes_total.\n" | tee -a $gtotree_log
-        printf "   --------------------------------------------------------------------------   \n" | tee -a $gtotree_log
+        printf "\n\n\n   --------------------------------------------------------------------------   \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\t    Aligning and cleaning gene ${GREEN}$SCG${NC}; Number $num of $new_hmm_target_genes_total.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "   --------------------------------------------------------------------------   \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         # removing those genomes that need to be removed based on not having enough hits to the target genes
         gtt-parse-fasta-by-headers -i ${tmp_dir}/${SCG}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${SCG}_hits_filtered.faa --inverse
@@ -2153,7 +2366,7 @@ else
 
 fi
 
-printf "\n\n\n________________________________________________________________________________\n\n\n" | tee -a $gtotree_log
+printf "\n\n\n________________________________________________________________________________\n\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
 #############################################################################
@@ -2241,15 +2454,15 @@ fi
 #############################################################################
 #####################  CATTING ALL ALIGNMENTS TOGETHER  #####################
 #############################################################################
-printf "\n ############################################################################## \n" | tee -a $gtotree_log
-printf " ####                  Catting all alignments together                     ####\n" | tee -a $gtotree_log
-printf " ############################################################################## \n\n" | tee -a $gtotree_log
+printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf " ####                  Catting all alignments together                     ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 curr_time=$(date +"%I:%M %p")
 duration=$SECONDS
 
-printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 # this concatenates the alignments and generates the partitions file for mixed model alignments
 gtt-cat-alignments -t $tmp_dir -o $output_dir
@@ -2257,7 +2470,7 @@ gtt-cat-alignments -t $tmp_dir -o $output_dir
 # storing genomes that made it through workflow to report at end
 genomes_retained=$(wc -l ${tmp_dir}/final_genomes_from_all_sources.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
-printf "\n________________________________________________________________________________\n\n\n" | tee -a $gtotree_log
+printf "\n________________________________________________________________________________\n\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
 #############################################################################
@@ -2270,9 +2483,9 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
     cp ${output_dir}/Aligned_SCGs.faa ${tmp_dir}/aligned_SCGs_mod_names.tmp
 
-    printf "\n ############################################################################## \n" | tee -a $gtotree_log
-    printf " ####                   Adding more informative headers                    ####\n" | tee -a $gtotree_log
-    printf " ############################################################################## \n\n" | tee -a $gtotree_log
+    printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ####                   Adding more informative headers                    ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     ## building id swap file starting with user-provided Genome-to-ID mapping file if given
     if [ -n "$new_file_to_genome_id_map" ]; then
@@ -2491,12 +2704,12 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
             fi
 
         else # this is if there are no taxids to use for taxonkit
-            printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}\n" | tee -a $gtotree_log
-            printf "    You specified to use Taxonkit to add lineage info (set with the '-t' flag),\n" | tee -a $gtotree_log
-            printf "    but there were no taxids available (which typically come from inputs provided\n" | tee -a $gtotree_log
-            printf "    as NCBI accessions or GenBank files that might hold that information).\n\n" | tee -a $gtotree_log
-            printf "    In this case no lineage information could be added.\n" | tee -a $gtotree_log
-            printf "  ${YELLOW}***************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+            printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    You specified to use Taxonkit to add lineage info (set with the '-t' flag),\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    but there were no taxids available (which typically come from inputs provided\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    as NCBI accessions or GenBank files that might hold that information).\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    In this case no lineage information could be added.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "  ${YELLOW}***************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
             # if base label swap map was provided by the user (via the -m flag) then making that the final swap map since no taxonkit lineage info to add
             if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
@@ -2518,7 +2731,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
     if [ $gtdb_id_swap != "false" ]; then
 
         # downloading gtdb bacteria and archaea info tables
-        printf "\n\t      ${GREEN}Downloading GTDB archaea and bacteria info tables...${NC}\n\n" | tee -a $gtotree_log
+        printf "\n\t      ${GREEN}Downloading GTDB archaea and bacteria info tables...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar122_metadata.tar.gz -o ${tmp_dir}/gtdb_archaea_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
         curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tar.gz -o ${tmp_dir}/gtdb_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
@@ -2529,7 +2742,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
         # making sure file downloaded with no errors
         if [ -s capture_any_dl_errors.tmp ]; then
-            printf "\n\n  ${RED}Download of GTDB taxonomy info failed :(${NC}\n  Is the internet connection weak maybe?\n\nContinuing, because we've come this far, but labels won't have GTDB lineages incorporated.\n\n" | tee -a $gtotree_log
+            printf "\n\n  ${RED}Download of GTDB taxonomy info failed :(${NC}\n  Is the internet connection weak maybe?\n\nContinuing, because we've come this far, but labels won't have GTDB lineages incorporated.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             rm -rf ${tmp_dir} ${output_dir} capture_any_dl_errors.tmp
             touch ${tmp_dir}/gtdb_failed_download.tmp
         else
@@ -2568,11 +2781,11 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
             
             if [ -n ${tmp_dir}/wanted_ranks.tmp ]; then
                 if grep -q "Strain" ${tmp_dir}/wanted_ranks.tmp; then
-                    printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
-                    printf "    Strain-level labels were requested in addition to using GTDB taxonomy\n" | tee -a $gtotree_log
-                    printf "    where possible. This is just a note that there will be no strain-level\n" | tee -a $gtotree_log
-                    printf "    labels added for those that had GTDB lineage info added.\n" | tee -a $gtotree_log
-                    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+                    printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                    printf "    Strain-level labels were requested in addition to using GTDB taxonomy\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                    printf "    where possible. This is just a note that there will be no strain-level\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                    printf "    labels added for those that had GTDB lineage info added.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
                 fi
             fi
 
@@ -2582,10 +2795,10 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
                 num_entries_found=$(tail -n +2 ${tmp_dir}/gtdb_found_accs.tsv | wc -l | sed "s/^ *//" | cut -d " " -f 1)
                 num_entries_not_found=$(tail -n +2 ${tmp_dir}/gtdb-not-found-accs.tsv | wc -l | sed "s/^ *//" | cut -d " " -f 1)
                 num_entries_searched=$(($num_entries_found + $num_entries_not_found))
-                printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee -a $gtotree_log
-                printf "    $num_entries_not_found accession(s) of the searched $num_entries_searched were not successfully found in GTDB.\n\n" | tee -a $gtotree_log
-                printf "    Reported in \"${output_dir}/run_files/GTDB_accessions_not_found.tsv\".\n" | tee -a $gtotree_log
-                printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee -a $gtotree_log
+                printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                printf "    $num_entries_not_found accession(s) of the searched $num_entries_searched were not successfully found in GTDB.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                printf "    Reported in \"${output_dir}/run_files/GTDB_accessions_not_found.tsv\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
                 sleep 3
 
@@ -3052,101 +3265,54 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
     else
 
-        printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}\n" | tee -a $gtotree_log
-        printf "    You specified to swap labels either with a specific mapping file (passed\n" | tee -a $gtotree_log
-        printf "    to the '-m' flag) and/or by specifying to add NCBI or GTDB taxonomy info,\n" | tee -a $gtotree_log
-        printf "    but none of these worked out :(\n\n" | tee -a $gtotree_log
-        printf "    Genomes from your mapping file may have been filtered out, and there may\n" | tee -a $gtotree_log
-        printf "    have been no accessible taxonomy information to retrieve (which typically\n" | tee -a $gtotree_log
-        printf "    would come from inputs provided as NCBI accessions or GenBank files that\n" | tee -a $gtotree_log
-        printf "    might hold that information).\n\n" | tee -a $gtotree_log
+        printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    You specified to swap labels either with a specific mapping file (passed\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    to the '-m' flag) and/or by specifying to add NCBI or GTDB taxonomy info,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    but none of these worked out :(\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    Genomes from your mapping file may have been filtered out, and there may\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    have been no accessible taxonomy information to retrieve (which typically\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    would come from inputs provided as NCBI accessions or GenBank files that\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "    might hold that information).\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-        printf "    In this case no labels could be swapped.\n" | tee -a $gtotree_log
-        printf "  ${YELLOW}***************************************************************************** ${NC}\n\n" | tee -a $gtotree_log
+        printf "    In this case no labels could be swapped.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "  ${YELLOW}***************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         rm -rf ${tmp_dir}/aligned_SCGs_mod_names.tmp
     fi
 
-    printf "\n________________________________________________________________________________\n\n\n" | tee -a $gtotree_log
+    printf "\n________________________________________________________________________________\n\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 fi
+
+
+#############################################################################
+################  COMBINING KO SEARCHING RESULTS IF NEEDED  #################
+#############################################################################
+if [ ${ko_targets} != 'false' ]; then
+
+    printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ##########            Combining KO searching results               ###########\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+    gtt-combine-kofamscan-results.sh ${tmp_dir}/genomes_from_all_sources.tmp ${tmp_dir} ${output_dir} ${target_KOs}
+
+    gtt-gen-KO-iToL-files.sh ${tmp_dir} ${output_dir}
+
+fi
+
 
 #############################################################################
 ##########  WRITING OUT ADDITIONAL TARGET PFAM RESULTS IF NEEDED  ###########
 #############################################################################
+
 if [ $additional_pfam_targets != 'false' ]; then
 
-    printf "\n ############################################################################## \n" | tee -a $gtotree_log
-    printf " ####            Parsing results of additional PFam searches               ####\n" | tee -a $gtotree_log
-    printf " ############################################################################## \n\n" | tee -a $gtotree_log
+    printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ####            Parsing results of additional Pfam searches               ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    ## setting variable holding whether or not any labels were swapped
-    if grep -q label <(head -n 1 ${output_dir}/Genomes_summary_info.tsv); then 
-        labels_swapped='true'
-    else
-        labels_swapped='false'
-    fi
+    gtt-gen-pfam-iToL-files.sh ${tmp_dir} ${output_dir}
 
-    num=4
-    for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
-    do
-
-        awk -F $'\t' -v col="$num" ' $col > 0 { print $1 } ' ${output_dir}/additional_pfam_search_results/Additional_Pfam_hit_counts.tsv | tail -n +2 > ${tmp_dir}/Genomes_with_hits_to_${target}.tmp
-
-        if [ -s ${tmp_dir}/Genomes_with_hits_to_${target}.tmp ]; then
-
-            if [ $labels_swapped == 'true' ]; then
-
-                for genome in $(cat ${tmp_dir}/Genomes_with_hits_to_${target}.tmp)
-                do
-                    
-                    grep -m1 "^$genome" ${output_dir}/Genomes_summary_info.tsv | cut -f 2 
-
-                done > ${tmp_dir}/Genome_labels_with_hits_to_${target}.tmp
-
-                paste ${tmp_dir}/Genomes_with_hits_to_${target}.tmp ${tmp_dir}/Genome_labels_with_hits_to_${target}.tmp > ${output_dir}/additional_pfam_search_results/Genomes_with_hits_to_${target}.tsv
-
-            else
-              
-                cp ${tmp_dir}/Genomes_with_hits_to_${target}.tmp ${output_dir}/additional_pfam_search_results/Genomes_with_hits_to_${target}.txt
-
-            fi
-            
-            ## if any, removing those not in final tree before making iToL file
-            awk -F $'\t' ' $8 == "No" { print $1 } ' ${output_dir}/Genomes_summary_info.tsv | sort > ${tmp_dir}/sorted_genomes_to_leave_out_of_iToL_files.tmp
-
-            if [ -s ${tmp_dir}/sorted_genomes_to_leave_out_of_iToL_files.tmp ]; then
-                comm -23 ${tmp_dir}/Genomes_with_hits_to_${target}.tmp ${tmp_dir}/sorted_genomes_to_leave_out_of_iToL_files.tmp > ${tmp_dir}/genomes_retained_for_${target}_iToL.tmp
-            else
-                cp ${tmp_dir}/Genomes_with_hits_to_${target}.tmp ${tmp_dir}/genomes_retained_for_${target}_iToL.tmp
-            fi
-
-            ## making iToL file for each additional target pfam
-            if [ $labels_swapped == 'true' ]; then
-                for genome in $(cat ${tmp_dir}/genomes_retained_for_${target}_iToL.tmp)
-                do
-                    grep -m 1 -w "$genome" ${output_dir}/additional_pfam_search_results/Genomes_with_hits_to_${target}.tsv
-                done | cut -f 2 > ${tmp_dir}/genomes_for_iToL_for_${target}.tmp
-
-            else
-                for genome in $(cat ${tmp_dir}/genomes_retained_for_${target}_iToL.tmp)
-                do
-                    grep -m 1 -w "$genome" ${output_dir}/additional_pfam_search_results/Genomes_with_hits_to_${target}.txt
-                done > ${tmp_dir}/genomes_for_iToL_for_${target}.tmp
-            fi
-
-            printf "DATASET_STYLE\nSEPARATOR SPACE\nDATASET_LABEL $target\nCOLOR #0000ff\nDATA\n" > ${output_dir}/additional_pfam_search_results/${target}-iToL.txt
-
-            cat <(sed 's/$/ branch node #0000ff 3 normal/' ${tmp_dir}/genomes_for_iToL_for_${target}.tmp) >> ${output_dir}/additional_pfam_search_results/${target}-iToL.txt
-        
-        else
-            rm ${tmp_dir}/Genomes_with_hits_to_${target}.tmp
-
-        fi
-
-        num=$(($num + 1))
-
-    done
 fi
 
 
@@ -3178,15 +3344,15 @@ if [ $align_only == 'false' ]; then
 
     if [ $tree_program == 'FastTreeMP' ]; then
 
-        printf "\n ############################################################################## \n" | tee -a $gtotree_log
-        printf " ####                         Running FastTreeMP                           ####\n" | tee -a $gtotree_log
-        printf " ############################################################################## \n\n" | tee -a $gtotree_log
+        printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ####                         Running FastTreeMP                           ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         curr_time=$(date +"%I:%M %p")
         duration=$SECONDS
 
-        printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-        printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+        printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         # setting env variable for FastTreeMP
         export OMP_NUM_THREADS=${num_jobs}
@@ -3208,15 +3374,15 @@ if [ $align_only == 'false' ]; then
 
     if [ $tree_program == 'FastTree' ]; then
 
-        printf "\n ############################################################################## \n" | tee -a $gtotree_log
-        printf " ####                          Running FastTree                            ####\n" | tee -a $gtotree_log
-        printf " ############################################################################## \n\n" | tee -a $gtotree_log
+        printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ####                          Running FastTree                            ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         curr_time=$(date +"%I:%M %p")
         duration=$SECONDS
 
-        printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-        printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+        printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
         # if headers were modified
@@ -3238,21 +3404,21 @@ if [ $align_only == 'false' ]; then
 
     if [ $tree_program == 'IQ-TREE' ]; then
 
-        printf "\n ############################################################################## \n" | tee -a $gtotree_log
-        printf " ####                          Running IQ-TREE                            ####\n" | tee -a $gtotree_log
-        printf " ############################################################################## \n\n" | tee -a $gtotree_log
+        printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ####                          Running IQ-TREE                            ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         curr_time=$(date +"%I:%M %p")
         duration=$SECONDS
 
-        printf "           It is currently $curr_time; the process started at $start_time.\n" | tee -a $gtotree_log
-        printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee -a $gtotree_log
+        printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 
         if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-            iqtree -s ${output_dir}/Aligned_SCGs_mod_names.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out | tee -a $gtotree_log
+            iqtree -s ${output_dir}/Aligned_SCGs_mod_names.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         else
-            iqtree -s ${output_dir}/Aligned_SCGs.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out | tee -a $gtotree_log
+            iqtree -s ${output_dir}/Aligned_SCGs.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         fi
 
         mkdir ${output_dir}/iqtree_out/
@@ -3289,15 +3455,15 @@ fi
 #############################################################################
 ##########################  JOB-FINISHED REPORTING  #########################
 #############################################################################
-printf "\n\n#################################################################################\n" | tee -a $gtotree_log
-printf "####                                 ${GREEN}Done!!${NC}                                  ####\n" | tee -a $gtotree_log
-printf "#################################################################################\n\n" | tee -a $gtotree_log
+printf "\n\n#################################################################################\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "####                                 ${GREEN}Done!!${NC}                                  ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "#################################################################################\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 # genome report
 if [ $genomes_retained == $total_input_genomes ]; then
-    printf "            ${GREEN}All $total_input_genomes input genomes were retained through the workflow!${NC}\n\n" | tee -a $gtotree_log
+    printf "            ${GREEN}All $total_input_genomes input genomes were retained through the workflow!${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 else
-    printf "  Overall, $genomes_retained genomes of the input $total_input_genomes were retained (see notes below).\n\n" | tee -a $gtotree_log
+    printf "  Overall, $genomes_retained genomes of the input $total_input_genomes were retained (see notes below).\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 fi
 
 # reporting primary output files
@@ -3307,88 +3473,92 @@ if [ $align_only == 'false' ]; then
 
     if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
 
-        printf "    Tree written to:\n" | tee -a $gtotree_log
-        printf "        ${GREEN}${output_dir}/${output_file_prefix}.tre${NC}\n\n" | tee -a $gtotree_log
+        printf "    Tree written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "        ${GREEN}${output_dir}/${output_file_prefix}.tre${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         mv ${output_dir}/Aligned_SCGs_mod_names.tre ${output_dir}/${output_file_prefix}.tre
     else
-        printf "    Tree written to:\n" | tee -a $gtotree_log
-        printf "        ${GREEN}${output_dir}/${output_file_prefix}.tre${NC}\n\n" | tee -a $gtotree_log
+        printf "    Tree written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "        ${GREEN}${output_dir}/${output_file_prefix}.tre${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         mv ${output_dir}/Aligned_SCGs.tre ${output_dir}/${output_file_prefix}.tre
     fi
 
 fi
 
 if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-    printf "    Alignment written to:\n" | tee -a $gtotree_log
-    printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.faa${NC}\n\n" | tee -a $gtotree_log
+    printf "    Alignment written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.faa${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     mv ${output_dir}/Aligned_SCGs.faa ${output_dir}/run_files/Aligned_SCGs.faa
 else
-    printf "    Alignment written to:\n" | tee -a $gtotree_log
-    printf "        ${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\n\n" | tee -a $gtotree_log
+    printf "    Alignment written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "        ${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 fi
 
 if [ $keep_individual_alignments == 'true' ]; then
-    printf "    Individual protein alignments stored in:\n" | tee -a $gtotree_log
-    printf "        ${GREEN}${output_dir}/run_files/individual_alignments/${NC}\n\n" | tee -a $gtotree_log
+    printf "    Individual protein alignments stored in:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "        ${GREEN}${output_dir}/run_files/individual_alignments/${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 fi
 
-printf "    Main genomes summary table with comp./redund. estimates written to:\n" | tee -a $gtotree_log
-printf "        ${GREEN}${output_dir}/Genomes_summary_info.tsv${NC}\n\n" | tee -a $gtotree_log
+printf "    Main genomes summary table written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "        ${GREEN}${output_dir}/Genomes_summary_info.tsv${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-printf "    Summary table with hits per target gene per genome written to:\n" | tee -a $gtotree_log
-printf "        ${GREEN}${output_dir}/SCG_hit_counts.tsv${NC}\n\n" | tee -a $gtotree_log
+printf "    Summary table with hits per target gene per genome written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "        ${GREEN}${output_dir}/SCG_hit_counts.tsv${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
+
+if [ $ko_targets == 'true' ]; then
+    printf "    Outputs from KO searching written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "        ${GREEN}${output_dir}/KO_search_results/${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+fi
 
 if [ $additional_pfam_targets == 'true' ]; then
-    printf "    Files for additional PFam searches written to:\n" | tee -a $gtotree_log
-    printf "        ${GREEN}${output_dir}/additional_pfam_search_results/${NC}\n\n" | tee -a $gtotree_log
+    printf "    Outputs from Pfam searching written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "        ${GREEN}${output_dir}/Pfam_search_results/${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 fi
 
-printf "    Partitions (for downstream use with mixed-model treeing) written to:\n" | tee -a $gtotree_log
-printf "        ${GREEN}${output_dir}/run_files/Partitions.txt${NC}\n\n" | tee -a $gtotree_log
+printf "    Partitions file (for downstream use with mixed-model treeing) written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "        ${GREEN}${output_dir}/run_files/Partitions.txt${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 mv ${output_dir}/Partitions.txt ${output_dir}/run_files/Partitions.txt
 
 # reporting any problem files/accessions and mentioning run_files/ directory
-printf " _______________________________________________________________________________\n\n" | tee -a $gtotree_log
+printf " _______________________________________________________________________________\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCBI_accessions_not_found.txt ] || [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ] || [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ] || [ -f ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ] || [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ] || [ -f ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ]; then
 
-    printf "  Notes:\n\n" | tee -a $gtotree_log
+    printf "  Notes:\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
-        printf "        $num_dupe_report accession(s) redundant.\n" | tee -a $gtotree_log
+        printf "        $num_dupe_report accession(s) redundant.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         cp ${output_dir}/Redundant_input_accessions.txt ${output_dir}/run_files/Redundant_input_accessions.txt
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
         num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "        $num_accs_not_found accession(s) not successfully found at NCBI.\n" | tee -a $gtotree_log
+        printf "        $num_accs_not_found accession(s) not successfully found at NCBI.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         cp ${output_dir}/NCBI_accessions_not_found.txt ${output_dir}/run_files/NCBI_accessions_not_found.txt
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ]; then
         num_accs_not_downloaded=$(wc -l ${output_dir}/NCBI_accessions_not_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "        $num_accs_not_downloaded did not download properly.\n" | tee -a $gtotree_log
+        printf "        $num_accs_not_downloaded did not download properly.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         cp ${output_dir}/NCBI_accessions_not_downloaded.txt ${output_dir}/run_files/NCBI_accessions_not_downloaded.txt
     fi
 
     if [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ]; then
-        printf "        $removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.\n" | tee -a $gtotree_log
+        printf "        $removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         cp ${output_dir}/Genomes_removed_for_too_few_hits.tsv ${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv
     fi
 
     # reporting of unsucessful targets depends on if run in best-hit mode (-B) or not
     if [ $best_hit_mode != "true" ]; then
 
-        if [ -f ${output_dir}/Target_genes_not_found_or_not_retained.txt ]; then
-            printf "        $removed_genes gene(s) either had no hits or only multiple hits in each genome.\n" | tee -a $gtotree_log
-            cp ${output_dir}/Target_genes_not_found_or_not_retained.txt ${output_dir}/run_files/Target_genes_not_found_or_not_retained.txt
+        if [ -f ${output_dir}/run_files/Target-genes-not-found-or-retained.txt ]; then
+            printf "        $removed_genes gene(s) either had no hits or only multiple hits in each genome.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         fi
 
     else
 
         if [ -f ${output_dir}/Target_genes_not_found.txt ]; then
-            printf "        $removed_genes gene(s) had no hits in any genome.\n" | tee -a $gtotree_log
+            printf "        $removed_genes gene(s) had no hits in any genome.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             cp ${output_dir}/Target_genes_not_found.txt ${output_dir}/run_files/Target_genes_not_found.txt
         fi
 
@@ -3396,36 +3566,39 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
 
 
     if [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ]; then
-        printf "        $removed_genes2 gene(s) had no hits after filtering by length.\n" | tee -a $gtotree_log
+        printf "        $removed_genes2 gene(s) had no hits after filtering by length.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         cp ${output_dir}/Genes_with_no_hits_after_length_filter.txt ${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt
     fi
 
     if [ -f ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ]; then
         num_genomes_high_redund=$(tail -n +2 ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv | wc -l | sed "s/^ *//" | cut -d " " -f 1)
-        printf "        $num_genomes_high_redund genome(s) had an estimated redundancy of >= 10%%.\n" | tee -a $gtotree_log
+        printf "        $num_genomes_high_redund genome(s) had an estimated redundancy of >= 10%%.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         cp ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ${output_dir}/run_files/Genomes_with_questionable_redundancy_estimates.tsv
     fi
 
-    printf "\n    Reported along with additional informative run files in:\n" | tee -a $gtotree_log
-    printf "        ${GREEN}${output_dir}/run_files/${NC}\n\n" | tee -a $gtotree_log
+    printf "\n    Reported along with additional informative run files in:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "        ${GREEN}${output_dir}/run_files/${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 else
 
-    printf "    Additional informative run files can be found in:\n" | tee -a $gtotree_log
-    printf "        ${GREEN}${output_dir}/run_files/${NC}\n\n" | tee -a $gtotree_log
+    printf "    Additional informative run files can be found in:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "        ${GREEN}${output_dir}/run_files/${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 fi
 
-printf " _______________________________________________________________________________\n\n" | tee -a $gtotree_log
+printf " _______________________________________________________________________________\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 # reporting log file output
-printf "    Log file written to:\n" | tee -a $gtotree_log
-printf "        ${GREEN}${output_dir}/gtotree-runlog.txt${NC}\n\n" | tee -a $gtotree_log
+printf "    Log file written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "        ${GREEN}${output_dir}/gtotree-runlog.txt${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+printf " _______________________________________________________________________________\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 ### checking programs used and reporting a citations file ###
-printf "    Programs used and their citations have been written to:\n" | tee -a $gtotree_log
-printf "        ${GREEN}${output_dir}/citations.txt${NC}\n\n" | tee -a $gtotree_log
+printf "    ${YELLOW}Programs used and their citations have been written to:\n${NC}" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "        ${GREEN}${output_dir}/citations.txt${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
+printf " _______________________________________________________________________________\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 printf "GToTree ${VERSION}\nLee MD. GToTree: a user-friendly workflow for phylogenomics. Bioinformatics. 2019; (March):1-3. doi.org/10.1093/bioinformatics/btz188\n\n" >> ${output_dir}/citations.txt
 
@@ -3445,7 +3618,16 @@ fi
 
 if [ $taxonkit_used == "true" ]; then
     taxonkit_version=$(taxonkit -h | grep Version | tr -s " " "\t" | cut -f 2)
-    printf "TaxonKit v${taxonkit_version}\nShen W and Xiong J. TaxonKit: a cross-platform and efficient NCBI taxonomy toolkit. bioRxiv. 2019. doi.org/10.1101/513523\n\n" >> ${output_dir}/citations.txt
+    printf "TaxonKit v${taxonkit_version}\nShen W and Ren H. TaxonKit: a practical and efficient NCBI Taxonomy toolkit. Journal of Genetics and Genomics. 2021. doi.org/10.1016/j.jgg.2021.03.006\n\n" >> ${output_dir}/citations.txt
+fi
+
+if [ $kofamscan_used == "true" ]; then
+    kofamscan_version=$(exec_annotation -v | cut -f 2 -d " ")
+    printf "KOfamScan ${kofamscan_version}\nAramaki, T et al. KofamKOALA: KEGG Ortholog assignment based on profile HMM and adaptive score threshold. Bioinformatics. 2020. doi.org/10.1093/bioinformatics/btz859\n\n" >> ${output_dir}/citations.txt
+fi
+
+if [ $pfam_db_used == "true" ]; then
+    printf "Pfam database\nMistry J et al. Pfam: the protein families database in 2021. Nucleic Acids Research. 2021. doi.org/10.1093/nar/gkaa913\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $gtdb_used == "true" ]; then
@@ -3473,10 +3655,10 @@ fi
 
 duration=$SECONDS
 
-printf "\n                                         Total process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n" | tee -a $gtotree_log
+printf "\n                                         Total process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 today=$(date +'%A')
 
-printf "                                                      ${GREEN}Happy $today :)${NC}\n\n" | tee -a $gtotree_log
+printf "                                                      ${GREEN}Happy $today :)${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 mv $gtotree_log ${output_dir}/gtotree-runlog.txt

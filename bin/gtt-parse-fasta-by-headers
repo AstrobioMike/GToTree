@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from Bio import SeqIO
+from Bio.SeqIO.FastaIO import SimpleFastaParser
 import sys
 import argparse
 
@@ -8,38 +8,39 @@ parser = argparse.ArgumentParser(description='This script is for parsing a fasta
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-i", "--input_fasta", help="Original fasta file", action="store", dest="input_fasta", required=True)
-required.add_argument("-w", "--sequence_headers", help="Single-column file with sequence headers", action="store", dest="headers", required=True)
-parser.add_argument("-o", "--output_fasta", help='Output fasta file default: "Wanted.fa"', action="store", dest="output_fasta", default="Wanted.fa")
+required.add_argument("-i", "--input-fasta", help="Original fasta file", action="store", required=True)
+required.add_argument("-w", "--wanted-headers", help="Single-column file with sequence headers", action="store", required=True)
+parser.add_argument("-o", "--output-fasta", help='Output fasta file default: "Wanted.fa"', action="store", default="Wanted.fa")
 parser.add_argument("--inverse", help="Add this flag to pull out all sequences with headers NOT in the provided header file.", action="store_true")
 
 if len(sys.argv)==1:
-  parser.print_help(sys.stderr)
-  sys.exit(0)
+    parser.print_help(sys.stderr)
+    sys.exit(0)
 
 args = parser.parse_args()
 
-fasta_in = open(args.input_fasta, "r")
-headers_of_int = open(args.headers, "r")
-
-headers_of_int_set = set(line.strip() for line in headers_of_int)
-
-fasta_out = open(args.output_fasta, "w")
+headers_of_int_list = [line.strip() for line in open(args.wanted_headers)]
 
 if not args.inverse:
 
-  for seq_record in SeqIO.parse(fasta_in, "fasta"):
-    if seq_record.id in headers_of_int_set:
-      fasta_out.write(">" + seq_record.id + "\n")
-      fasta_out.write(str(seq_record.seq) + "\n")
+    with open(args.output_fasta, "w") as output_file:
+        
+        with open(args.input_fasta, "r") as input_file:
+
+            for header, seq in SimpleFastaParser(input_file):
+
+                if header in headers_of_int_list:
+
+                    output_file.write(">%s\n%s\n" % (header, seq))
 
 else:
 
-  for seq_record in SeqIO.parse(fasta_in, "fasta"):
-    if seq_record.id not in headers_of_int_set:
-      fasta_out.write(">" + seq_record.id + "\n")
-      fasta_out.write(str(seq_record.seq) + "\n")
+    with open(args.output_fasta, "w") as output_file:
+        
+        with open(args.input_fasta, "r") as input_file:
 
-fasta_in.close()
-headers_of_int.close()
-fasta_out.close()
+            for header, seq in SimpleFastaParser(input_file):
+
+                if header not in headers_of_int_list:
+
+                    output_file.write(">%s\n%s\n" % (header, seq))

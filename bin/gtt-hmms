@@ -2,39 +2,66 @@
 
 # setting colors to use
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-printf "\n"
+printf "\n${YELLOW}                   GToTree pre-packaged HMM SCG-sets\n${NC}"
+printf "   See github.com/AstrobioMike/GToTree/wiki/SCG-sets for more info\n\n"
 
-if [ -n GToTree_HMM_dir ]; then
-    num_hmm_files=$(ls ${GToTree_HMM_dir}/*.hmm 2> /dev/null | wc -l | sed "s/^ *//" | cut -d " " -f 1)
-    if [ $num_hmm_files == 0 ]; then
-        printf "   The environment variable ${GREEN}GToTree_HMM_dir${NC} is set to:\n"
-        printf "        $GToTree_HMM_dir\n\n"
-        printf "    ${RED}But there don't appear to be any HMM files there :(${NC}\n\n"
+## making sure expected variable is set
+if [ -z ${GToTree_HMM_dir} ]; then
+    # reporting it is not set
+    printf "\n${YELLOW}   The 'GToTree_HMM_dir' variable is not set :( Use \`gtt-data-locations\` to check and configure.\n${NC}\n"
+    exit
+
+fi
+
+# now making sure directory exists or that we can create it if not
+if [ ! -d ${GToTree_HMM_dir} ]; then
+    
+    # attempting to create
+    mkdir -p ${GToTree_HMM_dir} > /dev/null
+    if [ $? -ne 0 ]; then
+        printf "\n${YELLOW}   The 'GToTree_HMM_dir' location does not exist and can't be created :( Use \`gtt-data-locations\` to check and configure.\n${NC}\n"
         exit
     fi
 
-    printf "   The environment variable ${GREEN}GToTree_HMM_dir${NC} is set to:\n"
-    printf "        $GToTree_HMM_dir\n\n"
-    printf "    The $num_hmm_files available HMM SCG-sets here include:\n\n"
+fi
 
-    for hmm_set in $(ls ${GToTree_HMM_dir}/*.hmm)
-    do
-        sleep 0.2
-        num_genes=$(grep -c "^NAME" $hmm_set)
-        printf "\t   %-30s %14s\n" "$(basename $hmm_set)" "($num_genes genes)"
-    done
+# making sure it is writable
+if [ ! -w ${GToTree_HMM_dir} ]; then
+    printf "\n${YELLOW}   The 'GToTree_HMM_dir' location is not writable for you :( Use \`gtt-data-locations\` to check and configure.\n${NC}\n"
+    exit
+fi
 
-    sleep 0.2
 
-    printf "\n"
+## now moving on to reporting the pre-packaged HMMs
+# making sure info table is there, or downloading if not
+# checking info table is there, downloading if not
+if [ ! -f "${GToTree_HMM_dir}/hmm-sources-and-info.tsv" ]; then
 
-else
-    printf "    The environmental variable 'GToTree_HMM_dir' is not yet set. This should\n"
-    printf "    store the path of the directory holding the HMM profiles that come with\n"
-    printf "    GToTree. See here for help:\n"
-    printf "            github.com/AstrobioMike/GToTree/wiki/installation\n\n"
+    # downloading to there if not already present
+    curl --silent --retry 10 -L -o ${GToTree_HMM_dir}/hmm-sources-and-info.tsv https://figshare.com/ndownloader/files/34066016
 
 fi
+
+# printing out info for pre-packaged HMMs
+num_hmm_files=$( wc -l ${GToTree_HMM_dir}/hmm-sources-and-info.tsv | sed "s/^ *//" | cut -d " " -f 1 )
+
+printf "   The environment variable ${GREEN}GToTree_HMM_dir${NC} is set to:\n"
+printf "     $GToTree_HMM_dir\n\n"
+
+printf "   The ${num_hmm_files} available pre-packaged HMM SCG-sets include:\n\n"
+
+for gene_set in $(tail -n +2 ${GToTree_HMM_dir}/hmm-sources-and-info.tsv | cut -f 1); do
+
+    gene_set=$(echo $gene_set | sed 's/.hmm//')
+    curr_number_of_genes=$(grep -m 1 -w "^${gene_set}" ${GToTree_HMM_dir}/hmm-sources-and-info.tsv | cut -f 4)
+
+    printf "\t   %-30s %14s\n" "${gene_set}" "($curr_number_of_genes genes)"
+
+done
+
+printf "\n"
+printf "   Details can be found in: \n     ${GToTree_HMM_dir}hmm-sources-and-info.tsv\n\n"

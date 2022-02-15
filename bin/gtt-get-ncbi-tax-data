@@ -1,0 +1,123 @@
+#!/usr/bin/env python
+
+"""
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
+to download NCBI tax data for using TaxonKit (https://bioinf.shenwei.me/taxonkit/) to add NCBI taxonomy. 
+
+For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
+"""
+
+import sys
+import os
+import urllib.request
+import argparse
+import shutil
+import textwrap
+import filecmp
+import tarfile
+import gzip
+
+parser = argparse.ArgumentParser(description="This is a helper program to setup NCBI tax data for TaxonKit (bioinf.shenwei.me/taxonkit/) \
+                                              to add taxonomy info.", \
+                                 epilog="Ex. usage: gtt-get-ncbi-tax-data\n")
+
+args = parser.parse_args()
+
+
+################################################################################
+
+def main():
+
+    NCBI_data_dir = check_location_var_is_set()
+
+    data_present = check_if_data_present(NCBI_data_dir)
+
+    if data_present:
+        exit()
+
+    else:
+
+        print(color_text("    Downloading required NCBI taxonomy data (only needs to be done once)...\n", "yellow"))
+        get_NCBI_tax_data(NCBI_data_dir)
+
+
+################################################################################
+
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def check_location_var_is_set():
+
+    # making sure there is a KO_data_dir env variable
+    try:
+        NCBI_data_dir = os.environ['TAXONKIT_DB']
+    except:
+        wprint(color_text("The environment variable 'TAXONKIT_DB'  does not seem to be set :(", "yellow"))
+        wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
+        print("")
+        sys.exit(0)
+
+    return(NCBI_data_dir)
+
+
+def check_if_data_present(location):
+
+    # seeing if present already
+    # if this function returns True, then data is present
+    # if it returns False, then we need to download things
+    names_path = os.path.join(str(location) + "/names.dmp")
+    nodes_path = os.path.join(str(location) + "/nodes.dmp")
+
+
+    if not os.path.isfile(names_path) or not os.path.isfile(nodes_path):
+
+        if os.path.exists(names_path):
+            os.remove(names_path)
+        if os.path.isdir(nodes_path):
+            shutil.rmtree(nodes_path)
+
+        return(False)
+
+    else:
+
+        return(True)
+
+
+def get_NCBI_tax_data(location):
+    """ downloads the needed ncbi tax data """
+
+    taxdump_path = os.path.join(str(location) + "taxdump.tar.gz")
+
+    urllib.request.urlretrieve("ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz", taxdump_path)
+
+    # unpacking
+    with tarfile.open(taxdump_path) as tarball:
+        tarball.extractall(location)
+
+    # removing tarball
+    os.remove(taxdump_path)
+
+
+################################################################################
+
+if __name__ == "__main__":
+    main()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from Bio import SeqIO
+from Bio.SeqIO.FastaIO import SimpleFastaParser
 import sys
 import argparse
 
@@ -8,26 +8,23 @@ parser = argparse.ArgumentParser(description='This script will rename all sequen
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-i", "--input_fasta", help="Starting fasta file", action="store", dest="input_fasta", required=True)
-parser.add_argument("-w", "--desired_name", help='Name to give seqs (default: "Seq"', action="store", dest="wanted_name", default="Seq")
-parser.add_argument("-o", "--output_fasta_name", help='Output fasta file (default: "Renamed.fasta").', dest="output_fasta_name", default="Renamed.fasta")
+required.add_argument("-i", "--input-fasta", help="Starting fasta file", action="store", required=True)
+parser.add_argument("-w", "--wanted-name", help='Name to give seqs (default: "Seq")', action="store", default="Seq")
+parser.add_argument("-o", "--output-fasta", help='Output fasta file (default: "Renamed.fasta").', default="Renamed.fasta")
 
 if len(sys.argv)==1:
-  parser.print_help(sys.stderr)
-  sys.exit(0)
+    parser.print_help(sys.stderr)
+    sys.exit(0)
 
 args = parser.parse_args()
 
-in_fasta = open(args.input_fasta, "r")
-new_header = args.wanted_name
-out_fasta = open(args.output_fasta_name, "w")
-
 n = 0
 
-for seq_record in SeqIO.parse(in_fasta, "fasta"):
-	n = n + 1
-	out_fasta.write(">" + new_header  + "_" + str(n) + "\n")
-	out_fasta.write(str(seq_record.seq) + "\n")
+with open(args.output_fasta, "w") as output_file:
 
-in_fasta.close()
-out_fasta.close()
+	  with open(args.input_fasta, "r") as input_file:
+
+	  	  for header, seq in SimpleFastaParser(input_file):
+
+	  	  	  n = n + 1
+	  	  	  output_file.write(">" + str(args.wanted_name) + "\n" + seq + "\n")

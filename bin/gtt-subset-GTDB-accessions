@@ -45,7 +45,9 @@ parser.add_argument("-o", "--output-accessions", help='output accessions (defaul
 parser.add_argument("-p", "--cutoff-fraction", help='Fraction of total target genomes that any given Class must contribute in order for that class to be randomly subset (default: 0.0005)', action="store", default=0.0005)
 parser.add_argument("-f", "--fraction-to-subset", help='Fraction those that are filtered should be randomly subset down to (default: 0.01)', action="store", dest="filter_fraction", default=0.01)
 
-parser.add_argument("--get-Order-representatives-only", action="store_true", help = "Provide this flag to simply get 1 random genome from each Order in GTDB.", dest = "order_only")
+parser.add_argument("--get-Order-representatives-only", action="store_true", help = "Provide this flag to simply get 1 random genome from each Order in GTDB", dest = "order_only")
+
+parser.add_argument("--seed", action = "store", help = "Specify the seed for random subsampling (default = 1)", default = 1, type = int)
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -77,13 +79,13 @@ def wprint(text):
 
 
 # function to subset master table to one for each order
-def order_subset_table(order_to_subset, input_tab):
+def order_subset_table(order_to_subset, input_tab, seed):
 
     sub_master_df_to_keep = input_tab.loc[input_tab["order"] != order_to_subset]
 
     curr_order_df = input_tab.loc[input_tab["order"] == order_to_subset]
 
-    random_sub_df = curr_order_df.sample(n = 1, random_state = 1)
+    random_sub_df = curr_order_df.sample(n = 1, random_state = int(seed))
 
     new_df = pd.concat([sub_master_df_to_keep, random_sub_df])
 
@@ -91,7 +93,7 @@ def order_subset_table(order_to_subset, input_tab):
 
 
 # function to subset master table
-def subset_table(class_to_subset, input_tab):
+def subset_table(class_to_subset, input_tab, seed):
 
     curr_class = class_to_subset
 
@@ -99,7 +101,7 @@ def subset_table(class_to_subset, input_tab):
 
     curr_class_df = input_tab.loc[input_tab["class"] == curr_class]
 
-    random_sub_df = curr_class_df.sample(n=int(len(curr_class_df.index) * float(args.filter_fraction)))
+    random_sub_df = curr_class_df.sample(n=int(len(curr_class_df.index) * float(args.filter_fraction)), random_state = int(seed))
 
     new_df = pd.concat([sub_master_df_to_keep, random_sub_df])
 
@@ -126,7 +128,7 @@ if args.order_only:
     # getting one of each order
     for entry in unique_orders:
 
-        lineage_df = order_subset_table(entry, lineage_df)
+        lineage_df = order_subset_table(entry, lineage_df, args.seed)
 
     filtered_size = len(lineage_df.index)
 
@@ -164,7 +166,7 @@ for key in class_dict:
 
 # subsetting each class
 for rank in classes_to_subset:
-    lineage_df = subset_table(rank, lineage_df)
+    lineage_df = subset_table(rank, lineage_df, args.seed)
 
 # removing "RS_" and "GB_" prefixes and writing out output accs
 with open(args.output_file, "w") as out:
