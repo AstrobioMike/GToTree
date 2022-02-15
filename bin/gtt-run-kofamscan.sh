@@ -2,13 +2,15 @@
 
 assembly_id=${1}
 genes_file=${2}
-target_KOs_table_file=${3}
-target_KO_hmms_dir=${4}
-tmp_dir=${5}
-output_dir=${6}
-unique_target_KOs=${7}
+gene_count=${3}
+target_KOs_table_file=${4}
+target_KO_hmms_dir=${5}
+tmp_dir=${6}
+output_dir=${7}
+unique_target_KOs=${8}
 
-curr_genome_output_dir="${output_dir}/KO_searching/individual_genome_results/${assembly_id}/"
+
+curr_genome_output_dir="${output_dir}/KO_search_results/individual_genome_results/${assembly_id}/"
 mkdir -p ${curr_genome_output_dir}
 
 output_results_table_file="${curr_genome_output_dir}/kofamscan-results.tsv"
@@ -46,10 +48,14 @@ else
 fi
 
 # creating count file that can be stuck together at end
-rm -rf ${output_counts_file}
+rm -rf ${output_counts_file}.tmp
 
 for ko in $(cat ${unique_target_KOs}); do
 
-    grep -w -c ${ko} ${output_results_table_file} >> ${output_counts_file}
+    grep -w -c ${ko} ${output_results_table_file} >> ${output_counts_file}.tmp
 
 done
+
+# rearranging so we can combine them afterwards more easily
+paste <( printf "${assembly_id}\t${gene_count}" ) <( tr "\n" "\t" < ${output_counts_file}.tmp | sed 's/\t$/\n/' ) > ${output_counts_file}
+rm ${output_counts_file}.tmp

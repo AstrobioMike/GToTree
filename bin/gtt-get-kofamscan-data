@@ -33,11 +33,11 @@ def main():
     data_present = check_if_data_present(KO_data_dir)
 
     if data_present:
-        print("\n\tAlready here!\n\n")
         exit()
 
     else:
-        print("\n\tWe need to download!!\n\n")
+
+        print(color_text("    Downloading required KO data (only needs to be done once)...\n", "yellow"))
         get_kofamscan_data(KO_data_dir)
 
 
@@ -72,7 +72,7 @@ def check_location_var_is_set():
         KO_data_dir = os.environ['KO_data_dir']
     except:
         wprint(color_text("The environment variable 'KO_data_dir'  does not seem to be set :(", "yellow"))
-        wprint("This shouldn't happen, check on things with `gtt-list-data-locations`.")
+        wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
         print("")
         sys.exit(0)
 

@@ -55,15 +55,9 @@ parser.add_argument("--store-GTDB-metadata-in-current-working-dir", action="stor
                                                                         ignore that and store the master table in the current working directory.")
 
 
-
-
-
-
-
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
     sys.exit(0)
-
 
 args = parser.parse_args()
 
@@ -83,13 +77,18 @@ def main():
         print("")
         wprint("  E.g.: gtt-get-accessions-from-GTDB --get-taxon-counts -t Alteromonas")
         print("")
-        sys.exit(0)
+        sys.exit(1)
 
     if args.GTDB_representatives_only and args.RefSeq_representatives_only:
         print("")
         wprint(color_text("Only one of `--GTDB-representatives-only` or `--RefSeq-representatives-only` can be provided.", "yellow"))
         print("")
-        sys.exit(0)
+        sys.exit(1)
+
+    ## checking env variable is present if not putting in current working dir
+    if not args.store_GTDB_metadata_in_current_working_dir:
+
+        check_location_var_is_set_and_writable("GTDB_dir")
 
     ## moving on
     gtdb_tab = get_gtdb_tab(args.do_not_check_GTDB_version, args.store_GTDB_metadata_in_current_working_dir)
@@ -156,6 +155,37 @@ def color_text(text, color='green'):
 def wprint(text):
     print(textwrap.fill(text, width=80, initial_indent="  ", 
           subsequent_indent="  ", break_on_hyphens=False))
+
+
+def check_location_var_is_set_and_writable(variable):
+
+    # making sure there is an env variable
+    try:
+        path = os.environ[variable]
+
+        if path == "":
+            raise
+
+    except:
+        print()
+        wprint(color_text("The environment variable '" + str(variable) + "' does not seem to be set :(", "yellow"))
+        print()
+        wprint("Try to set it with `gtt-data-locations set`, or use the `--store-GTDB-metadata-in-current-working-dir` argument with this program.")
+        print("")
+        sys.exit(1)
+
+    # making sure path is writable for the user
+    path_writable = os.access(path, os.W_OK)
+
+    if not path_writable:
+        print()
+        wprint(color_text("The environment variable '" + str(variable) + "'' does not seem to be writable :(", "yellow"))
+        print()
+        wprint("You can modify the location with `gtt-data-locations set`, or use the `--store-GTDB-metadata-in-current-working-dir` argument with this program.")
+        print("")
+        sys.exit(1)
+
+    return()
 
 
 def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representatives_source=None):

@@ -13,7 +13,9 @@ num_cpus=$5
 hmm_target_genes_total=$6
 output_dir=$7
 best_hit_mode=$8
-additional_pfam_targets=$9
+additional_pfam_targets=${9}
+ko_targets=${10}
+target_KOs=${11}
 
 # looping through the lines of the provided [-f] file (this loop operates on one genome at a time)
 while IFS=$'\t' read -r -a file
@@ -125,7 +127,6 @@ do
     ## writing summary info to table ##
     printf "$assembly\t$file\t$taxid\t$num_SCG_hits\t$uniq_SCG_hits\t$perc_comp_rnd\t$perc_redund_rnd\n" >> ${output_dir}/Amino_acid_genomes_summary_info.tsv
 
-
     ### Pulling out hits for this genome ###
     # looping through SCGs and pulling out each first hit (hmm results tab is sorted by e-value):
     esl-sfetch --index ${tmp_dir}/${assembly}_genes.tmp > /dev/null
@@ -149,41 +150,25 @@ do
     fi
 
     ## searching for additional targets if provided
-    if [ $additional_pfam_targets == "true" ]; then
+    # getting count of genes if there are additional targets
+    if [ $ko_targets == "true" ] || [ $additional_pfam_targets == "true" ]; then
 
-        ### counting how many genes in this genome
         gene_count=$(grep -c ">" ${tmp_dir}/${assembly}_genes.tmp)
 
-        hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp ${tmp_dir}/all_targets.hmm ${tmp_dir}/${assembly}_genes.tmp > /dev/null
+    fi
 
-        ### getting counts of each target in this genome
-        for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
-        do
-            grep -w ${target} ${tmp_dir}/${assembly}_curr_hmm_hits.tmp | wc -l | sed 's/^ *//' >> ${tmp_dir}/${assembly}_hit_counts.tmp
-        done
+    ## KOs
+    if [ $ko_targets == "true" ]; then
 
-        ### writing results to main output file
-        paste <( printf "${assembly}\tNA\t${gene_count}" ) <(printf %s "$(cat ${tmp_dir}/${assembly}_hit_counts.tmp | tr "\n" "\t") " )  >> ${output_dir}/additional_pfam_search_results/Additional_Pfam_hit_counts.tsv
+        gtt-run-kofamscan.sh ${assembly} ${tmp_dir}/${assembly}_genes.tmp ${gene_count} ${output_dir}/KO_search_results/target-KOs.tsv ${output_dir}/KO_search_results/target_KO_profiles/ ${tmp_dir} ${output_dir} ${target_KOs}
 
-        ### Pulling out hits to additional pfam targets for this genome ###
-        for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
-        do
-            if grep -w -q "$target" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp; then
+    fi
 
-                grep -w "$target" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp | cut -f 1 -d " " >> ${tmp_dir}/${assembly}_${target}_genes_of_int.tmp
+    ## Pfams
+    if [ $additional_pfam_targets == "true" ]; then
 
-                for gene in $(cat ${tmp_dir}/${assembly}_${target}_genes_of_int.tmp)
-                do
-                    echo $gene | esl-sfetch -f ${tmp_dir}/${assembly}_genes.tmp -
-                done >> ${tmp_dir}/${assembly}_${target}_genes1.tmp
+        gtt-run-additional-pfam-search.sh ${assembly} ${tmp_dir}/${assembly}_genes.tmp ${gene_count} ${num_cpus} ${tmp_dir} ${output_dir}
 
-                gtt-append-fasta-headers -i ${tmp_dir}/${assembly}_${target}_genes1.tmp -w ${assembly}_${target} -o ${tmp_dir}/${assembly}_${target}_genes.tmp
-            
-                # adding to fasta of that target holding all genomes
-                cat ${tmp_dir}/${assembly}_${target}_genes.tmp >> ${output_dir}/additional_pfam_search_results/${target}_hits.faa
-            fi
-
-        done
     fi
 
     rm -rf ${tmp_dir}/${assembly}_*.tmp ${tmp_dir}/${assembly}_genes.tmp.ssi
