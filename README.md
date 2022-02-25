@@ -44,30 +44,31 @@ conda create -y -n gtotree -c conda-forge -c bioconda -c astrobiomike gtotree
 
 ---
 
-## Dependencies 
-> **NOTE: The [conda installation](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) takes care of all of these!**
+## Citation information
 
-**GToTree will print out a `citations.txt` file with citation information specific for your run. Please be sure to cite the developers appropriately :)**
+GToTree will print out a `citations.txt` file with citation information specific for every run that accounts for all programs it relies upon. Please be sure to cite the developers appropriately :)
 
-### Default usage:
-If you use GToTree with default settings, please cite these folks :)  
+Here is an example output `citations.txt` file from a run, and how I'd cite it in the methods:
 
-- **[Biopython](https://biopython.org/wiki/Download)** - [citation](https://academic.oup.com/bioinformatics/article/25/11/1422/330687)
-- **[HMMER3](http://hmmer.org/download.html)** v3.2.1 - citation: they note in the [user manual](http://eddylab.org/software/hmmer/Userguide.pdf) to cite [the website](http://hmmer.org/download.html), but there is also [this paper](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1002195)  
-- **[Muscle](https://www.drive5.com/muscle/downloads.htm)** v3.8 - [citation](https://academic.oup.com/nar/article/32/5/1792/2380623)  
-- **[Trimal](http://trimal.cgenomics.org/downloads)** v1.4 - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2712344/)  
-- **[FastTree](http://www.microbesonline.org/fasttree/)** v2.1 - [citation](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490)  
+```
+GToTree v1.6.11
+Lee MD. GToTree: a user-friendly workflow for phylogenomics. Bioinformatics. 2019; (March):1-3. doi:10.1093/bioinformatics/btz188
 
-### Required based on inputs and options:
-If you use GToTree in a manner that uses these tools, please cite these folks :)  
+HMMER3 v3.3.2
+Eddy SR. Accelerated profile HMM searches. PLoS Comput. Biol. 2011; (7)10. doi:10.1371/journal.pcbi.1002195
 
-- **[Prodigal](https://github.com/hyattpd/Prodigal)** v2.6.3 - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/)  
-  - *if providing input genomes in fasta format, or GenBank format with no CDS annotations, or NCBI accessions to genomes with no gene calls*
-- **[TaxonKit](https://bioinf.shenwei.me/taxonkit/)** v0.3 - [citation](https://www.biorxiv.org/content/early/2019/01/08/513523)
-  - *if changing genome labels based on lineage information for input genomes with associated NCBI taxids*
-- **[Genome Taxonomy Database](https://gtdb.ecogenomic.org/)** always current release - [citation](https://www.nature.com/articles/s41587-020-0501-8)
-  - *if changing genome labels based on lineage information for input genomes with associated NCBI taxids, but based on the GTDB*
-- **[IQ-TREE2]()** v2.0.3 - [citation](https://doi.org/10.1093/molbev/msu300)
-  - *if using IQ-TREE2 instead of FastTree*
-- **[GNU Parallel](https://www.gnu.org/software/parallel/)** v20161122 - [citation info](https://www.gnu.org/software/parallel/parallel_design.html#Citation-notice)
-  - *if running in parallel*
+Muscle v3.8.1551
+Edgar RC. MUSCLE: a multiple sequence alignment method with reduced time and space complexity. BMC Bioinformatics. 2004; 5, 113. doi:10.1093/nar/gkh340
+
+TrimAl v1.4.rev15
+Gutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972–1973. doi:10.1093/bioinformatics/btp348
+
+TaxonKit v0.8.0
+Shen W and Xiong J. TaxonKit: a cross-platform and efficient NCBI taxonomy toolkit. bioRxiv. 2019. doi:10.1101/513523
+
+FastTree 2 v2.1.10
+Price MN et al. FastTree 2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi:10.1371/journal.pone.0009490
+```
+
+**Example methods/citations text based on above**
+> *The archaeal phylogenomic tree was produced with GToTree v1.6.11 (Lee 2019), using the prepackaged single-copy gene-set for archaea (76 target genes). Briefly, target genes were identified with HMMER3 v3.2.2 (Eddy 2011), individually aligned with muscle v3.8.1551 (Edgar 2004), trimmed with trimal v1.3.rev15 (Capella-Gutiérrez et al. 2009), and concatenated prior to phylogenetic estimation with FastTree2 v2.1.10 (Price et al. 2010).*
