@@ -51,24 +51,27 @@ GToTree will print out a `citations.txt` file with citation information specific
 Here is an example output `citations.txt` file from a run, and how I'd cite it in the methods:
 
 ```
-GToTree v1.6.11
+GToTree v1.6.31
 Lee MD. GToTree: a user-friendly workflow for phylogenomics. Bioinformatics. 2019; (March):1-3. doi:10.1093/bioinformatics/btz188
+
+Prodigal v2.6.3
+Hyatt, D. et al. Gene and translation initiation site prediction in metagenomic sequences. Bioinformatics. 2010; 28, 2223–2230. doi.org/10.1186/1471-2105-11-119
 
 HMMER3 v3.3.2
 Eddy SR. Accelerated profile HMM searches. PLoS Comput. Biol. 2011; (7)10. doi:10.1371/journal.pcbi.1002195
 
-Muscle v3.8.1551
-Edgar RC. MUSCLE: a multiple sequence alignment method with reduced time and space complexity. BMC Bioinformatics. 2004; 5, 113. doi:10.1093/nar/gkh340
+Muscle v5.1
+Edgar RC. MUSCLE v5 enables improved estimates of phylogenetic tree confidence by ensemble bootstrapping. bioRxiv. 2021. doi.org/10.1101/2021.06.20.449169
 
 TrimAl v1.4.rev15
 Gutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972–1973. doi:10.1093/bioinformatics/btp348
 
-TaxonKit v0.8.0
-Shen W and Xiong J. TaxonKit: a cross-platform and efficient NCBI taxonomy toolkit. bioRxiv. 2019. doi:10.1101/513523
+TaxonKit v0.9.0
+Shen W and Ren H. TaxonKit: a practical and efficient NCBI Taxonomy toolkit. Journal of Genetics and Genomics. 2021. doi.org/10.1016/j.jgg.2021.03.006
 
-FastTree 2 v2.1.10
+FastTree 2 v2.1.11
 Price MN et al. FastTree 2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi:10.1371/journal.pone.0009490
 ```
 
-**Example methods/citations text based on above**
-> *The archaeal phylogenomic tree was produced with GToTree v1.6.11 (Lee 2019), using the prepackaged single-copy gene-set for archaea (76 target genes). Briefly, target genes were identified with HMMER3 v3.2.2 (Eddy 2011), individually aligned with muscle v3.8.1551 (Edgar 2004), trimmed with trimal v1.3.rev15 (Capella-Gutiérrez et al. 2009), and concatenated prior to phylogenetic estimation with FastTree2 v2.1.10 (Price et al. 2010).*
+**Example methods text based on above citation output (be sure to modify as appropriate for your run)**
+> *The archaeal phylogenomic tree was produced with GToTree v1.6.31 (Lee 2019), using the prepackaged single-copy gene-set for archaea (76 target genes). Briefly, prodigal v2.6.3 (Hyatt et al. 2010) was used to predict genes on input genomes provided as fasta files. Target genes were identified with HMMER3 v3.2.2 (Eddy 2011), individually aligned with muscle v5.1 (Edgar 2021), trimmed with trimal v1.4.rev15 (Capella-Gutiérrez et al. 2009), and concatenated prior to phylogenetic estimation with FastTree2 v2.1.11 (Price et al. 2010). TaxonKit (Shen and Ren 2021) was used to connect full lineages to taxonomic IDs.*
