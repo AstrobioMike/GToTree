@@ -8,7 +8,7 @@ For examples, please visit the GToTree wiki here: https://github.com/AstrobioMik
 For details on the process, please see: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets
 """
 
-version = "v1.5.52"
+VERSION = "v1.6.32"
 import os
 import sys
 import argparse
@@ -27,7 +27,7 @@ from functools import partial
 from math import ceil
 from glob import glob
 
-print("\n\n                                 GToTree " + version)
+print("\n\n                                 GToTree " + VERSION)
 print("                        (github.com/AstrobioMike/GToTree)\n")
 print(" ------------------------------------------------------------------------------- ")
 

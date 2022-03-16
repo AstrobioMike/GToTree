@@ -32,7 +32,7 @@ do
     if $(file $file | grep -q "gzip"); then
         was_gzipped=TRUE # setting variable to be able to check and remove gunzipped file afterwards
         file_location=${file%.*}
-        gunzip -c $file > $file_location
+        gunzip -f -c $file > $file_location
         assembly="$(basename ${file_location%.*})"
     else
         file_location=$file
@@ -70,8 +70,11 @@ do
         rm -rf $file_location
     fi
 
+    # filtering sequences by length to be sure none with > 99,999 amino acids are there, as this breaks hmmer (https://github.com/AstrobioMike/GToTree/issues/50 ; https://github.com/EddyRivasLab/hmmer/issues/244)
+    gtt-filter-seqs-by-length -q -i ${tmp_dir}/${assembly}_genes2.tmp -m 0 -M 99999 -o ${tmp_dir}/${assembly}_genes3.tmp
+
     ## renaming seqs to have assembly name
-    gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
+    gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes3.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
 
     printf "      Performing HMM search...\n"
       

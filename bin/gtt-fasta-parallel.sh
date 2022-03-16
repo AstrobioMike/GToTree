@@ -28,7 +28,7 @@ fi
 if $(file $1 | grep -q "gzip"); then
     was_gzipped=TRUE # setting variable to be able to check and remove gunzipped file afterwards
     file_location=${1%.*}
-    gunzip -c $1 > $file_location
+    gunzip -f -c $1 > $file_location
     assembly="$(basename ${file_location%.*})"
 else
     file_location=$1

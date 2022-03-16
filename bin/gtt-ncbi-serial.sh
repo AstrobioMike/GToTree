@@ -78,7 +78,7 @@ do
     # if ftp, no file is pulled down
     # so to cover both cases, just making this need to be present and gzipped
     if $(file ${tmp_dir}/${assembly}_genes2.tmp.gz | grep -q gzip); then
-        gunzip ${tmp_dir}/${assembly}_genes2.tmp.gz
+        gunzip -f ${tmp_dir}/${assembly}_genes2.tmp.gz
         # renaming headers to avoid problems with odd characters and how hmmer parses and such
         gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
 
@@ -88,7 +88,7 @@ do
 
         if [ -s ${tmp_dir}/${assembly}_genome.tmp.gz ]; then
 
-            gunzip ${tmp_dir}/${assembly}_genome.tmp.gz
+            gunzip -f ${tmp_dir}/${assembly}_genome.tmp.gz
 
             printf "  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n"
             printf "   $assembly doesn't appear to have gene annotations.\n\n"

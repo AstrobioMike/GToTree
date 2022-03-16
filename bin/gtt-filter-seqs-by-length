@@ -11,7 +11,8 @@ required = parser.add_argument_group('required arguments')
 required.add_argument("-i", "--input_fasta", help="Original fasta file", action="store", dest="input_fasta")
 required.add_argument("-m", "--min_length", help="minimum length retained", action="store", dest="min_len")
 required.add_argument("-M", "--max_length", help="maximum length retained", action="store", dest="max_len")
-parser.add_argument("-o", "--output_file", help='Name of output fasta file (default: "filtered.fasta")', action="store", dest="output_file", default="filtered.fasta")
+parser.add_argument("-o", "--output_file", help='name of output fasta file (default: "filtered.fasta")', action="store", dest="output_file", default="filtered.fasta")
+parser.add_argument("-q", "--quiet", help="don't report percentage of retained sequences", action = "store_true")
 
 if len(sys.argv)==1:
   parser.print_help(sys.stderr)
@@ -37,8 +38,10 @@ for seq_record in SeqIO.parse(in_fasta, "fasta"):
     out_file.write(">" + str(seq_record.description) + "\n" + str(seq_record.seq) + "\n")
 
 
-perc = round(float(kept) / float(total) * 100, 2)
-print("\n\tRetained " + str(kept) + " sequences of the initial " + str(total) + " (" + str(perc) + "%).\n")
+if not args.quiet:
+  
+  perc = round(float(kept) / float(total) * 100, 2)
+  print("\n\tRetained " + str(kept) + " sequences of the initial " + str(total) + " (" + str(perc) + "%).\n")
 
 
 

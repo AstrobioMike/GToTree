@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.6.31"
+VERSION="v1.6.32"
 
 printf "\n\n                                  GToTree ${VERSION}\n"
 printf "                         (github.com/AstrobioMike/GToTree)\n\n"
@@ -551,14 +551,14 @@ if [ -n "$NCBI_acc_file" ]; then
         curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genes.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
 
         if [ -s ${tmp_dir}/${assembly}_genes.tmp.gz ]; then
-            gunzip ${tmp_dir}/${assembly}_genes.tmp.gz
+            gunzip -f ${tmp_dir}/${assembly}_genes.tmp.gz
 
         else # trying to get assembly if there were no gene annotations available
             curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
 
             if [ -s ${tmp_dir}/${assembly}_genome.tmp.gz ]; then
 
-                gunzip ${tmp_dir}/${assembly}_genome.tmp.gz
+                gunzip -f ${tmp_dir}/${assembly}_genome.tmp.gz
 
                 printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n"
                 printf "   $assembly doesn't appear to have gene annotations.\n\n"
@@ -665,7 +665,7 @@ if [ -n "$genbank_list_file" ]; then
         if $(file $file | grep -q "gzip"); then
             was_gzipped=TRUE # setting variable to be able to check and remove gunzipped file afterwards
             file_location=${file%.*}
-            gunzip -c $file > $file_location
+            gunzip -f -c $file > $file_location
             assembly="$(basename ${file_location%.*})"
         else
             file_location=$file
@@ -835,7 +835,7 @@ if [ -n "$fasta_files" ]; then
         if $(file $file | grep -q "gzip"); then
             was_gzipped=TRUE # setting variable to be able to check and remove gunzipped file afterwards
             file_location=${file%.*}
-            gunzip -c $file > $file_location
+            gunzip -f -c $file > $file_location
             assembly="$(basename ${file_location%.*})"
         else
             file_location=$file
@@ -963,7 +963,7 @@ if [ -n "$amino_acid_files" ]; then
         if $(file $file | grep -q "gzip"); then
             was_gzipped=TRUE # setting variable to be able to check and remove gunzipped file afterwards
             file_location=${file%.*}
-            gunzip -c $file > $file_location
+            gunzip -f -c $file > $file_location
             assembly="$(basename ${file_location%.*})"
         else
             file_location=$file
