@@ -43,8 +43,13 @@ echo $assembly >> ${tmp_dir}/amino_acid_genomes_list.tmp
 
 num=$((num+1)) # to track progress
 
-## renaming seqs to have assembly name
-gtt-rename-fasta-headers -i $file_location -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
+
+# filtering sequences by length to be sure none with > 99,999 amino acids are there, as this breaks hmmer (https://github.com/AstrobioMike/GToTree/issues/50 ; https://github.com/EddyRivasLab/hmmer/issues/244)
+gtt-filter-seqs-by-length -q -i ${file_location} -m 0 -M 99999 -o ${tmp_dir}/${assembly}_genes1.tmp
+
+## renaming seqs to have assembly name (also to ensure simple headers)
+gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes1.tmp -w ${assembly} -o ${tmp_dir}/${assembly}_genes.tmp
+
 
 ## removing gunzipped genome file if it was gunzipped
 if [ $was_gzipped == "TRUE" ]; then

@@ -80,7 +80,7 @@ do
     if $(file ${tmp_dir}/${assembly}_genes2.tmp.gz | grep -q gzip); then
         gunzip -f ${tmp_dir}/${assembly}_genes2.tmp.gz
         # renaming headers to avoid problems with odd characters and how hmmer parses and such
-        gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
+        gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes3.tmp
 
     else # trying to get assembly if there were no gene annotations available
         rm -rf ${tmp_dir}/${assembly}_genes2.tmp.gz
@@ -101,11 +101,11 @@ do
             tr -d '*' < ${tmp_dir}/${assembly}_genes1.tmp > ${tmp_dir}/${assembly}_genes2.tmp
 
             ## renaming seqs to have assembly name
-            gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
+            gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes3.tmp
         fi
     fi
 
-    if [ -s ${tmp_dir}/${assembly}_genes.tmp ]; then
+    if [ -s ${tmp_dir}/${assembly}_genes3.tmp ]; then
 
         # storing more info about the assembly to write out into ncbi-derived-genome summary file (for each setting to NA if not found)
         ass_name="${curr_line[2]}"
@@ -123,7 +123,10 @@ do
 
 
         ### counting how many genes in this genome
-        gene_count=$(grep -c ">" ${tmp_dir}/${assembly}_genes.tmp)
+        gene_count=$(grep -c ">" ${tmp_dir}/${assembly}_genes3.tmp)
+
+        # filtering sequences by length to be sure none with > 99,999 amino acids are there, as this breaks hmmer (https://github.com/AstrobioMike/GToTree/issues/50 ; https://github.com/EddyRivasLab/hmmer/issues/244)
+        gtt-filter-seqs-by-length -q -i ${tmp_dir}/${assembly}_genes3.tmp -m 0 -M 99999 -o ${tmp_dir}/${assembly}_genes.tmp
 
         printf "      Performing HMM search...\n"
 

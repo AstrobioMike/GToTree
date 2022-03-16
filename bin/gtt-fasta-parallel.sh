@@ -63,8 +63,11 @@ if [ $was_gzipped == "TRUE" ]; then
     rm -rf $file_location
 fi
 
-## renaming seqs to have assembly name
-gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.tmp
+# filtering sequences by length to be sure none with > 99,999 amino acids are there, as this breaks hmmer (https://github.com/AstrobioMike/GToTree/issues/50 ; https://github.com/EddyRivasLab/hmmer/issues/244)
+gtt-filter-seqs-by-length -q -i ${tmp_dir}/${assembly}_genes2.tmp -m 0 -M 99999 -o ${tmp_dir}/${assembly}_genes3.tmp
+
+## renaming seqs to have assembly name (also to ensure simple headers)
+gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes3.tmp -w ${assembly} -o ${tmp_dir}/${assembly}_genes.tmp
   
 ### running hmm search ###
 hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp $hmm_file ${tmp_dir}/${assembly}_genes.tmp > /dev/null
