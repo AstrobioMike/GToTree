@@ -1,1 +1,1 @@
-rm -rf *gt*.tmpdir GToTree_test/
+rm -rf GToTree-test-data/ GToTree-test-output/
