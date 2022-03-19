@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.6.32"
+VERSION="v1.6.33"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -263,7 +263,7 @@ ko_targets='false'
 override_faster_alignment='false'
 http_flag='false'
 
-while getopts :a:g:f:A:H:o:m:tDL:K:p:NkT:c:G:BFdn:j:P args
+while getopts :a:g:f:A:H:o:m:tDL:K:p:NkT:c:G:BFdn:j:XP args
 do
     case "${args}"
     in
