@@ -861,7 +861,7 @@ if [ $total_input_genomes -ge 1000 ] && [ $override_faster_alignment == 'false' 
     printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    We seem to be aiming to work with $total_input_genomes total genomes. This is quite a\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    bit, and the time the individual gene alignments take can quickly become\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "    prohibitive with many thousands of genomes like this. By default, GToTree\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "    prohibitive with many thousands of genomes like this. By default, GToTree\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    is going use the 'super5' muscle algorithm to help speed up the alignments\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    for this run (since we have so many here). If you don't want this to\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    happen, you should cancel this run now with 'ctrl + c', and add the '-X' \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
