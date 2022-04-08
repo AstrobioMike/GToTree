@@ -406,7 +406,7 @@ def gen_gtdb_tab(location):
     """ downloads and parses the GTDB info tables """
 
     # getting archaea
-    arc_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar122_metadata.tar.gz")
+    arc_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar53_metadata.tar.gz")
     arc_tab = pd.read_csv(arc_tar_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     arc_tab.rename(columns={arc_tab.columns[0]:"accession"}, inplace=True)
     arc_tab.dropna(inplace=True, how="all")
@@ -547,7 +547,8 @@ def get_gtdb_tab(prevent_database_version_check, store_db_metadata_in_current_wo
         else:
             print("")
             wprint(color_text("Downloading and parsing archaeal and bacterial metadata tables from GTDB (only needs to be done once)...", "yellow"))
-
+            print("")
+            
             gtdb_tab = gen_gtdb_tab(GTDB_dir)
 
             # reporting version info
