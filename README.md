@@ -7,6 +7,9 @@
 
 <a href="https://doi.org/10.5281/zenodo.2532021"><img align="right" src="https://zenodo.org/badge/DOI/10.5281/zenodo.2532021.svg" alt="DOI"></a>
 <br>
+<a href="https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart"><img align="right" alt="Conda installs" src="https://img.shields.io/conda/dn/AstrobioMike/GToTree?color=blue&label=Conda%20installs" height="25"></a>
+<br>
+
 ---
 
 # GToTree: a user-friendly workflow for phylogenomics
