@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.6.34"
+VERSION="v1.6.35"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -2759,11 +2759,11 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
         # downloading gtdb bacteria and archaea info tables
         printf "\n\t      ${GREEN}Downloading GTDB archaea and bacteria info tables...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-        curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar122_metadata.tar.gz -o ${tmp_dir}/gtdb_archaea_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
-        curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tar.gz -o ${tmp_dir}/gtdb_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
+        curl --connect-timeout 30 --retry 10 https://data.gtdb.ecogenomic.org/releases/latest/ar53_metadata.tar.gz -o ${tmp_dir}/gtdb_archaea_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
+        curl --connect-timeout 30 --retry 10 https://data.gtdb.ecogenomic.org/releases/latest/bac120_metadata.tar.gz -o ${tmp_dir}/gtdb_info.tmp.tar.gz || echo "failed" > capture_any_dl_errors.tmp
         
         # and getting version info downloaded
-        curl --connect-timeout 30 --retry 10 https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/VERSION -o ${tmp_dir}/GTDB-version-info.txt
+        curl --connect-timeout 30 --retry 10 https://data.gtdb.ecogenomic.org/releases/latest/VERSION -o ${tmp_dir}/GTDB-version-info.txt
         printf "\n\n"
 
         # making sure file downloaded with no errors

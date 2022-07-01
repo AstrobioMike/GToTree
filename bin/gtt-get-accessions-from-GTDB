@@ -31,7 +31,7 @@ parser.add_argument("-t", "--target-taxon", help="Target taxon (enter 'all' for 
 parser.add_argument("-r", "--target-rank", help='Target rank', action="store", dest="target_rank")
 parser.add_argument("--get-table", action="store_true", help="Provide just this flag alone to download and parse a GTDB metadata \
                                            table. Archaea and Bacteria tables pulled from here \
-                                           (https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/) and combined, and the \
+                                           (https://data.gtdb.ecogenomic.org/releases/latest/) and combined, and the \
                                            GTDB taxonomy column is split for easier manual searching if wanted.")
 parser.add_argument("--get-rank-counts", action="store_true", help="Provide just this flag alone to see counts of how many \
                                            unique taxa there are for each rank.")
@@ -406,13 +406,13 @@ def gen_gtdb_tab(location):
     """ downloads and parses the GTDB info tables """
 
     # getting archaea
-    arc_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar53_metadata.tar.gz")
+    arc_tar_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/ar53_metadata.tar.gz")
     arc_tab = pd.read_csv(arc_tar_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     arc_tab.rename(columns={arc_tab.columns[0]:"accession"}, inplace=True)
     arc_tab.dropna(inplace=True, how="all")
 
     # getting bacteria
-    bac_tar_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tar.gz")
+    bac_tar_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/bac120_metadata.tar.gz")
     bac_tab = pd.read_csv(bac_tar_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     bac_tab.rename(columns={bac_tab.columns[0]:"accession"}, inplace=True)
     bac_tab.dropna(inplace=True, how="all")
@@ -456,7 +456,7 @@ def gen_gtdb_tab(location):
     # writing out
     gtdb_tab.to_csv(location + "GTDB-arc-and-bac-metadata.tsv", index=False, sep="\t")
 
-    gtdb_version_info = urllib.request.urlretrieve("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/VERSION", location + "GTDB-version-info.txt")
+    gtdb_version_info = urllib.request.urlretrieve("https://data.gtdb.ecogenomic.org/releases/latest/VERSION", location + "GTDB-version-info.txt")
 
     return(gtdb_tab)
 
@@ -479,7 +479,7 @@ def check_stored_gtdb_up_to_date(location):
     """ checks if the stored gtdb metadata table is the latest """
 
     # getting latest version info from GTDB
-    gtdb_latest_version_info = urllib.request.urlretrieve("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/VERSION", location + "GTDB-latest-version-info.txt")
+    gtdb_latest_version_info = urllib.request.urlretrieve("https://data.gtdb.ecogenomic.org/releases/latest/VERSION", location + "GTDB-latest-version-info.txt")
 
     # comparing vs old
     if filecmp.cmp(location + "GTDB-latest-version-info.txt", location + "GTDB-version-info.txt"):
