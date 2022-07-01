@@ -8,15 +8,16 @@ NC='\033[0m'
 
 tmp_dir=$2
 faster_alignment=$3
+num_muscle_threads=$4
 
 # removing those genomes that need to be removed based on not having enough hits to the target genes
 gtt-parse-fasta-by-headers -i ${tmp_dir}/${1}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${1}_hits_filtered.faa --inverse
 
 # aligning
 if [ $faster_alignment == 'true' ]; then
-    muscle -super5 ${tmp_dir}/${1}_hits_filtered.faa -output ${tmp_dir}/${1}_aligned.tmp &> /dev/null
+    muscle -super5 ${tmp_dir}/${1}_hits_filtered.faa -output ${tmp_dir}/${1}_aligned.tmp -threads ${num_muscle_threads} &> /dev/null
 else
-    muscle -align ${tmp_dir}/${1}_hits_filtered.faa -output ${tmp_dir}/${1}_aligned.tmp &> /dev/null
+    muscle -align ${tmp_dir}/${1}_hits_filtered.faa -output ${tmp_dir}/${1}_aligned.tmp -threads ${num_muscle_threads} &> /dev/null
 fi
 
 # trimming

@@ -153,7 +153,13 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "        - [-n <int> ] default: 2\n"
     printf "                  The number of cpus you'd like to use during the HMM search. (Given\n"
     printf "                  these are individual small searches on single genomes, 2 is probably\n"
-    printf "                  always sufficient.)\n\n"
+    printf "                  always sufficient. Keep in mind this will be multiplied by the number of jobs\n"
+    printf "                  running concurrently if also modifying the \`-j\` parameter.)\n\n"
+
+    printf "        - [-M <int> ] default: 5\n"
+    printf "                  The number of threads muscle will use during alignment. (Keep in mind\n"
+    printf "                  this will be multiplied by the number of jobs running concurrently\n"
+    printf "                  if also modifying the \`-j\` parameter.)\n\n"
 
     printf "        - [-j <int> ] default: 1\n"
     printf "                  The number of jobs you'd like to run in parallel during steps\n"
@@ -263,7 +269,7 @@ ko_targets='false'
 override_faster_alignment='false'
 http_flag='false'
 
-while getopts :a:g:f:A:H:o:m:tDL:K:p:NkT:c:G:BFdn:j:XP args
+while getopts :a:g:f:A:H:o:m:tDL:K:p:NkT:c:G:BFdn:j:M:XP args
 do
     case "${args}"
     in
@@ -289,6 +295,7 @@ do
         d) debug_flag='true';;
         n) num_cpus=${OPTARG};;
         j) num_jobs=${OPTARG};;
+        M) num_muscle_threads=${OPTARG};;
         X) override_faster_alignment='true';;
         P) http_flag='true';;
         \?) printf "\n  ${RED}Invalid argument: -${OPTARG}${NC}\n\n    Run 'GToTree' with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
@@ -628,6 +635,25 @@ else
         exit
     fi
 fi
+
+
+if [ -z $num_muscle_threads ]; then
+    num_muscle_threads=5
+else
+    # checking is an integer
+    if ! [[ $num_muscle_threads =~ ^[0-9]+$ ]]; then
+        printf "\n  ${RED}The value provided for muscle threads (\"-M\") needs to be an integer.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+
+    if [ $num_cpus == 0 ]; then
+        printf "\n  ${RED}The value provided for muscle threads (\"-M\") needs to be greater than 0.${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+fi
+
 
 if [ -z $num_jobs ]; then
     num_jobs=1
@@ -2303,9 +2329,9 @@ if [ $num_jobs == "1" ]; then
 
         # aligning
         if [ $total_input_genomes -ge 1000 ] && [ $override_faster_alignment == 'false' ]; then
-            muscle -super5 ${tmp_dir}/${SCG}_hits_filtered.faa -output ${tmp_dir}/aligned.tmp
+            muscle -super5 ${tmp_dir}/${SCG}_hits_filtered.faa -output ${tmp_dir}/aligned.tmp -threads ${num_muscle_threads}
         else
-            muscle -align ${tmp_dir}/${SCG}_hits_filtered.faa -output ${tmp_dir}/aligned.tmp
+            muscle -align ${tmp_dir}/${SCG}_hits_filtered.faa -output ${tmp_dir}/aligned.tmp -threads ${num_muscle_threads}
         fi
 
         # trimming
@@ -2362,7 +2388,7 @@ else
         faster_alignment='false'
     fi
 
-    cat ${tmp_dir}/final_genes_list.tmp | parallel -j $num_jobs gtt-align-and-trim-parallel.sh {} $tmp_dir $faster_alignment
+    cat ${tmp_dir}/final_genes_list.tmp | parallel -j $num_jobs gtt-align-and-trim-parallel.sh {} $tmp_dir $faster_alignment $num_muscle_threads
 
 fi
 
