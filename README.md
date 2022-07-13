@@ -6,11 +6,11 @@
 <br>
 <br>
 
-<a href="https://doi.org/10.5281/zenodo.2532021"><img align="right" src="https://zenodo.org/badge/DOI/10.5281/zenodo.2532021.svg" alt="DOI"></a>
+<a href="https://scholar.google.com/citations?view_op=view_citation&citation_for_view=-ONw6lsAAAAJ:_FxGoFyzp5QC"><img align="right" alt="Citations" src="https://img.shields.io/badge/Citations-160+-blue" height="22"></a>
 <br>
 <a href="https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart"><img align="right" alt="Conda installs" src="https://img.shields.io/badge/Conda%20installs-1.6k-blue" height="22"></a>
 <br>
-<a href="https://scholar.google.com/citations?view_op=view_citation&citation_for_view=-ONw6lsAAAAJ:_FxGoFyzp5QC"><img align="right" alt="Citations" src="https://img.shields.io/badge/Citations-160+-blue" height="22"></a>
+<a href="https://doi.org/10.1093/bioinformatics/btz188"><img align="right" alt="DOI" src="https://img.shields.io/badge/DOI-10.1093/bioinformatics/btz188-blue" height="22"></a>
 <br>
 
 ---
@@ -81,3 +81,6 @@ Price MN et al. FastTree 2 - approximately maximum-likelihood trees for large al
 
 **Example methods text based on above citation output (be sure to modify as appropriate for your run)**
 > *The archaeal phylogenomic tree was produced with GToTree v1.6.31 (Lee 2019), using the prepackaged single-copy gene-set for archaea (76 target genes). Briefly, prodigal v2.6.3 (Hyatt et al. 2010) was used to predict genes on input genomes provided as fasta files. Target genes were identified with HMMER3 v3.2.2 (Eddy 2011), individually aligned with muscle v5.1 (Edgar 2021), trimmed with trimal v1.4.rev15 (Capella-Gutiérrez et al. 2009), and concatenated prior to phylogenetic estimation with FastTree2 v2.1.11 (Price et al. 2010). TaxonKit (Shen and Ren 2021) was used to connect full lineages to taxonomic IDs.*
+
+<a href="https://doi.org/10.5281/zenodo.2532021"><img align="right" src="https://zenodo.org/badge/DOI/10.5281/zenodo.2532021.svg" alt="DOI"></a>
+<br>
