@@ -10,6 +10,8 @@
 <br>
 <a href="https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart"><img align="right" alt="Conda installs" src="https://img.shields.io/badge/Conda%20installs-1.6k-blue" height="22"></a>
 <br>
+<a href="https://scholar.google.com/citations?view_op=view_citation&citation_for_view=-ONw6lsAAAAJ:_FxGoFyzp5QC"><img align="right" alt="Citations" src="https://img.shields.io/badge/Citations-160+-blue" height="22"></a>
+<br>
 
 ---
 
