@@ -47,7 +47,7 @@ if [ ! -f "${GToTree_HMM_dir}/hmm-sources-and-info.tsv" ]; then
 fi
 
 # printing out info for pre-packaged HMMs
-num_hmm_files=$( wc -l ${GToTree_HMM_dir}/hmm-sources-and-info.tsv | sed "s/^ *//" | cut -d " " -f 1 )
+num_hmm_files=$( wc -l ${GToTree_HMM_dir}/hmm-sources-and-info.tsv | sed "s/^ *//" | cut -d " " -f 1 | tail -n +2)
 
 printf "   The environment variable ${GREEN}GToTree_HMM_dir${NC} is set to:\n"
 printf "     $GToTree_HMM_dir\n\n"
