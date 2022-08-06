@@ -213,8 +213,10 @@ if [ -s ${tmp_dir}/${assembly}_genes3.tmp ]; then
 
     fi
 
-    rm -rf ${tmp_dir}/${assembly}_*.tmp ${tmp_dir}/${assembly}_genes.tmp.ssi
-
+    rm -rf ${tmp_dir}/${assembly}_genes3.tmp ${tmp_dir}/${assembly}_genes2.tmp ${tmp_dir}/${assembly}_genes1.tmp
+    rm -rf ${tmp_dir}/${assembly}_genes.tmp ${tmp_dir}/${assembly}_curr_hmm_hits.tmp ${tmp_dir}/${assembly}_uniq_counts.tmp
+    rm -rf ${tmp_dir}/${assembly}_genes.tmp.ssi ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp 
+    rm -rf ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp
 
 else
     printf "  ${ORANGE}********************************** ${NC}NOTICE ${ORANGE}**********************************${NC}  \n"
