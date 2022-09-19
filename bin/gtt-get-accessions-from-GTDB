@@ -85,7 +85,7 @@ def main():
         print("")
         sys.exit(1)
 
-    ## checking env variable is present if not putting in current working dir
+    ## checking env variable is present, if not putting in current working dir
     if not args.store_GTDB_metadata_in_current_working_dir:
 
         check_location_var_is_set_and_writable("GTDB_dir")
@@ -179,7 +179,7 @@ def check_location_var_is_set_and_writable(variable):
 
     if not path_writable:
         print()
-        wprint(color_text("The environment variable '" + str(variable) + "'' does not seem to be writable :(", "yellow"))
+        wprint(color_text("The environment variable '" + str(variable) + "' does not seem to be writable :(", "yellow"))
         print()
         wprint("You can modify the location with `gtt-data-locations set`, or use the `--store-GTDB-metadata-in-current-working-dir` argument with this program.")
         print("")

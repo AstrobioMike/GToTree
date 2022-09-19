@@ -3,7 +3,7 @@
 import sys
 import argparse
 
-parser = argparse.ArgumentParser(description='This script is for parsing GTDB\'s assembly metadata file down to the provided accessions.')
+parser = argparse.ArgumentParser(description='This script is for parsing GTDB\'s assembly metadata file down to the target accessions.')
 
 required = parser.add_argument_group('required arguments')
 
@@ -90,12 +90,12 @@ with open(args.output_file, "r") as assemblies:
         line = line.strip().split("\t")
         full_gtdb_acc = line[0]
         base_gtdb_acc = full_gtdb_acc[3:]
-        
-        gtdb_tax_list = line[16].split(";")
+
+        gtdb_tax_list = [line[1], line[2], line[3], line[4], line[5], line[6], line[7]]
         
         if len(gtdb_tax_list) != 7:
             print("GTDB entry " + full_gtdb_acc + " doesn't seem to have full lineage info.")
-            
-        out_gtdb_tax_table.write(base_gtdb_acc + "\t" + full_gtdb_acc + "\t" + gtdb_tax_list[0][3:] + "\t" + gtdb_tax_list[1][3:] + "\t" + gtdb_tax_list[2][3:] + "\t" + gtdb_tax_list[3][3:] + "\t" + gtdb_tax_list[4][3:] + "\t" + gtdb_tax_list[5][3:] + "\t" + gtdb_tax_list[6][3:] + "\n")
+
+        out_gtdb_tax_table.write(base_gtdb_acc + "\t" + full_gtdb_acc + "\t" + gtdb_tax_list[0] + "\t" + gtdb_tax_list[1] + "\t" + gtdb_tax_list[2] + "\t" + gtdb_tax_list[3] + "\t" + gtdb_tax_list[4] + "\t" + gtdb_tax_list[5] + "\t" + gtdb_tax_list[6] + "\n")
 
 out_gtdb_tax_table.close()
