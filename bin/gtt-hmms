@@ -38,7 +38,6 @@ fi
 
 ## now moving on to reporting the pre-packaged HMMs
 # making sure info table is there, or downloading if not
-# checking info table is there, downloading if not
 if [ ! -f "${GToTree_HMM_dir}/hmm-sources-and-info.tsv" ]; then
 
     # downloading to there if not already present
@@ -47,7 +46,7 @@ if [ ! -f "${GToTree_HMM_dir}/hmm-sources-and-info.tsv" ]; then
 fi
 
 # printing out info for pre-packaged HMMs
-num_hmm_files=$( wc -l ${GToTree_HMM_dir}/hmm-sources-and-info.tsv | sed "s/^ *//" | cut -d " " -f 1 | tail -n +2)
+num_hmm_files=$( tail -n +2 ${GToTree_HMM_dir}/hmm-sources-and-info.tsv | cut -f 1 | wc -l | sed "s/^ *//" )
 
 printf "   The environment variable ${GREEN}GToTree_HMM_dir${NC} is set to:\n"
 printf "     $GToTree_HMM_dir\n\n"

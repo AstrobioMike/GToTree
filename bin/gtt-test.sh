@@ -33,7 +33,7 @@ printf "            -f ${TEST_DATA_DIR}/fasta_files.txt "'\\ \n'
 printf "            -A ${TEST_DATA_DIR}/amino_acid_files.txt "'\\ \n'
 printf "            -m ${TEST_DATA_DIR}/genome_to_id_map.tsv "'\\ \n'
 printf "            -p ${TEST_DATA_DIR}/pfam_targets.txt "'\\ \n'
-printf "            -H Universal -t -D -j 4 -o GToTree-test-output\n\n${NC}"
+printf "            -H Universal -t -D -j 4 -o GToTree-test-output -F\n\n${NC}"
 
 sleep 2
 
@@ -44,11 +44,25 @@ sleep 2
 
 printf "  ${GREEN}Starting run now:\n${NC}"
 
-GToTree -a ${TEST_DATA_DIR}/ncbi_accessions.txt -g ${TEST_DATA_DIR}/genbank_files.txt -f ${TEST_DATA_DIR}/fasta_files.txt -A ${TEST_DATA_DIR}/amino_acid_files.txt -H Universal -m ${TEST_DATA_DIR}/genome_to_id_map.tsv -p ${TEST_DATA_DIR}/pfam_targets.txt -t -D -j 4 -o GToTree-test-output
+GToTree -a ${TEST_DATA_DIR}/ncbi_accessions.txt -g ${TEST_DATA_DIR}/genbank_files.txt -f ${TEST_DATA_DIR}/fasta_files.txt -A ${TEST_DATA_DIR}/amino_acid_files.txt -H Universal -m ${TEST_DATA_DIR}/genome_to_id_map.tsv -p ${TEST_DATA_DIR}/pfam_targets.txt -t -D -j 4 -o GToTree-test-output -F
 
-printf "\n ${YELLOW}_______________________________________________________________________________${NC}\n\n"
-printf "\n  ${GREEN}Test completed! See here for how things should look:\n${NC}"
-printf "    ${YELLOW}https://github.com/AstrobioMike/GToTree/wiki/Installation#test-run${NC}\n\n"
+if [ -d "GToTree-test-output/" ]; then
+
+    printf "\n ${YELLOW}_______________________________________________________________________________${NC}\n\n"
+    printf "\n  ${GREEN}Test completed! See here for how things should look:\n${NC}"
+    printf "    ${YELLOW}https://github.com/AstrobioMike/GToTree/wiki/Installation#test-run${NC}\n\n"
+
+else
+
+    printf "\n ${YELLOW}_______________________________________________________________________________${NC}\n\n"
+    printf "\n  ${RED}There seems to have been a problem with the test run :(\n${NC}"
+    printf "    ${YELLOW}If this continues, please consider submitting an issue here:\n${NC}"
+    printf "        ${YELLOW}https://github.com/AstrobioMike/GToTree/issues${NC}\n\n"
+
+    printf "  ${GREEN}You can clear out the test data and results by running:${NC}\n"
+    printf "    ${YELLOW}gtt-clean-after-test.sh\n\n${NC}"
+
+fi
 
 printf "  ${GREEN}You can clear out the test data and results by running:${NC}\n"
 printf "    ${YELLOW}gtt-clean-after-test.sh\n\n${NC}"

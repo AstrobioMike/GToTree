@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.7.01"
+VERSION="v1.7.00"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -994,13 +994,13 @@ elif [ ! -f "${GToTree_HMM_dir}/${hmm_file}" ]; then
 
         downloaded_md5=$(md5sum ${hmm_file} | cut -f 1 -d " ")
 
-        if [ "${expected_md5}" != "${downloaded_md5}" ]; then
+        if [ ! ${expected_md5} == ${downloaded_md5} ]; then
 
             printf "\n${RED}      There seems to have been a problem downloading the ${base_hmm_file_name} file :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "      Please try again, and if problems continue, please report an issue here:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "              https://github.com/AstrobioMike/GToTree/issues\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-            rm -rf ${hmm_file}
+            # rm -rf ${hmm_file}
             exit
 
         fi
