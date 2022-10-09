@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.7.03"
+VERSION="v1.7.04"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -562,6 +562,24 @@ fi
 
 ### checking on mapping file
 if [ -f "$file_to_genome_id_map" ]; then
+
+    # checking for some special characters in there, reporting and exiting if so
+    # ones we're checking for
+    problem_chars='()*&^#$@!/\|[]'
+
+    if grep -q "[${problem_chars}]" ${file_to_genome_id_map}; then
+
+        printf "\n${RED}  $file_to_genome_id_map appears to have some potentially problematic special characters.${NC}\n" 
+        printf "${RED}  Check it out and remove them to proceed.${NC}\n\n"
+        printf "${YELLOW}Some characters to avoid include: '${problem_chars}'.\n\n${NC}"
+        printf "${YELLOW}Here is an example of one of the current problem lines:\n\n${NC}"
+
+        grep -m 1 "[${problem_chars}]" ${file_to_genome_id_map}
+
+        printf "\nExiting for now.\n\n"
+        exit
+
+    fi
 
     # checking if file has windows CRLF line-terminators, and running dos2unix if so
     dos2unix < ${file_to_genome_id_map} | cmp - ${file_to_genome_id_map} > /dev/null
