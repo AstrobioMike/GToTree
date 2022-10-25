@@ -334,10 +334,12 @@ def modify_conda_activate_startup_script(paths_dict):
 
 def notify_to_reactivate_conda():
 
+    curr_conda_name = os.environ["CONDA_DEFAULT_ENV"]
+
     print(color_text("\n  --------------------------------------------------------------------------------", "green"))
     print(color_text("  --------------------------------------------------------------------------------", "green"))
     wprint(color_text("Environment variables have been updated. But for the changes to take effect, be sure to reactivate the conda environment, e.g.:", "yellow"))
-    print("\n        `conda activate gtotree`\n")
+    print(f"\n        `conda activate {curr_conda_name}`\n")
     wprint(color_text("Then you can double-check with `gtt-data-locations check`.", "yellow"))
     print(color_text("  --------------------------------------------------------------------------------", "green"))
     print(color_text("  --------------------------------------------------------------------------------\n", "green"))
