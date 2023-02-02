@@ -139,7 +139,7 @@ def gen_gtdb_tab(location):
     # writing out
     gtdb_tab.to_csv(location + "GTDB-arc-and-bac-metadata.tsv", index=False, sep="\t")
 
-    gtdb_version_info = urllib.request.urlretrieve("https://data.gtdb.ecogenomic.org/releases/latest/VERSION", location + "GTDB-version-info.txt")
+    gtdb_version_info = urllib.request.urlretrieve("https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt", location + "GTDB-version-info.txt")
 
 
 def check_and_or_get_gtdb_files(GTDB_dir):
