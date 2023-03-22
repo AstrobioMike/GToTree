@@ -25,7 +25,7 @@
 **See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to have things up and running in just a single step!**
 
 ```
-conda create -y -n gtotree -c conda-forge -c bioconda -c astrobiomike gtotree
+conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda -c defaults gtotree
 ```
 
 ---
@@ -47,7 +47,7 @@ See the ["What is GToTree?" wiki page](https://github.com/AstrobioMike/GToTree/w
 **See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to get GToTree up and running in just a single step!**
 
 ```
-conda create -y -n gtotree -c conda-forge -c bioconda -c astrobiomike gtotree
+conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda -c defaults gtotree
 ```
 
 ---
