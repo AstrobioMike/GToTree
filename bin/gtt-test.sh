@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -e
 
 # setting colors to use
 GREEN='\033[0;32m'
@@ -12,7 +11,33 @@ printf "  ${GREEN}Downloading GToTree test data into the subdirectory ${YELLOW}G
 printf "  ${GREEN}Data being pulled from here:\n${NC}"
 printf "    ${YELLOW}https://figshare.com/articles/dataset/GToTree_test_data/19372334${NC}\n\n\n"
 
-curl -L -o GToTree-test-data.tar.gz https://figshare.com/ndownloader/files/34404560
+curl -L --retry 10 --fail -o GToTree-test-data.tar.gz https://figshare.com/ndownloader/files/34404560
+
+# checking download was successfull (can finish with 0 exit)
+if [ $? -ne 0 ] ; then
+
+    printf "\n${RED}  Downloading the small test data failed for some reason :(${NC}\n"
+    printf "  You can try downloading it yourself from the link printed above and running the test as follows after unpacking it:\n\n"
+
+    printf "    ${YELLOW}GToTree -a GToTree-test-data/ncbi_accessions.txt "'\\ \n'
+    printf "            -g GToTree-test-data/genbank_files.txt "'\\ \n'
+    printf "            -f GToTree-test-data/fasta_files.txt "'\\ \n'
+    printf "            -A GToTree-test-data/amino_acid_files.txt "'\\ \n'
+    printf "            -m GToTree-test-data/genome_to_id_map.tsv "'\\ \n'
+    printf "            -p GToTree-test-data/pfam_targets.txt "'\\ \n'
+    printf "            -H Universal -t -D -j 4 -o GToTree-test-output -F\n\n${NC}"
+
+    printf "  Then you can compare the output to what is depicted here:\n"
+    printf "    https://github.com/AstrobioMike/GToTree/wiki/Installation#test-run${NC}\n\n"
+
+    printf "Exiting for now.\n\n"
+    exit
+
+fi
+
+# putting here so the above message is sent if curl fails
+set -e
+
 tar -xf GToTree-test-data.tar.gz
 rm GToTree-test-data.tar.gz
 
