@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.7.07"
+VERSION="v1.7.08"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -1342,16 +1342,16 @@ fi
 #############################################################################
 ###############  CREATE A TEMP DIRECTORY AND EXITING IF FAILS  ##############
 #############################################################################
-tmp_dir=$(date +%s).gtotree.tmpdir
-
-mkdir $tmp_dir 2> /dev/null
+tmp_dir=$(mktemp -d -t gtotree.tmp.XXXXX)
 
 if [ $? -ne 0 ] ; then
-    printf "\n${RED}  Tried to make temporary directory named ${tmp_dir} but failed, this shouldn't happen :(${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "\n${RED}  Tried to make temporary directory named ${tmp_dir} but failed, this shouldn't happen :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     rm -rf uniq_hmm_names.tmp uniq_pfam_targets.tmp
+    printf "  Please post an issue if this continues.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "Exiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     exit
 fi
+
 
 ### making sure each id provided in the mapping file (if given) is found in one
 ### of the genome input files
@@ -3362,8 +3362,11 @@ if [ $keep_individual_alignments == 'true' ]; then
 
 fi
 
-if [ $debug_flag == 'false' ]; then
-    rm -rf $tmp_dir
+# saving output dir if -d was provided, removing if not
+if [ ${debug_flag} == 'false' ]; then
+    rm -rf ${tmp_dir}
+else
+    mv ${tmp_dir} ${output_dir}
 fi
 
 
