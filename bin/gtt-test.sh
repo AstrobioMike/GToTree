@@ -8,10 +8,10 @@ NC='\033[0m'
 
 printf "\n"
 printf "  ${GREEN}Downloading GToTree test data into the subdirectory ${YELLOW}GToTree-test-data/\n\n${NC}"
-printf "  ${GREEN}Data being pulled from here:\n${NC}"
-printf "    ${YELLOW}https://figshare.com/articles/dataset/GToTree_test_data/19372334${NC}\n\n\n"
+printf "  ${GREEN}Test data being pulled from here:\n${NC}"
+printf "    ${YELLOW}https://zenodo.org/record/7860720#.ZEcWkexlA_8${NC}\n\n\n"
 
-curl -L --retry 10 --fail -o GToTree-test-data.tar.gz https://figshare.com/ndownloader/files/34404560
+curl -L --retry 10 --fail -o GToTree-test-data.tar.gz "https://zenodo.org/record/7860720/files/GToTree-test-data.tar.gz?download=1"
 
 # checking download was successfull (can finish with 0 exit)
 if [ $? -ne 0 ] ; then
@@ -35,7 +35,7 @@ if [ $? -ne 0 ] ; then
 
 fi
 
-# putting here so the above message is sent if curl fails
+# putting here instead of at top so that the above message is still sent if curl fails
 set -e
 
 tar -xf GToTree-test-data.tar.gz

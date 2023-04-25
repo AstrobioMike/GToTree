@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.7.08"
+VERSION="v1.7.09"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -989,8 +989,9 @@ elif [ ! -f "${GToTree_HMM_dir}/${hmm_file}" ]; then
     if [ ! -f "${GToTree_HMM_dir}/hmm-sources-and-info.tsv" ]; then
 
         # downloading to there if not already present
-        curl --silent --retry 10 -L -o ${GToTree_HMM_dir}/hmm-sources-and-info.tsv https://figshare.com/ndownloader/files/37703646
-
+        # changed from figshare to zenodo when this certificate trouble was happening (https://github.com/AstrobioMike/GToTree/issues/74)
+        # curl --silent --retry 10 -L -o ${GToTree_HMM_dir}/hmm-sources-and-info.tsv https://figshare.com/ndownloader/files/37703646
+        curl --silent --retry 10 -L -o ${GToTree_HMM_dir}/hmm-sources-and-info.tsv "https://zenodo.org/record/7860736/files/hmm-sources-and-info.tsv?download=1"
     fi
 
     # searching for what was requested
@@ -1005,7 +1006,7 @@ elif [ ! -f "${GToTree_HMM_dir}/${hmm_file}" ]; then
         hmm_file=${GToTree_HMM_dir}${hmm_file}
 
         # downloading
-        curl --silent --retry 10 -L -o ${hmm_file} ${wanted_hmm_link}
+        curl --silent --retry 10 -L -o ${hmm_file} "${wanted_hmm_link}"
 
         # making sure download was completed successfully by checking md5
         expected_md5=$(grep -w "^${base_hmm_file_name}" ${GToTree_HMM_dir}/hmm-sources-and-info.tsv | cut -f 8)
