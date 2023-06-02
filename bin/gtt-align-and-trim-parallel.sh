@@ -9,26 +9,27 @@ NC='\033[0m'
 tmp_dir=$2
 faster_alignment=$3
 num_muscle_threads=$4
+target_gene_suffix=$5
 
 # removing those genomes that need to be removed based on not having enough hits to the target genes
-gtt-parse-fasta-by-headers -i ${tmp_dir}/${1}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${1}_hits_filtered.faa --inverse
+gtt-parse-fasta-by-headers -i ${tmp_dir}/${1}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${1}_hits_filtered${target_gene_suffix} --inverse
 
 # aligning
 if [ $faster_alignment == 'true' ]; then
-    muscle -super5 ${tmp_dir}/${1}_hits_filtered.faa -output ${tmp_dir}/${1}_aligned.tmp -threads ${num_muscle_threads} &> /dev/null
+    muscle -super5 ${tmp_dir}/${1}_hits_filtered${target_gene_suffix} -output ${tmp_dir}/${1}_aligned.tmp -threads ${num_muscle_threads} &> /dev/null
 else
-    muscle -align ${tmp_dir}/${1}_hits_filtered.faa -output ${tmp_dir}/${1}_aligned.tmp -threads ${num_muscle_threads} &> /dev/null
+    muscle -align ${tmp_dir}/${1}_hits_filtered${target_gene_suffix} -output ${tmp_dir}/${1}_aligned.tmp -threads ${num_muscle_threads} &> /dev/null
 fi
 
 # trimming
-trimal -in ${tmp_dir}/${1}_aligned.tmp -out ${tmp_dir}/${1}_trimmed.faa.tmp -automated1
+trimal -in ${tmp_dir}/${1}_aligned.tmp -out ${tmp_dir}/${1}_trimmed${target_gene_suffix}.tmp -automated1
 
 # removing linewraps:
-sed 's/ .*$//' ${tmp_dir}/${1}_trimmed.faa.tmp | awk '!/^>/ { printf "%s", $0; n="\n" } /^>/ { print n $0; n = "" } END { printf "%s", n }' > ${tmp_dir}/${1}_formatted.faa.tmp
+sed 's/ .*$//' ${tmp_dir}/${1}_trimmed${target_gene_suffix}.tmp | awk '!/^>/ { printf "%s", $0; n="\n" } /^>/ { print n $0; n = "" } END { printf "%s", n }' > ${tmp_dir}/${1}_formatted${target_gene_suffix}.tmp
 
 ## adding gap-sequences for genomes missing the current gene ##
 # finding here which ones have it
-grep ">" ${tmp_dir}/${1}_formatted.faa.tmp | tr -d ">" | sort > ${tmp_dir}/${1}_genomes_with_gene.tmp
+grep ">" ${tmp_dir}/${1}_formatted${target_gene_suffix}.tmp | tr -d ">" | sort > ${tmp_dir}/${1}_genomes_with_gene.tmp
 
 # now getting which ones don't have it
 comm -23 ${tmp_dir}/final_genomes_from_all_sources.tmp ${tmp_dir}/${1}_genomes_with_gene.tmp | sort > ${tmp_dir}/${1}_needed_gappers.tmp
@@ -40,7 +41,7 @@ if [ -s ${tmp_dir}/${1}_needed_gappers.tmp ]; then
     sed 's/^/>/' ${tmp_dir}/${1}_needed_gappers.tmp > ${tmp_dir}/${1}_needed_headers.tmp
 
     # getting length of the alignment for the current gene:
-    aln_length_tmp=$(sed -n '2p' ${tmp_dir}/${1}_formatted.faa.tmp | wc -c | tr -s " " | cut -f2 -d " ")
+    aln_length_tmp=$(sed -n '2p' ${tmp_dir}/${1}_formatted${target_gene_suffix}.tmp | wc -c | tr -s " " | cut -f2 -d " ")
     # subtracting 1 for newline characters 
     aln_length_tmp=$(echo "$aln_length_tmp"-1 | bc)
     # making a string of gaps the length of the alignment for those missing it:
@@ -53,15 +54,15 @@ if [ -s ${tmp_dir}/${1}_needed_gappers.tmp ]; then
     done > ${tmp_dir}/${1}_gaps.tmp
 
     # making fasta of those genomes missing the current gene:
-    paste -d "\n" ${tmp_dir}/${1}_needed_headers.tmp ${tmp_dir}/${1}_gaps.tmp > ${tmp_dir}/${1}_missing_genomes.faa.tmp
+    paste -d "\n" ${tmp_dir}/${1}_needed_headers.tmp ${tmp_dir}/${1}_gaps.tmp > ${tmp_dir}/${1}_missing_genomes${target_gene_suffix}.tmp
     # catting the genomes missing the current gene together with those that have it
-    cat ${tmp_dir}/${1}_formatted.faa.tmp ${tmp_dir}/${1}_missing_genomes.faa.tmp > ${tmp_dir}/${1}.faa.tmp
+    cat ${tmp_dir}/${1}_formatted${target_gene_suffix}.tmp ${tmp_dir}/${1}_missing_genomes${target_gene_suffix}.tmp > ${tmp_dir}/${1}${target_gene_suffix}.tmp
 else
-    mv ${tmp_dir}/${1}_formatted.faa.tmp ${tmp_dir}/${1}.faa.tmp
+    mv ${tmp_dir}/${1}_formatted${target_gene_suffix}.tmp ${tmp_dir}/${1}${target_gene_suffix}.tmp
 fi
 
 ## reordering the final fasta of this gene so that all gene sets can be pasted together at end ##
-gtt-reorder-fasta -i ${tmp_dir}/${1}.faa.tmp -w ${tmp_dir}/final_genomes_from_all_sources.tmp -o ${tmp_dir}/${1}_all_aligned.faa
+gtt-reorder-fasta -i ${tmp_dir}/${1}${target_gene_suffix}.tmp -w ${tmp_dir}/final_genomes_from_all_sources.tmp -o ${tmp_dir}/${1}_all_aligned${target_gene_suffix}
 
 printf "\n\n\n   --------------------------------------------------------------------------   \n"
 printf "\t    Finished aligning and formatting gene-set ${GREEN}$1${NC}.\n"

@@ -129,11 +129,17 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
 
     printf "\n      ${YELLOW}General run settings:${NC}\n\n"
 
+    printf "        - [-z ] default: false\n"
+    printf "                  Make alignment and/or tree with nucleotide sequences instead of amino-acid\n"
+    printf "                  sequences. Note this mode can only accept NCBI accessions (passed to \`-a\`)\n"
+    printf "                  and genome fasta files (passed to \`-f\` as input sources. (GToTree still\n"
+    printf "                  finds target genes based on amino-acid HMM searches.)\n\n"
+    
     printf "        - [-N ] default: false\n"
     printf "                  No tree. Generate alignment only.\n\n"
 
     printf "        - [-k ] default: false\n"
-    printf "                  Keep individual protein alignment files.\n\n"
+    printf "                  Keep individual alignment files.\n\n"
 
     printf "        - [-T <str>] default: FastTreeMP if available, FastTree if not\n"
     printf "                  Which program to use for tree generation. Currently supported are\n"
@@ -147,7 +153,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     printf "                  parallelizes some steps of the treeing step. Currently, conda installs\n"
     printf "                  FastTreeMP with FastTree on linux systems, but not on Mac OSX systems.\n"
     printf "                  So if using the conda installation, you may not have FastTreeMP if on a Mac,\n"
-    printf "                  in which case FastTree will be used instead – this will be reported when the\n"
+    printf "                  in which case FastTree will be used instead - this will be reported when the\n"
     printf "                  program starts, and be in the log file.\n\n"
 
     printf "        - [-n <int> ] default: 2\n"
@@ -268,8 +274,9 @@ additional_pfam_targets='false'
 ko_targets='false'
 override_faster_alignment='false'
 http_flag='false'
+nucleotide='false'
 
-while getopts :a:g:f:A:H:o:m:tDL:K:p:NkT:c:G:BFdn:j:M:XP args
+while getopts :a:g:f:A:H:o:m:tDL:K:p:NkT:c:G:BFdn:j:M:XPz args
 do
     case "${args}"
     in
@@ -298,6 +305,7 @@ do
         M) num_muscle_threads=${OPTARG};;
         X) override_faster_alignment='true';;
         P) http_flag='true';;
+        z) nucleotide='true';;
         \?) printf "\n  ${RED}Invalid argument: -${OPTARG}${NC}\n\n    Run 'GToTree' with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
     esac
 done
@@ -358,6 +366,24 @@ if [ $tree_program == "IQ-TREE" ]; then
         printf "\nExiting for now.\n\n"
         exit
     fi
+fi
+
+# checking if -z for nucleotide alignment and tree were provided, then no amino-acid input was provided
+if [ $nucleotide != "false" ] && [ -f "$amino_acid_files" ]; then
+    printf "\n  ${RED}You specified wanting to work with nucleotide sequences (-z option), but also provided an input amino-acids file (-A parameter) :(${NC}\n"
+    printf "\n  We can't confidently reverse-translate the amino-acid seqs to nucleotide seqs, so can't take both those options.\n\n"
+
+    printf "\nExiting for now.\n\n"
+    exit
+fi
+
+# checking if -z for nucleotide alignment and tree were provided, then no genbank input was provided
+if [ $nucleotide != "false" ] && [ -f "$genbank_list_file" ]; then
+    printf "\n  ${RED}You specified wanting to work with nucleotide sequences (-z option), but also provided an input genbanks file (-g parameter) :(${NC}\n"
+    printf "\n  Input genbank files are not currently permitted with nucleotide mode.\n\n"
+
+    printf "\nExiting for now.\n\n"
+    exit
 fi
 
 ### if NCBI accessions were provided, checking the assembly summary tables are present/new-ish, and downloading if needed
@@ -1061,7 +1087,7 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
    [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || \
    [ $tree_program != "FastTreeMP" ] || [ $wanting_but_missing_FastTreeMP == "true" ] || \
    [ $align_only == 'true' ] || [ $keep_individual_alignments == 'true' ] || \
-   [ ! -z $target_pfams ] || [ ! -z $target_KOs ]; then
+   [ ! -z $target_pfams ] || [ ! -z $target_KOs ] || [ $nucleotide != 'false' ]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
@@ -1105,6 +1131,11 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
 
     if [ $len_cutoff != "0.2" ]; then
         printf "      - Gene-length filtering cutoff threshold (\"-c\") has been set to $len_cutoff\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    fi
+
+    if [ $nucleotide != 'false' ]; then
+        printf "      - Working towards nucleotide alignment and/or tree, as \"-z\" option was provided\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "          (amino-acid seqs still used for HMM searching of target genes)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $align_only == 'true' ]; then
@@ -1574,13 +1605,21 @@ if [ -n "$NCBI_acc_file" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+        if [ "$nucleotide" == 'false' ]; then
+            gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs} 
+        else
+            gtt-ncbi-serial-nt.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs} 
+        fi
     else
-        cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+        if [ "$nucleotide" == 'false' ]; then
+            cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+        else
+            cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel-nt.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+        fi
     fi
 
     ## checking if prodigal was used to add to citations list being reported at end
-    if [ -s ${tmp_dir}/prodigal_used ]; then
+    if [ -s ${tmp_dir}/prodigal_used ] || [ $nucleotide != 'false' ]; then
         prodigal_used="true"
     fi
 
@@ -1782,7 +1821,12 @@ if [ -n "$fasta_files" ]; then
 
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
-        gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
+
+        if [ "$nucleotide" == 'false' ]; then
+            gtt-fasta-serial.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
+        else
+            gtt-fasta-serial-nt.sh $fasta_files $tmp_dir $hmm_file $fasta_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
+        fi
 
         ### kill backstop ###
         # if there was a problem with the serial fasta genome processing, killing main program here and reporting
@@ -1801,9 +1845,9 @@ if [ -n "$fasta_files" ]; then
             printf "    ${GREEN}${problem_assembly}${NC}. GToTree is not sure it should\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "    move forward when something odd is going on like this :(\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "    It is possible this is just because this assembly is shorter than\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    If this assembly is shorter than 100,000 bps, that may be why.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    That's unlikely to be sufficient for incorporation into a\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    phylogenomic tree, but if you'd like to still try with it,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "    out due to not having enough of the target genes (set with '-G').\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -1821,7 +1865,12 @@ if [ -n "$fasta_files" ]; then
         fi
 
     else
-        cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
+
+        if [ "$nucleotide" == 'false' ]; then
+            cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
+        else
+            cat $fasta_files | parallel -j $num_jobs gtt-fasta-parallel-nt.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets ${ko_targets} ${target_KOs}
+        fi
 
         ### kill backstop ###
         # if there was a problem with the parallel fasta genome processing, killing main program here and reporting
@@ -1840,9 +1889,9 @@ if [ -n "$fasta_files" ]; then
             printf "    ${GREEN}${problem_assembly}${NC}. GToTree is not sure it should\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "    move forward when something odd is going on like this :(\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-            printf "    It is possible this is just because this assembly is shorter than\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-            printf "    100,000 bps. That's unlikely to be sufficient for incorporation\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-            printf "    into a phylogenomic tree, but if you'd like to still try with it,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    If this assembly is shorter than 100,000 bps, that may be why.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    That's unlikely to be sufficient for incorporation into a\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "    phylogenomic tree, but if you'd like to still try with it,\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "    you can run prodigal on it yourself and provide the amino acid\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "    sequences to GToTree. Though it is still likely to get filtered\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
             printf "    out due to not having enough of the target genes (set with '-G').\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -1986,9 +2035,15 @@ printf "           It is currently $curr_time; the process started at $start_tim
 printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 ### first checking that all genes have some sequences, if not, removing from gene list ###
+if [ $nucleotide != 'false' ]; then
+    target_gene_suffix=".fa"
+else
+    target_gene_suffix=".faa"
+fi
+
 for SCG in $(cat ${tmp_dir}/uniq_hmm_names.tmp)
 do
-    if [ ! -s ${tmp_dir}/${SCG}_hits.faa ]; then
+    if [ ! -s ${tmp_dir}/${SCG}_hits${target_gene_suffix} ]; then
         echo "$SCG"
     fi
 done > ${tmp_dir}/SCG_targets_with_no_retained_seqs.tmp
@@ -2000,7 +2055,7 @@ comm -23 <(sort ${tmp_dir}/uniq_hmm_names.tmp) <(sort ${tmp_dir}/SCG_targets_wit
 for SCG in $(cat ${tmp_dir}/updated_genes_list_a.tmp)
 do
 
-    curr_count=$(grep -c ">" ${tmp_dir}/${SCG}_hits.faa)
+    curr_count=$(grep -c ">" ${tmp_dir}/${SCG}_hits${target_gene_suffix})
 
     if [ ${curr_count} -lt 2 ]; then
         echo "$SCG"
@@ -2040,7 +2095,9 @@ if [ $removed_genes != "0" ]; then
         printf "    $removed_genes gene(s) had no hits in any genome, or a hit in only one genome... Just so ya know!!\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "        These included:\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         sed 's/^/                     /' ${tmp_dir}/removed_SCG_targets.tmp | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        printf "\n    Reported in \"${output_dir}/run_files/Target-genes-not-found-or-retained.txt\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\n    Reported in \"${output_dir}/run_files/Target-genes-not-found-or-retained.txt\".\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "   If interested, you can figure out which of those scenarios was the cause by\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "   checking out \"${output_dir}/SCG_hit_counts.tsv\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         cp ${tmp_dir}/removed_SCG_targets.tmp ${output_dir}/run_files/Target-genes-not-found-or-retained.txt
 
@@ -2049,7 +2106,6 @@ if [ $removed_genes != "0" ]; then
     fi
 
 fi
-
 
 ### making sure there are some genes left after removing those with 0 hits in any genome or only multiple hits per genome (this shouldn't be a problem except under odd circumstances like when testing with VERY few genes and/or very few genomes)
 len_updated_genes_list=$(wc -l ${tmp_dir}/updated_genes_list.tmp | sed "s/^ *//" | cut -d " " -f 1)
@@ -2123,7 +2179,7 @@ if [ $num_jobs == "1" ]; then
         printf "   --------------------------------------------------------------------------   \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "\n    Filtering ${GREEN}$SCG${NC} sequences by length...\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-        gtt-count-bases-per-seq -i ${tmp_dir}/${SCG}_hits.faa -o ${tmp_dir}/${SCG}-num_bps.tmp
+        gtt-count-bases-per-seq -i ${tmp_dir}/${SCG}_hits${target_gene_suffix} -o ${tmp_dir}/${SCG}-num_bps.tmp
         cut -f 2 ${tmp_dir}/${SCG}-num_bps.tmp > ${tmp_dir}/${SCG}-lengths.tmp
         median=$(gtt-get-median.sh ${tmp_dir}/${SCG}-lengths.tmp)
         buff=$(echo "$median * $len_cutoff" | bc)
@@ -2132,14 +2188,15 @@ if [ $num_jobs == "1" ]; then
         max_len=$(echo "$median + $buff" | bc)
         max_len_rnd=$(printf "%.0f\n" $max_len)
 
-        gtt-filter-seqs-by-length -i ${tmp_dir}/${SCG}_hits.faa -m $min_len_rnd -M $max_len_rnd -o ${tmp_dir}/${SCG}_hits_filtered.tmp
+        gtt-filter-seqs-by-length -i ${tmp_dir}/${SCG}_hits${target_gene_suffix} -m $min_len_rnd -M $max_len_rnd -o ${tmp_dir}/${SCG}_hits_filtered.tmp
 
     done
 
 else
-    cat ${tmp_dir}/updated_genes_list.tmp | parallel -j $num_jobs gtt-filter-parallel.sh {} $tmp_dir $len_cutoff
-fi
 
+    cat ${tmp_dir}/updated_genes_list.tmp | parallel -j $num_jobs gtt-filter-parallel.sh {} $tmp_dir $len_cutoff $nucleotide
+
+fi
 
 ### removing genes again if they had all filtered, which really shouldn't happen unless there are very few sequences (like when testing) ###
 for SCG in $(cat ${tmp_dir}/updated_genes_list.tmp)
@@ -2183,13 +2240,12 @@ if [ $len_final_genes_list == "0" ]; then
     exit
 fi    
 
-
 removed_genes2=$(wc -l ${tmp_dir}/genes_to_remove2.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
 # reporting
 if [ $removed_genes2 != "0" ]; then
     printf "     ${YELLOW}******************************* ${NC}NOTICE ${YELLOW}*******************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "\t  $removed_genes2 gene(s) had no hits in any genomes after filtering by length! Just so ya know...\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "\t  $removed_genes2 gene(s) had no hits in any genomes after filtering by length. Just so ya know...\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "\t    Length-filtered out of existence:\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     sed 's/^/          /' ${tmp_dir}/genes_to_remove2.tmp | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "\n     Reported in \"${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt\".\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -2302,8 +2358,6 @@ if [ $num_final_genomes_from_all_sources -lt 3 ]; then
 
 fi
 
-
-
 #############################################################################
 #############  ALIGNING, TRIMMING, AND INSERTING GAP-SEQUENCES  #############
 #############################################################################
@@ -2335,24 +2389,24 @@ if [ $num_jobs == "1" ]; then
         printf "   --------------------------------------------------------------------------   \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
         # removing those genomes that need to be removed based on not having enough hits to the target genes
-        gtt-parse-fasta-by-headers -i ${tmp_dir}/${SCG}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${SCG}_hits_filtered.faa --inverse
+        gtt-parse-fasta-by-headers -i ${tmp_dir}/${SCG}_hits_filtered.tmp -w ${tmp_dir}/sorted_genomes_to_remove.tmp -o ${tmp_dir}/${SCG}_hits_filtered${target_gene_suffix} --inverse
 
         # aligning
         if [ $total_input_genomes -ge 1000 ] && [ $override_faster_alignment == 'false' ]; then
-            muscle -super5 ${tmp_dir}/${SCG}_hits_filtered.faa -output ${tmp_dir}/aligned.tmp -threads ${num_muscle_threads}
+            muscle -super5 ${tmp_dir}/${SCG}_hits_filtered${target_gene_suffix} -output ${tmp_dir}/aligned.tmp -threads ${num_muscle_threads}
         else
-            muscle -align ${tmp_dir}/${SCG}_hits_filtered.faa -output ${tmp_dir}/aligned.tmp -threads ${num_muscle_threads}
+            muscle -align ${tmp_dir}/${SCG}_hits_filtered${target_gene_suffix} -output ${tmp_dir}/aligned.tmp -threads ${num_muscle_threads}
         fi
 
         # trimming
-        trimal -in ${tmp_dir}/aligned.tmp -out ${tmp_dir}/trimmed.faa.tmp -automated1
+        trimal -in ${tmp_dir}/aligned.tmp -out ${tmp_dir}/trimmed${target_gene_suffix}.tmp -automated1
 
         # removing linewraps:
-        sed 's/ .*$//' ${tmp_dir}/trimmed.faa.tmp | awk '!/^>/ { printf "%s", $0; n="\n" } /^>/ { print n $0; n = "" } END { printf "%s", n }' > ${tmp_dir}/formatted.faa.tmp
+        sed 's/ .*$//' ${tmp_dir}/trimmed${target_gene_suffix}.tmp | awk '!/^>/ { printf "%s", $0; n="\n" } /^>/ { print n $0; n = "" } END { printf "%s", n }' > ${tmp_dir}/formatted${target_gene_suffix}.tmp
 
         ## adding gap-sequences for genomes missing the current gene ##
         # finding here which ones have it
-        grep ">" ${tmp_dir}/formatted.faa.tmp | tr -d ">" | sort > ${tmp_dir}/genomes_with_gene.tmp
+        grep ">" ${tmp_dir}/formatted${target_gene_suffix}.tmp | tr -d ">" | sort > ${tmp_dir}/genomes_with_gene.tmp
 
         # now getting which ones don't have it
         comm -23 ${tmp_dir}/final_genomes_from_all_sources.tmp ${tmp_dir}/genomes_with_gene.tmp | sort > ${tmp_dir}/needed_gappers.tmp
@@ -2364,7 +2418,7 @@ if [ $num_jobs == "1" ]; then
             sed 's/^/>/' ${tmp_dir}/needed_gappers.tmp > ${tmp_dir}/needed_headers.tmp
 
             # getting length of the alignment for the current gene:
-            aln_length_tmp=$(sed -n '2p' ${tmp_dir}/formatted.faa.tmp | wc -c | tr -s " " | cut -f2 -d " ")
+            aln_length_tmp=$(sed -n '2p' ${tmp_dir}/formatted${target_gene_suffix}.tmp | wc -c | tr -s " " | cut -f2 -d " ")
             # subtracting 1 for newline characters
             aln_length_tmp=$(echo "$aln_length_tmp"-1 | bc)
             # making a string of gaps the length of the alignment for those missing it:
@@ -2377,15 +2431,15 @@ if [ $num_jobs == "1" ]; then
             done > ${tmp_dir}/gaps.tmp
 
             # making fasta of those genomes missing the current gene:
-            paste -d "\n" ${tmp_dir}/needed_headers.tmp ${tmp_dir}/gaps.tmp > ${tmp_dir}/missing_genomes.faa.tmp
+            paste -d "\n" ${tmp_dir}/needed_headers.tmp ${tmp_dir}/gaps.tmp > ${tmp_dir}/missing_genomes${target_gene_suffix}.tmp
             # catting the genomes missing the current gene together with those that have it
-            cat ${tmp_dir}/formatted.faa.tmp ${tmp_dir}/missing_genomes.faa.tmp > ${tmp_dir}/${SCG}.faa.tmp
+            cat ${tmp_dir}/formatted${target_gene_suffix}.tmp ${tmp_dir}/missing_genomes${target_gene_suffix}.tmp > ${tmp_dir}/${SCG}${target_gene_suffix}.tmp
         else
-            mv ${tmp_dir}/formatted.faa.tmp ${tmp_dir}/${SCG}.faa.tmp
+            mv ${tmp_dir}/formatted${target_gene_suffix}.tmp ${tmp_dir}/${SCG}${target_gene_suffix}.tmp
         fi
 
         ## reordering the final fasta of this gene so that all gene sets can be pasted together at end ##
-        gtt-reorder-fasta -i ${tmp_dir}/${SCG}.faa.tmp -w ${tmp_dir}/final_genomes_from_all_sources.tmp -o ${tmp_dir}/${SCG}_all_aligned.faa
+        gtt-reorder-fasta -i ${tmp_dir}/${SCG}${target_gene_suffix}.tmp -w ${tmp_dir}/final_genomes_from_all_sources.tmp -o ${tmp_dir}/${SCG}_all_aligned${target_gene_suffix}
 
     done
 
@@ -2398,7 +2452,7 @@ else
         faster_alignment='false'
     fi
 
-    cat ${tmp_dir}/final_genes_list.tmp | parallel -j $num_jobs gtt-align-and-trim-parallel.sh {} $tmp_dir $faster_alignment $num_muscle_threads
+    cat ${tmp_dir}/final_genes_list.tmp | parallel -j $num_jobs gtt-align-and-trim-parallel.sh {} $tmp_dir $faster_alignment $num_muscle_threads $target_gene_suffix
 
 fi
 
@@ -2501,13 +2555,16 @@ printf "           It is currently $curr_time; the process started at $start_tim
 printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 # this concatenates the alignments and generates the partitions file for mixed model alignments
-gtt-cat-alignments -t $tmp_dir -o $output_dir
+if [ $nucleotide != 'false' ]; then
+    gtt-cat-alignments -t $tmp_dir -o $output_dir --nucleotides
+else
+    gtt-cat-alignments -t $tmp_dir -o $output_dir
+fi
 
 # storing genomes that made it through workflow to report at end
 genomes_retained=$(wc -l ${tmp_dir}/final_genomes_from_all_sources.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
 printf "\n________________________________________________________________________________\n\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
 
 #############################################################################
 ##############  ADDING MORE INFORMATIVE HEADERS IF SPECIFIED  ###############
@@ -2517,7 +2574,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
     echo $lineage_spec | tr "," "\n" > ${tmp_dir}/wanted_ranks.tmp
 
-    cp ${output_dir}/Aligned_SCGs.faa ${tmp_dir}/aligned_SCGs_mod_names.tmp
+    cp ${output_dir}/Aligned_SCGs${target_gene_suffix} ${tmp_dir}/aligned_SCGs_mod_names.tmp
 
     printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf " ####                   Adding more informative headers                    ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -2990,7 +3047,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
         paste <(cut -f 1 ${tmp_dir}/final_id_swap_map.tmp) <(cut -f 2,3 ${tmp_dir}/final_id_swap_map.tmp | tr "[:,; ]" "_" | tr -s "_") > ${tmp_dir}/final_id_swap_map_colonless.tmp
 
         ### now swapping ids
-        gtt-swap-ids -i ${tmp_dir}/aligned_SCGs_mod_names.tmp -s ${tmp_dir}/final_id_swap_map_colonless.tmp -o ${output_dir}/Aligned_SCGs_mod_names.faa
+        gtt-swap-ids -i ${tmp_dir}/aligned_SCGs_mod_names.tmp -s ${tmp_dir}/final_id_swap_map_colonless.tmp -o ${output_dir}/Aligned_SCGs_mod_names${target_gene_suffix}
 
         ### adding new ids to summary table as column "label"
         # first pulling out and adding to those that were changed
@@ -3322,9 +3379,9 @@ fi
 if [ $keep_individual_alignments == 'true' ]; then
     mkdir ${output_dir}/run_files/individual_alignments
 
-    for file in ${tmp_dir}/*_all_aligned.faa
+    for file in ${tmp_dir}/*_all_aligned${target_gene_suffix}
     do
-        new_path="${output_dir}/run_files/individual_alignments/$(basename $(echo ${file%%_all_aligned.faa}))_aln.faa"
+        new_path="${output_dir}/run_files/individual_alignments/$(basename $(echo ${file%%_all_aligned${target_gene_suffix}}))_aln${target_gene_suffix}"
         mv ${file} ${new_path}
     done
 
@@ -3344,6 +3401,15 @@ fi
 
 if [ $align_only == 'false' ]; then
 
+    # alignment file depends on if headers were modified or not
+    if [ -s ${output_dir}/Aligned_SCGs_mod_names${target_gene_suffix} ]; then
+        alignment_file=${output_dir}/Aligned_SCGs_mod_names${target_gene_suffix}
+        tree_file=${output_dir}/Aligned_SCGs_mod_names.tre
+    else
+        alignment_file=${output_dir}/Aligned_SCGs${target_gene_suffix}
+        tree_file=${output_dir}/Aligned_SCGs.tre
+    fi
+
     if [ $tree_program == 'FastTreeMP' ]; then
 
         printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -3359,16 +3425,7 @@ if [ $align_only == 'false' ]; then
         # setting env variable for FastTreeMP
         export OMP_NUM_THREADS=${num_jobs}
 
-        # if headers were modified
-        if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-
-            FastTreeMP ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> >(tee -a $gtotree_log >&2)
-
-        else
-
-            FastTreeMP ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> >(tee -a $gtotree_log >&2)
-
-        fi
+        FastTreeMP ${alignment_file} > ${tree_file} 2> >(tee -a $gtotree_log >&2)
 
         fasttree_used="true" # setting to report citations at end
 
@@ -3386,18 +3443,7 @@ if [ $align_only == 'false' ]; then
         printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-
-        # if headers were modified
-        if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-
-            FastTree ${output_dir}/Aligned_SCGs_mod_names.faa > ${output_dir}/Aligned_SCGs_mod_names.tre 2> >(tee -a $gtotree_log >&2)
-
-        # if headers were not modified
-        else
-
-            FastTree ${output_dir}/Aligned_SCGs.faa > ${output_dir}/Aligned_SCGs.tre 2> >(tee -a $gtotree_log >&2)
-
-        fi
+        FastTree ${alignment_file} > ${tree_file} 2> >(tee -a $gtotree_log >&2)
 
         fasttree_used="true" # setting to report citations at end
 
@@ -3416,16 +3462,24 @@ if [ $align_only == 'false' ]; then
         printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
+        # bootstrap only works if at least 4 genomes
+        if [ $genomes_retained -ge 4 ]; then
 
-        if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
-            iqtree -s ${output_dir}/Aligned_SCGs_mod_names.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            iqtree -s ${alignment_file} -nt $num_jobs -m MFP -B 1000 -pre iqtree_out | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
         else
-            iqtree -s ${output_dir}/Aligned_SCGs.faa -nt $num_jobs -mset WAG,LG -bb 1000 -pre iqtree_out | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+            printf "  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "      Bootstrapping not performed with IQ-TREE with fewer than 4 genomes.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+            printf "  ${YELLOW}**************************************************************************** ${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+            iqtree -s ${alignment_file} -nt $num_jobs -m MFP -pre iqtree_out | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
         fi
 
-        mkdir ${output_dir}/iqtree_out/
+        mkdir -p ${output_dir}/iqtree_out/
         mv iqtree_out* ${output_dir}/iqtree_out/
-        cp ${output_dir}/iqtree_out/iqtree_out.treefile ${output_dir}/Aligned_SCGs_mod_names.tre
+        cp ${output_dir}/iqtree_out/iqtree_out.treefile ${tree_file}
 
         iqtree_used="true" # setting to report citations at end
 
@@ -3473,7 +3527,7 @@ output_file_prefix=$(basename ${output_dir})
 
 if [ $align_only == 'false' ]; then
 
-    if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
+    if [ -s ${output_dir}/Aligned_SCGs_mod_names${target_gene_suffix} ]; then
 
         printf "    Tree written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "        ${GREEN}${output_dir}/${output_file_prefix}.tre${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -3486,13 +3540,13 @@ if [ $align_only == 'false' ]; then
 
 fi
 
-if [ -s ${output_dir}/Aligned_SCGs_mod_names.faa ]; then
+if [ -s ${output_dir}/Aligned_SCGs_mod_names${target_gene_suffix} ]; then
     printf "    Alignment written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names.faa${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    mv ${output_dir}/Aligned_SCGs.faa ${output_dir}/run_files/Aligned_SCGs.faa
+    printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names${target_gene_suffix}${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    mv ${output_dir}/Aligned_SCGs${target_gene_suffix} ${output_dir}/run_files/Aligned_SCGs${target_gene_suffix}
 else
     printf "    Alignment written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "        ${GREEN}${output_dir}/Aligned_SCGs.faa${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "        ${GREEN}${output_dir}/Aligned_SCGs${target_gene_suffix}${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 fi
 
 if [ $keep_individual_alignments == 'true' ]; then
@@ -3611,11 +3665,11 @@ muscle_version=$(muscle -version | tr -s " " "\t" | cut -f 2 | head -n 1)
 printf "Muscle ${muscle_version}\nEdgar RC. MUSCLE v5 enables improved estimates of phylogenetic tree confidence by ensemble bootstrapping. bioRxiv. 2021.06.20.449169. doi.org/10.1101/2021.06.20.449169\n\n" >> ${output_dir}/citations.txt
 
 trimal_version=$(trimal --version | grep "trim" | tr -s " " "\t" | cut -f 2)
-printf "TrimAl ${trimal_version}\nGutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972–1973. doi.org/10.1093/bioinformatics/btp348\n\n" >> ${output_dir}/citations.txt
+printf "TrimAl ${trimal_version}\nGutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972-1973. doi.org/10.1093/bioinformatics/btp348\n\n" >> ${output_dir}/citations.txt
 
 if [ $prodigal_used == "true" ]; then
     prodigal_version=$(prodigal -v 2>&1 | grep Prodigal | tr -s " " "\t" | cut -f 2 | tr -d ":" | sed 's/V/v/')
-    printf "Prodigal ${prodigal_version}\nHyatt, D. et al. Gene and translation initiation site prediction in metagenomic sequences. Bioinformatics. 2010; 28, 2223–2230. doi.org/10.1186/1471-2105-11-119\n\n" >> ${output_dir}/citations.txt
+    printf "Prodigal ${prodigal_version}\nHyatt, D. et al. Gene and translation initiation site prediction in metagenomic sequences. Bioinformatics. 2010; 28, 2223-2230. doi.org/10.1186/1471-2105-11-119\n\n" >> ${output_dir}/citations.txt
 fi
 
 if [ $taxonkit_used == "true" ]; then
@@ -3643,7 +3697,15 @@ fi
 
 if [ $iqtree_used == "true" ]; then
     iqtree_version=$(iqtree -V | head -n 1 | tr -s " " "\t" | cut -f 4)
-    printf "IQ-TREE v${iqtree_version}\nNguyen L-T et al. IQ-TREE: a fast and effective stochastic algorithm for estimating maximum likelihood phylogenies. Mol. Biol. Evol. 2015; 32, 268–274. doi.org/10.1093/molbev/msu300\n\n" >> ${output_dir}/citations.txt
+    printf "IQ-TREE v${iqtree_version}\nNguyen L-T et al. IQ-TREE: a fast and effective stochastic algorithm for estimating maximum likelihood phylogenies. Mol. Biol. Evol. 2015; 32, 268-274. doi.org/10.1093/molbev/msu300\n" >> ${output_dir}/citations.txt
+    printf "Kalyaanamoorthy et al. ModelFinder: fast model selection for accurate phylogenetic estimates. Nat. Methods 2017; 14:587-589. doi.org/10.1038/nmeth.4285\n" >> ${output_dir}/citations.txt
+    # bootstrap only used if greater than 4 genomes
+    if [ $genomes_retained -ge 4 ]; then
+        printf "Hoang et al. UFBoot2: Improving the ultrafast bootstrap approximation. Mol. Biol. Evol. 2018; 35:518-522. doi.org/10.1093/molbev/msx281\n\n" >> ${output_dir}/citations.txt
+    else
+        printf "\n" >> ${output_dir}/citations.txt
+    fi
+
 fi
 
 if [ $parallel_used == "true" ]; then
@@ -3652,7 +3714,7 @@ if [ $parallel_used == "true" ]; then
 fi
 
 if [ $universal_SCGs_used == "true" ]; then
-    printf "Universal SCG-set\nHug LA et al. A new view of the tree of life. Nat. Microbiol. 2016; 1, 1–6. doi.org/10.1038/NMICROBIOL.2016.48\n\n" >> ${output_dir}/citations.txt
+    printf "Universal SCG-set\nHug LA et al. A new view of the tree of life. Nat. Microbiol. 2016; 1, 1-6. doi.org/10.1038/NMICROBIOL.2016.48\n\n" >> ${output_dir}/citations.txt
 fi
 
 duration=$SECONDS
