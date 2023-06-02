@@ -14,10 +14,10 @@ import textwrap
 import subprocess
 import shutil
 
-parser = argparse.ArgumentParser(description = "This is a helper program to check and set required environmental variables.", \
+parser = argparse.ArgumentParser(description = "This is a helper program to check and set required environment variables.", \
                                  epilog="Ex. usage: gtt-data-locations check\n")
 
-parser.add_argument('task', choices = ['check', 'set'], help = 'check or set required environmental variables')
+parser.add_argument('task', choices = ['check', 'set'], help = 'check or set required environment variables')
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -83,6 +83,9 @@ def check_and_report_env_variables():
     # gtotree hmms dir
     SCG_hmms_dir_path, SCG_hmms_dir_path_writable = check_location_var_is_set_and_writable("GToTree_HMM_dir")
 
+    # NCBI assembly summary table
+    ncbi_assembly_summary_dir_path, ncbi_assembly_summary_dir_path_writable = check_location_var_is_set_and_writable("NCBI_assembly_data_dir")
+
     # taxonkit
     taxonkit_dir_path, taxonkit_dir_path_writable = check_location_var_is_set_and_writable("TAXONKIT_DB")
 
@@ -94,16 +97,18 @@ def check_and_report_env_variables():
 
     print(color_text("\n    GToTree environment variables are set as follows:\n", "yellow"))
 
-    print("\t  {:<28} {:>10}".format("\033[4mvariable\033[0m", "\033[4mpath\033[0m"))
-    print("\t  {:<20} {:>10}".format("GToTree_HMM_dir", SCG_hmms_dir_path))
-    print("\t  {:<20} {:>10}".format("TAXONKIT_DB", taxonkit_dir_path))
-    print("\t  {:<20} {:>10}".format("GTDB_dir", gtdb_dir_path))
-    print("\t  {:<20} {:>10}".format("KO_data_dir", ko_dir_path))
+    print("\t  {:<38} {:>10}".format("\033[4mvariable\033[0m", "\033[4mpath\033[0m"))
+    print("\t  {:<30} {:>10}".format("NCBI_assembly_summaries_dir", ncbi_assembly_summary_dir_path))
+    print("\t  {:<30} {:>10}".format("GToTree_HMM_dir", SCG_hmms_dir_path))
+    print("\t  {:<30} {:>10}".format("TAXONKIT_DB", taxonkit_dir_path))
+    print("\t  {:<30} {:>10}".format("GTDB_dir", gtdb_dir_path))
+    print("\t  {:<30} {:>10}".format("KO_data_dir", ko_dir_path))
     print()
 
 
     # reporting if any are not writable
     writable_dict = {"GToTree_HMM_dir" : SCG_hmms_dir_path_writable,
+                     "NCBI_assembly_data_dir" : ncbi_assembly_summary_dir_path_writable,
                      "TAXONKIT_DB" : taxonkit_dir_path_writable,
                      "GTDB_dir" : gtdb_dir_path_writable,
                      "KO_data_dir" : ko_dir_path_writable}
@@ -223,6 +228,7 @@ def set_variable_path(variable, curr_path):
 def set_env_variables():
 
     paths_dict = {"GToTree_HMM_dir" : "",
+                  "NCBI_assembly_data_dir" : "",
                  "TAXONKIT_DB" : "",
                  "GTDB_dir" : "",
                  "KO_data_dir" : ""}

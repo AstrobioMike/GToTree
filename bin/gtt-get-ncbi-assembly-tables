@@ -1,0 +1,177 @@
+#!/usr/bin/env python
+
+"""
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
+to download the NCBI assembly summary tables if they are not present, or are more than 4 weeks old.
+"""
+
+import sys
+import os
+import urllib.request
+import argparse
+import shutil
+import textwrap
+from datetime import date, timedelta
+import filecmp
+import tarfile
+import gzip
+
+parser = argparse.ArgumentParser(description="This is a helper program to download and setup the NCBI assembly summary tables if they are \
+                                              not present, or are older than 4 weeks.", \
+                                 epilog="Ex. usage: gtt-get-ncbi-assembly-tables\n")
+
+parser.add_argument("-P", "--use-http", help='Use http instead of ftp', action = "store_true")
+parser.add_argument("-f", "--force-update", help='Force an update regardless of last date retrieved', action = "store_true")
+
+
+args = parser.parse_args()
+
+
+################################################################################
+
+def main():
+
+    NCBI_assembly_data_dir = check_location_var_is_set()
+
+    data_present = check_if_data_present_and_less_than_4_weeks_old(NCBI_assembly_data_dir)
+
+    if data_present and not args.force_update:
+        exit()
+
+    else:
+
+        get_NCBI_assembly_summary_data(NCBI_assembly_data_dir)
+
+################################################################################
+
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    print(textwrap.fill(text, width=80, initial_indent="                      ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def check_location_var_is_set():
+
+    # making sure there is a KO_data_dir env variable
+    try:
+        NCBI_data_dir = os.environ['NCBI_assembly_data_dir']
+    except:
+        wprint(color_text("The environment variable 'NCBI_assembly_data_dir'  does not seem to be set :(", "yellow"))
+        wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
+        print("")
+        sys.exit(0)
+
+    return(NCBI_data_dir)
+
+
+def check_if_data_present_and_less_than_4_weeks_old(location):
+
+    # seeing if present already and if it was downloaded less than 4 weeks ago
+    # if this function returns True, then we don't do anything
+    # if it returns False, then we need to download things
+    table_path = os.path.join(str(location), "ncbi-assembly-info.tsv")
+    date_retrieved_path = os.path.join(str(location), "date-retrieved.txt")
+
+    # if either file is missing, we are going to download
+    if not os.path.isfile(table_path) or not os.path.isfile(date_retrieved_path):
+
+        if os.path.exists(table_path):
+            os.remove(table_path)
+        if os.path.isdir(date_retrieved_path):
+            shutil.rmtree(date_retrieved_path)
+
+        return(False)
+    
+    # if both files are present, we are checking if it was downloaded more than 4 weeks ago
+    # and will download if it was
+    if os.path.isfile(table_path) and os.path.isfile(date_retrieved_path):
+
+        # getting current date
+        curr_date = date.today()
+
+        # reading date it was downloaded
+        with open(date_retrieved_path, 'r') as file:
+            stored_date = file.read().strip()
+
+        # setting to date object
+        stored_date_list = stored_date.split(",")
+        stored_date = date(int(stored_date_list[0]), int(stored_date_list[1]), int(stored_date_list[2]))
+
+        # getting difference
+        diff = curr_date - stored_date
+
+        # checking if difference is greater than 28 days
+        if diff.days > 28:
+
+            return(False)
+        
+        else:
+
+            return(True)
+
+    else:
+
+        return(True)
+
+
+def get_NCBI_assembly_summary_data(location):
+
+    """ downloads the needed ncbi assembly summary tables and combines them """
+
+    # setting links
+    if args.use_http:
+
+        genbank_link = "https://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt"
+        refseq_link = "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt"
+
+    else:
+
+        genbank_link = "ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt"
+        refseq_link = "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt"
+
+    table_path = os.path.join(str(location), "ncbi-assembly-info.tsv")
+    refseq_temp_path = os.path.join(str(location), "refseq-assembly-info.tmp")
+
+    print(color_text("    Downloading NCBI assembly summaries (only done once, or updated after 4 weeks)...\n", "yellow"))
+    
+    urllib.request.urlretrieve(genbank_link, table_path)
+    urllib.request.urlretrieve(refseq_link, refseq_temp_path)
+
+    # combining
+    with open (table_path, "a") as final_table:
+        with open(refseq_temp_path, "r") as refseq:
+            final_table.write(refseq.read())
+
+    # removing temp
+    if os.path.exists(refseq_temp_path):
+        os.remove(refseq_temp_path)
+ 
+    # storing date retrieved
+    date_retrieved = str(date.today()).replace("-", ",")
+    date_retrieved.replace("-", ",")
+
+    date_retrieved_path = os.path.join(str(location), "date-retrieved.txt")
+
+    with open(date_retrieved_path, "w") as outfile:
+        outfile.write(date_retrieved + "\n")
+
+################################################################################
+
+if __name__ == "__main__":
+    main()

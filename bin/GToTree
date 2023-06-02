@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.7.10"
+VERSION="v1.7.2"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -360,6 +360,16 @@ if [ $tree_program == "IQ-TREE" ]; then
     fi
 fi
 
+### if NCBI accessions were provided, checking the assembly summary tables are present/new-ish, and downloading if needed
+if [ -f "$NCBI_acc_file" ]; then
+
+    if [ $http_flag == "true" ]; then
+        gtt-get-ncbi-assembly-tables --use-http
+    else
+        gtt-get-ncbi-assembly-tables
+    fi
+
+fi
 
 ### if KO targets were provided, checking that KO data is present already, and downloading if it isn't
 if [ "$target_KOs" != "" ]; then
@@ -1525,52 +1535,9 @@ if [ -n "$NCBI_acc_file" ]; then
         mv ${tmp_dir}/sorted_ncbi_accs.tmp ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp
     fi
 
-    # downloading genbank files and/or refseq assembly summary files as needed
-
-    if grep -q "^GCA" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
-        printf "\t\t  ${GREEN}Downloading GenBank assembly summaries...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-        if [ "$http_flag" == 'false' ]; then
-            curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
-        else
-            curl --connect-timeout 30 --retry 10 https://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt -o ${tmp_dir}/ncbi_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
-        fi
-    fi
-
-    # making sure file downloaded with no errors
-    if [ -s capture_any_dl_errors.tmp ]; then
-        printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is the internet connection weak?\n\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        rm -rf ${tmp_dir} ${output_dir} capture_any_dl_errors.tmp
-        exit
-    else
-        rm -rf capture_any_dl_errors.tmp
-    fi
-
-    if grep -q "^GCF" ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp; then
-        printf "\n\t\t  ${GREEN}Downloading RefSeq assembly summaries...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-        if [ "$http_flag" == 'false' ]; then
-            curl --connect-timeout 30 --retry 10 ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
-        else
-            curl --connect-timeout 30 --retry 10 https://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt -o ${tmp_dir}/ncbi_RS_assembly_info.tmp || echo "failed" > capture_any_dl_errors.tmp
-        fi
-
-        cat ${tmp_dir}/ncbi_RS_assembly_info.tmp >> ${tmp_dir}/ncbi_assembly_info.tmp
-    fi
-
-    # making sure file downloaded with no errors
-    if [ -s capture_any_dl_errors.tmp ]; then
-        printf "\n\n  ${RED}Download of NCBI assembly summaries failed :(${NC}\n  Is the internet connection weak?\n\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        rm -rf ${tmp_dir} ${output_dir} capture_any_dl_errors.tmp
-        exit
-    else
-        rm -rf capture_any_dl_errors.tmp
-    fi
-
-
     ## searching assembly info table for the input accessions (NOTE: will always return latest accession version as of now)
     # to keep track of what was searched and what was downloaded, both are included in the output summary table
-    gtt-parse-assembly-summary-file -a ${tmp_dir}/ncbi_assembly_info.tmp -w ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp -o ${tmp_dir}/ncbi_accessions_info.tmp
+    gtt-parse-assembly-summary-file -a ${NCBI_assembly_data_dir}/ncbi-assembly-info.tsv -w ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp -o ${tmp_dir}/ncbi_accessions_info.tmp
 
     ## sorting and saving found input accs 
     cut -f 1 ${tmp_dir}/ncbi_accessions_info.tmp | sort > ${tmp_dir}/sorted_got_ncbi_accs.tmp
