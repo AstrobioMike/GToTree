@@ -21,12 +21,14 @@
 [GToTree](https://github.com/AstrobioMike/GToTree/wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to easily create phylogenomic trees. Documentation and examples can be found [at the wiki here](https://github.com/AstrobioMike/GToTree/wiki), and the open-access Bioinformatics Journal publication is available [here](https://doi.org/10.1093/bioinformatics/btz188).
 
 ---
-
-**See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to have things up and running in just a single step!**
+**A quick [conda installation](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) can be run like so:**
 
 ```
-conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda -c defaults gtotree
+# installing mamba if needed first (for faster conda installs)
+conda install -n base -c conda-forge mamba
+mamba create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda -c defaults gtotree
 ```
+
 
 ---
 
@@ -44,11 +46,14 @@ See the ["What is GToTree?" wiki page](https://github.com/AstrobioMike/GToTree/w
 
 ---
 
-**See the [conda quickstart](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) installation page to get GToTree up and running in just a single step!**
+**A quick [conda installation](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) can be run like so:**
 
 ```
-conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda -c defaults gtotree
+# installing mamba if needed first (for faster conda installs)
+conda install -n base -c conda-forge mamba
+mamba create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda -c defaults gtotree
 ```
+
 
 ---
 
