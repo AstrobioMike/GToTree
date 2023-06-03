@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.8.0"
+VERSION="v1.8.1"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -29,28 +29,28 @@ help_menu()
     printf "\n -------------------------------  ${YELLOW}REQUIRED INPUTS${NC}  ------------------------------- \n\n"
     
     printf "      1) Input genomes in one or any combination of the following formats:\n"
-    printf "        - [-a | --NCBI-accessions-file <file>] single-column file of NCBI assembly accessions\n"
-    printf "        - [-g | --GenBank-inputs-file <file>] single-column file with the paths to each GenBank file\n"
-    printf "        - [-f | --fasta-genome-inputs-file <file>] single-column file with the paths to each fasta file\n"
-    printf "        - [-A | --amino-acid-inputs-file <file>] single-column file with the paths to each amino acid file,\n"
+    printf "        - [-a <file>] single-column file of NCBI assembly accessions\n"
+    printf "        - [-g <file>] single-column file with the paths to each GenBank file\n"
+    printf "        - [-f <file>] single-column file with the paths to each fasta file\n"
+    printf "        - [-A <file>] single-column file with the paths to each amino acid file,\n"
     printf "                      each file should hold the coding sequences for just one genome\n\n"
 
-    printf "      2)  [-H | target-SCGs-HMM-file <file>] location of the uncompressed HMM file being used, or just the\n"
-    printf "                      HMM name if you've set the environment variable 'GToTree_HMM_dir'\n"
-    printf "                      to the appropriate location or installed via conda (run 'gtt-hmms'\n"
-    printf "                      by itself to view the available gene-sets)\n\n"
+    printf "      2)  [-H <file>] location of the uncompressed target SCGs HMM file\n"
+    printf "                      being used, or just the HMM name if the 'GToTree_HMM_dir' env variable\n"
+    printf "                      is set to the appropriate location (which is done by conda install), run\n"
+    printf "                      'gtt-hmms' by itself to view the available gene-sets)\n\n"
 
 
     printf "\n -------------------------------  ${YELLOW}OPTIONAL INPUTS${NC}  ------------------------------- \n\n"
 
     printf "\n      ${YELLOW}Output directory specification:${NC}\n\n"
 
-    printf "        - [-o | --output-directory <str>] default: GToTree_output\n"
+    printf "        - [-o <str>] default: GToTree_output\n"
     printf "                  Specify the desired output directory.\n\n"
 
     printf "\n      ${YELLOW}User-specified modification of genome labels:${NC}\n\n"
 
-    printf "        - [-m  | --mapping-file <file>] specify desired genome labels\n"
+    printf "        - [-m <file>] mapping file specifying desired genome labels\n"
     printf "                  A two- or three-column tab-delimited file where column 1 holds either\n"
     printf "                  the file name or NCBI accession of the genome to name (depending\n"
     printf "                  on the input source), column 2 holds the desired new genome label,\n"
@@ -61,7 +61,7 @@ help_menu()
 
     printf "\n      ${YELLOW}Options for adding taxonomy information:${NC}\n\n"
 
-    printf "        - [-t | --add-NCBI-taxonomy ] default: false\n"
+    printf "        - [-t ] add NCBI taxonomy; default: false\n"
     printf "                  Provide this flag with no arguments if you'd like to add NCBI taxonomy\n"
     printf "                  info to the sequence headers for any genomes with NCBI taxids. This will\n"
     printf "                  will largely be effective for input genomes provided as NCBI accessions\n"
@@ -69,7 +69,7 @@ help_menu()
     printf "                  be searched for an NCBI taxid. See \`-L\` argument for specifying desired\n"
     printf "                  ranks.\n\n"
 
-    printf "        - [-D | --add-GTDB-taxonomy ] default: false\n"
+    printf "        - [-D ] add GTDB taxonomy; default: false\n"
     printf "                  Provide this flag with no arguments if you'd like to add taxonomy from the\n"
     printf "                  Genome Taxonomy Database (GTDB; gtdb.ecogenomic.org). This will only be\n"
     printf "                  effective for input genomes provided as NCBI accessions (provided to the\n"
@@ -79,7 +79,7 @@ help_menu()
     printf "                  specifying desired ranks, and see helper script \`gtt-get-accessions-from-GTDB\`\n"
     printf "                  for help getting input accessions based on GTDB taxonomy searches.\n\n"
 
-    printf "        - [-L | --taxonomic-ranks-wanted <str>] default: Domain,Phylum,Class,Species,Strain\n"
+    printf "        - [-L <str>] specify wanted lineage ranks; default: Domain,Phylum,Class,Species,Strain\n"
     printf "                  A comma-separated list of the taxonomic ranks you'd like added to\n"
     printf "                  the labels if adding taxonomic information. E.g., all would be\n"
     printf "                  \"-L Domain,Phylum,Class,Order,Family,Genus,Species\". Note that\n"
@@ -88,20 +88,20 @@ help_menu()
 
     printf "\n      ${YELLOW}Filtering settings:${NC}\n\n"
 
-    printf "        - [-c | --seq-len-cutoff <float>] default: 0.2\n"
+    printf "        - [-c <float>] sequence length cutoff; default: 0.2\n"
     printf "                  A float between 0-1 specifying the range about the median of\n"
     printf "                  sequences to be retained. For example, if the median length of a\n"
     printf "                  set of sequences is 100 AAs, those seqs longer than 120 or shorter\n"
     printf "                  than 80 will be filtered out before alignment of that gene set\n"
     printf "                  with the default 0.2 setting.\n\n"
 
-    printf "        - [-G | --genome-hits-cutoff <float>] default: 0.5\n"
+    printf "        - [-G <float>] genome hits cutoff; default: 0.5\n"
     printf "                  A float between 0-1 specifying the minimum fraction of hits a\n"
     printf "                  genome must have of the SCG-set. For example, if there are 100\n"
     printf "                  target genes in the HMM profile, and Genome X only has hits to 49\n"
     printf "                  of them, it will be removed from analysis with default value 0.5.\n\n"
 
-    printf "        - [-B | --best-hit-mode ] default: false\n"
+    printf "        - [-B ] best-hit mode; default: false\n"
     printf "                  Provide this flag with no arguments if you'd like to run GToTree\n"
     printf "                  in \"best-hit\" mode. By default, if a SCG has more than one hit\n"
     printf "                  in a given genome, GToTree won't include a sequence for that target\n"
@@ -111,7 +111,7 @@ help_menu()
 
     printf "\n      ${YELLOW}KO searching:${NC}\n\n"
 
-    printf "        - [-K | --additional-KO-targets <file>] single-column file of KO targets to search each genome for\n"
+    printf "        - [-K <file>] single-column file of KO targets to search each genome for\n"
     printf "                  Table of hit counts, fastas of hit sequences, and files compatible\n"
     printf "                  with the iToL web-based tree-viewer will be generated for each\n"
     printf "                  target. See visualization of gene presence/absence example at\n"
@@ -120,7 +120,7 @@ help_menu()
 
     printf "\n      ${YELLOW}Pfam searching:${NC}\n\n"
 
-    printf "        - [-p | --additional-PFam-targets <file>] single-column file of Pfam targets to search each genome for\n"
+    printf "        - [-p <file>] single-column file of Pfam targets to search each genome for\n"
     printf "                  Table of hit counts, fastas of hit sequences, and files compatible\n"
     printf "                  with the iToL web-based tree-viewer will be generated for each\n"
     printf "                  target. See visualization of gene presence/absence example at\n"
@@ -128,19 +128,19 @@ help_menu()
 
     printf "\n      ${YELLOW}General run settings:${NC}\n\n"
 
-    printf "        - [-z | --nucleotide-mode ] default: false\n"
+    printf "        - [-z ] nucleotide mode; default: false\n"
     printf "                  Make alignment and/or tree with nucleotide sequences instead of amino-acid\n"
     printf "                  sequences. Note this mode can only accept NCBI accessions (passed to \`-a\`)\n"
     printf "                  and genome fasta files (passed to \`-f\` as input sources. (GToTree still\n"
     printf "                  finds target genes based on amino-acid HMM searches.)\n\n"
     
-    printf "        - [-N | --no-tree ] default: false\n"
+    printf "        - [-N ] do not make a tree; default: false\n"
     printf "                  No tree. Generate alignment only.\n\n"
 
-    printf "        - [-k | --keep-individual-alignments ] default: false\n"
+    printf "        - [-k ] keep individual target gene alignments; default: false\n"
     printf "                  Keep individual alignment files.\n\n"
 
-    printf "        - [-T | --tree-program <str>] default: FastTreeMP if available, FastTree if not\n"
+    printf "        - [-T <str>] tree program to use; default: FastTreeMP if available, FastTree if not\n"
     printf "                  Which program to use for tree generation. Currently supported are\n"
     printf "                  \"FastTree\", \"FastTreeMP\", and \"IQ-TREE\". As of now, these run with\n"
     printf "                  default settings only (and IQ-TREE includes \"-m MFP\" and \"-B 1000\"). To\n" 
@@ -155,18 +155,18 @@ help_menu()
     printf "                  in which case FastTree will be used instead - this will be reported when the\n"
     printf "                  program starts, and be in the log file.\n\n"
 
-    printf "        - [-n | --num-cpus <int> ] default: 2\n"
+    printf "        - [-n <int> ] num cpus; default: 2\n"
     printf "                  The number of cpus you'd like to use during the HMM search. (Given\n"
     printf "                  these are individual small searches on single genomes, 2 is probably\n"
     printf "                  always sufficient. Keep in mind this will be multiplied by the number of jobs\n"
     printf "                  running concurrently if also modifying the \`-j\` parameter.)\n\n"
 
-    printf "        - [-M | --num-muscle-threads <int> ] default: 5\n"
+    printf "        - [-M <int> ] num muscle threads; default: 5\n"
     printf "                  The number of threads muscle will use during alignment. (Keep in mind\n"
     printf "                  this will be multiplied by the number of jobs running concurrently\n"
     printf "                  if also modifying the \`-j\` parameter.)\n\n"
 
-    printf "        - [-j | --num-jobs <int> ] default: 1\n"
+    printf "        - [-j ] num jobs; default: 1\n"
     printf "                  The number of jobs you'd like to run in parallel during steps\n"
     printf "                  that are parallelizable. This includes things like downloading input\n"
     printf "                  accession genomes and running parallel alignments, and portions of the\n"
@@ -177,7 +177,7 @@ help_menu()
     printf "                  there or higher, and GToTree is saying a lot of input accessions were not\n"
     printf "                  successfully downloaded, consider trying with fewer.\n\n"
 
-    printf "        - [-X | --override-super5-alignment ] default: false\n"
+    printf "        - [-X ] override super5 alignment; default: false\n"
     printf "                  If working with greater than 1,000 target genomes, GToTree will by default\n"
     printf "                  use the 'super5' muscle alignment algorithm to increase the speed of the alignments (see\n"
     printf "                  github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes\n"
@@ -185,15 +185,15 @@ help_menu()
     printf "                  Anyway, provide this flag with no arguments if you don't want to speed up\n"
     printf "                  the alignments.\n\n"
 
-    printf "        - [-P | --use-http ] default: false\n"
+    printf "        - [-P ] use http instead of ftp; default: false\n"
     printf "                  Provide this flag with no arguments if your system can't use ftp,\n"
     printf "                  and you'd like to try using http.\n\n"
 
-    printf "        - [-F | --force-overwrite ] default: false\n"
+    printf "        - [-F ] force overwrite; default: false\n"
     printf "                  Provide this flag with no arguments if you'd like to force\n"
     printf "                  overwriting the output directory if it exists.\n\n"
 
-    printf "        - [-d | --debug ] default: false\n"
+    printf "        - [-d ] debug mode; default: false\n"
     printf "                  Provide this flag with no arguments if you'd like to keep the\n"
     printf "                  temporary directory. (Mostly useful for debugging.)\n\n"
 
@@ -285,73 +285,37 @@ override_faster_alignment='false'
 http_flag='false'
 nucleotide='false'
 
-PARSED_ARGS=$(gnu-getopt -n GToTree -o a:g:f:A:H:o:m:tDL:K:p:NkT:c:G:BFdn:j:M:XPz \
--l accessions-file:,\
-GenBank-inputs-file:,\
-fasta-genome-inputs-file:,\
-amino-acid-inputs-file:,\
-target-SCGs-HMM-file:,\
-output-directory:,\
-mapping-file:,\
-add-NCBI-taxonomy,\
-add-GTDB-taxonomy,\
-taxonomic-ranks-wanted:,\
-additional-KO-targets:,\
-additional-PFam-targets:,\
-no-tree,\
-keep-individual-alignments,\
-tree-program:,\
-seq-len-cutoff:,\
-genome-hits-cutoff:,\
-best-hit-mode,\
-force-overwrite,\
-debug,\
-num-cpus:,\
-num-jobs:,\
-num-muscle-threads:,\
-override-super5-alignment,\
-use-http,\
-nucleotide-mode \
--- "$@") 
-
-VALID_ARGUMENTS=$?
-if [ "$VALID_ARGUMENTS" != "0" ]; then
-    printf "\n  ${RED}The above inavlid argument was provided.${NC}\n\n    Run 'GToTree' with no arguments or '-h' only to see help menu.\n\n" && exit
-fi
-
-eval set -- ${PARSED_ARGS}
-
-while :
+while getopts :a:g:f:A:H:o:m:tDL:K:p:NkT:c:G:BFdn:j:M:XPz args
 do
-    case "$1" in
-        -a | --accessions-file)             NCBI_acc_file="$2"                  ; shift 2   ;;
-        -g | --GenBank-inputs-file)         genbank_list_file="$2"              ; shift 2   ;;
-        -f | --fasta-genome-inputs-file)    fasta_files="$2"                    ; shift 2   ;;
-        -A | --amino-acid-inputs-file)      amino_acid_files="$2"               ; shift 2   ;;
-        -H | --target-SCGs-HMM-file)        hmm_file="$2"                       ; shift 2   ;;
-        -o | --output-directory)            output_dir="$2"                     ; shift 2   ;;
-        -m | --mapping-file)                file_to_genome_id_map="$2"          ; shift 2   ;;
-        -t | --add-NCBI-taxonomy)           taxonkit_id_swap='true'             ; shift     ;;
-        -D | --add-GTDB-taxonomy)           gtdb_id_swap='true'                 ; shift     ;;
-        -L | --taxonomic-ranks-wanted)      lineage_spec="$2"                   ; shift 2   ;;
-        -K | --additional-KO-targets)       target_KOs="$2"                     ; shift 2   ;;
-        -p | --additional-PFam-targets)     target_pfams="$2"                   ; shift 2   ;;
-        -N | --no-tree)                     align_only='true'                   ; shift     ;;
-        -k | --keep-individual-alignments)  keep_individual_alignments='true'   ; shift     ;;
-        -T | --tree-program)                tree_program="$2"                   ; shift 2   ;;
-        -c | --seq-len-cutoff)              len_cutoff="$2"                     ; shift 2   ;;
-        -G | --genome-hits-cutoff)          gen_cutoff="$2"                     ; shift 2   ;;
-        -B | --best-hit-mode)               best_hit_mode='true'                ; shift     ;;
-        -F | --force-overwrite)             overwrite_output_dir='true'         ; shift     ;;
-        -d | --debug)                       debug_flag='true'                   ; shift     ;;
-        -n | --num-cpus)                    num_cpus="$2"                       ; shift 2   ;;
-        -j | --num-jobs)                    num_jobs="$2"                       ; shift 2   ;;
-        -M | --num-muscle-threads)          num_muscle_threads="$2"             ; shift 2   ;;
-        -X | --override-super5-alignment)   override_faster_alignment='true'    ; shift     ;;
-        -P | --use-http)                    http_flag='true'                    ; shift     ;;
-        -z | --nucleotide-mode)             nucleotide='true'                   ; shift     ;;
-        --) shift; break ;;
-        -[A-z]*) printf "\n  ${RED}Invalid argument: ${1}${NC}\n\nRun 'GToTree' with no arguments or '-h' only for help menu.\n\n" && exit
+    case "${args}"
+    in
+        a) NCBI_acc_file=${OPTARG};;
+        g) genbank_list_file=${OPTARG};;
+        f) fasta_files=${OPTARG};;
+        A) amino_acid_files=${OPTARG};;
+        H) hmm_file=${OPTARG};;
+        o) output_dir=${OPTARG};;
+        m) file_to_genome_id_map=${OPTARG};;
+        t) taxonkit_id_swap='true';;
+        D) gtdb_id_swap='true';;
+        L) lineage_spec=${OPTARG};;
+        K) target_KOs=${OPTARG};;
+        p) target_pfams=${OPTARG};;
+        N) align_only='true';;
+        k) keep_individual_alignments='true';;
+        T) tree_program=${OPTARG};;
+        c) len_cutoff=${OPTARG};;
+        G) gen_cutoff=${OPTARG};;
+        B) best_hit_mode='true';;
+        F) overwrite_output_dir='true';;
+        d) debug_flag='true';;
+        n) num_cpus=${OPTARG};;
+        j) num_jobs=${OPTARG};;
+        M) num_muscle_threads=${OPTARG};;
+        X) override_faster_alignment='true';;
+        P) http_flag='true';;
+        z) nucleotide='true';;
+        \?) printf "\n  ${RED}Invalid argument: -${OPTARG}${NC}\n\n    Run 'GToTree' with no arguments or '-h' only to see help menu.\n\n" >&2 && exit
     esac
 done
 
