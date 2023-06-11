@@ -1,0 +1,26 @@
+name: testing conda installs
+
+on: [push]
+
+jobs:
+  install-tests:
+    name: ${{ matrix.os }} conda install test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-latest"]
+
+    steps:
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniconda-version: "latest"
+          mamba-version: "*"
+          channels: astrobiomike,conda-forge,bioconda,defaults
+          channel-priority: true
+          activate-environment: gtotree
+      - shell: bash -el {0}
+        run: |
+          mamba install -y gtotree
+      - shell: bash -l {0}
+        run: |
+          GToTree -v
