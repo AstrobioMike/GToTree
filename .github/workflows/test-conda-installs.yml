@@ -1,6 +1,6 @@
 name: testing conda installs
 
-on: [push]
+on: workflow_dispatch
 
 jobs:
   install-tests:
