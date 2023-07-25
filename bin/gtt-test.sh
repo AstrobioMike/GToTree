@@ -13,6 +13,13 @@ printf "    ${YELLOW}https://zenodo.org/record/7860720#.ZEcWkexlA_8${NC}\n\n\n"
 
 curl -L --retry 10 --fail -o GToTree-test-data.tar.gz "https://zenodo.org/record/7860720/files/GToTree-test-data.tar.gz?download=1"
 
+# if run as 'gtt-test.sh http', will use http instead of ftp
+if [ ! -z $1 ] && [ $1 == "http" ]; then
+    p_flag="-P"
+else
+    p_flag=""
+fi
+
 # checking download was successfull (can finish with 0 exit)
 if [ $? -ne 0 ] ; then
 
@@ -25,7 +32,7 @@ if [ $? -ne 0 ] ; then
     printf "            -A GToTree-test-data/amino_acid_files.txt "'\\ \n'
     printf "            -m GToTree-test-data/genome_to_id_map.tsv "'\\ \n'
     printf "            -p GToTree-test-data/pfam_targets.txt "'\\ \n'
-    printf "            -H Universal -t -D -j 4 -o GToTree-test-output -F\n\n${NC}"
+    printf "            -H Universal -t -D -j 4 -o GToTree-test-output -F ${p_flag}\n\n${NC}"
 
     printf "  Then you can compare the output to what is depicted here:\n"
     printf "    https://github.com/AstrobioMike/GToTree/wiki/Installation#test-run${NC}\n\n"
@@ -58,7 +65,7 @@ printf "            -f ${TEST_DATA_DIR}/fasta_files.txt "'\\ \n'
 printf "            -A ${TEST_DATA_DIR}/amino_acid_files.txt "'\\ \n'
 printf "            -m ${TEST_DATA_DIR}/genome_to_id_map.tsv "'\\ \n'
 printf "            -p ${TEST_DATA_DIR}/pfam_targets.txt "'\\ \n'
-printf "            -H Universal -t -D -j 4 -o GToTree-test-output -F\n\n${NC}"
+printf "            -H Universal -t -D -j 4 -o GToTree-test-output -F ${p_flag}\n\n${NC}"
 
 sleep 2
 
@@ -69,7 +76,7 @@ sleep 2
 
 printf "  ${GREEN}Starting run now:\n${NC}"
 
-GToTree -a ${TEST_DATA_DIR}/ncbi_accessions.txt -g ${TEST_DATA_DIR}/genbank_files.txt -f ${TEST_DATA_DIR}/fasta_files.txt -A ${TEST_DATA_DIR}/amino_acid_files.txt -H Universal -m ${TEST_DATA_DIR}/genome_to_id_map.tsv -p ${TEST_DATA_DIR}/pfam_targets.txt -t -D -j 4 -o GToTree-test-output -F
+GToTree -a ${TEST_DATA_DIR}/ncbi_accessions.txt -g ${TEST_DATA_DIR}/genbank_files.txt -f ${TEST_DATA_DIR}/fasta_files.txt -A ${TEST_DATA_DIR}/amino_acid_files.txt -H Universal -m ${TEST_DATA_DIR}/genome_to_id_map.tsv -p ${TEST_DATA_DIR}/pfam_targets.txt -t -D -j 4 -o GToTree-test-output -F ${p_flag}
 
 if [ -d "GToTree-test-output/" ]; then
 
