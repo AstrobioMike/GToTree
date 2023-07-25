@@ -21,6 +21,8 @@ parser = argparse.ArgumentParser(description="This is a helper program to setup 
                                               to add taxonomy info.", \
                                  epilog="Ex. usage: gtt-get-ncbi-tax-data\n")
 
+parser.add_argument("-P", "--use-http", help='Use http instead of ftp', action = "store_true")
+
 args = parser.parse_args()
 
 
@@ -107,7 +109,17 @@ def get_NCBI_tax_data(location):
 
     taxdump_path = os.path.join(str(location) + "taxdump.tar.gz")
 
-    urllib.request.urlretrieve("ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz", taxdump_path)
+
+    # setting links
+    if args.use_http:
+
+        taxdump_link = "https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
+
+    else:
+
+        taxdump_link = "ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
+
+    urllib.request.urlretrieve(taxdump_link, taxdump_path)
 
     # unpacking
     with tarfile.open(taxdump_path) as tarball:

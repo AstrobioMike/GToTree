@@ -414,7 +414,13 @@ fi
 
 ### if ncbi taxonomy info wanted, checking that ncbi tax data is present already, and downloading if it isn't
 if [ $taxonkit_id_swap != "false" ]; then
-    gtt-get-ncbi-tax-data
+    
+    if [ $http_flag == "true" ]; then
+        gtt-get-ncbi-tax-data --use-http
+    else
+        gtt-get-ncbi-tax-data
+    fi
+
 fi
 
 
