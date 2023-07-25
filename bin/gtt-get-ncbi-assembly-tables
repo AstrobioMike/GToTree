@@ -88,8 +88,8 @@ def check_if_data_present_and_less_than_4_weeks_old(location):
     table_path = os.path.join(str(location), "ncbi-assembly-info.tsv")
     date_retrieved_path = os.path.join(str(location), "date-retrieved.txt")
 
-    # if either file is missing, we are going to download
-    if not os.path.isfile(table_path) or not os.path.isfile(date_retrieved_path):
+    # if either file is missing, we are going to download, we also package the date-retrieved file empty with conda to retain directory, so checking it's not empty as well
+    if not os.path.isfile(table_path) or not os.path.isfile(date_retrieved_path) or not os.path.getsize(date_retrieved_path) > 0:
 
         if os.path.exists(table_path):
             os.remove(table_path)
@@ -98,7 +98,7 @@ def check_if_data_present_and_less_than_4_weeks_old(location):
 
         return(False)
     
-    # if both files are present, we are checking if it was downloaded more than 4 weeks ago
+    # if both files are present (and not empty), we are checking if it was downloaded more than 4 weeks ago
     # and will download if it was
     if os.path.isfile(table_path) and os.path.isfile(date_retrieved_path):
 
