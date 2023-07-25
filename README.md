@@ -6,9 +6,9 @@
 <br>
 <br>
 
-<a href="https://scholar.google.com/citations?view_op=view_citation&citation_for_view=-ONw6lsAAAAJ:_FxGoFyzp5QC"><img align="right" alt="Citations" src="https://img.shields.io/badge/Citations-230+-blue" height="22"></a>
+<a href="https://scholar.google.com/citations?view_op=view_citation&citation_for_view=-ONw6lsAAAAJ:_FxGoFyzp5QC"><img align="right" alt="Citations" src="https://img.shields.io/badge/Citations-250+-blue" height="22"></a>
 <br>
-<a href="https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart"><img align="right" alt="Conda installs" src="https://img.shields.io/badge/Conda%20installs-4.0k-blue" height="22"></a>
+<a href="https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart"><img align="right" alt="Conda installs" src="https://img.shields.io/badge/Conda%20installs-5.0k-blue" height="22"></a>
 <br>
 <a href="https://doi.org/10.1093/bioinformatics/btz188"><img align="right" alt="DOI" src="https://img.shields.io/badge/DOI-10.1093/bioinformatics/btz188-blue" height="22"></a>
 <br>
