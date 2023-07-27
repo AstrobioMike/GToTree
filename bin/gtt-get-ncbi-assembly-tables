@@ -100,7 +100,7 @@ def check_if_data_present_and_less_than_4_weeks_old(location):
     
     # if both files are present (and not empty), we are checking if it was downloaded more than 4 weeks ago
     # and will download if it was
-    if os.path.isfile(table_path) and os.path.isfile(date_retrieved_path):
+    if os.path.isfile(table_path) and os.path.isfile(date_retrieved_path) and os.path.getsize(date_retrieved_path) > 0:
 
         # getting current date
         curr_date = date.today()
@@ -111,6 +111,8 @@ def check_if_data_present_and_less_than_4_weeks_old(location):
 
         # setting to date object
         stored_date_list = stored_date.split(",")
+        if stored_date_list[0] == ",":
+            return(True)  # the file is actually empty
         stored_date = date(int(stored_date_list[0]), int(stored_date_list[1]), int(stored_date_list[2]))
 
         # getting difference
