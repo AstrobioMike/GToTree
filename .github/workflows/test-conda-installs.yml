@@ -14,7 +14,7 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           miniconda-version: "latest"
-          mamba-version: "*"
+          miniforge-variant: Mambaforge
           channels: astrobiomike,conda-forge,bioconda,defaults
           channel-priority: true
           activate-environment: gtotree
