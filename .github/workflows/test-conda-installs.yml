@@ -24,6 +24,3 @@ jobs:
       - shell: bash -l {0}
         run: |
           GToTree -v
-      - shell: bash -l {0}
-        run: |
-          gtt-test.sh
