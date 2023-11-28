@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.8.3"
+VERSION="v1.8.4"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -888,7 +888,7 @@ if [ "$fasta_files" != "" ]; then
         for file in $(cat $fasta_files)
         do
             if [ ! -s $file ]; then
-                printf "\n${RED}      Some fasta files specified in $fasta_files cannot be found :(${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+                printf "\n${RED}      Some fasta files specified in $fasta_files cannot be found or are empty :(${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
                 printf "  Double-check the provided locations and where they should be, here's one of the problems:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
                 printf "            $file\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
                 printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -1360,15 +1360,15 @@ if [ $total_input_genomes -ge 12500 ]; then
     
     printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    printf "      ${YELLOW}Press any key to continue, or press \`ctrl + c\` to cancel this run...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+    printf "      ${YELLOW}Type '${GREEN}yes${YELLOW}' and press return to continue, or type anything else and press return to cancel this run...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     # temporarily changing IFS so can tell the difference between input spacebar vs return key
     orig_IFS=$IFS
     IFS=""
 
-    read -r -s -n 1 key_var
+    read -r -s -n 4 key_var
     
-    if [[ $key_var == "" ]]; then
+    if [[ "$key_var" == "yes" ]]; then
         IFS=${orig_IFS}
         printf "\n                         You're the boss! Movin' on :)\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         sleep 3
@@ -1379,7 +1379,7 @@ if [ $total_input_genomes -ge 12500 ]; then
         rm -rf $gtotree_log uniq_hmm_names.tmp
         exit
     fi
-    
+
 fi
 
 
