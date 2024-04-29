@@ -82,7 +82,7 @@ help_menu()
     printf "        - [-L <str>] specify wanted lineage ranks; default: Domain,Phylum,Class,Species,Strain\n"
     printf "                  A comma-separated list of the taxonomic ranks you'd like added to\n"
     printf "                  the labels if adding taxonomic information. E.g., all would be\n"
-    printf "                  \"-L Domain,Phylum,Class,Order,Family,Genus,Species\". Note that\n"
+    printf "                  \"-L Domain,Phylum,Class,Order,Family,Genus,Species,Strain\". Note that\n"
     printf "                  strain-level information is available through NCBI, but not GTDB.\n\n"
 
 
