@@ -8,7 +8,7 @@ For examples, please visit the GToTree wiki here: https://github.com/AstrobioMik
 For details on the process, please see: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets
 """
 
-VERSION="v1.8.4"
+VERSION="v1.8.5"
 import os
 import sys
 import argparse
@@ -27,10 +27,6 @@ from functools import partial
 from math import ceil
 from glob import glob
 
-print("\n\n                                 GToTree " + VERSION)
-print("                        (github.com/AstrobioMike/GToTree)\n")
-print(" ------------------------------------------------------------------------------- ")
-
 parser = argparse.ArgumentParser(description="This program takes a list of NCBI accessions and generates a set of single-copy gene HMMs based on PFams.\
                                               Please see the wiki here for details on the process: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets")
 
@@ -43,7 +39,12 @@ parser.add_argument("-p", "--percent-single-copy", help='The percent of target g
 parser.add_argument("--rerun", help="Specify this flag if you'd like to try to restart a prior run from any currently existing files", action="store_true")
 parser.add_argument("--keep-working-dir", help="Specify this flag if you'd like to keep the working directory", action="store_true")
 
-if len(sys.argv)==1:
+if len(sys.argv)==1 or "-h" in sys.argv or "--help" in sys.argv:
+
+    print("\n                                 GToTree " + VERSION)
+    print("                        (github.com/AstrobioMike/GToTree)\n")
+    print(" -------------------------------------------------------------------------------\n")
+
     parser.print_help(sys.stderr)
     sys.exit(0)
 
@@ -52,6 +53,10 @@ args = parser.parse_args()
 ################################################################################
 
 def main():
+
+    print("\n                                 GToTree " + VERSION)
+    print("                        (github.com/AstrobioMike/GToTree)\n")
+    print(" ------------------------------------------------------------------------------- ")
 
     percent_single_copy = check_input_percent(args.percent_single_copy)
 
@@ -250,25 +255,25 @@ def get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, output_dir, rerun):
 
         if needed_dbs == "GCA":
             genbank_tab = urllib.request.urlopen("ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt")
-            ncbi_tab = pd.read_csv(genbank_tab, sep="\t", header=1, low_memory=False, usecols=["# assembly_accession", "ftp_path"])
+            ncbi_tab = pd.read_csv(genbank_tab, sep="\t", header=1, low_memory=False, usecols=["#assembly_accession", "ftp_path"])
 
         elif needed_dbs == "GCF":
             refseq_tab = urllib.request.urlopen("ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt")
-            ncbi_tab = pd.read_csv(refseq_tab, sep="\t", header=1, low_memory=False, usecols=["# assembly_accession", "ftp_path"])
+            ncbi_tab = pd.read_csv(refseq_tab, sep="\t", header=1, low_memory=False, usecols=["#assembly_accession", "ftp_path"])
 
         else:
             genbank_tab = urllib.request.urlopen("ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt")
-            genbank_tab = pd.read_csv(genbank_tab, sep="\t", header=1, low_memory=False, usecols=["# assembly_accession", "ftp_path"])
+            genbank_tab = pd.read_csv(genbank_tab, sep="\t", header=1, low_memory=False, usecols=["#assembly_accession", "ftp_path"])
             refseq_tab = urllib.request.urlopen("ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt")
-            refseq_tab = pd.read_csv(refseq_tab, sep="\t", header=1, low_memory=False, usecols=["# assembly_accession", "ftp_path"])
+            refseq_tab = pd.read_csv(refseq_tab, sep="\t", header=1, low_memory=False, usecols=["#assembly_accession", "ftp_path"])
 
             ncbi_tab = pd.concat([genbank_tab, refseq_tab])
 
         # filtering down to just those needed
-        ncbi_tab = ncbi_tab[ncbi_tab["# assembly_accession"].isin(target_accs)]
+        ncbi_tab = ncbi_tab[ncbi_tab["#assembly_accession"].isin(target_accs)]
 
         # figuring out if any were not found, to track and report
-        found_accs = ncbi_tab["# assembly_accession"].tolist()
+        found_accs = ncbi_tab["#assembly_accession"].tolist()
         accs_not_found = list(set(target_accs) - set(found_accs))
 
         # writing out to be re-used if run fails in the middle
@@ -399,13 +404,13 @@ def dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir):
     download_failed = []
     prodigal_failed = []
 
-    target_accs = ncbi_tab["# assembly_accession"].tolist()
+    target_accs = ncbi_tab["#assembly_accession"].tolist()
 
     AA_suffix = "_protein.faa.gz"
     nt_suffix = "_genomic.fna.gz"
 
     for index, row in ncbi_tab.iterrows():
-        curr_acc = row["# assembly_accession"]
+        curr_acc = row["#assembly_accession"]
         curr_base_url = row["ftp_path"]
         base_name = os.path.basename(curr_base_url)
         AA_url = curr_base_url + "/" + base_name + AA_suffix
