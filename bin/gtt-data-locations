@@ -98,7 +98,7 @@ def check_and_report_env_variables():
     print(color_text("\n    GToTree environment variables are set as follows:\n", "yellow"))
 
     print("\t  {:<38} {:>10}".format("\033[4mvariable\033[0m", "\033[4mpath\033[0m"))
-    print("\t  {:<30} {:>10}".format("NCBI_assembly_summaries_dir", ncbi_assembly_summary_dir_path))
+    print("\t  {:<30} {:>10}".format("NCBI_assembly_data_dir", ncbi_assembly_summary_dir_path))
     print("\t  {:<30} {:>10}".format("GToTree_HMM_dir", SCG_hmms_dir_path))
     print("\t  {:<30} {:>10}".format("TAXONKIT_DB", taxonkit_dir_path))
     print("\t  {:<30} {:>10}".format("GTDB_dir", gtdb_dir_path))
