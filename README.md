@@ -18,7 +18,7 @@
 ---
 
 # GToTree: a user-friendly workflow for phylogenomics
-[GToTree](https://github.com/AstrobioMike/GToTree/wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to easily create phylogenomic trees. Documentation and examples can be found [at the wiki here](https://github.com/AstrobioMike/GToTree/wiki), and the open-access Bioinformatics Journal publication is available [here](https://doi.org/10.1093/bioinformatics/btz188). GToTree can be installed and run on a Mac, Linux, or on Windows within the Windows Subsystem for Linux environment 👍 
+[GToTree](https://github.com/AstrobioMike/GToTree/wiki) is a user-friendly workflow for phylogenomics intended to give more researchers the capability to easily create phylogenomic trees. Documentation and examples can be found [at the wiki here](https://github.com/AstrobioMike/GToTree/wiki), and the open-access Bioinformatics Journal publication is available [here](https://doi.org/10.1093/bioinformatics/btz188). GToTree can be installed and run on a Mac or Linux machine, as well as on Windows within a Windows Subsystem for Linux environment 👍 
 
 ---
 **A quick [conda installation](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) can be run like so:**
