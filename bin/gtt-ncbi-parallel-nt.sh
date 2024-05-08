@@ -80,21 +80,19 @@ if $(file ${tmp_dir}/${assembly}_genome.tmp.gz | grep -q gzip); then
     gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.faa.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes3.faa.tmp
     gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes1.fa.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes.fa.tmp
 
-
     # storing more info about the assembly to write out into ncbi-derived-genome summary file (for each setting to NA if not found)
-    ass_name="${curr_line[2]}"
+    ass_name=$(echo "$1" | cut -f 3)
     if [ -z "$ass_name" ]; then ass_name="NA"; fi
-    org_name="${curr_line[4]}"
+    org_name=$(echo "$1" | cut -f 5)
     if [ -z "$org_name" ]; then org_name="NA"; fi
-    infraspecific_name="${curr_line[5]}"
+    infraspecific_name=$(echo "$1" | cut -f 6)
     if [ -z "$infraspecific_name" ]; then infraspecific_name="NA"; fi
-    taxid="${curr_line[3]}"
+    taxid=$(echo "$1" | cut -f 4)
     if [ -z "$taxid" ]; then taxid="NA"; fi
-    version_status="${curr_line[6]}"
+    version_status=$(echo "$1" | cut -f 7)
     if [ -z "$version_status" ]; then version_status="NA"; fi
-    asm_level="${curr_line[7]}"
+    asm_level=$(echo "$1" | cut -f 8)
     if [ -z "$asm_level" ]; then asm_level="NA"; fi
-
 
     ### counting how many genes in this genome
     gene_count=$(grep -c ">" ${tmp_dir}/${assembly}_genes3.faa.tmp)
