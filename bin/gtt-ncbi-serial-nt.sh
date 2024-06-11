@@ -229,7 +229,7 @@ do
 
     else
         printf "     ${ORANGE}******************************* ${NC}NOTICE ${ORANGE}*******************************${NC}  \n"
-        printf "\t  $assembly's genome not successfully :(\n\n"
+        printf "\t  $assembly's genome not successfully downloaded :(\n\n"
         printf "\t    Reported in \"${output_dir}/run_files/NCBI_accessions_not_downloaded.txt\"\n"
         printf "     ${ORANGE}************************************************************************ ${NC}\n"
         rm -rf ${tmp_dir}/${assembly}_genome.tmp.gz
