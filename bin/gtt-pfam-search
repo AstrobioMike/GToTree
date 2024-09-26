@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.8.6"
+VERSION="v1.8.7"
 
 printf "\n\n                                  GToTree ${VERSION}\n"
 printf "                         (github.com/AstrobioMike/GToTree)\n\n"
@@ -222,7 +222,7 @@ if [ "$fasta_files" != "" ]; then
     fi
 
     if [ -s "$fasta_files" ]; then
-        
+
         # checking all files pointed to by this file can be found
         for file in $(cat $fasta_files)
         do
@@ -252,7 +252,7 @@ fi
 if [ "$amino_acid_files" != "" ]; then
 
     if [ -s "$amino_acid_files" ]; then
-        
+
         # checking all files pointed to by this file can be found
         for file in $(cat $amino_acid_files)
         do
@@ -603,7 +603,7 @@ if [ -n "$NCBI_acc_file" ]; then
 
             ### Pulling out hits for this genome ###
             esl-sfetch --index ${tmp_dir}/${assembly}_genes.tmp > /dev/null
-                
+
             for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
             do
                 if grep -w -q "$target" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp; then
@@ -616,14 +616,14 @@ if [ -n "$NCBI_acc_file" ]; then
                     done >> ${tmp_dir}/${assembly}_${target}_genes1.tmp
 
                     gtt-append-fasta-headers -i ${tmp_dir}/${assembly}_${target}_genes1.tmp -w ${assembly}_${target} -o ${tmp_dir}/${assembly}_${target}_genes.tmp
-                
+
                     # adding to fasta of that target holding all genomes
                     cat ${tmp_dir}/${assembly}_${target}_genes.tmp >> ${output_dir}/All_${target}_hits.faa
                 fi
 
             done
 
-        else 
+        else
             printf "     ${YELLOW}******************************* ${NC}NOTICE ${YELLOW}*******************************${NC}  \n"
             printf "\t  $assembly's genes nor genome downloaded properly :(\n\n"
             printf "\t    Reported in \"${output_dir}/NCBI_accessions_not_downloaded.txt\"\n"
@@ -679,13 +679,13 @@ if [ -n "$genbank_list_file" ]; then
         printf "   --------------------------------------------------------------------------   \n\n"
 
         # # storing more info about the assembly if it's present in the genbank file:
-        # if grep -q "ORGANISM" $file_location; then 
+        # if grep -q "ORGANISM" $file_location; then
         #     org_name=$(grep -m1 "ORGANISM" $file_location | tr -s " " | cut -f3- -d " " | tr "[ ./\\]" "_" | tr -s "_")
         # else
         #     org_name="NA"
         # fi
 
-        # if grep -q "strain=" $file_location; then 
+        # if grep -q "strain=" $file_location; then
         #     strain=$(grep -m1 "strain=" $file_location | tr -s " " | cut -f 2 -d '"')
         # else
         #     strain="NA"
@@ -762,7 +762,7 @@ if [ -n "$genbank_list_file" ]; then
         ## removing gunzipped genome file if it was gunzipped
         if [ $was_gzipped == "TRUE" ]; then
             rm -rf $file_location
-        fi          
+        fi
 
         ### counting how many genes in this genome
         gene_count=$(grep -c ">" ${tmp_dir}/${assembly}_genes.tmp)
@@ -783,7 +783,7 @@ if [ -n "$genbank_list_file" ]; then
 
         ### Pulling out hits for this genome ###
         esl-sfetch --index ${tmp_dir}/${assembly}_genes.tmp > /dev/null
-            
+
         for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
         do
             if grep -w -q "$target" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp; then
@@ -796,7 +796,7 @@ if [ -n "$genbank_list_file" ]; then
                 done >> ${tmp_dir}/${assembly}_${target}_genes1.tmp
 
                 gtt-append-fasta-headers -i ${tmp_dir}/${assembly}_${target}_genes1.tmp -w ${assembly}_${target} -o ${tmp_dir}/${assembly}_${target}_genes.tmp
-            
+
                 # adding to fasta of that target holding all genomes
                 cat ${tmp_dir}/${assembly}_${target}_genes.tmp >> ${output_dir}/All_${target}_hits.faa
             fi
@@ -893,10 +893,10 @@ if [ -n "$fasta_files" ]; then
         if [ $was_gzipped == "TRUE" ]; then
             rm -rf $file_location
         fi
-          
+
         ### counting how many genes in this genome
         gene_count=$(grep -c ">" ${tmp_dir}/${assembly}_genes.tmp)
-        
+
         ### running hmm search ###
         hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp ${tmp_dir}/all_targets.hmm ${tmp_dir}/${assembly}_genes.tmp > /dev/null
 
@@ -911,7 +911,7 @@ if [ -n "$fasta_files" ]; then
 
         ### Pulling out hits for this genome ###
         esl-sfetch --index ${tmp_dir}/${assembly}_genes.tmp > /dev/null
-            
+
         for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
         do
             if grep -w -q "$target" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp; then
@@ -924,7 +924,7 @@ if [ -n "$fasta_files" ]; then
                 done >> ${tmp_dir}/${assembly}_${target}_genes1.tmp
 
                 gtt-append-fasta-headers -i ${tmp_dir}/${assembly}_${target}_genes1.tmp -w ${assembly}_${target} -o ${tmp_dir}/${assembly}_${target}_genes.tmp
-            
+
                 # adding to fasta of that target holding all genomes
                 cat ${tmp_dir}/${assembly}_${target}_genes.tmp >> ${output_dir}/All_${target}_hits.faa
             fi
@@ -985,7 +985,7 @@ if [ -n "$amino_acid_files" ]; then
 
         ### counting how many genes in this genome
         gene_count=$(grep -c ">" ${tmp_dir}/${assembly}_genes.tmp)
-        
+
         ### running hmm search ###
         hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp ${tmp_dir}/all_targets.hmm ${tmp_dir}/${assembly}_genes.tmp > /dev/null
 
@@ -1000,7 +1000,7 @@ if [ -n "$amino_acid_files" ]; then
 
         ### Pulling out hits for this genome ###
         esl-sfetch --index ${tmp_dir}/${assembly}_genes.tmp > /dev/null
-            
+
         for target in $(cat ${tmp_dir}/actual_pfam_targets.tmp)
         do
             if grep -w -q "$target" ${tmp_dir}/${assembly}_curr_hmm_hits.tmp; then
@@ -1013,7 +1013,7 @@ if [ -n "$amino_acid_files" ]; then
                 done >> ${tmp_dir}/${assembly}_${target}_genes1.tmp
 
                 gtt-append-fasta-headers -i ${tmp_dir}/${assembly}_${target}_genes1.tmp -w ${assembly}_${target} -o ${tmp_dir}/${assembly}_${target}_genes.tmp
-            
+
                 # adding to fasta of that target holding all genomes
                 cat ${tmp_dir}/${assembly}_${target}_genes.tmp >> ${output_dir}/All_${target}_hits.faa
             fi
@@ -1035,7 +1035,7 @@ do
         printf "DATASET_STYLE\nSEPARATOR SPACE\nDATASET_LABEL $target\nCOLOR\t#0000ff\nDATA\n" > ${output_dir}/${target}-iToL.txt
 
         cat <(sed 's/$/ branch node #0000ff 3 normal/' ${output_dir}/Genomes_with_hits_to_${target}.txt) >> ${output_dir}/${target}-iToL.txt
-    
+
     else
         rm ${output_dir}/Genomes_with_hits_to_${target}.txt
 

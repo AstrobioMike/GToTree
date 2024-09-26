@@ -8,21 +8,22 @@ For examples, please visit the GToTree wiki here: https://github.com/AstrobioMik
 For details on the process, please see: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets
 """
 
-VERSION="v1.8.6"
+VERSION="v1.8.7"
 import os
+import re
 import sys
 import argparse
 import textwrap
 import shutil
 import urllib.request
-import pandas as pd
-import numpy as np
+import pandas as pd # type: ignore
+import numpy as np # type: ignore
 import gzip
 import io
 import subprocess
 import filecmp
 import multiprocessing as mp
-from Bio import SeqIO
+from Bio import SeqIO # type: ignore
 from functools import partial
 from math import ceil
 from glob import glob
@@ -70,13 +71,13 @@ def main():
 
     remaining_accs = get_amino_acids(ncbi_tab, tmp_dir, output_dir, num_cpus, rerun)
 
-    filtered_pfam_IDs = get_and_filter_pfam_hmms(tmp_dir, rerun)
+    filtered_pfam_IDs, latest_pfam_version = get_and_filter_pfam_hmms(tmp_dir, rerun)
 
     run_hmmsearch(tmp_dir, num_cpus, rerun)
 
     wanted_pfam_count = filter_HMM_hits(remaining_accs, filtered_pfam_IDs, percent_single_copy, tmp_dir, output_dir, rerun)
 
-    filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun)
+    filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, latest_pfam_version, rerun)
 
     report_missed_accessions(output_dir, rerun)
 
@@ -106,7 +107,7 @@ def color_text(text, color='green'):
 def wprint(text):
     """ print wrapper """
 
-    print(textwrap.fill(text, width=80, initial_indent="  ", 
+    print(textwrap.fill(text, width=80, initial_indent="  ",
           subsequent_indent="  ", break_on_hyphens=False))
 
 
@@ -507,6 +508,22 @@ def parallelize_get_amino_acids(df, func, num_cpus, tmp_dir):
     return(remaining_accs, download_failed, prodigal_failed)
 
 
+def get_latest_pfam_version():
+
+    url = 'ftp://ftp.ebi.ac.uk/pub/databases/Pfam/releases/'
+
+    with urllib.request.urlopen(url) as response:
+        html = response.read().decode('utf-8')
+
+    versions = re.findall(r'Pfam(\d+\.\d+)', html)
+
+    sorted_versions = sorted(versions, key=lambda x: float(x), reverse=True)
+
+    latest_version = sorted_versions[0]
+
+    return latest_version
+
+
 def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm", filtered_pfam_IDs_file="filtered-pfam-IDs.txt", filtered_pfams_info_file="filtered-pfams-info.tsv", filtered_pfams_hmm_file="filtered-pfams.hmm"):
     """ getting all latest PFams and filtering based on coverage """
 
@@ -524,13 +541,25 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm"
 
                 filtered_pfam_IDs.append(line.strip().split("\t")[0])
 
+        latest_pfam_version = get_latest_pfam_version()
+
     else:
 
         print("")
         wprint("Downloading all PFam HMMs and filtering based on average coverage of underlying proteins...")
 
+        base_url = 'ftp://ftp.ebi.ac.uk/pub/databases/Pfam/releases/'
+
+        latest_pfam_version = get_latest_pfam_version()
+
+        print(f"    - the PFam version being used is: {latest_pfam_version}")
+
+        pfam_hmm_link = f"{base_url}Pfam{latest_pfam_version}/Pfam-A.hmm.gz"
+        pfam_info_link = f"{base_url}Pfam{latest_pfam_version}/database_files/pfamA.txt.gz"
+
         try:
-            pfam_hmms_gz = urllib.request.urlopen("ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz")
+            # pfam_hmms_gz = urllib.request.urlopen("ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz")
+            pfam_hmms_gz = urllib.request.urlopen(pfam_hmm_link)
             pfam_hmms = gzip.decompress(pfam_hmms_gz.read()).decode("UTF-8", "ignore")
 
             with open(tmp_dir + full_pfams_hmm_file, "w") as out:
@@ -543,7 +572,8 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm"
             sys.exit(0)
 
         try:
-            pfam_hmm_info_gz = urllib.request.urlopen("ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/database_files/pfamA.txt.gz")
+            # pfam_hmm_info_gz = urllib.request.urlopen("ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/database_files/pfamA.txt.gz")
+            pfam_hmm_info_gz = urllib.request.urlopen(pfam_info_link)
             pfam_hmm_info_tab = pd.read_csv(pfam_hmm_info_gz, sep="\t", compression="gzip", header=None, low_memory=False, usecols=[0,1,3,27,33])
 
         except:
@@ -576,7 +606,7 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm"
             print("Exiting for now.\n")
             sys.exit(0)
 
-    return(filtered_pfam_IDs)
+    return(filtered_pfam_IDs, latest_pfam_version)
 
 
 def run_hmmsearch(tmp_dir, num_cpus, rerun, input_seqs="all-genes.faa", filtered_pfams_hmm_file="filtered-pfams.hmm"):
@@ -715,7 +745,7 @@ def filter_HMM_hits(target_genome_accs, filtered_pfam_IDs, percent_single_copy, 
     return(len(wanted_pfams))
 
 
-def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered_pfams_hmm_file="filtered-pfams.hmm", wanted_pfam_IDs_file="wanted-PFam-IDs.txt"):
+def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, latest_pfam_version, rerun, filtered_pfams_hmm_file="filtered-pfams.hmm", wanted_pfam_IDs_file="wanted-PFam-IDs.txt"):
     """ filter final HMM set """
 
     # if specific output_dir was provided by user, going to use that as prefix to final output hmm file
@@ -730,9 +760,9 @@ def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered
 
         print(color_text("\n -------------------------------------------------------------------------------\n"))
 
-        wprint("It seems all is done already, you should specify a non-existent output directory or a different input accessions file if you'd like to do something different :)")
+        wprint("It seems all is done already, you should specify a non-existent output directory or a different input-accessions file if you'd like to do something different :)")
         print("")
-        print("  The previous run generated the following SCG-HMMs file holding " + str(wanted_pfam_count) + " target genes:")
+        print(f"  The previous run generated the following SCG-HMMs file holding {wanted_pfam_count} target genes from PFam v{latest_pfam_version}:")
         print(color_text("    " + output_dir + wanted_HMM_out_file))
         print("")
 
@@ -753,9 +783,12 @@ def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, rerun, filtered
 
         print(color_text("\n -------------------------------------------------------------------------------\n"))
 
-        print("  New SCG-HMMs holding " + str(wanted_pfam_count) + " target genes written to:")
+        print(f"  New SCG-HMMs holding {wanted_pfam_count} target genes from PFam v{latest_pfam_version} written to:")
         print(color_text("    " + output_dir + wanted_HMM_out_file))
         print("")
+
+        with open(f"{output_dir}pfam-version-used.txt", "w") as outfile:
+            write(f"{latest_pfam_version}\n")
 
 
 def report_missed_accessions(output_dir, rerun):

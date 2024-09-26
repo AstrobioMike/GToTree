@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.8.6"
+VERSION="v1.8.7"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -27,7 +27,7 @@ help_menu()
 
 
     printf "\n -------------------------------  ${YELLOW}REQUIRED INPUTS${NC}  ------------------------------- \n\n"
-    
+
     printf "      1) Input genomes in one or any combination of the following formats:\n"
     printf "        - [-a <file>] single-column file of NCBI assembly accessions\n"
     printf "        - [-g <file>] single-column file with the paths to each GenBank file\n"
@@ -133,7 +133,7 @@ help_menu()
     printf "                  sequences. Note this mode can only accept NCBI accessions (passed to \`-a\`)\n"
     printf "                  and genome fasta files (passed to \`-f\` as input sources. (GToTree still\n"
     printf "                  finds target genes based on amino-acid HMM searches.)\n\n"
-    
+
     printf "        - [-N ] do not make a tree; default: false\n"
     printf "                  No tree. Generate alignment only.\n\n"
 
@@ -143,7 +143,7 @@ help_menu()
     printf "        - [-T <str>] tree program to use; default: FastTreeMP if available, FastTree if not\n"
     printf "                  Which program to use for tree generation. Currently supported are\n"
     printf "                  \"FastTree\", \"FastTreeMP\", and \"IQ-TREE\". As of now, these run with\n"
-    printf "                  default settings only (and IQ-TREE includes \"-m MFP\" and \"-B 1000\"). To\n" 
+    printf "                  default settings only (and IQ-TREE includes \"-m MFP\" and \"-B 1000\"). To\n"
     printf "                  run either with more specific options (and there is a lot of room for\n"
     printf "                  variation here), you can use the output alignment file from GToTree (and\n"
     printf "                  the partitions file if wanted for mixed-model specification) as input into\n"
@@ -370,7 +370,7 @@ if [ $tree_program == "FastTreeMP" ]; then
 fi
 
 # checking iqtree is available if it was specified
-if [ $tree_program == "IQ-TREE" ]; then    
+if [ $tree_program == "IQ-TREE" ]; then
     if ! command -v iqtree > /dev/null; then
         printf "\n  ${RED}You specified to use IQ-TREE, but 'iqtree' not found in your PATH :(${NC}\n"
         printf "\nExiting for now.\n\n"
@@ -414,7 +414,7 @@ fi
 
 ### if ncbi taxonomy info wanted, checking that ncbi tax data is present already, and downloading if it isn't
 if [ $taxonkit_id_swap != "false" ]; then
-    
+
     if [ $http_flag == "true" ]; then
         gtt-get-ncbi-tax-data --use-http
     else
@@ -428,7 +428,7 @@ fi
 ##### CHECKING INPUT FILES, INCLUDING IF THEY HAVE CRLF LINE ENDINGS #####
 ##########################################################################
 
-# checking out NCBI accessions file 
+# checking out NCBI accessions file
 if [ -f "$NCBI_acc_file" ]; then
 
     # checking if file has windows CRLF line-terminators, and running dos2unix if so
@@ -457,7 +457,7 @@ if [ -f "$NCBI_acc_file" ]; then
 
     # checking no whitespace in there
     if grep -q " " ${NCBI_acc_file}; then
-        printf "\n${RED}  $NCBI_acc_file has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $NCBI_acc_file has spaces in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -465,7 +465,7 @@ if [ -f "$NCBI_acc_file" ]; then
 
     # checking no tabs in there
     if grep -q $'\t' ${NCBI_acc_file}; then
-        printf "\n${RED}  $NCBI_acc_file has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $NCBI_acc_file has tabs in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -474,7 +474,7 @@ if [ -f "$NCBI_acc_file" ]; then
 fi
 
 
-# checking out input fasta files file 
+# checking out input fasta files file
 if [ -f "$fasta_files" ]; then
 
     # checking if file has windows CRLF line-terminators, and running dos2unix if so
@@ -503,7 +503,7 @@ if [ -f "$fasta_files" ]; then
 
     # checking no whitespace in there
     if grep -q " " ${fasta_files}; then
-        printf "\n${RED}  $fasta_files has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $fasta_files has spaces in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -511,7 +511,7 @@ if [ -f "$fasta_files" ]; then
 
     # checking no tabs in there
     if grep -q $'\t' ${fasta_files}; then
-        printf "\n${RED}  $fasta_files has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $fasta_files has tabs in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -520,7 +520,7 @@ if [ -f "$fasta_files" ]; then
 fi
 
 
-# checking out input amino-acid files file 
+# checking out input amino-acid files file
 if [ -f "$amino_acid_files" ]; then
 
     # checking if file has windows CRLF line-terminators, and running dos2unix if so
@@ -549,7 +549,7 @@ if [ -f "$amino_acid_files" ]; then
 
     # checking no whitespace in there
     if grep -q " " ${amino_acid_files}; then
-        printf "\n${RED}  $amino_acid_files has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $amino_acid_files has spaces in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -557,7 +557,7 @@ if [ -f "$amino_acid_files" ]; then
 
     # checking no tabs in there
     if grep -q $'\t' ${amino_acid_files}; then
-        printf "\n${RED}  $amino_acid_files has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $amino_acid_files has tabs in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -566,7 +566,7 @@ if [ -f "$amino_acid_files" ]; then
 fi
 
 
-# checking out input genbank files file 
+# checking out input genbank files file
 if [ -f "$genbank_list_file" ]; then
 
     # checking if file has windows CRLF line-terminators, and running dos2unix if so
@@ -595,7 +595,7 @@ if [ -f "$genbank_list_file" ]; then
 
     # checking no whitespace in there
     if grep -q " " ${genbank_list_file}; then
-        printf "\n${RED}  $genbank_list_file has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $genbank_list_file has spaces in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -603,7 +603,7 @@ if [ -f "$genbank_list_file" ]; then
 
     # checking no tabs in there
     if grep -q $'\t' ${genbank_list_file}; then
-        printf "\n${RED}  $genbank_list_file has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $genbank_list_file has tabs in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -621,7 +621,7 @@ if [ -f "$file_to_genome_id_map" ]; then
 
     if grep -q "[${problem_chars}]" ${file_to_genome_id_map}; then
 
-        printf "\n${RED}  $file_to_genome_id_map appears to have some potentially problematic special characters.${NC}\n" 
+        printf "\n${RED}  $file_to_genome_id_map appears to have some potentially problematic special characters.${NC}\n"
         printf "${RED}  Check it out and remove them to proceed.${NC}\n\n"
         printf "${YELLOW}Some characters to avoid include: '${problem_chars}'.\n\n${NC}"
         printf "${YELLOW}Here is an example of one of the current problem lines:\n\n${NC}"
@@ -652,7 +652,7 @@ if [ -f "$file_to_genome_id_map" ]; then
     # looking for duplicate desired labels in mapping file
     num_dupes=$(cut -f 2,3 "$file_to_genome_id_map" | tr "\t" "_" | sort | uniq -d | wc -l)
     if [ ! $num_dupes == 0 ]; then
-        printf "\n${RED}  $file_to_genome_id_map appears to have duplicate labels in there.${NC}\n" 
+        printf "\n${RED}  $file_to_genome_id_map appears to have duplicate labels in there.${NC}\n"
         printf "${RED}Check it out and provide unique labels only.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -883,7 +883,7 @@ if [ "$fasta_files" != "" ]; then
     fi
 
     if [ -s "$fasta_files" ]; then
-        
+
         # checking all files pointed to by this file can be found
         for file in $(cat $fasta_files)
         do
@@ -913,7 +913,7 @@ fi
 if [ "$amino_acid_files" != "" ]; then
 
     if [ -s "$amino_acid_files" ]; then
-        
+
         # checking all files pointed to by this file can be found
         for file in $(cat $amino_acid_files)
         do
@@ -996,7 +996,7 @@ if [ -f "$hmm_file" ]; then
     printf "      - $hmm_file ($hmm_target_genes_total targets)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 # if not a direct path by user, we are expecting it to be in the GToTree stored HMMs directory
-# here we are making sure the variable holds something 
+# here we are making sure the variable holds something
 elif [ -z ${GToTree_HMM_dir} ]; then
     # reporting it is not set
     printf "\n${RED}      The 'GToTree_HMM_dir' variable is not set :( Use \`gtt-data-locations\` to check and configure.\n${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -1005,7 +1005,7 @@ elif [ -z ${GToTree_HMM_dir} ]; then
 
 # now making sure directory exists or that we can create it if not
 elif [ ! -d ${GToTree_HMM_dir} ]; then
-    
+
     # attempting to create
     mkdir -p ${GToTree_HMM_dir} > /dev/null
     if [ $? -ne 0 ]; then
@@ -1077,7 +1077,7 @@ elif [ ! -f "${GToTree_HMM_dir}/${hmm_file}" ]; then
 
         printf "      - $(basename ${hmm_file}) ($hmm_target_genes_total targets)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-    else 
+    else
 
         printf "\n${RED}      You specified $hmm_file as the HMM file to use, but that file cannot be found :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "      You can see the available gene-sets packaged with GToTree by running \`gtt-hmms\`\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -1133,7 +1133,7 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
         printf "      - NCBI taxonomic info will be added where possible when GTDB is not\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         taxonkit_used="true"
         gtdb_used="true"
-    fi    
+    fi
 
     if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
         lineage_mod_report=$(echo $lineage_spec | sed 's/,/, /g')
@@ -1240,7 +1240,7 @@ if [ "$target_KOs" != "" ]; then
 
     # checking no whitespace in there
     if grep -q " " ${target_KOs}; then
-        printf "\n${RED}  $target_KOs has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $target_KOs has spaces in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -1248,7 +1248,7 @@ if [ "$target_KOs" != "" ]; then
 
     # checking no tabs in there
     if grep -q $'\t' ${target_KOs}; then
-        printf "\n${RED}  $target_KOs has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $target_KOs has tabs in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -1299,7 +1299,7 @@ if [ "$target_pfams" != "" ]; then
 
     # checking no whitespace in there
     if grep -q " " ${target_pfams}; then
-        printf "\n${RED}  $target_pfams has spaces in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $target_pfams has spaces in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no spaces.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -1307,7 +1307,7 @@ if [ "$target_pfams" != "" ]; then
 
     # checking no tabs in there
     if grep -q $'\t' ${target_pfams}; then
-        printf "\n${RED}  $target_pfams has tabs in it, maybe they are at the end of all of the entries?${NC}\n" 
+        printf "\n${RED}  $target_pfams has tabs in it, maybe they are at the end of all of the entries?${NC}\n"
         printf "  They might cause problems. Check it out and provide one with no tabs.${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
@@ -1347,7 +1347,7 @@ if [ $total_input_genomes -ge 12500 ]; then
     printf "    The alignment and treeing steps, particularly the alignments, can become\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    prohibitively memory-intensive with many input genomes. With $total_input_genomes total\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    input genomes, this job may not be feasible :( \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    
+
     printf "    Often it is useful to slim down how many genomes of closely related\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    organisms we are including when looking across a broad level of\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    diversity, as having many closely organisms usually isn't helpful or\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -1357,7 +1357,7 @@ if [ $total_input_genomes -ge 12500 ]; then
     printf "    NCBI or GTDB)? Those both provide helpful systems for reducing some\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    redundancy when working at a broad level with many organisms. See\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     printf "    github.com/AstrobioMike/GToTree/wiki/things-to-consider#consider-using-representative-genomes\n"
-    
+
     printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     printf "      ${YELLOW}Type '${GREEN}yes${YELLOW}' and press return to continue, or type anything else and press return to cancel this run...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -1367,7 +1367,7 @@ if [ $total_input_genomes -ge 12500 ]; then
     IFS=""
 
     read -r -s -n 4 key_var
-    
+
     if [[ "$key_var" == "yes" ]]; then
         IFS=${orig_IFS}
         printf "\n                         You're the boss! Movin' on :)\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -1434,7 +1434,7 @@ if [ "$file_to_genome_id_map" != "" ]; then
     fi
 
     cat $NCBI_acc_file $genbank_list_file_basenames $fasta_files_basenames $amino_acid_files_basenames | sort > ${tmp_dir}/sorted_all_input_genome_ids.tmp
-    
+
     ## adding in properly handling mapping file if the user provides paths rather than just file names, re: https://github.com/AstrobioMike/GToTree/issues/14
 
     paste <( cut -f 1 $file_to_genome_id_map | awk -F '/' ' { print $NF } ' ) <( cut -f 2- $file_to_genome_id_map ) > ${tmp_dir}/new_id_map.tmp
@@ -1444,7 +1444,7 @@ if [ "$file_to_genome_id_map" != "" ]; then
 
     if [ -s ${tmp_dir}/spurious_ids.tmp ]; then
         spurious_ids_count=$(wc -l ${tmp_dir}/spurious_ids.tmp | sed "s/^ *//" | cut -d " " -f 1)
-        
+
         cp ${tmp_dir}/spurious_ids.tmp Missing_IDs.txt
         mv uniq_hmm_names.tmp ${tmp_dir}/
 
@@ -1455,13 +1455,13 @@ if [ "$file_to_genome_id_map" != "" ]; then
         if [ $debug_flag == 'false' ]; then
              rm -rf $tmp_dir
         fi
-        
+
         printf "\n${RED}  $spurious_ids_count genome ID(s) listed in the mapping file (passed to \"-m\") not found in${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "  ${RED}any of the input genomes :(${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "  Reported in the file \"Missing_IDs.txt\" for you to investigate.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "  If things look the same at first glance, double-check there are no extra\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "  empty spaces or anything at the ends of the entries in that file.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        
+
         rm -rf $output_dir
         printf "Exiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         exit
@@ -1581,7 +1581,7 @@ if [ -n "$NCBI_acc_file" ]; then
     # to keep track of what was searched and what was downloaded, both are included in the output summary table
     gtt-parse-assembly-summary-file -a ${NCBI_assembly_data_dir}/ncbi-assembly-info.tsv -w ${tmp_dir}/updated_sorted_input_ncbi_accs.tmp -o ${tmp_dir}/ncbi_accessions_info.tmp
 
-    ## sorting and saving found input accs 
+    ## sorting and saving found input accs
     cut -f 1 ${tmp_dir}/ncbi_accessions_info.tmp | sort > ${tmp_dir}/sorted_got_ncbi_accs.tmp
 
     # checking if any accs weren't successfully found (including removing any potential whitespace which users may have accidentally left in, eventually should put a check for this at the start):
@@ -1617,9 +1617,9 @@ if [ -n "$NCBI_acc_file" ]; then
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
         if [ "$nucleotide" == 'false' ]; then
-            gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs} 
+            gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
         else
-            gtt-ncbi-serial-nt.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs} 
+            gtt-ncbi-serial-nt.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
         fi
     else
         if [ "$nucleotide" == 'false' ]; then
@@ -2249,7 +2249,7 @@ if [ $len_final_genes_list == "0" ]; then
     mv $gtotree_log ${output_dir}/gtotree-runlog.txt
 
     exit
-fi    
+fi
 
 removed_genes2=$(wc -l ${tmp_dir}/genes_to_remove2.tmp | sed "s/^ *//" | cut -d " " -f 1)
 
@@ -2458,7 +2458,7 @@ else
 
     # running in parallel
     if [ $total_input_genomes -ge 1000 ] && [ $override_faster_alignment == 'false' ]; then
-        faster_alignment='true'    
+        faster_alignment='true'
     else
         faster_alignment='false'
     fi
@@ -2496,7 +2496,7 @@ cut -f 1 ${tmp_dir}/building_genomes_tab.tmp | sort > ${tmp_dir}/sorted_all_outp
 # first getting which were removed from analysis due to too few hits, if any:
 if [ $removed_genomes != "0" ]; then
     sort <(tail -n +2 ${output_dir}/Genomes_removed_for_too_few_hits.tsv | cut -f1) > ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp
-    
+
     # getting a list of those that weren't removed to iterate over
     comm -23 ${tmp_dir}/sorted_all_output_genome_ids.tmp ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp | sort > ${tmp_dir}/sorted_genomes_not_removed.tmp
 
@@ -2506,7 +2506,7 @@ if [ $removed_genomes != "0" ]; then
         grep -m1 -w "^$genome" ${tmp_dir}/building_genomes_tab.tmp >> ${tmp_dir}/building_genomes_tab_for_removed_genomes.tmp
         grep -m1 -w "^$genome" ${tmp_dir}/counts_tab.tmp | cut -f 2 >> ${tmp_dir}/reporting_SCG_counts_after_len_filt_for_genomes_removed.tmp
         echo "No" >> ${tmp_dir}/reporting_that_not_in_final_tree_column.tmp
-    done 
+    done
 
     # adding columns on:
     paste ${tmp_dir}/building_genomes_tab_for_removed_genomes.tmp ${tmp_dir}/reporting_SCG_counts_after_len_filt_for_genomes_removed.tmp ${tmp_dir}/reporting_that_not_in_final_tree_column.tmp > ${tmp_dir}/genomes_tab_for_removed_genomes.tmp
@@ -2622,10 +2622,10 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
                 non_gz_file_name=$(echo $file | sed 's/.gz//')
                 echo "${non_gz_file_name%.*}" >> ${tmp_dir}/non_ncbi_swap_map_p1.tmp
                 grep -w -m1 "^${file}" ${tmp_dir}/sorted_id_swap_map.tmp | cut -f 2- >> ${tmp_dir}/non_ncbi_swap_map_p2.tmp
-            done 
+            done
 
             paste ${tmp_dir}/non_ncbi_swap_map_p1.tmp ${tmp_dir}/non_ncbi_swap_map_p2.tmp | sort -k 1,1 > ${tmp_dir}/sorted_non_ncbi_swap_map.tmp
-     
+
             fi
 
         else
@@ -2638,10 +2638,10 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
                 non_gz_file_name=$(echo "$file" | sed 's/.gz//')
                 echo "${non_gz_file_name%.*}" >> ${tmp_dir}/non_ncbi_swap_map_p1.tmp
                 grep -w -m1 "^${file}" ${tmp_dir}/sorted_id_swap_map.tmp | cut -f 2- >> ${tmp_dir}/non_ncbi_swap_map_p2.tmp
-            done 
+            done
 
             paste ${tmp_dir}/non_ncbi_swap_map_p1.tmp ${tmp_dir}/non_ncbi_swap_map_p2.tmp | sort -k 1,1 > ${tmp_dir}/sorted_non_ncbi_swap_map.tmp
-    
+
         fi
 
         ## updating id_swap_map
@@ -2671,7 +2671,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
         ### checking there are actually some taxids to work with, if not, then printing message at end that no lineage info added
         taxid_counts=$(cut -f 2 ${output_dir}/Genomes_summary_info.tsv | sed '/^NA$/d' | wc -l | sed 's/^ *//')
 
-        if [ $taxid_counts -gt 1 ]; then 
+        if [ $taxid_counts -gt 1 ]; then
 
             ## running taxonkit and adding to summary table ##
             cut -f 2 ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | taxonkit lineage | taxonkit reformat -r NA | cut -f3 | tr ";" "\t" > ${tmp_dir}/lineages.tmp
@@ -2755,7 +2755,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
                         # getting the ids and strains of those that have infraspecific names
                         grep "strain=" ${tmp_dir}/ncbi_genomes_summary_subset_for_id_change.tmp | cut -f 1,6 | sed 's/strain=//' | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]" > ${tmp_dir}/strain_info_tab.tmp
-              
+
                     fi
 
                     # input-genbank labels to add strain info to:
@@ -2765,7 +2765,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
                         do
                             grep -m1 -w "$id" ${output_dir}/Genbank_genomes_summary_info.tsv
                         done > ${tmp_dir}/genbank_genomes_summary_subset_for_id_change.tmp
-              
+
                         # getting the ids and strains of those that have strains IDs:
                         awk ' BEGIN { FS=OFS="\t" } $5 != "NA" { print $1,$5 } ' ${tmp_dir}/genbank_genomes_summary_subset_for_id_change.tmp | tr " " "_" | tr "(" "_" | tr ")" "_" | tr "/" "_" | sed 's/__/_/g' | sed 's/_$//' | tr -d "[';\[\]]" >> ${tmp_dir}/strain_info_tab.tmp
 
@@ -2820,7 +2820,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
                 cp ${tmp_dir}/base_label_swap.tmp ${tmp_dir}/full_id_swap_map.tmp
             fi
         fi
-    
+
     else
         ## if no taxonkit swapping specified, moving user-provided map to final file if it exists
         if [ -f ${tmp_dir}/base_label_swap.tmp ]; then
@@ -2841,7 +2841,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
         # creating subset gtdb table holding all target accessions (in case the user providing a mapping file that supersedes re-labeling any of these, but still wants the gtdb taxonomy and other information for the entry)
         gtt-parse-gtdb-assembly-summary-file -o ${tmp_dir}/target-gtdb.tsv -f ${tmp_dir}/gtdb_found_accs.tsv -n ${tmp_dir}/gtdb-not-found-accs.tsv -t ${tmp_dir}/target-gtdb-tax.tsv -a ${GTDB_dir}/GTDB-arc-and-bac-metadata.tsv -w ${tmp_dir}/potential_ids_for_gtdb_swap.tmp
-        
+
         ## there are no strain level designations in GTDB, so those will be absent on any labels where GTDB taxonomy was added if requested by the user
             # notifying user here if this is the case
         if [ -n ${tmp_dir}/wanted_ranks.tmp ]; then
@@ -2911,7 +2911,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
         paste ${tmp_dir}/gtdb_rows_that_need_tax_info_added.tmp ${tmp_dir}/gtdb_tax_to_add_to_rows.tmp > ${tmp_dir}/rows_for_genome_summary_table_with_gtdb_tax_info.tmp
 
-            # adding NAs for these columns for those that don't have gtdb info 
+            # adding NAs for these columns for those that don't have gtdb info
         for id in $(cat ${tmp_dir}/ids_that_need_NAs_added_for_gtdb_info.tmp)
         do
             printf "NA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\n"
@@ -2988,7 +2988,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
             # getting those with taxonkit (NCBI) lineage info, but no GTDB info (will happen in current release of GTDB doesn't include this particular accession)
             comm -23 ${tmp_dir}/current_taxonkit_ids_to_swap.tmp ${tmp_dir}/current_gtdb_ids_to_swap.tmp > ${tmp_dir}/taxonkit_ids_to_keep_because_no_GTDB_info.tmp
-            
+
             # pulling those out, adding to base label swap file (with a marker that they are from NCBI since both will be mixed), then adding GTDB swap info
             for id in $(cat ${tmp_dir}/taxonkit_ids_to_keep_because_no_GTDB_info.tmp)
             do
@@ -3015,10 +3015,10 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
     ### if some need appending, then appending here
     if [ -s ${tmp_dir}/base_labels_need_append.tmp ]; then
-    
+
         # getting ids that need appending:
         sort -k 1 ${tmp_dir}/base_labels_need_append.tmp | tee ${tmp_dir}/sorted_base_labels_need_append.tmp | cut -f 1 > ${tmp_dir}/sorted_base_ids_need_append.tmp
-    
+
         # getting those that don't need appending, so can separate:
         comm -23 <(cut -f 1 ${tmp_dir}/full_id_swap_map.tmp | sort) ${tmp_dir}/sorted_base_ids_need_append.tmp | sort > ${tmp_dir}/sorted_base_ids_no_append.tmp
 
@@ -3127,7 +3127,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
         fi
 
-        ### now making new column for each specifying the "label_source" (e.g. NCBI, GTDB, user_map, user_map_append_to_<X>, input) and re-making final output genome summary tab 
+        ### now making new column for each specifying the "label_source" (e.g. NCBI, GTDB, user_map, user_map_append_to_<X>, input) and re-making final output genome summary tab
             # for user appended ones, will report "<X>_and_appended", with <X> being either "input", "NCBI", "user_map", or "GTDB"
 
             # wrapping all with appended since need to treat them differently if label was appended to (specified by the 3rd column in the input mapping file passed to '-m')
@@ -3166,7 +3166,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
                 # adding to file holding all types so at end we can use that to find those that aren't re-labeled by any method (and just have their input labels)
                 cat ${tmp_dir}/taxonkit_label_swapped_ids.tmp >> ${tmp_dir}/all_relabeled_ids.tmp
-                
+
                 for id in $(cat ${tmp_dir}/taxonkit_label_swapped_ids.tmp)
                 do
 
@@ -3185,7 +3185,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
                 done
 
-            fi                    
+            fi
 
             # GTDB
             if [ -s ${tmp_dir}/gtdb_label_swapped_ids.tmp ]; then
@@ -3230,7 +3230,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
                             grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
                             printf "input_and_appended\n" >> ${tmp_dir}/building_label_source_column.tmp
-                        
+
                         fi
 
                     # if label NOT in user-appended list
@@ -3255,7 +3255,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
                 for id in $(cat ${tmp_dir}/user_label_swapped_ids.tmp)
                 do
-                  
+
                     grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
                     printf "user_map\n" >> ${tmp_dir}/building_label_source_column.tmp
 
@@ -3268,7 +3268,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
                 # adding to file holding all types so at end we can use that to find those that aren't re-labeled by any method (and just have their input labels)
                 cat ${tmp_dir}/taxonkit_label_swapped_ids.tmp >> ${tmp_dir}/all_relabeled_ids.tmp
-                
+
                 for id in $(cat ${tmp_dir}/taxonkit_label_swapped_ids.tmp)
                 do
 
@@ -3277,7 +3277,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
 
                 done
 
-            fi                    
+            fi
 
             # GTDB
             if [ -s ${tmp_dir}/gtdb_label_swapped_ids.tmp ]; then
