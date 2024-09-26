@@ -788,7 +788,7 @@ def filter_final_HMM_set(wanted_pfam_count, tmp_dir, output_dir, latest_pfam_ver
         print("")
 
         with open(f"{output_dir}pfam-version-used.txt", "w") as outfile:
-            write(f"{latest_pfam_version}\n")
+            outfile.write(f"{latest_pfam_version}\n")
 
 
 def report_missed_accessions(output_dir, rerun):
