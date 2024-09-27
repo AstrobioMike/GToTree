@@ -20,7 +20,7 @@ do
     # --insecure flag added on 29-Nov-2020, due to pfam certificate being invalid (https://github.com/AstrobioMike/GToTree/issues/28)
     curl --insecure --silent --retry 10 -o ${tmp_dir}/${target}.hmm.gz "${base_link}${target}?annotation=hmm"
     gunzip ${tmp_dir}/${target}.hmm.gz
-    
+
     if [ -s ${tmp_dir}/${target}.hmm ]; then
         # getting accession pulled (to account for current version on Pfam as compared to what was searched)
         actual_target=$(grep -m1 "^ACC" ${tmp_dir}/${target}.hmm | tr -s " " "\t" | cut -f 2)
@@ -54,3 +54,6 @@ done
 
 # starting the main results table which will have the following as its header:
 paste <(printf "assembly_id\ttotal_gene_count") <(printf %s "$(cat ${tmp_dir}/actual_pfam_targets.tmp | tr "\n" "\t")") > ${output_dir}/Pfam_search_results/Pfam-hit-counts.tsv
+
+# copying over the additional pfam-target hmms
+cp ${tmp_dir}/all_pfam_targets.hmm ${output_dir}/Pfam_search_results/target_Pfam_profiles/all-additional-pfam-targets.hmm
