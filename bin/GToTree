@@ -1209,7 +1209,7 @@ if [ "$target_KOs" != "" ]; then
         kofamscan_used="true"
 
     else
-        printf "\n${RED}      You specified $target_KOs as your target Pfams to sesarch, but that file cannot be found :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "\n${RED}      You specified $target_KOs as your target KOs to sesarch, but that file cannot be found :(${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "\nExiting for now.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         exit
     fi
