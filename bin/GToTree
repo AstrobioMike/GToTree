@@ -980,7 +980,7 @@ fi
 printf "${YELLOW}\n    HMM source to be used:\n${NC}" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 if [ $hmm_file == "Universal" ]; then
-    hmm_file="Universal_Hug_et_al"
+    hmm_file="Universal-Hug-et-al"
     universal_SCGs_used="true"
 fi
 
