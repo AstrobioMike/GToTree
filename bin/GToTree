@@ -1145,12 +1145,12 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
     fi
 
     if [ $nucleotide != 'false' ]; then
-        printf "      - Working towards nucleotide alignment and/or tree, as \"-z\" option was provided\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "      - Working towards nucleotide alignments, as the \"-z\" option was provided\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "          (amino-acid seqs still used for HMM searching of target genes)\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $align_only == 'true' ]; then
-        printf "      - Only generating alignment, no tree, as \"-N\" option has been provided\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "      - Only generating alignment, no tree, as the \"-N\" option has been provided\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
     fi
 
     if [ $align_only == 'false' ]; then
