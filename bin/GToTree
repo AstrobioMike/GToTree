@@ -3436,7 +3436,11 @@ if [ $align_only == 'false' ]; then
         # setting env variable for FastTreeMP
         export OMP_NUM_THREADS=${num_jobs}
 
-        FastTreeMP ${alignment_file} > ${tree_file} 2> >(tee -a $gtotree_log >&2)
+        if [ $nucleotide == 'false' ]; then
+            FastTreeMP ${alignment_file} > ${tree_file} 2> >(tee -a $gtotree_log >&2)
+        else
+            FastTreeMP -nt -gtr ${alignment_file} > ${tree_file} 2> >(tee -a $gtotree_log >&2)
+        fi
 
         fasttree_used="true" # setting to report citations at end
 
@@ -3454,7 +3458,11 @@ if [ $align_only == 'false' ]; then
         printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
         printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-        FastTree ${alignment_file} > ${tree_file} 2> >(tee -a $gtotree_log >&2)
+        if [ $nucleotide == 'false' ]; then
+            FastTree ${alignment_file} > ${tree_file} 2> >(tee -a $gtotree_log >&2)
+        else
+            FastTree -nt -gtr ${alignment_file} > ${tree_file} 2> >(tee -a $gtotree_log >&2)
+        fi
 
         fasttree_used="true" # setting to report citations at end
 
