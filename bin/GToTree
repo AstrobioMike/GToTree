@@ -3226,7 +3226,7 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
                     if grep -q $id ${tmp_dir}/user_label_appended_ids.tmp; then
 
                         # making sure wasn't already found and added from gtdb_label_swapped_ids.tmp
-                        if ! grep -q $id ${tmp_dir}/gtdb_label_swapped_ids.tmp; then
+                        if ! grep -q $id ${tmp_dir}/gtdb_label_swapped_ids.tmp > /dev/null 2>&1; then
 
                             grep -w -m 1 ^$id ${output_dir}/Genomes_summary_info.tsv >> ${tmp_dir}/building_new_genome_summary_tab_with_label_source.tmp
                             printf "input_and_appended\n" >> ${tmp_dir}/building_label_source_column.tmp
