@@ -24,9 +24,7 @@
 **A quick [conda installation](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) can be run like so:**
 
 ```
-# installing mamba if needed first (for faster conda installs)
-conda install -n base -c conda-forge mamba
-mamba create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda -c defaults gtotree
+conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda gtotree
 ```
 
 
@@ -49,9 +47,7 @@ See the ["What is GToTree?" wiki page](https://github.com/AstrobioMike/GToTree/w
 **A quick [conda installation](https://github.com/AstrobioMike/GToTree/wiki/installation#conda-quickstart) can be run like so:**
 
 ```
-# installing mamba if needed first (for faster conda installs)
-conda install -n base -c conda-forge mamba
-mamba create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda -c defaults gtotree
+conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda gtotree
 ```
 
 
