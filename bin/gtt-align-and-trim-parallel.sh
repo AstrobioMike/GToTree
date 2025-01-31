@@ -16,9 +16,15 @@ gtt-parse-fasta-by-headers -i ${tmp_dir}/${1}_hits_filtered.tmp -w ${tmp_dir}/so
 
 # aligning
 if [ $faster_alignment == 'true' ]; then
-    muscle -super5 ${tmp_dir}/${1}_hits_filtered${target_gene_suffix} -output ${tmp_dir}/${1}_aligned.tmp -threads ${num_muscle_threads} &> /dev/null
+    muscle -super5 ${tmp_dir}/${1}_hits_filtered${target_gene_suffix} -output ${tmp_dir}/${1}_aligned.tmp -threads ${num_muscle_threads} > ${tmp_dir}/${1}-muscle.log 2>&1
 else
-    muscle -align ${tmp_dir}/${1}_hits_filtered${target_gene_suffix} -output ${tmp_dir}/${1}_aligned.tmp -threads ${num_muscle_threads} &> /dev/null
+    muscle -align ${tmp_dir}/${1}_hits_filtered${target_gene_suffix} -output ${tmp_dir}/${1}_aligned.tmp -threads ${num_muscle_threads} > ${tmp_dir}/${1}-muscle.log 2>&1
+fi
+
+# checking if alignment was successful (really this is a sloppy way of checking, but it's better than nothing and the muscle log file will be available)
+if [ ! -s ${tmp_dir}/${1}_aligned.tmp ]; then
+    printf "${1}\n" >> ${tmp_dir}/kill_align_and_trim_parallel.problem
+    exit
 fi
 
 # trimming
@@ -42,7 +48,7 @@ if [ -s ${tmp_dir}/${1}_needed_gappers.tmp ]; then
 
     # getting length of the alignment for the current gene:
     aln_length_tmp=$(sed -n '2p' ${tmp_dir}/${1}_formatted${target_gene_suffix}.tmp | wc -c | tr -s " " | cut -f2 -d " ")
-    # subtracting 1 for newline characters 
+    # subtracting 1 for newline characters
     aln_length_tmp=$(echo "$aln_length_tmp"-1 | bc)
     # making a string of gaps the length of the alignment for those missing it:
     gap_seq=$(printf "%0.s-" $(seq 1 1 $aln_length_tmp))
