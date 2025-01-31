@@ -23,7 +23,7 @@ jobs:
         shell: bash -el {0}
         run: |
           if [[ "${RUNNER_OS}" == "macOS" ]]; then
-            arch -x86_64 conda install -y gtotree
+            conda install --platform osx-64 -y gtotree
           else
             conda install -y gtotree
           fi
@@ -32,7 +32,7 @@ jobs:
         shell: bash -l {0}
         run: |
           if [[ "${RUNNER_OS}" == "macOS" ]]; then
-            arch -x86_64 GToTree -v
+            GToTree -v
           else
             GToTree -v
           fi
