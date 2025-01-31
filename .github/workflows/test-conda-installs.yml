@@ -17,23 +17,18 @@ jobs:
           python-version: "3.9"
           channels: astrobiomike,conda-forge,bioconda
           channel-priority: true
-          activate-environment: gtotree
 
       - name: Install GToTree
         shell: bash -el {0}
         run: |
           if [[ "${RUNNER_OS}" == "macOS" ]]; then
-            conda install --platform osx-64 -y gtotree
+            conda create --platform osx-64 -n gtotree -y gtotree
           else
-            conda install -y gtotree
+            conda create -n gtotree -y gtotree
           fi
 
       - name: Check GToTree
         shell: bash -l {0}
         run: |
-          if [[ "${RUNNER_OS}" == "macOS" ]]; then
-            GToTree -v
-          else
-            GToTree -v
-          fi
-
+          conda activate gtotree
+          GToTree -h
