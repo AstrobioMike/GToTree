@@ -9,18 +9,16 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "macos-latest"]
-
     steps:
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: "3.9"
-          miniforge-variant: Mambaforge
           channels: astrobiomike,conda-forge,bioconda,defaults
           channel-priority: true
           activate-environment: gtotree
       - shell: bash -el {0}
         run: |
-          mamba install -y gtotree
+          conda install -y gtotree
       - shell: bash -l {0}
         run: |
           GToTree -v
