@@ -1,0 +1,34 @@
+name: testing full run
+
+on: workflow_dispatch
+
+jobs:
+  install-tests:
+    name: ${{ matrix.os }} conda install test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-latest"]
+
+    steps:
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: "3.9"
+          channels: astrobiomike,conda-forge,bioconda
+          channel-priority: true
+
+      - name: Install GToTree
+        shell: bash -el {0}
+        run: |
+          if [[ "${RUNNER_OS}" == "macOS" ]]; then
+            conda create --platform osx-64 -n gtotree -y gtotree
+          else
+            conda create -n gtotree -y gtotree
+          fi
+
+      - name: Run GToTree
+        shell: bash -l {0}
+        run: |
+          conda activate gtotree
+          gtt-test.sh
