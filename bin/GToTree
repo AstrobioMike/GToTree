@@ -281,6 +281,7 @@ keep_individual_alignments='false'
 tree_program='FastTreeMP'
 additional_pfam_targets='false'
 ko_targets='false'
+target_KOs='none'
 override_faster_alignment='false'
 http_flag='false'
 nucleotide='false'
@@ -1098,7 +1099,7 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
    [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || \
    [ $tree_program != "FastTreeMP" ] || [ $wanting_but_missing_FastTreeMP == "true" ] || \
    [ $align_only == 'true' ] || [ $keep_individual_alignments == 'true' ] || \
-   [ ! -z $target_pfams ] || [ ! -z $target_KOs ] || [ $nucleotide != 'false' ]; then
+   [ ! -z $target_pfams ] || [ $target_KOs != "none" ] || [ $nucleotide != 'false' ]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
@@ -1198,7 +1199,7 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
 fi
 
 #### checking and reporting if KOs targeted ####
-if [ "$target_KOs" != "" ]; then
+if [ "$target_KOs" != "none" ]; then
 
     if [ -s "$target_KOs" ]; then
         uniq ${target_KOs} > uniq_ko_targets.tmp
@@ -1405,6 +1406,14 @@ if [ $? -ne 0 ] ; then
     exit
 fi
 
+# adding place to store ncbi downloads if needed
+if [ ${debug_flag} == 'true' ] && [ -n "$NCBI_acc_file" ]; then
+    mkdir -p ${tmp_dir}/ncbi-downloads
+fi
+
+#############################################################################
+###########################  SOME LAST ADJUSTMENTS  #########################
+#############################################################################
 
 ### making sure each id provided in the mapping file (if given) is found in one
 ### of the genome input files
@@ -1617,15 +1626,16 @@ if [ -n "$NCBI_acc_file" ]; then
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
         if [ "$nucleotide" == 'false' ]; then
-            gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+            gtt-ncbi-serial.sh "${tmp_dir}/ncbi_accessions_info.tmp" "$tmp_dir" "$hmm_file" "$NCBI_remaining_genomes_total" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
         else
-            gtt-ncbi-serial-nt.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+            gtt-ncbi-serial-nt.sh "${tmp_dir}/ncbi_accessions_info.tmp" "$tmp_dir" "$hmm_file" "$NCBI_remaining_genomes_total" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
         fi
     else
         if [ "$nucleotide" == 'false' ]; then
-            cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+            printf "\n\ndebug flag is $debug_flag\n\n"
+            cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel --quote -j "$num_jobs" -- gtt-ncbi-parallel.sh "{}" "$tmp_dir" "$hmm_file" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
         else
-            cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel-nt.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+            cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel --quote -j "$num_jobs" -- gtt-ncbi-parallel-nt.sh "{}" "$tmp_dir" "$hmm_file" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
         fi
     fi
 

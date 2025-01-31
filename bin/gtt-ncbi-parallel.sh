@@ -6,16 +6,42 @@ RED='\033[0;31m'
 ORANGE='\033[0;33m'
 NC='\033[0m'
 
-tmp_dir=$2
-hmm_file=$3
-num_cpus=$4
-hmm_target_genes_total=$5
-output_dir=$6
-best_hit_mode=$7
-additional_pfam_targets=$8
-http_flag=$9
-ko_targets=${10}
-target_KOs=${11}
+tmp_dir="$2"
+hmm_file="$3"
+num_cpus="$4"
+hmm_target_genes_total="$5"
+output_dir="$6"
+best_hit_mode="$7"
+additional_pfam_targets="$8"
+http_flag="$9"
+ko_targets="${10}"
+target_KOs="${11}"
+debug_flag="${12}"
+
+printf "\n\ntmp_dir: $tmp_dir\n"
+printf "hmm_file: $hmm_file\n"
+printf "num_cpus: $num_cpus\n"
+printf "hmm_target_genes_total: $hmm_target_genes_total\n"
+printf "output_dir: $output_dir\n"
+printf "best_hit_mode: $best_hit_mode\n"
+printf "additional_pfam_targets: $additional_pfam_targets\n"
+printf "http_flag: $http_flag\n"
+printf "ko_targets: $ko_targets\n"
+printf "target_KOs: $target_KOs\n"
+printf "debug_flag: $debug_flag\n\n"
+
+printf "\n\narg 2: $2\n"
+printf "arg 3: $3\n"
+printf "arg 4: $4\n"
+printf "arg 5: $5\n"
+printf "arg 6: $6\n"
+printf "arg 7: $7\n"
+printf "arg 8: $8\n"
+printf "arg 9: $9\n"
+printf "arg 10: ${10}\n"
+printf "arg 11: ${11}\n"
+printf "arg 12: ${12}\n\n"
+
 
 assembly=$(echo "$1" | cut -f 1)
 downloaded_accession=$(echo "$1" | cut -f 2)
@@ -38,12 +64,12 @@ if [ $base_link == "na" ] || [ -z $base_link ]; then
     fi
 
     # checking if GCF or GCA
-    if [[ $assembly == "GCF"* ]]; then 
+    if [[ $assembly == "GCF"* ]]; then
         p2="GCF"
     else
         p2="GCA"
     fi
-    
+
     p3=$(echo $assembly | cut -f 2 -d "_" | cut -c 1-3)
     p4=$(echo $assembly | cut -f 2 -d "_" | cut -c 4-6)
     p5=$(echo $assembly | cut -f 2 -d "_" | cut -c 7-9)
@@ -213,9 +239,23 @@ if [ -s ${tmp_dir}/${assembly}_genes3.tmp ]; then
 
     fi
 
+    printf "\n\n    ${debug_flag}\n\n"
+
+    if [ $debug_flag == "true" ]; then
+        printf "\n\n   Debug mode on, keeping intermediate files.\n\n"
+        if [ -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
+            printf "   Keeping ${tmp_dir}/${assembly}_genes2.tmp\n"
+            mv ${tmp_dir}/${assembly}_genes2.tmp ${tmp_dir}/ncbi-downloads/${assembly}_protein.faa
+        fi
+        if [ -s ${tmp_dir}/${assembly}_genome.tmp ]; then
+            printf "   Keeping ${tmp_dir}/${assembly}_genome.tmp\n"
+            mv ${tmp_dir}/${assembly}_genome.tmp ${tmp_dir}/ncbi-downloads/${assembly}_genomic.fna
+        fi
+    fi
+
     rm -rf ${tmp_dir}/${assembly}_genes3.tmp ${tmp_dir}/${assembly}_genes2.tmp ${tmp_dir}/${assembly}_genes1.tmp
     rm -rf ${tmp_dir}/${assembly}_genes.tmp ${tmp_dir}/${assembly}_curr_hmm_hits.tmp ${tmp_dir}/${assembly}_uniq_counts.tmp
-    rm -rf ${tmp_dir}/${assembly}_genes.tmp.ssi ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp 
+    rm -rf ${tmp_dir}/${assembly}_genes.tmp.ssi ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp
     rm -rf ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp
 
 else
