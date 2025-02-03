@@ -18,31 +18,6 @@ ko_targets="${10}"
 target_KOs="${11}"
 debug_flag="${12}"
 
-printf "\n\ntmp_dir: $tmp_dir\n"
-printf "hmm_file: $hmm_file\n"
-printf "num_cpus: $num_cpus\n"
-printf "hmm_target_genes_total: $hmm_target_genes_total\n"
-printf "output_dir: $output_dir\n"
-printf "best_hit_mode: $best_hit_mode\n"
-printf "additional_pfam_targets: $additional_pfam_targets\n"
-printf "http_flag: $http_flag\n"
-printf "ko_targets: $ko_targets\n"
-printf "target_KOs: $target_KOs\n"
-printf "debug_flag: $debug_flag\n\n"
-
-printf "\n\narg 2: $2\n"
-printf "arg 3: $3\n"
-printf "arg 4: $4\n"
-printf "arg 5: $5\n"
-printf "arg 6: $6\n"
-printf "arg 7: $7\n"
-printf "arg 8: $8\n"
-printf "arg 9: $9\n"
-printf "arg 10: ${10}\n"
-printf "arg 11: ${11}\n"
-printf "arg 12: ${12}\n\n"
-
-
 assembly=$(echo "$1" | cut -f 1)
 downloaded_accession=$(echo "$1" | cut -f 2)
 
