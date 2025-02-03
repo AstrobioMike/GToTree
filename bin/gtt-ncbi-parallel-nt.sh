@@ -6,16 +6,17 @@ RED='\033[0;31m'
 ORANGE='\033[0;33m'
 NC='\033[0m'
 
-tmp_dir=$2
-hmm_file=$3
-num_cpus=$4
-hmm_target_genes_total=$5
-output_dir=$6
-best_hit_mode=$7
-additional_pfam_targets=$8
-http_flag=$9
-ko_targets=${10}
-target_KOs=${11}
+tmp_dir="$2"
+hmm_file="$3"
+num_cpus="$4"
+hmm_target_genes_total="$5"
+output_dir="$6"
+best_hit_mode="$7"
+additional_pfam_targets="$8"
+http_flag="$9"
+ko_targets="${10}"
+target_KOs="${11}"
+debug_flag="${12}"
 
 assembly=$(echo "$1" | cut -f 1)
 downloaded_accession=$(echo "$1" | cut -f 2)
@@ -38,12 +39,12 @@ if [ $base_link == "na" ] || [ -z $base_link ]; then
     fi
 
     # checking if GCF or GCA
-    if [[ $assembly == "GCF"* ]]; then 
+    if [[ $assembly == "GCF"* ]]; then
         p2="GCF"
     else
         p2="GCA"
     fi
-    
+
     p3=$(echo $assembly | cut -f 2 -d "_" | cut -c 1-3)
     p4=$(echo $assembly | cut -f 2 -d "_" | cut -c 4-6)
     p5=$(echo $assembly | cut -f 2 -d "_" | cut -c 7-9)
@@ -206,9 +207,21 @@ if $(file ${tmp_dir}/${assembly}_genome.tmp.gz | grep -q gzip); then
 
     fi
 
+    if [ $debug_flag == "true" ]; then
+        if [ -s ${tmp_dir}/${assembly}_genes2.faa.tmp ]; then
+            mv ${tmp_dir}/${assembly}_genes2.faa.tmp ${tmp_dir}/ncbi-downloads/${assembly}_protein.faa
+        fi
+        if [ -s ${tmp_dir}/${assembly}_genes1.fa.tmp ]; then
+            mv ${tmp_dir}/${assembly}_genes1.fa.tmp ${tmp_dir}/ncbi-downloads/${assembly}_cds.fa
+        fi
+        if [ -s ${tmp_dir}/${assembly}_genome.tmp ]; then
+            mv ${tmp_dir}/${assembly}_genome.tmp ${tmp_dir}/ncbi-downloads/${assembly}_genomic.fna
+        fi
+    fi
+
     rm -rf ${tmp_dir}/${assembly}_genes*.tmp*
     rm -rf ${tmp_dir}/${assembly}_curr_hmm_hits.tmp ${tmp_dir}/${assembly}_uniq_counts.tmp
-    rm -rf ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp 
+    rm -rf ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp
     rm -rf ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp
 
 else

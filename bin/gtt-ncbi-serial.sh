@@ -6,17 +6,18 @@ RED='\033[0;31m'
 ORANGE='\033[0;33m'
 NC='\033[0m'
 
-tmp_dir=$2
-hmm_file=$3
-NCBI_remaining_genomes_total=$4
-num_cpus=$5
-hmm_target_genes_total=$6
-output_dir=$7
-best_hit_mode=$8
-additional_pfam_targets=$9
-http_flag=${10}
-ko_targets=${11}
-target_KOs=${12}
+tmp_dir="$2"
+hmm_file="$3"
+NCBI_remaining_genomes_total="$4"
+num_cpus="$5"
+hmm_target_genes_total="$6"
+output_dir="$7"
+best_hit_mode="$8"
+additional_pfam_targets="$9"
+http_flag="${10}"
+ko_targets="${11}"
+target_KOs="${12}"
+debug_flag="${13}"
 
 num=0
 
@@ -50,12 +51,12 @@ do
         fi
 
         # checking if GCF or GCA
-        if [[ $assembly == "GCF"* ]]; then 
+        if [[ $assembly == "GCF"* ]]; then
             p2="GCF"
         else
             p2="GCA"
         fi
-        
+
         p3=$(echo $assembly | cut -f 2 -d "_" | cut -c 1-3)
         p4=$(echo $assembly | cut -f 2 -d "_" | cut -c 4-6)
         p5=$(echo $assembly | cut -f 2 -d "_" | cut -c 7-9)
@@ -68,7 +69,7 @@ do
     else
 
         end_path=$(basename $base_link)
-    
+
     fi
 
     # attempting to download genes for assembly
@@ -234,9 +235,18 @@ do
 
         fi
 
+        if [ $debug_flag == "true" ]; then
+            if [ -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
+                mv ${tmp_dir}/${assembly}_genes2.tmp ${tmp_dir}/ncbi-downloads/${assembly}_protein.faa
+            fi
+            if [ -s ${tmp_dir}/${assembly}_genome.tmp ]; then
+                mv ${tmp_dir}/${assembly}_genome.tmp ${tmp_dir}/ncbi-downloads/${assembly}_genomic.fna
+            fi
+        fi
+
         rm -rf ${tmp_dir}/${assembly}_genes3.tmp ${tmp_dir}/${assembly}_genes2.tmp ${tmp_dir}/${assembly}_genes1.tmp
         rm -rf ${tmp_dir}/${assembly}_genes.tmp ${tmp_dir}/${assembly}_curr_hmm_hits.tmp ${tmp_dir}/${assembly}_uniq_counts.tmp
-        rm -rf ${tmp_dir}/${assembly}_genes.tmp.ssi ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp 
+        rm -rf ${tmp_dir}/${assembly}_genes.tmp.ssi ${tmp_dir}/${assembly}_conservative_filtering_counts_tab.tmp
         rm -rf ${tmp_dir}/${assembly}_conservative_target_unique_hmm_names.tmp
 
     else

@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.8.9"
+VERSION="v1.8.10"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -281,6 +281,7 @@ keep_individual_alignments='false'
 tree_program='FastTreeMP'
 additional_pfam_targets='false'
 ko_targets='false'
+target_KOs='none'
 override_faster_alignment='false'
 http_flag='false'
 nucleotide='false'
@@ -408,7 +409,7 @@ if [ -f "$NCBI_acc_file" ]; then
 fi
 
 ### if KO targets were provided, checking that KO data is present already, and downloading if it isn't
-if [ "$target_KOs" != "" ]; then
+if [ "$target_KOs" != "none" ]; then
     gtt-get-kofamscan-data
 fi
 
@@ -1098,7 +1099,7 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
    [ $num_jobs != "1" ] || [ $num_cpus != 2 ] || [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ] || \
    [ $tree_program != "FastTreeMP" ] || [ $wanting_but_missing_FastTreeMP == "true" ] || \
    [ $align_only == 'true' ] || [ $keep_individual_alignments == 'true' ] || \
-   [ ! -z $target_pfams ] || [ ! -z $target_KOs ] || [ $nucleotide != 'false' ]; then
+   [ ! -z $target_pfams ] || [ $target_KOs != "none" ] || [ $nucleotide != 'false' ]; then
 
     if [ "$file_to_genome_id_map" != "" ]; then
         if [ ! -s $file_to_genome_id_map ]; then
@@ -1198,7 +1199,7 @@ if [ $output_dir != "GToTree_output" ] || [ "$file_to_genome_id_map" != "" ] || 
 fi
 
 #### checking and reporting if KOs targeted ####
-if [ "$target_KOs" != "" ]; then
+if [ "$target_KOs" != "none" ]; then
 
     if [ -s "$target_KOs" ]; then
         uniq ${target_KOs} > uniq_ko_targets.tmp
@@ -1405,6 +1406,14 @@ if [ $? -ne 0 ] ; then
     exit
 fi
 
+# adding place to store ncbi downloads if needed
+if [ ${debug_flag} == 'true' ] && [ -n "$NCBI_acc_file" ]; then
+    mkdir -p ${tmp_dir}/ncbi-downloads
+fi
+
+#############################################################################
+###########################  SOME LAST ADJUSTMENTS  #########################
+#############################################################################
 
 ### making sure each id provided in the mapping file (if given) is found in one
 ### of the genome input files
@@ -1617,15 +1626,16 @@ if [ -n "$NCBI_acc_file" ]; then
     ### running in parallel if set, otherwise running in serial ###
     if [ $num_jobs == "1" ]; then
         if [ "$nucleotide" == 'false' ]; then
-            gtt-ncbi-serial.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+            gtt-ncbi-serial.sh "${tmp_dir}/ncbi_accessions_info.tmp" "$tmp_dir" "$hmm_file" "$NCBI_remaining_genomes_total" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
         else
-            gtt-ncbi-serial-nt.sh ${tmp_dir}/ncbi_accessions_info.tmp $tmp_dir $hmm_file $NCBI_remaining_genomes_total $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+            gtt-ncbi-serial-nt.sh "${tmp_dir}/ncbi_accessions_info.tmp" "$tmp_dir" "$hmm_file" "$NCBI_remaining_genomes_total" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
         fi
     else
         if [ "$nucleotide" == 'false' ]; then
-            cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+            printf "\n\ndebug flag is $debug_flag\n\n"
+            cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel --quote -j "$num_jobs" -- gtt-ncbi-parallel.sh "{}" "$tmp_dir" "$hmm_file" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
         else
-            cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel -j $num_jobs gtt-ncbi-parallel-nt.sh {} $tmp_dir $hmm_file $num_cpus $hmm_target_genes_total $output_dir $best_hit_mode $additional_pfam_targets $http_flag ${ko_targets} ${target_KOs}
+            cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel --quote -j "$num_jobs" -- gtt-ncbi-parallel-nt.sh "{}" "$tmp_dir" "$hmm_file" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
         fi
     fi
 
@@ -3668,24 +3678,24 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
 
     if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
         printf "        $num_dupe_report accession(s) redundant.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/Redundant_input_accessions.txt ${output_dir}/run_files/Redundant_input_accessions.txt
+        mv ${output_dir}/Redundant_input_accessions.txt ${output_dir}/run_files/Redundant_input_accessions.txt
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
         num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
         printf "        $num_accs_not_found accession(s) not successfully found at NCBI.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/NCBI_accessions_not_found.txt ${output_dir}/run_files/NCBI_accessions_not_found.txt
+        mv ${output_dir}/NCBI_accessions_not_found.txt ${output_dir}/run_files/NCBI_accessions_not_found.txt
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ]; then
         num_accs_not_downloaded=$(wc -l ${output_dir}/NCBI_accessions_not_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
         printf "        $num_accs_not_downloaded did not download properly.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/NCBI_accessions_not_downloaded.txt ${output_dir}/run_files/NCBI_accessions_not_downloaded.txt
+        mv ${output_dir}/NCBI_accessions_not_downloaded.txt ${output_dir}/run_files/NCBI_accessions_not_downloaded.txt
     fi
 
     if [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ]; then
         printf "        $removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/Genomes_removed_for_too_few_hits.tsv ${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv
+        mv ${output_dir}/Genomes_removed_for_too_few_hits.tsv ${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv
     fi
 
     # reporting of unsucessful targets depends on if run in best-hit mode (-B) or not
@@ -3699,7 +3709,7 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
 
         if [ -f ${output_dir}/Target_genes_not_found.txt ]; then
             printf "        $removed_genes gene(s) had no hits in any genome.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-            cp ${output_dir}/Target_genes_not_found.txt ${output_dir}/run_files/Target_genes_not_found.txt
+            mv ${output_dir}/Target_genes_not_found.txt ${output_dir}/run_files/Target_genes_not_found.txt
         fi
 
     fi
@@ -3707,13 +3717,13 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
 
     if [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ]; then
         printf "        $removed_genes2 gene(s) had no hits after filtering by length.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/Genes_with_no_hits_after_length_filter.txt ${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt
+        mv ${output_dir}/Genes_with_no_hits_after_length_filter.txt ${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt
     fi
 
     if [ -f ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ]; then
         num_genomes_high_redund=$(tail -n +2 ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv | wc -l | sed "s/^ *//" | cut -d " " -f 1)
         printf "        $num_genomes_high_redund genome(s) had an estimated redundancy of >= 10%%.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ${output_dir}/run_files/Genomes_with_questionable_redundancy_estimates.tsv
+        mv ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ${output_dir}/run_files/Genomes_with_questionable_redundancy_estimates.tsv
     fi
 
     printf "\n    Reported along with additional informative run files in:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
