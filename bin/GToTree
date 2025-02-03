@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.8.9"
+VERSION="v1.8.10"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -409,7 +409,7 @@ if [ -f "$NCBI_acc_file" ]; then
 fi
 
 ### if KO targets were provided, checking that KO data is present already, and downloading if it isn't
-if [ "$target_KOs" != "" ]; then
+if [ "$target_KOs" != "none" ]; then
     gtt-get-kofamscan-data
 fi
 
@@ -3678,24 +3678,24 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
 
     if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
         printf "        $num_dupe_report accession(s) redundant.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/Redundant_input_accessions.txt ${output_dir}/run_files/Redundant_input_accessions.txt
+        mv ${output_dir}/Redundant_input_accessions.txt ${output_dir}/run_files/Redundant_input_accessions.txt
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
         num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
         printf "        $num_accs_not_found accession(s) not successfully found at NCBI.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/NCBI_accessions_not_found.txt ${output_dir}/run_files/NCBI_accessions_not_found.txt
+        mv ${output_dir}/NCBI_accessions_not_found.txt ${output_dir}/run_files/NCBI_accessions_not_found.txt
     fi
 
     if [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ]; then
         num_accs_not_downloaded=$(wc -l ${output_dir}/NCBI_accessions_not_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
         printf "        $num_accs_not_downloaded did not download properly.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/NCBI_accessions_not_downloaded.txt ${output_dir}/run_files/NCBI_accessions_not_downloaded.txt
+        mv ${output_dir}/NCBI_accessions_not_downloaded.txt ${output_dir}/run_files/NCBI_accessions_not_downloaded.txt
     fi
 
     if [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ]; then
         printf "        $removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/Genomes_removed_for_too_few_hits.tsv ${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv
+        mv ${output_dir}/Genomes_removed_for_too_few_hits.tsv ${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv
     fi
 
     # reporting of unsucessful targets depends on if run in best-hit mode (-B) or not
@@ -3709,7 +3709,7 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
 
         if [ -f ${output_dir}/Target_genes_not_found.txt ]; then
             printf "        $removed_genes gene(s) had no hits in any genome.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-            cp ${output_dir}/Target_genes_not_found.txt ${output_dir}/run_files/Target_genes_not_found.txt
+            mv ${output_dir}/Target_genes_not_found.txt ${output_dir}/run_files/Target_genes_not_found.txt
         fi
 
     fi
@@ -3717,13 +3717,13 @@ if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCB
 
     if [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ]; then
         printf "        $removed_genes2 gene(s) had no hits after filtering by length.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/Genes_with_no_hits_after_length_filter.txt ${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt
+        mv ${output_dir}/Genes_with_no_hits_after_length_filter.txt ${output_dir}/run_files/Genes_with_no_hits_after_length_filter.txt
     fi
 
     if [ -f ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ]; then
         num_genomes_high_redund=$(tail -n +2 ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv | wc -l | sed "s/^ *//" | cut -d " " -f 1)
         printf "        $num_genomes_high_redund genome(s) had an estimated redundancy of >= 10%%.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        cp ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ${output_dir}/run_files/Genomes_with_questionable_redundancy_estimates.tsv
+        mv ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ${output_dir}/run_files/Genomes_with_questionable_redundancy_estimates.tsv
     fi
 
     printf "\n    Reported along with additional informative run files in:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
