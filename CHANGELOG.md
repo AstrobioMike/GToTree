@@ -82,11 +82,11 @@
 ## v1.8.2 (26-Jul-2023)
 
 ### Added
-- added http option to gtt-test.sh (`gtt-test.sh http`) thanks to https://github.com/AstrobioMike/GToTree/issues/78 (803511539500d085af3afe8b65b898f0b5d64dbe)
+- added http option to gtt-test.sh (`gtt-test.sh http`) thanks to https://github.com/AstrobioMike/GToTree/issues/78 (https://github.com/AstrobioMike/GToTree/commit/9eb248ad5a54563370978d3575727eb63ad93483)
 
 ### Fixed
 - updated `gtt-get-ncbi-tax-data` to appropriately pull from http instead of ftp also thanks to https://github.com/AstrobioMike/GToTree/issues/78
-- fix to check for ncbi assemblies "date-retrieved.txt" file, as also caught and fixed by @hyphaltip (https://github.com/AstrobioMike/GToTree/pull/80) 🙏 (9eb248ad5a54563370978d3575727eb63ad93483)
+- fix to check for ncbi assemblies "date-retrieved.txt" file, as also caught and fixed by @hyphaltip (https://github.com/AstrobioMike/GToTree/pull/80) 🙏 
 
 ---
 
