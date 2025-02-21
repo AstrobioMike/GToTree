@@ -3,7 +3,8 @@
 ## Unreleased
 
 ### Changed
-- when using `gtt-get-accessions-from-GTDB`, if the requested taxon has spaces in it (e.g., `gtt-get-accessions-from-GTDB -t "Bacillus_A anthracis"`), the output files will have spaces replaced with dashes now, e.g., giving "GTDB-Bacillus_A-anthracis-species-accs.txt" instead of "GTDB-Bacillus_A anthracis-species-accs.txt"
+- when using `gtt-get-accessions-from-GTDB`, if the requested taxon has spaces in it (e.g., `gtt-get-accessions-from-GTDB -t "Bacillus_A anthracis"`), the output files will have spaces replaced with dashes now
+  - e.g., one of the outputs will now be "GTDB-Bacillus_A-anthracis-species-accs.txt" instead of "GTDB-Bacillus_A anthracis-species-accs.txt"
 
 ---
 
