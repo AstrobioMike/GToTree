@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
-to facilitate accessing and using taxonomy and genomes from the glorious Genome Taxonomy 
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki)
+to facilitate accessing and using taxonomy and genomes from the glorious Genome Taxonomy
 Database (gtdb.ecogenomic.org/).
 
 For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
@@ -153,7 +153,7 @@ def color_text(text, color='green'):
 
 
 def wprint(text):
-    print(textwrap.fill(text, width=80, initial_indent="  ", 
+    print(textwrap.fill(text, width=80, initial_indent="  ",
           subsequent_indent="  ", break_on_hyphens=False))
 
 
@@ -193,6 +193,8 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
 
     if taxon != "all":
 
+        out_taxon = taxon.replace(" ", "-")
+
         if not representatives_source:
 
             ranks_found_in = get_unique_taxon_counts(taxon, gtdb_tab, return_ranks_found_in=True)
@@ -216,8 +218,8 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
             # subsetting table and writing out that and accessions list
             gtdb_sub_tab = gtdb_tab[gtdb_tab[rank] == taxon]
 
-            tab_out_filename = "GTDB-" + taxon + "-" + rank + "-metadata.tsv"
-            acc_out_filename = "GTDB-" + taxon + "-" + rank + "-accs.txt"
+            tab_out_filename = "GTDB-" + out_taxon + "-" + rank + "-metadata.tsv"
+            acc_out_filename = "GTDB-" + out_taxon + "-" + rank + "-accs.txt"
 
             gtdb_sub_tab.to_csv(tab_out_filename, sep="\t", index=False)
 
@@ -257,8 +259,8 @@ def get_accessions(taxon, gtdb_tab, gtdb_rep_tab=None, rank=None, representative
             # subsetting table and writing out that and accessions list
             gtdb_sub_rep_tab = gtdb_rep_tab[gtdb_rep_tab[rank] == taxon]
 
-            tab_out_filename = "GTDB-" + taxon + "-" + rank + "-" + representatives_source + "-rep-metadata.tsv"
-            acc_out_filename = "GTDB-" + taxon + "-" + rank + "-" + representatives_source + "-rep-accs.txt"
+            tab_out_filename = "GTDB-" + out_taxon + "-" + rank + "-" + representatives_source + "-rep-metadata.tsv"
+            acc_out_filename = "GTDB-" + out_taxon + "-" + rank + "-" + representatives_source + "-rep-accs.txt"
 
             gtdb_sub_rep_tab.to_csv(tab_out_filename, sep="\t", index=False)
 
@@ -556,7 +558,7 @@ def get_gtdb_tab(prevent_database_version_check, store_db_metadata_in_current_wo
             print("")
             wprint(color_text("Downloading and parsing archaeal and bacterial metadata tables from GTDB (only needs to be done once)...", "yellow"))
             print("")
-            
+
             gtdb_tab = gen_gtdb_tab(GTDB_dir)
 
             # reporting version info
