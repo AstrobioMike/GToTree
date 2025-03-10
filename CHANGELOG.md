@@ -1,6 +1,9 @@
 # Change Log
 
-## Unreleased
+## v1.8.11 (10-Mar-2025)
+
+### Added
+- VeryFastTree is now an available treeing program (`-T`)
 
 ### Changed
 - when using `gtt-get-accessions-from-GTDB`, if the requested taxon has spaces in it (e.g., `gtt-get-accessions-from-GTDB -t "Bacillus_A anthracis"`), the output files will have spaces replaced with dashes now
