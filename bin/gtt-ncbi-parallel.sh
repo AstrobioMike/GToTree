@@ -214,8 +214,6 @@ if [ -s ${tmp_dir}/${assembly}_genes3.tmp ]; then
 
     fi
 
-    printf "\n\n    ${debug_flag}\n\n"
-
     if [ $debug_flag == "true" ]; then
         printf "\n\n   Debug mode on, keeping intermediate files.\n\n"
         if [ -s ${tmp_dir}/${assembly}_genes2.tmp ]; then

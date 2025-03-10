@@ -142,18 +142,13 @@ help_menu()
 
     printf "        - [-T <str>] tree program to use; default: FastTreeMP if available, FastTree if not\n"
     printf "                  Which program to use for tree generation. Currently supported are\n"
-    printf "                  \"FastTree\", \"FastTreeMP\", and \"IQ-TREE\". As of now, these run with\n"
+    printf "                  \"FastTree\", \"FastTreeMP\", \"VeryFastTree\", and \"IQ-TREE\". These run with\n"
     printf "                  default settings only (and IQ-TREE includes \"-m MFP\" and \"-B 1000\"). To\n"
-    printf "                  run either with more specific options (and there is a lot of room for\n"
+    printf "                  run any with more specific options (and there is a lot of room for\n"
     printf "                  variation here), you can use the output alignment file from GToTree (and\n"
     printf "                  the partitions file if wanted for mixed-model specification) as input into\n"
-    printf "                  a dedicated treeing program.\n"
-    printf "                  Note on FastTreeMP (http://www.microbesonline.org/fasttree/#OpenMP). FastTreeMP\n"
-    printf "                  parallelizes some steps of the treeing step. Currently, conda installs\n"
-    printf "                  FastTreeMP with FastTree on linux systems, but not on Mac OSX systems.\n"
-    printf "                  So if using the conda installation, you may not have FastTreeMP if on a Mac,\n"
-    printf "                  in which case FastTree will be used instead - this will be reported when the\n"
-    printf "                  program starts, and be in the log file.\n\n"
+    printf "                  a dedicated treeing program (the GToTree \`-N\` option will generate the alignment\n"
+    printf "                  only to skip internal treeing if wanted).\n\n"
 
     printf "        - [-n <int> ] num cpus; default: 2\n"
     printf "                  The number of cpus you'd like to use during the HMM search. (Given\n"
@@ -170,12 +165,11 @@ help_menu()
     printf "                  The number of jobs you'd like to run in parallel during steps\n"
     printf "                  that are parallelizable. This includes things like downloading input\n"
     printf "                  accession genomes and running parallel alignments, and portions of the\n"
-    printf "                  tree step if using FastTree on a Linux system (e.g. see FastTree docs\n"
-    printf "                  here: http://www.microbesonline.org/fasttree/#OpenMP).\n\n"
+    printf "                  tree step if using FastTreeMP or VeryFastTree.\n\n"
     printf "                  Note that I've occassionally noticed NCBI not being happy with over ~50\n"
     printf "                  downloads being attempted concurrently. So if using a \`-j\` setting around\n"
     printf "                  there or higher, and GToTree is saying a lot of input accessions were not\n"
-    printf "                  successfully downloaded, consider trying with fewer.\n\n"
+    printf "                  successfully downloaded, consider trying with a lower \`-j\` setting.\n\n"
 
     printf "        - [-X ] override super5 alignment; default: false\n"
     printf "                  If working with greater than 1,000 target genomes, GToTree will by default\n"
@@ -259,6 +253,7 @@ trimal_used="false"
 taxonkit_used="false"
 gtdb_used="false"
 fasttree_used="false"
+veryfasttree_used="false"
 iqtree_used="false"
 universal_SCGs_used="false"
 pfam_db_used="false"
@@ -348,13 +343,13 @@ fi
 
 
 # checking specified tree program is one of the expected ones
-if [ $tree_program != "FastTreeMP" ] && [ $tree_program != "FastTree" ] && [ $tree_program != "IQ-TREE" ]; then
+if [ $tree_program != "FastTreeMP" ] && [ $tree_program != "FastTree" ] && [ $tree_program != "VeryFastTree" ] && [ $tree_program != "IQ-TREE" ]; then
 
     printf "\n  ${RED}You specified to use $tree_program as the treeing program, but that is not one of the options :(${NC}\n"
-    printf "\n  Currently available options are 'FastTreeMP' (the default), 'FastTree', or 'IQ-TREE'.\n\n"
+    printf "\n  Currently available options are 'FastTreeMP' (the default), 'FastTree', 'VeryFastTree', or 'IQ-TREE'.\n\n"
 
     printf "  You can also run GToTree in alignment-only mode by adding the \"-N\" flag,\n"
-    printf "  and then take your concatenated alignment to another tree program :)\n"
+    printf "  and then take your concatenated alignment to any tree program you wish :)\n"
     printf "\nExiting for now.\n\n"
     exit
 
@@ -370,10 +365,19 @@ if [ $tree_program == "FastTreeMP" ]; then
     fi
 fi
 
+# checking veryfasttree is available if it was specified
+if [ $tree_program == "VeryFastTree" ]; then
+    if ! command -v VeryFastTree > /dev/null; then
+        printf "\n  ${RED}You specified to use VeryFastTree, but 'VeryFastTree' is not found in your PATH :(${NC}\n"
+        printf "\nExiting for now.\n\n"
+        exit
+    fi
+fi
+
 # checking iqtree is available if it was specified
 if [ $tree_program == "IQ-TREE" ]; then
     if ! command -v iqtree > /dev/null; then
-        printf "\n  ${RED}You specified to use IQ-TREE, but 'iqtree' not found in your PATH :(${NC}\n"
+        printf "\n  ${RED}You specified to use IQ-TREE, but 'iqtree' is not found in your PATH :(${NC}\n"
         printf "\nExiting for now.\n\n"
         exit
     fi
@@ -1632,7 +1636,6 @@ if [ -n "$NCBI_acc_file" ]; then
         fi
     else
         if [ "$nucleotide" == 'false' ]; then
-            printf "\n\ndebug flag is $debug_flag\n\n"
             cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel --quote -j "$num_jobs" -- gtt-ncbi-parallel.sh "{}" "$tmp_dir" "$hmm_file" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
         else
             cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel --quote -j "$num_jobs" -- gtt-ncbi-parallel-nt.sh "{}" "$tmp_dir" "$hmm_file" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
@@ -3544,6 +3547,29 @@ if [ $align_only == 'false' ]; then
     fi
 
 
+    if [ $tree_program == 'VeryFastTree' ]; then
+
+        printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ####                        Running VeryFastTree                          ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+        curr_time=$(date +"%I:%M %p")
+        duration=$SECONDS
+
+        printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+        printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+        if [ $nucleotide == 'false' ]; then
+            VeryFastTree -threads ${num_jobs} ${alignment_file} > ${tree_file} 2> >(tee -a $gtotree_log >&2)
+        else
+            VeryFastTree -threads ${num_jobs} -nt -gtr ${alignment_file} > ${tree_file} 2> >(tee -a $gtotree_log >&2)
+        fi
+
+        veryfasttree_used="true" # setting to report citations at end
+
+    fi
+
+
     if [ $tree_program == 'IQ-TREE' ]; then
 
         printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
@@ -3784,9 +3810,19 @@ if [ $gtdb_used == "true" ]; then
     printf "Genome Taxonomy Database (GTDB) ${gtdb_version}; ${gtdb_release_date}\nParks DH et al. A complete domain-to-species taxonomy for Bacteria and Archaea. Nat. Biotech. 2020. doi.org/10.1038/s41587-020-0501-8\n\n" >> ${output_dir}/citations.txt
 fi
 
+if [ $veryfasttree_used == "true" ]; then
+    veryfasttree_version=$(VeryFastTree -h | head -n 1 | cut -f 2 -d " ")
+    printf "VeryFastTree v${veryfasttree_version}\nPineiro C et al. VeryFastTree: speeding up the estimation of phylogenies for large alignments through parallelization and vectorization strategies. Bioinformatics. 2020. doi.org/10.1093/bioinformatics/btaa582\n\n" >> ${output_dir}/citations.txt
+    fasttree_used="true" # setting so the fasttree citation is included too since this is built off of that
+fi
+
 if [ $fasttree_used == "true" ]; then
-    fasttree_version=$(fasttree -expert 2>&1 | head -n 1 | tr -s " " "\t" | cut -f 5)
-    printf "FastTree 2 v${fasttree_version}\nPrice MN et al. FastTree 2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi.org/10.1371/journal.pone.0009490\n\n" >> ${output_dir}/citations.txt
+    if [ $veryfasttree_used == "true" ]; then
+        printf "FastTree2 (VeryFastTree, noted above, is an optimized re-implementation of FastTree2, so you should probably cite both even though FastTree2 wasn't directly used here.)\nPrice MN et al. FastTree 2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi.org/10.1371/journal.pone.0009490\n\n" >> ${output_dir}/citations.txt
+    else
+        fasttree_version=$(FastTree -expert 2>&1 | head -n 1 | tr -s " " "\t" | cut -f 5)
+        printf "FastTree2 v${fasttree_version}\nPrice MN et al. FastTree2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi.org/10.1371/journal.pone.0009490\n\n" >> ${output_dir}/citations.txt
+    fi
 fi
 
 if [ $iqtree_used == "true" ]; then
