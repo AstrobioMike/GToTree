@@ -89,13 +89,15 @@ def gen_gtdb_tab(location):
     """ downloads and parses the GTDB info tables """
 
     # getting archaea
-    arc_tsv_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/ar53_metadata.tsv.gz")
+    # arc_tsv_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/ar53_metadata.tsv.gz")
+    arc_tsv_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar53_metadata.tsv.gz")
     arc_tab = pd.read_csv(arc_tsv_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     arc_tab.rename(columns={arc_tab.columns[0]:"accession"}, inplace=True)
     arc_tab.dropna(inplace=True, how="all")
 
     # getting bacteria
-    bac_tsv_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/bac120_metadata.tsv.gz")
+    # bac_tsv_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/bac120_metadata.tsv.gz")
+    bac_tsv_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tsv.gz")
     bac_tab = pd.read_csv(bac_tsv_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     bac_tab.rename(columns={bac_tab.columns[0]:"accession"}, inplace=True)
     bac_tab.dropna(inplace=True, how="all")
