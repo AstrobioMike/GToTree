@@ -1,5 +1,12 @@
 # Change Log
 
+## v1.8.12 (11-Mar-2025)
+
+### Changed
+- changed GTDB download links from https://data.gtdb.ecogenomic.org/releases/ to https://data.ace.uq.edu.au/public/gtdb/data/releases/ due to the former becoming prohibitively slow recently
+
+---
+
 ## v1.8.11 (10-Mar-2025)
 
 ### Added
