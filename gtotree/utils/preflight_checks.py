@@ -100,6 +100,7 @@ def checks_for_input_files(args):
         args.amino_acid_files = path
     return args
 
+
 def check_for_required_dbs(args):
     if args.ncbi_accessions or args.add_ncbi_tax:
         get_ncbi_data(use_http=args.use_http)
