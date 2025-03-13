@@ -7,68 +7,34 @@ to download the NCBI assembly summary tables if they are not present, or are mor
 
 import sys
 import os
-import urllib.request
 import argparse
 import shutil
-import textwrap
-from datetime import date, timedelta
-import filecmp
-import tarfile
-import gzip
-
-parser = argparse.ArgumentParser(description="This is a helper program to download and setup the NCBI assembly summary tables if they are \
-                                              not present, or are older than 4 weeks.", \
-                                 epilog="Ex. usage: gtt-get-ncbi-assembly-tables\n")
-
-parser.add_argument("-P", "--use-http", help='Use http instead of ftp', action = "store_true")
-parser.add_argument("-f", "--force-update", help='Force an update regardless of last date retrieved', action = "store_true")
-
-
-args = parser.parse_args()
-
+from datetime import date
+from gtotree.utils.messaging import wprint, color_text, report_message, report_early_exit
+from gtotree.utils.general import download_with_tqdm
 
 ################################################################################
 
 def main():
 
-    NCBI_assembly_data_dir = check_location_var_is_set()
+    parser = argparse.ArgumentParser(description="This is a helper program to download and setup the NCBI assembly summary tables if they are \
+                                              not present, or are older than 4 weeks.", \
+                                 epilog="Ex. usage: get_ncbi_assembly_tables.py\n")
 
-    data_present = check_if_data_present_and_less_than_4_weeks_old(NCBI_assembly_data_dir)
+    parser.add_argument("-P", "--use-http", help='Use http instead of ftp', action = "store_true")
+    parser.add_argument("-f", "--force-update", help='Force an update regardless of last date retrieved', action = "store_true")
 
-    if data_present and not args.force_update:
-        exit()
+    args = parser.parse_args()
 
-    else:
-
-        get_NCBI_assembly_summary_data(NCBI_assembly_data_dir)
+    get_ncbi_data(use_http=args.use_http, force_update=args.force_update)
 
 ################################################################################
 
 
-# setting some colors
-tty_colors = {
-    'green' : '\033[0;32m%s\033[0m',
-    'yellow' : '\033[0;33m%s\033[0m',
-    'red' : '\033[0;31m%s\033[0m'
-}
-
-
 ### functions ###
-def color_text(text, color='green'):
-    if sys.stdout.isatty():
-        return tty_colors[color] % text
-    else:
-        return text
-
-
-def wprint(text):
-    print(textwrap.fill(text, width=80, initial_indent="                      ",
-          subsequent_indent="  ", break_on_hyphens=False))
-
-
 def check_location_var_is_set():
 
-    # making sure there is a KO_data_dir env variable
+    # making sure there is a NCBI_assembly_data_dir env variable
     try:
         NCBI_data_dir = os.environ['NCBI_assembly_data_dir']
     except:
@@ -130,12 +96,12 @@ def check_if_data_present_and_less_than_4_weeks_old(location):
         return(True)
 
 
-def get_NCBI_assembly_summary_data(location):
+def get_NCBI_assembly_summary_data(location, use_http=False):
 
     """ downloads the needed ncbi assembly summary tables and combines them """
 
     # setting links
-    if args.use_http:
+    if use_http:
 
         genbank_link = "https://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt"
         refseq_link = "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt"
@@ -150,8 +116,13 @@ def get_NCBI_assembly_summary_data(location):
 
     print(color_text("    Downloading NCBI assembly summaries (only done once, or updated after 4 weeks)...\n", "yellow"))
 
-    urllib.request.urlretrieve(genbank_link, table_path)
-    urllib.request.urlretrieve(refseq_link, refseq_temp_path)
+    try:
+        download_with_tqdm(genbank_link, table_path, "        Genbank assemblies summary")
+        download_with_tqdm(refseq_link, refseq_temp_path, "        RefSeq assemblies summary")
+    except Exception as e:
+        report_message(f"Downloading the NCBI assembly summary tables failed with the following error:\n{e}", "red")
+        report_message(f"Maybe try running with the `-P` flag to use http instead of ftp.")
+        report_early_exit()
 
     # combining
     with open (table_path, "a") as final_table:
@@ -170,6 +141,16 @@ def get_NCBI_assembly_summary_data(location):
 
     with open(date_retrieved_path, "w") as outfile:
         outfile.write(date_retrieved + "\n")
+
+
+def get_ncbi_data(use_http=False, force_update=False):
+    ncbi_dir = check_location_var_is_set()
+    data_up_to_date = check_if_data_present_and_less_than_4_weeks_old(ncbi_dir)
+
+    if data_up_to_date and not force_update:
+        return
+    else:
+        get_NCBI_assembly_summary_data(ncbi_dir, use_http)
 
 ################################################################################
 

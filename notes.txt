@@ -1,0 +1,29 @@
+conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
+
+conda activate gtotree-dev
+conda install tqdm=4.67.1
+
+pip install -e gtotree/
+
+# example test
+gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -j 4 -t -P
+
+## TO DO
+
+# add check for minimum required arguments prior to checking all input files
+
+# do all checks and print out all settings before starting db downloads
+
+# check if i should just use http all the time (or have an option for ftp, instead of ftp by default)
+    # would affect: get_ncbi_assembly_tables.py
+        # get_ncbi_assembly_tables.py
+        # ncbi assembly downloads
+        # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree)
+
+
+## CHANGES
+
+# default output changed to "gtotree-output"
+# default lineage settings are D,P,C,S (no longer strain)
+
+

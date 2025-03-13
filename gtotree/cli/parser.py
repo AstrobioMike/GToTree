@@ -67,7 +67,7 @@ def parser():
     opt.add_argument("-n", "--num-cpus", metavar="<int>", type=int, default=2)
     opt.add_argument("-M", "--muscle-threads", metavar="<int>", type=int, default=5)
     opt.add_argument("-X", "--no-super5", action="store_true")
-    opt.add_argument("-P", "--http", action="store_true")
+    opt.add_argument("-P", "--use-http", action="store_true")
     opt.add_argument("-F", "--force-overwrite", action="store_true")
     opt.add_argument("-d", "--debug", action="store_true")
 

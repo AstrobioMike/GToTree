@@ -14,6 +14,7 @@ def gtotree_header():
 
                                    GToTree v{version('GToTree')}
                          (github.com/AstrobioMike/GToTree)
+
     """
     return header
 
@@ -37,6 +38,11 @@ def wprint(text):
 def report_message(message, color = "yellow"):
     print("")
     wprint(color_text(message, color))
+
+
+def report_missing_input_genomes_file(path, flag):
+    report_message(f'You specified "{path}" as a source of input genomes to use (passed to `{flag}`), but that file can\'t be found.')
+    report_early_exit()
 
 
 def report_early_exit(message = None, color = "red", suggest_help = False):
