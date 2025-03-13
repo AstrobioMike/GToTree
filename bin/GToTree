@@ -205,6 +205,7 @@ if [ "$#" == 0 ] || [ $1 == "-h" ] || [ $1 == "help" ]; then
     help_menu
 fi
 
+### STILL NEEDED ###
 # storing the command as entered for the log file
 command_call="$(printf %q "$BASH_SOURCE")$(printf ' %q' "$@")"
 command_call=$(printf "$command_call" | sed 's/\\,/,/g')
@@ -247,9 +248,6 @@ fi
 #############################################################################
 parallel_used="false"
 prodigal_used="false"
-hmmer_used="false"
-muscle_used="false"
-trimal_used="false"
 taxonkit_used="false"
 gtdb_used="false"
 fasttree_used="false"
@@ -269,7 +267,7 @@ taxonkit_id_swap='false'
 gtdb_id_swap='false'
 debug_flag='false'
 overwrite_output_dir='false'
-lineage_spec="Domain,Phylum,Class,Species,Strain"
+lineage_spec="Domain,Phylum,Class,Species"
 best_hit_mode='false'
 align_only='false'
 keep_individual_alignments='false'
@@ -322,7 +320,7 @@ done
 
 
 # checking if `-L` argument was set that also `-t` or `-D` were provided, otherwise no tax info is added
-if [ $lineage_spec != "Domain,Phylum,Class,Species,Strain" ]; then
+if [ $lineage_spec != "Domain,Phylum,Class,Species" ]; then
     if [ $taxonkit_id_swap != "true" ] && [ $gtdb_id_swap != "true" ]; then
         printf "\n  ${RED}You specified to add lineage info to headers with the \`-L ...\` argument, but\n"
         printf "  neither the \`-t\` nor \`-D\` flags were provided to indicate which taxonomy to use :(${NC}\n\n"

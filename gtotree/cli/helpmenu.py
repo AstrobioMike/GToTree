@@ -1,10 +1,8 @@
-from importlib.metadata import version
-from gtotree.utils.messaging import color_text
+from gtotree.utils.messaging import color_text, gtotree_header
 
-helpmenu = f"""
-                                   GToTree v{version('GToTree')}
-                         (github.com/AstrobioMike/GToTree)
+helpmenu = gtotree_header()
 
+helpmenu += f"""
 
  ----------------------------------  {color_text("HELP INFO", "yellow")}  ----------------------------------
 
@@ -153,8 +151,8 @@ helpmenu = f"""
 
         - [-T <str>] tree program to use; default: FastTreeMP
                   Which program to use for tree generation. Currently supported
-                  are "FastTree", "FastTreeMP", "VeryFastTree", and "IQ-TREE".
-                  These run with default settings only (and IQ-TREE includes
+                  are "FastTree", "FastTreeMP", "VeryFastTree", and "IQTREE".
+                  These run with default settings only (and IQTREE includes
                   "-m MFP" and "-B 1000"). To run any with more specific options
                   you can use the output alignment file from GToTree (and the
                   partitions file if wanted for mixed-model specification) as
@@ -214,4 +212,8 @@ helpmenu = f"""
  --------------------------------  {color_text("EXAMPLE USAGE", "yellow")}  --------------------------------
 
 	GToTree -a ncbi-accessions.txt -f fasta-files.txt -H Bacteria -D -j 4
+
 """
+
+
+

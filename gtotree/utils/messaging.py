@@ -1,11 +1,25 @@
 import textwrap
 import sys
+from importlib.metadata import version
 
 tty_colors = {
     'green' : '\033[0;32m%s\033[0m',
     'yellow' : '\033[0;33m%s\033[0m',
     'red' : '\033[0;31m%s\033[0m'
 }
+
+
+def gtotree_header():
+    header = f"""
+
+                                   GToTree v{version('GToTree')}
+                         (github.com/AstrobioMike/GToTree)
+    """
+    return header
+
+
+def get_version():
+    return version('GToTree')
 
 
 def color_text(text, color = 'green'):
@@ -25,8 +39,11 @@ def report_message(message, color = "yellow"):
     wprint(color_text(message, color))
 
 
-def report_failure(message, color = "red"):
-    print("")
-    wprint(color_text(message, color))
+def report_early_exit(message = None, color = "red", suggest_help = False):
+    if message:
+        print("")
+        wprint(color_text(message, color))
+    if suggest_help:
+        print("\n  See `GToTree -h` for more info.")
     print("\nExiting for now :(\n")
     sys.exit(1)
