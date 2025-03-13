@@ -4,7 +4,7 @@ from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_data
 from gtotree.utils.kos.get_kofamscan_data import setup_kofamscan_data
 from gtotree.utils.general import ToolsUsed, check_path, check_expected_single_column_input
 
-def perform_preflight_checks(args):
+def preflight_checks(args):
     check_for_essential_deps()
     check_optional_deps(args)
     args = primary_args_validation(args)

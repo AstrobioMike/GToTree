@@ -38,11 +38,8 @@ def check_path(path, flag):
 def check_expected_single_column_input(path, flag):
 
     check_for_whitespace(path, flag)
-    print(path)
     path = check_line_endings(path, flag)
-    print(path)
     path = check_for_duplicates(path, flag)
-    print(path)
 
     return path
 

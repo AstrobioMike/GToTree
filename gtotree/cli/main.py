@@ -7,7 +7,7 @@ def main(args = None):
         args = parser().parse_args()
 
     print(gtotree_header())
-    print(args)
+
     args, tools_used = perform_preflight_checks(args)
-    print(args)
+
 
