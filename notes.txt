@@ -6,11 +6,17 @@ conda install tqdm=4.67.1
 pip install -e gtotree/
 
 # example test
+gtotree2 -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -j 4 -t -P
+
+GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -j 4 -t -P -F
+
 gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -j 4 -t -P
 
-## TO DO
 
-# add check for minimum required arguments prior to checking all input files
+
+### TO DO ###
+
+# check on mapping file (preflight_checks.py)
 
 # do all checks and print out all settings before starting db downloads
 
@@ -21,9 +27,23 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
         # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree)
 
 
-## CHANGES
+
+### CHANGES ###
 
 # default output changed to "gtotree-output"
 # default lineage settings are D,P,C,S (no longer strain)
 
 
+
+### IMPROVEMENTS to highlight in paper ###
+
+# python packaging and structure (rather than 4,000 lines of bash as main runner with dozens of individual python helper scripts)
+# instead of just exiting and informing when input files have problems, GToTree2 fixes them
+    # e.g., duplicate entries will be unique'd, windows line-endings will be converted, changes written to a new file that is then used
+# snakemake control over the main components for easier restart capabilities
+# things i've added over time
+    # gtt-gen-SCG-HMMs
+    # gtt-get-GTDB-accessions
+    # gtt-subset...
+    # new prepackaged HMMs based on GTDB taxonomy
+    # in tandem scanning of target KOs or pfams, files for added vizualization in iToL

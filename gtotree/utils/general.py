@@ -1,10 +1,9 @@
-import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import List
 from tqdm import tqdm # type: ignore
 import urllib.request
-from gtotree.utils.messaging import report_missing_input_genomes_file, report_message, report_early_exit
-import time
+
 
 @dataclass
 class ToolsUsed:
@@ -30,72 +29,91 @@ def download_with_tqdm(url, filename, target):
     sys.stdout.write("")
 
 
-def check_path(path, flag):
-    if not os.path.isfile(path):
-        report_missing_input_genomes_file(path, flag)
+def populate_input_genome_data(args):
+    input_genome_data = InputGenomeData()
 
+    if args.ncbi_accessions:
+        with open(args.ncbi_accessions, "r") as f:
+            entries_list = f.read().splitlines()
+        input_genome_data.ncbi_accessions = entries_list
 
-def check_expected_single_column_input(path, flag):
+    if args.genbank_files:
+        with open(args.genbank_files, "r") as f:
+            entries_list = f.read().splitlines()
+        input_genome_data.genbank_files = entries_list
 
-    check_for_whitespace(path, flag)
-    path = check_line_endings(path, flag)
-    path = check_for_duplicates(path, flag)
+    if args.fasta_files:
+        with open(args.fasta_files, "r") as f:
+            entries_list = f.read().splitlines()
+        input_genome_data.fasta_files = entries_list
 
-    return path
+    if args.amino_acid_files:
+        with open(args.amino_acid_files, "r") as f:
+            entries_list = f.read().splitlines()
+        input_genome_data.amino_acid_files = entries_list
 
+    return input_genome_data
 
-def check_for_whitespace(path, flag):
+@dataclass
+class InputGenomeData:
+    ncbi_accessions: List[str] = field(default_factory=list)
+    genbank_files: List[str] = field(default_factory=list)
+    fasta_files: List[str] = field(default_factory=list)
+    amino_acid_files: List[str] = field(default_factory=list)
 
-    # there should be no tabs or spaces in these input files
-    with open(path, 'r') as f:
-        lines = [line.strip() for line in f if line.strip()]
+    removed_ncbi_accessions: List[str] = field(default_factory=list)
+    removed_genbank_files: List[str] = field(default_factory=list)
+    removed_fasta_files: List[str] = field(default_factory=list)
+    removed_amino_acid_files: List[str] = field(default_factory=list)
 
-    for line in lines:
-        if " " in line:
-            report_early_exit(f'The specified input genomes file "{path}" (passed to `{flag}`) contains spaces in one or more entries. '
-                              f'That is not expected and will break things. Please double-check things and remove any whitespace from the file.', suggest_help=True)
-        if "\t" in line:
-            report_early_exit(f'The specified input genomes file "{path}" (passed to `{flag}`) contains tabs in one or more entries. '
-                              f'That is not expected and will break things. Please double-check things and remove any whitespace from the file.', suggest_help=True)
+    @property
+    def num_ncbi_accessions(self) -> int:
+        return len(self.ncbi_accessions)
 
+    @property
+    def num_genbank_files(self) -> int:
+        return len(self.genbank_files)
 
-def check_line_endings(path, flag):
+    @property
+    def num_fasta_files(self) -> int:
+        return len(self.fasta_files)
 
-    # checking for any CLRF line endings and creating a new file if so
-    with open(path, 'rb') as f:
-        content = f.read()
+    @property
+    def num_amino_acid_files(self) -> int:
+        return len(self.amino_acid_files)
 
-    if b'\r\n' in content:
-        new_filename = f"{path}-unix"
-        new_content = content.replace(b'\r\n', b'\n')
-        with open(new_filename, 'wb') as f:
-            f.write(new_content)
+    # def add_ncbi_accession(self, accession: str):
+    #     if accession not in self.ncbi_accessions:
+    #         self.ncbi_accessions.append(accession)
 
-        report_message(f'Input file "{path}" (passed to `{flag}`) had Windows-formatting that would have caused problems. '
-                       f'A modified version was created, "{new_filename}", which will be used.')
+    # def add_genbank_file(self, filepath: str):
+    #     if filepath not in self.genbank_files:
+    #         self.genbank_files.append(filepath)
 
-        path = new_filename
-        time.sleep(2)
+    # def add_fasta_file(self, filepath: str):
+    #     if filepath not in self.fasta_files:
+    #         self.fasta_files.append(filepath)
 
-    return path
+    # def add_amino_acid_file(self, filepath: str):
+    #     if filepath not in self.amino_acid_files:
+    #         self.amino_acid_files.append(filepath)
 
+    def remove_ncbi_accession(self, accession: str):
+        if accession in self.ncbi_accessions:
+            self.ncbi_accessions.remove(accession)
+            self.removed_ncbi_accessions.append(accession)
 
-def check_for_duplicates(path, flag):
+    def remove_genbank_file(self, filepath: str):
+        if filepath in self.genbank_files:
+            self.genbank_files.remove(filepath)
+            self.removed_genbank_files.append(filepath)
 
-    # checking for duplicates in the input file
-    with open(path, 'r') as f:
-        lines = [line.strip() for line in f if line.strip()]
+    def remove_fasta_file(self, filepath: str):
+        if filepath in self.fasta_files:
+            self.fasta_files.remove(filepath)
+            self.removed_fasta_files.append(filepath)
 
-    if len(lines) != len(set(lines)):
-        new_filename = f"{path}-unique"
-        new_lines = list(set(lines))
-        with open(new_filename, 'w') as f:
-            f.write("\n".join(new_lines))
-
-        report_message(f'Input file "{path}" (passed to `{flag}`) had duplicate entries that would have caused problems. '
-                       f'A modified version was created, "{new_filename}", which will be used.')
-
-        path = new_filename
-        time.sleep(2)
-
-    return path
+    def remove_amino_acid_file(self, filepath: str):
+        if filepath in self.amino_acid_files:
+            self.amino_acid_files.remove(filepath)
+            self.removed_amino_acid_files.append(filepath)

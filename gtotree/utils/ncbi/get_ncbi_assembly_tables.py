@@ -26,7 +26,7 @@ def main():
 
     args = parser.parse_args()
 
-    get_ncbi_data(use_http=args.use_http, force_update=args.force_update)
+    get_ncbi_assembly_data(use_http=args.use_http, force_update=args.force_update)
 
 ################################################################################
 
@@ -143,7 +143,7 @@ def get_NCBI_assembly_summary_data(location, use_http=False):
         outfile.write(date_retrieved + "\n")
 
 
-def get_ncbi_data(use_http=False, force_update=False):
+def get_ncbi_assembly_data(use_http=False, force_update=False):
     ncbi_dir = check_location_var_is_set()
     data_up_to_date = check_if_data_present_and_less_than_4_weeks_old(ncbi_dir)
 

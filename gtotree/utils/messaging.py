@@ -14,7 +14,6 @@ def gtotree_header():
 
                                    GToTree v{version('GToTree')}
                          (github.com/AstrobioMike/GToTree)
-
     """
     return header
 

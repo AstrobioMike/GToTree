@@ -26,7 +26,7 @@ def main():
         description="Setup the KOFamScan (https://github.com/takaram/kofam_scan) data files for use.",
         epilog="Example usage: gtt-get-kofamscan-data"
     )
-    setup_kofamscan_data()
+    get_kofamscan_data()
 
 ################################################################################
 
@@ -74,10 +74,7 @@ def report_KOFam_dl_failure(e):
 
 
 def check_if_data_present(location):
-    """
-    Checks if the KOFamScan data is present and up-to-date in the specified directory.
-    Returns True if data is present and up-to-date, otherwise False.
-    """
+
     readme_path = os.path.join(location, "README")
     ko_list_path = os.path.join(location, "ko_list")
     hmms_dir_path = os.path.join(location, "profiles")
@@ -107,9 +104,7 @@ def check_if_data_present(location):
 
 
 def download_kofamscan_data(location):
-    """
-    Downloads and sets up the KOFamScan data files from the remote server.
-    """
+
     readme_url = "ftp://ftp.genome.jp/pub/db/kofam/README"
     ko_list_gz_url = "ftp://ftp.genome.jp/pub/db/kofam/ko_list.gz"
     hmms_tar_url = "ftp://ftp.genome.jp/pub/db/kofam/profiles.tar.gz"
@@ -129,29 +124,22 @@ def download_kofamscan_data(location):
     except Exception as e:
         report_KOFam_dl_failure(e)
 
-    # Decompress ko_list.gz to ko_list
     with gzip.open(ko_list_gz_path, 'rb') as f_in:
         with open(ko_list_path, 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
     os.remove(ko_list_gz_path)
 
-    # Unpack profiles.tar.gz into the specified directory
     with tarfile.open(hmms_tar_path) as tarball:
         tarball.extractall(location)
     os.remove(hmms_tar_path)
 
 
-def setup_kofamscan_data():
-    """
-    High-level function to check for the presence and freshness of the KOFamScan data.
-    If data is missing or outdated, it downloads and sets up the data.
-    """
+def get_kofamscan_data():
     ko_data_dir = check_location_var_is_set()
     if check_if_data_present(ko_data_dir):
-        return  # Data is present and up-to-date.
+        return
     else:
-        wprint(color_text("Downloading required KO data (only needs to be done once, unless newer HMMs become available)...", "yellow"))
-        print("")
+        print(color_text("    Downloading required KO data (only needs to be done once, unless newer HMMs become available)...\n", "yellow"))
         download_kofamscan_data(ko_data_dir)
 
 

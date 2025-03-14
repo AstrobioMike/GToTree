@@ -3,6 +3,7 @@ from gtotree.utils.messaging import color_text, gtotree_header
 helpmenu = gtotree_header()
 
 helpmenu += f"""
+
  ----------------------------------  {color_text("HELP INFO", "yellow")}  ----------------------------------
 
   This program takes input genomes from various sources and ultimately produces
