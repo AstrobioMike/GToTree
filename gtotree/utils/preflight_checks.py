@@ -350,7 +350,9 @@ def check_and_report_any_changed_default_behavior(args):
         print("      - Debug mode is enabled")
 
     if args.target_pfam_file:
-        print(f"      - Genomes will be searched for Pfams listed in: \"{args.target_pfam_file}\" (<num targets> targets)")
+        print(f"      - Genomes will be searched for Pfams listed in: {args.target_pfam_file} ({args.total_pfam_targets} targets)")
 
     if args.target_ko_file:
-        print(f"      - Genomes will be searched for KOs listed in: \"{args.target_ko_file}\" (<num targets> targets)")
+        print(f"      - Genomes will be searched for KOs listed in: {args.target_ko_file} ({args.total_ko_targets} targets)")
+
+    time.sleep(3)

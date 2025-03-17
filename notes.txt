@@ -1,4 +1,4 @@
-## i'm adding code to count input ko/pfam targets
+## next: add note about filtering with too few input genomes
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
