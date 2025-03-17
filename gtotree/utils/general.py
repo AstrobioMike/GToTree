@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from typing import List
 from tqdm import tqdm # type: ignore
 import urllib.request
+from gtotree.utils.messaging import report_notice, many_genomes_notice
+import time
 
 
 @dataclass
@@ -117,3 +119,4 @@ class InputGenomeData:
         if filepath in self.amino_acid_files:
             self.amino_acid_files.remove(filepath)
             self.removed_amino_acid_files.append(filepath)
+

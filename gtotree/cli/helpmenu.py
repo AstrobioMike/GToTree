@@ -173,7 +173,7 @@ helpmenu += f"""
                   lot of input accessions were not successfully downloaded,
                   consider trying with a lower `-j` setting.
 
-        - [-n <int> ] num cpus; default: 2
+        - [-n <int> ] num HMM cpus; default: 2
                   The number of cpus you'd like to use during the HMM search.
                   Given these are individual small searches on single genomes,
                   2 is probably always sufficient. (Keep in mind this will be
@@ -196,9 +196,9 @@ helpmenu += f"""
                   working with many genomes:
                       github.com/AstrobioMike/GToTree/wiki/things-to-consider
 
-        - [-P ] use http instead of ftp; default: false
-                  Provide this flag with no arguments if your system can't use
-                  ftp, and you'd like to try using http.
+        - [-P (DEPRECATED)] use http instead of ftp (DEPRECATED)
+                  Previously, GToTree used ftp where possible by default. Now it
+                  uses http by default wherever it can, so this flag is no longer needed.
 
         - [-F ] force overwrite; default: false
                   Provide this flag with no arguments if you'd like to force

@@ -39,7 +39,7 @@ def check_location_var_is_set():
     try:
         ko_data_dir = os.environ['KO_data_dir']
     except KeyError:
-        wprint(color_text("The environment variable 'KO_data_dir' does not seem to be set :(", "yellow"))
+        wprint(color_text("The environment variable 'KO_data_dir' does not seem to be set :(", "red"))
         wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
         sys.exit(1)
     return ko_data_dir

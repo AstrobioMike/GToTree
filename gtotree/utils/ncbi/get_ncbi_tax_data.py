@@ -27,11 +27,11 @@ def main():
 
 ################################################################################
 
-def check_location_var_is_set():
+def check_tax_location_var_is_set():
     try:
         ncbi_data_dir = os.environ['TAXONKIT_DB']
     except KeyError:
-        wprint(color_text("The environment variable 'TAXONKIT_DB' does not seem to be set :(", "yellow"))
+        wprint(color_text("The environment variable 'TAXONKIT_DB' does not seem to be set :(", "red"))
         wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
         sys.exit(1)
     return ncbi_data_dir
@@ -71,7 +71,7 @@ def download_ncbi_tax_data(location):
 
 def get_ncbi_tax_data():
 
-    ncbi_data_dir = check_location_var_is_set()
+    ncbi_data_dir = check_tax_location_var_is_set()
     if check_if_data_present(ncbi_data_dir):
         return
     else:

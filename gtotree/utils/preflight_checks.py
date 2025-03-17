@@ -4,8 +4,13 @@ import time
 from gtotree.utils.messaging import (report_message,
                                      report_early_exit,
                                      report_missing_input_genomes_file,
+                                     report_missing_pfam_targets_file,
+                                     report_missing_ko_targets_file,
+                                     report_notice,
+                                     many_genomes_notice
                                      )
 from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_data
+from gtotree.utils.hmm_handling import check_hmm_file
 from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
 from gtotree.utils.kos.get_kofamscan_data import get_kofamscan_data
 from gtotree.utils.general import ToolsUsed
@@ -40,8 +45,7 @@ def primary_args_validation(args):
     check_lineage(args)
     check_tree_program(args)
     checks_for_nucleotide_mode(args)
-    args = checks_for_input_files(args)
-    check_mapping_file(args)
+    args = check_input_files(args)
     return args
 
 
@@ -99,36 +103,54 @@ def checks_for_nucleotide_mode(args):
             report_early_exit()
 
 
-def checks_for_input_files(args):
+def check_input_files(args):
     if args.ncbi_accessions:
-        check_path(args.ncbi_accessions, "-a")
-        path = check_expected_single_column_input(args.ncbi_accessions, "-a")
-        args.ncbi_accessions = path
+        args.ncbi_accessions = check_expected_single_column_input(args.ncbi_accessions, "-a")
     if args.genbank_files:
-        check_path(args.genbank_files, "-g")
-        path = check_expected_single_column_input(args.genbank_files, "-g")
-        args.genbank_files = path
+        args.genbank_files = check_expected_single_column_input(args.genbank_files, "-g")
     if args.fasta_files:
-        check_path(args.fasta_files, "-f")
-        path = check_expected_single_column_input(args.fasta_files, "-f")
-        args.fasta_files = path
+        args.fasta_files = check_expected_single_column_input(args.fasta_files, "-f")
     if args.amino_acid_files:
-        check_path(args.amino_acid_files, "-A")
-        path = check_expected_single_column_input(args.amino_acid_files, "-A")
-        args.amino_acid_files = path
+        args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
+
+    args = check_hmm_file(args)
+
+    if args.mapping_file:
+        check_mapping_file(args)
+
+    if args.target_pfam_file:
+        args.target_pfam_file, total_pfam_targets = check_expected_single_column_input(args.target_pfam_file, "-p", get_count=True)
+        args.total_pfam_targets = total_pfam_targets
+
+    if args.target_ko_file:
+        args.target_ko_file, total_ko_targets = check_expected_single_column_input(args.target_ko_file, "-K", get_count=True)
+        args.total_ko_targets = total_ko_targets
+
     return args
 
 
 def check_path(path, flag):
+
     if not os.path.isfile(path):
-        report_missing_input_genomes_file(path, flag)
+        if flag == "-a" or flag == "-g" or flag == "-f" or flag == "-A":
+            report_missing_input_genomes_file(path, flag)
+        if flag == "-p":
+            report_missing_pfam_targets_file(path, flag)
+        if flag == "-K":
+            report_missing_ko_targets_file(path, flag)
 
 
-def check_expected_single_column_input(path, flag):
+def check_expected_single_column_input(path, flag, get_count=False):
 
+    check_path(path, flag)
     check_for_whitespace(path, flag)
     path = check_line_endings(path, flag)
     path = check_for_duplicates(path, flag)
+
+    if get_count:
+        with open(path, 'r') as f:
+            lines = [line.strip() for line in f if line.strip()]
+        return path, len(lines)
 
     return path
 
@@ -201,11 +223,11 @@ def check_mapping_file(args):
 
 def check_for_required_dbs(args):
     if args.ncbi_accessions or args.add_ncbi_tax:
-        get_ncbi_assembly_data(use_http=args.use_http)
+        get_ncbi_assembly_data()
     if args.add_ncbi_tax:
         get_ncbi_tax_data()
-    if args.target_ko_file:
-        get_kofamscan_data()
+    # if args.target_ko_file:
+    #     get_kofamscan_data()
 
 
 def track_tools_used(args):
@@ -227,7 +249,7 @@ def track_tools_used(args):
         tools_used.fasttree_used = True
     if args.tree_program == "IQTREE":
         tools_used.iqtree_used = True
-    if args.hmm == "Universal" or args.hmm == "Universal-Hug-et-al":
+    if args.hmm == "Universal" or args.hmm == "Universal-Hug-et-al" or args.hmm == "Universal-Hug-et-al.hmm":
         tools_used.universal_SCGs_used = True
     if args.target_pfam_file:
         tools_used.pfam_db_used = True
@@ -235,3 +257,100 @@ def track_tools_used(args):
         tools_used.kofamscan_used = True
 
     return tools_used
+
+
+def check_input_genomes_amount(total_input_genomes, args):
+    if total_input_genomes >= 1000 and not args.no_super5:
+        message = many_genomes_notice(total_input_genomes)
+        report_notice(message)
+        time.sleep(30)
+
+
+def check_and_report_any_changed_default_behavior(args):
+
+    conditions = [
+        args.output != "gtotree-output",
+        args.mapping_file,
+        args.nucleotide_mode,
+        args.no_tree,
+        args.add_gtdb_tax,
+        args.add_ncbi_tax,
+        args.lineage != "Domain,Phylum,Class,Species",
+        args.tree_program != "FastTreeMP",
+        args.best_hit,
+        args.seq_length_cutoff != 0.2,
+        args.genome_hits_cutoff != 0.5,
+        args.num_jobs != 1,
+        args.num_hmm_cpus != 2,
+        args.muscle_threads != 5,
+        args.no_super5,
+        args.keep_gene_alignments,
+        args.force_overwrite,
+        args.debug,
+    ]
+
+    if any(conditions):
+        report_message("  Other options set:")
+
+    if args.output != "gtotree-output":
+        print(f"      - The output directory has been set to: \"{args.output}\"")
+
+    if args.mapping_file:
+        print(f"      - Labels of the specified input genomes will be modified based on: \"{args.mapping_file}\"")
+
+    if args.nucleotide_mode:
+        print("      - Working towards nucleotie alignments, as the `-z` flag was provided\n"
+              "          (amino-acid seqs are still used for HMM-searching of target genes)")
+
+    if args.no_tree:
+        print("      - Only generating alignment, and no tree, as the `-N` flag was provided")
+
+    if args.add_gtdb_tax:
+        print("      - GTDB taxonomic info will be added to labels where possible")
+        if args.add_ncbi_tax:
+            print("      - NCBI taxonomic info will be added where possible when GTDB is not")
+
+    if args.add_ncbi_tax and not args.add_gtdb_tax:
+        print("      - NCBI taxonomic info will be added to labels where possible")
+
+    if args.lineage != "Domain,Phylum,Class,Species":
+        print(f"      - Lineage info added to labels will be: \"{args.lineage}\"")
+
+    if args.tree_program != "FastTreeMP":
+        print(f"      - The treeing program used will be: \"{args.tree_program}\"")
+
+    if args.best_hit:
+        print("      - Running in \"best-hit\" mode")
+
+    if args.seq_length_cutoff != 0.2:
+        print(f"      - Gene-length filtering cutoff threshold (`-c`) has been set to: {args.seq_length_cutoff}")
+
+    if args.genome_hits_cutoff != 0.5:
+        print(f"      - Genome minimum gene-copy threshold (`-G`) has been set to: {args.genome_hits_cutoff}")
+
+    if args.num_jobs != 1:
+        print(f"      - The number of jobs to run during parallelizable steps has been set to: {args.num_jobs}")
+
+    if args.num_hmm_cpus != 2:
+        print(f"      - The number of CPUs used for `hmmsearch` calls will be: {args.num_hmm_cpus}")
+
+    if args.muscle_threads != 5:
+        print(f"      - The number of threads used for `muscle` calls will be: {args.muscle_threads}")
+
+    if args.no_super5:
+        print("      - The 'super5' muscle algorithm will not be used even with greater than 1,000 input genomes")
+
+    if args.keep_gene_alignments:
+        print("      - Individual protein-alignment files will retained, due to the `-k` flag being provided")
+
+    if args.force_overwrite:
+        print("      - Existing files will be overwritten, as the `-F` flag was provided")
+
+    if args.debug:
+        print("      - Debug mode is enabled")
+
+    if args.target_pfam_file:
+        print(f"      - Genomes will be searched for Pfams listed in: \"{args.target_pfam_file}\" (<num targets> targets)")
+
+    if args.target_ko_file:
+        print(f"      - Genomes will be searched for KOs listed in: \"{args.target_ko_file}\" (<num targets> targets)")

@@ -11,12 +11,14 @@ setup(
     packages=find_packages(),
     entry_points={
         "console_scripts": [
-            "gtotree2=gtotree.cli.main:main",
+            "gtotree2=gtotree.main:main",
         ],
     },
     install_requires=[
         "biopython",
         "pyarrow",
+        "pyhmmer",
+        "tqdm",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

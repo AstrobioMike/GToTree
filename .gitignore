@@ -1,3 +1,4 @@
 .DS_Store
 GToTree.egg-info/
 *__pycache__*
+build/

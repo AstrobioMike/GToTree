@@ -21,24 +21,23 @@ def main():
                                               not present, or are older than 4 weeks.", \
                                  epilog="Ex. usage: get_ncbi_assembly_tables.py\n")
 
-    parser.add_argument("-P", "--use-http", help='Use http instead of ftp', action = "store_true")
     parser.add_argument("-f", "--force-update", help='Force an update regardless of last date retrieved', action = "store_true")
 
     args = parser.parse_args()
 
-    get_ncbi_assembly_data(use_http=args.use_http, force_update=args.force_update)
+    get_ncbi_assembly_data(force_update=args.force_update)
 
 ################################################################################
 
 
 ### functions ###
-def check_location_var_is_set():
+def check_ncbi_assembly_info_location_var_is_set():
 
     # making sure there is a NCBI_assembly_data_dir env variable
     try:
         NCBI_data_dir = os.environ['NCBI_assembly_data_dir']
     except:
-        wprint(color_text("The environment variable 'NCBI_assembly_data_dir'  does not seem to be set :(", "yellow"))
+        wprint(color_text("The environment variable 'NCBI_assembly_data_dir'  does not seem to be set :(", "red"))
         wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
         print("")
         sys.exit(0)
@@ -96,20 +95,13 @@ def check_if_data_present_and_less_than_4_weeks_old(location):
         return(True)
 
 
-def get_NCBI_assembly_summary_data(location, use_http=False):
+def get_NCBI_assembly_summary_data(location):
 
     """ downloads the needed ncbi assembly summary tables and combines them """
 
     # setting links
-    if use_http:
-
-        genbank_link = "https://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt"
-        refseq_link = "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt"
-
-    else:
-
-        genbank_link = "ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt"
-        refseq_link = "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt"
+    genbank_link = "https://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt"
+    refseq_link = "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt"
 
     table_path = os.path.join(str(location), "ncbi-assembly-info.tsv")
     refseq_temp_path = os.path.join(str(location), "refseq-assembly-info.tmp")
@@ -121,7 +113,6 @@ def get_NCBI_assembly_summary_data(location, use_http=False):
         download_with_tqdm(refseq_link, refseq_temp_path, "        RefSeq assemblies summary")
     except Exception as e:
         report_message(f"Downloading the NCBI assembly summary tables failed with the following error:\n{e}", "red")
-        report_message(f"Maybe try running with the `-P` flag to use http instead of ftp.")
         report_early_exit()
 
     # combining
@@ -143,14 +134,14 @@ def get_NCBI_assembly_summary_data(location, use_http=False):
         outfile.write(date_retrieved + "\n")
 
 
-def get_ncbi_assembly_data(use_http=False, force_update=False):
-    ncbi_dir = check_location_var_is_set()
+def get_ncbi_assembly_data(force_update=False):
+    ncbi_dir = check_ncbi_assembly_info_location_var_is_set()
     data_up_to_date = check_if_data_present_and_less_than_4_weeks_old(ncbi_dir)
 
     if data_up_to_date and not force_update:
         return
     else:
-        get_NCBI_assembly_summary_data(ncbi_dir, use_http)
+        get_NCBI_assembly_summary_data(ncbi_dir)
 
 ################################################################################
 

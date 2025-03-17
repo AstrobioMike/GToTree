@@ -1,8 +1,10 @@
+## i'm adding code to count input ko/pfam targets
+
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
 conda activate gtotree-dev
 conda install tqdm=4.67.1
-
+conda install pyhmmer=0.11.0
 pip install -e gtotree/
 
 # example test
@@ -20,9 +22,9 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 # do all checks and print out all settings before starting db downloads
 
-# check if i should just use http all the time (or have an option for ftp, instead of ftp by default)
-    # would affect: get_ncbi_assembly_tables.py
-        # get_ncbi_assembly_tables.py
+# switch to only using http when available 
+    # affects:
+        # get_ncbi_assembly_tables.py (DONE)
         # ncbi assembly downloads
         # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree)
 
@@ -32,7 +34,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 # default output changed to "gtotree-output"
 # default lineage settings are D,P,C,S (no longer strain)
-
+# http is used instead of ftp always where available (used to be ftp by default with http option)
 
 
 ### IMPROVEMENTS to highlight in paper ###
@@ -47,3 +49,9 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # gtt-subset...
     # new prepackaged HMMs based on GTDB taxonomy
     # in tandem scanning of target KOs or pfams, files for added vizualization in iToL
+
+### """
+# In its first 6 years, the original GToTree received over 500 citations and had tens of thousands of Conda installs. It has been
+# successfully used and maintained over this time, despite its foundation being a main runner of ~4,000 lines of BASH and dozens of independent python
+# and BASH helper scripts with a lot of redundancy in its code base. This was purely a consequence of my capabilities at the time.
+### """
