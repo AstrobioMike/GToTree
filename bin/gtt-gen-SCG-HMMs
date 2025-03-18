@@ -8,7 +8,7 @@ For examples, please visit the GToTree wiki here: https://github.com/AstrobioMik
 For details on the process, please see: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets
 """
 
-VERSION="v1.8.12"
+VERSION="v1.8.13"
 import os
 import re
 import sys
@@ -510,18 +510,24 @@ def parallelize_get_amino_acids(df, func, num_cpus, tmp_dir):
 
 def get_latest_pfam_version():
 
-    url = 'ftp://ftp.ebi.ac.uk/pub/databases/Pfam/releases/'
+    print("")
+    wprint(color_text("NOTICE! Currently the latest PFam version we can work with is 37.0 for reasons described here: https://github.com/AstrobioMike/GToTree/issues/104", "yellow"))
+    print("")
 
-    with urllib.request.urlopen(url) as response:
-        html = response.read().decode('utf-8')
+    return "37.0"
 
-    versions = re.findall(r'Pfam(\d+\.\d+)', html)
+    # url = 'https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/'
 
-    sorted_versions = sorted(versions, key=lambda x: float(x), reverse=True)
+    # with urllib.request.urlopen(url) as response:
+    #     html = response.read().decode('utf-8')
 
-    latest_version = sorted_versions[0]
+    # versions = re.findall(r'Pfam(\d+\.\d+)', html)
 
-    return latest_version
+    # sorted_versions = sorted(versions, key=lambda x: float(x), reverse=True)
+
+    # latest_version = sorted_versions[0]
+
+    # return latest_version
 
 
 def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm", filtered_pfam_IDs_file="filtered-pfam-IDs.txt", filtered_pfams_info_file="filtered-pfams-info.tsv", filtered_pfams_hmm_file="filtered-pfams.hmm"):
@@ -548,7 +554,7 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm"
         print("")
         wprint("Downloading all PFam HMMs and filtering based on average coverage of underlying proteins...")
 
-        base_url = 'ftp://ftp.ebi.ac.uk/pub/databases/Pfam/releases/'
+        base_url = 'https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/'
 
         latest_pfam_version = get_latest_pfam_version()
 
