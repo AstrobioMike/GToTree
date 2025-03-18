@@ -1,5 +1,12 @@
 # Change Log
 
+## v1.8.13 (18-Mar-2025)
+
+### Changed
+- changed `gtt-gen-SCG-HMMs` to only use Pfam 37.0 for now (as later versions don't have one of the required files currently; see https://github.com/AstrobioMike/GToTree/issues/104)
+
+---
+
 ## v1.8.12 (11-Mar-2025)
 
 ### Changed
