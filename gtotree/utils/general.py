@@ -3,8 +3,10 @@ from dataclasses import dataclass, field
 from typing import List
 from tqdm import tqdm # type: ignore
 import urllib.request
+import contextvars
 from gtotree.utils.messaging import report_notice, many_genomes_notice
-import time
+
+log_file_var = contextvars.ContextVar("log_file", default = "gtotree-runlog.txt")
 
 
 @dataclass
@@ -21,40 +23,20 @@ class ToolsUsed:
     kofamscan_used: bool = False
 
 
-def download_with_tqdm(url, filename, target):
+def download_with_tqdm(url, target, filename=None, urlopen=False):
     with tqdm(unit='B', unit_scale=True, unit_divisor=1024, miniters=1, desc=target, ncols = 90) as t:
         def reporthook(block_num, block_size, total_size):
             if total_size > 0:
                 t.total = total_size
             t.update(block_size)
-        urllib.request.urlretrieve(url, filename, reporthook=reporthook)
-    sys.stdout.write("")
+        if not urlopen:
+            urllib.request.urlretrieve(url, filename, reporthook=reporthook)
+            sys.stdout.write("")
+        else:
+            dl = urllib.request.urlopen(url, reporthook=reporthook)
+            sys.stdout.write("")
+            return dl
 
-
-def populate_input_genome_data(args):
-    input_genome_data = InputGenomeData()
-
-    if args.ncbi_accessions:
-        with open(args.ncbi_accessions, "r") as f:
-            entries_list = f.read().splitlines()
-        input_genome_data.ncbi_accessions = entries_list
-
-    if args.genbank_files:
-        with open(args.genbank_files, "r") as f:
-            entries_list = f.read().splitlines()
-        input_genome_data.genbank_files = entries_list
-
-    if args.fasta_files:
-        with open(args.fasta_files, "r") as f:
-            entries_list = f.read().splitlines()
-        input_genome_data.fasta_files = entries_list
-
-    if args.amino_acid_files:
-        with open(args.amino_acid_files, "r") as f:
-            entries_list = f.read().splitlines()
-        input_genome_data.amino_acid_files = entries_list
-
-    return input_genome_data
 
 @dataclass
 class InputGenomeData:
@@ -120,3 +102,28 @@ class InputGenomeData:
             self.amino_acid_files.remove(filepath)
             self.removed_amino_acid_files.append(filepath)
 
+
+def populate_input_genome_data(args):
+    input_genome_data = InputGenomeData()
+
+    if args.ncbi_accessions:
+        with open(args.ncbi_accessions, "r") as f:
+            entries_list = f.read().splitlines()
+        input_genome_data.ncbi_accessions = entries_list
+
+    if args.genbank_files:
+        with open(args.genbank_files, "r") as f:
+            entries_list = f.read().splitlines()
+        input_genome_data.genbank_files = entries_list
+
+    if args.fasta_files:
+        with open(args.fasta_files, "r") as f:
+            entries_list = f.read().splitlines()
+        input_genome_data.fasta_files = entries_list
+
+    if args.amino_acid_files:
+        with open(args.amino_acid_files, "r") as f:
+            entries_list = f.read().splitlines()
+        input_genome_data.amino_acid_files = entries_list
+
+    return input_genome_data

@@ -51,7 +51,7 @@ def check_stored_data_up_to_date(location):
     latest_readme_path = os.path.join(location, "README-latest")
     remote_url = "ftp://ftp.genome.jp/pub/db/kofam/README"
     try:
-        download_with_tqdm(remote_url, latest_readme_path, "        Latest KOFam README")
+        download_with_tqdm(remote_url, "        Latest KOFam README", latest_readme_path)
     except Exception as e:
         report_KOFam_dl_failure(e)
 
@@ -115,12 +115,12 @@ def download_kofamscan_data(location):
     hmms_tar_path = os.path.join(location, "profiles.tar.gz")
 
     try:
-        download_with_tqdm(readme_url, readme_path, "        KOFam README")
+        download_with_tqdm(readme_url, "        KOFam README", readme_path)
     except Exception as e:
         report_KOFam_dl_failure(e)
     try:
-        download_with_tqdm(ko_list_gz_url, ko_list_gz_path, "        KOFam KO list")
-        download_with_tqdm(hmms_tar_url, hmms_tar_path, "        KOFam HMMs")
+        download_with_tqdm(ko_list_gz_url, "        KOFam KO list", ko_list_gz_path)
+        download_with_tqdm(hmms_tar_url, "        KOFam HMMs", hmms_tar_path)
     except Exception as e:
         report_KOFam_dl_failure(e)
 

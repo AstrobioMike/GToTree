@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import time
 from gtotree.utils.messaging import (report_message,
@@ -7,13 +8,18 @@ from gtotree.utils.messaging import (report_message,
                                      report_missing_pfam_targets_file,
                                      report_missing_ko_targets_file,
                                      report_notice,
-                                     many_genomes_notice
+                                     many_genomes_notice,
+                                     few_genomes_notice,
+                                     absurd_number_of_genomes_notice,
+                                     gtotree_header,
+                                     stdout_and_log
                                      )
-from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_data
 from gtotree.utils.hmm_handling import check_hmm_file
+from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_data
 from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
+from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.kos.get_kofamscan_data import get_kofamscan_data
-from gtotree.utils.general import ToolsUsed
+from gtotree.utils.general import ToolsUsed, log_file_var
 
 
 def preflight_checks(args):
@@ -21,6 +27,7 @@ def preflight_checks(args):
     args = primary_args_validation(args)
     check_for_required_dbs(args)
     tools_used = track_tools_used(args)
+    args = setup_outputs_and_tmp_dir(args)
     return args, tools_used
 
 
@@ -45,6 +52,7 @@ def primary_args_validation(args):
     check_lineage(args)
     check_tree_program(args)
     checks_for_nucleotide_mode(args)
+    args = check_output_dir(args)
     args = check_input_files(args)
     return args
 
@@ -126,6 +134,19 @@ def check_input_files(args):
         args.target_ko_file, total_ko_targets = check_expected_single_column_input(args.target_ko_file, "-K", get_count=True)
         args.total_ko_targets = total_ko_targets
 
+    return args
+
+
+def check_output_dir(args):
+    if os.path.exists(args.output):
+        if not args.force_overwrite:
+            report_message(f'The output directory "{args.output}" already exists. '
+                           'Please choose a different directory or add the `-F` flag to try to continue a prior run.')
+            report_early_exit()
+        else:
+            args.output_already_existed = True
+    else:
+        args.output_already_existed = False
     return args
 
 
@@ -226,8 +247,10 @@ def check_for_required_dbs(args):
         get_ncbi_assembly_data()
     if args.add_ncbi_tax:
         get_ncbi_tax_data()
-    # if args.target_ko_file:
-    #     get_kofamscan_data()
+    if args.add_gtdb_tax:
+        get_gtdb_data()
+    if args.target_ko_file:
+        get_kofamscan_data()
 
 
 def track_tools_used(args):
@@ -260,10 +283,18 @@ def track_tools_used(args):
 
 
 def check_input_genomes_amount(total_input_genomes, args):
-    if total_input_genomes >= 1000 and not args.no_super5:
+    if total_input_genomes >= 1000 and total_input_genomes < 12500 and not args.no_super5:
         message = many_genomes_notice(total_input_genomes)
         report_notice(message)
         time.sleep(30)
+    if total_input_genomes <= 20:
+        message = few_genomes_notice(total_input_genomes, args)
+        report_notice(message)
+        time.sleep(5)
+    if total_input_genomes >= 12500:
+        message = absurd_number_of_genomes_notice(total_input_genomes)
+        report_notice(message)
+        time.sleep(60)
 
 
 def check_and_report_any_changed_default_behavior(args):
@@ -344,7 +375,8 @@ def check_and_report_any_changed_default_behavior(args):
         print("      - Individual protein-alignment files will retained, due to the `-k` flag being provided")
 
     if args.force_overwrite:
-        print("      - Existing files will be overwritten, as the `-F` flag was provided")
+        if args.output_already_existed:
+            print("      - A previously generated output directory is being used, as the `-F` flag was provided")
 
     if args.debug:
         print("      - Debug mode is enabled")
@@ -356,3 +388,19 @@ def check_and_report_any_changed_default_behavior(args):
         print(f"      - Genomes will be searched for KOs listed in: {args.target_ko_file} ({args.total_ko_targets} targets)")
 
     time.sleep(3)
+
+
+def setup_outputs_and_tmp_dir(args):
+    run_files_dir = os.path.join(args.output, "run-files")
+    os.makedirs(run_files_dir, exist_ok=True)
+    args.run_files_dir = run_files_dir
+    log_file = os.path.join(args.output, "gtotree-runlog.txt")
+    args.log_file = log_file
+    log_file_var.set(log_file)
+    full_execution_command = f"{' '.join(sys.argv)}"
+    stdout_and_log(gtotree_header(), log_file=args.log_file, log_only=True, restart_log=True)
+    stdout_and_log("    Command entered:\n       ", full_execution_command, log_file=args.log_file, log_only=True)
+
+    # os.makedirs("gtotree-tmp")
+    return args
+

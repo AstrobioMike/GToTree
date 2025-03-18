@@ -54,7 +54,7 @@ def download_prepackaged_hmm(hmm_file, hmm_arg):
     print(color_text(f"    Downloading the prebuilt \"{hmm_arg}\" HMM set (only needs to be done once)...\n", "yellow"))
 
     try:
-        download_with_tqdm(target_hmm_url, hmm_file, f"        {hmm_arg} HMM file")
+        download_with_tqdm(target_hmm_url, f"        {hmm_arg} HMM file", hmm_file)
     except Exception as e:
         report_message(f"Downloading the HMM file failed with the following error:\n{e}", "red")
         report_early_exit()

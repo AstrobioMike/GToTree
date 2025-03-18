@@ -58,7 +58,7 @@ def download_ncbi_tax_data(location):
     taxdump_link = "https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
 
     try:
-        download_with_tqdm(taxdump_link, taxdump_path, "        NCBI Taxonomy data")
+        download_with_tqdm(taxdump_link, "        NCBI Taxonomy data", taxdump_path)
     except Exception as e:
         report_message(f"Downloading the NCBI taxonomy data failed with the following error:\n{e}", "red")
         report_early_exit()

@@ -109,8 +109,8 @@ def get_NCBI_assembly_summary_data(location):
     print(color_text("    Downloading NCBI assembly summaries (only done once, or updated after 4 weeks)...\n", "yellow"))
 
     try:
-        download_with_tqdm(genbank_link, table_path, "        Genbank assemblies summary")
-        download_with_tqdm(refseq_link, refseq_temp_path, "        RefSeq assemblies summary")
+        download_with_tqdm(genbank_link, "        Genbank assemblies summary", table_path)
+        download_with_tqdm(refseq_link, "        RefSeq assemblies summary", refseq_temp_path)
     except Exception as e:
         report_message(f"Downloading the NCBI assembly summary tables failed with the following error:\n{e}", "red")
         report_early_exit()

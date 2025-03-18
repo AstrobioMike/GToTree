@@ -1,6 +1,6 @@
 from gtotree.cli.parser import parser
 from gtotree.utils.preflight_checks import preflight_checks
-from gtotree.utils.messaging import gtotree_header
+from gtotree.utils.messaging import gtotree_header, stdout_and_log
 from gtotree.utils.general import populate_input_genome_data
 from gtotree.utils.runinfo import display_initial_run_info
 
