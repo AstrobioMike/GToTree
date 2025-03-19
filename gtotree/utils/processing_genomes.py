@@ -27,19 +27,17 @@ def process_ncbi_genomes(args, genome_data):
                 genome_data.remove_ncbi_accession(acc)
 
         for acc in genome_data.ncbi_accessions:
-            downloaded = download_accession(acc, args, genome_data)
 
-            if downloaded == "amino-acids":
-                print("\n\nAAs downloaded, so now on to regular stuff...\n\n")
-            elif downloaded == "nucleotides":
-                print("\n\nNucleotides downloaded, need to run prodigal...\n\n")
-            else:
-                print("\n\nNothing was downloaded, need to remove this bugger from analysis...\n\n")
+            downloaded = prepare_accession(acc, args, genome_data)
+            if not downloaded:
+                genome_data.remove_ncbi_accession(acc)
+                continue
 
+            # scan_genome()
 
 ##### MIGHT WANT TO HANDLE ALL CONVERSIONS IN HERE TOO (E.G., GTT-RENAME-FASTA, GTT-FILTER-SEQS-BY-LENGTH,
 ##### PRODIGAL WHEN NEEDED, ETC.) AND JUST GET TO FINAL AMINO-ACID FILES
-def download_accession(acc, args, genome_data):
+def prepare_accession(acc, args, genome_data):
     base_link, acc_assembly_str = get_base_link(acc, args)
 
     # trying amino acids first
@@ -48,7 +46,7 @@ def download_accession(acc, args, genome_data):
         amino_acid_filepath = args.ncbi_downloads_dir + "/" + acc + "_protein.faa"
 
         download_and_unzip_accession(amino_acid_link, amino_acid_filepath)
-        downloaded = "amino-acids"
+        downloaded = True
     except:
         # then trying nucleotides
         try:
@@ -56,9 +54,9 @@ def download_accession(acc, args, genome_data):
             nucleotide_file = args.ncbi_downloads_dir + "/" + acc + "_genomic.fna"
 
             download_and_unzip_accession(nucleotide_link, nucleotide_file)
-            downloaded = "nucleotides"
+            downloaded = True
         except:
-            downloaded = None
+            downloaded = False
 
     return downloaded
 
