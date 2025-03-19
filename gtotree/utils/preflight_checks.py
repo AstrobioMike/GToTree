@@ -2,11 +2,15 @@ import os
 import sys
 import shutil
 import time
+import pandas as pd
+from collections import Counter
 from gtotree.utils.messaging import (report_message,
                                      report_early_exit,
                                      report_missing_input_genomes_file,
                                      report_missing_pfam_targets_file,
                                      report_missing_ko_targets_file,
+                                     report_missing_mapping_file,
+                                     report_problem_with_mapping_file,
                                      report_notice,
                                      many_genomes_notice,
                                      few_genomes_notice,
@@ -19,16 +23,16 @@ from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_data
 from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.kos.get_kofamscan_data import get_kofamscan_data
-from gtotree.utils.general import ToolsUsed, log_file_var
+from gtotree.utils.general import ToolsUsed, log_file_var, populate_input_genome_data
 
 
 def preflight_checks(args):
     check_for_essential_deps()
-    args = primary_args_validation(args)
+    args, input_genome_data = primary_args_validation(args)
     check_for_required_dbs(args)
     tools_used = track_tools_used(args)
     args = setup_outputs_and_tmp_dir(args)
-    return args, tools_used
+    return args, input_genome_data, tools_used
 
 
 def check_for_essential_deps():
@@ -53,8 +57,8 @@ def primary_args_validation(args):
     check_tree_program(args)
     checks_for_nucleotide_mode(args)
     args = check_output_dir(args)
-    args = check_input_files(args)
-    return args
+    args, input_genome_data = check_input_files(args)
+    return args, input_genome_data
 
 
 def check_for_minimum_args(args):
@@ -121,10 +125,12 @@ def check_input_files(args):
     if args.amino_acid_files:
         args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
 
+    input_genome_data = populate_input_genome_data(args)
+
     args = check_hmm_file(args)
 
     if args.mapping_file:
-        check_mapping_file(args)
+        check_mapping_file(args, input_genome_data)
 
     if args.target_pfam_file:
         args.target_pfam_file, total_pfam_targets = check_expected_single_column_input(args.target_pfam_file, "-p", get_count=True)
@@ -134,7 +140,7 @@ def check_input_files(args):
         args.target_ko_file, total_ko_targets = check_expected_single_column_input(args.target_ko_file, "-K", get_count=True)
         args.total_ko_targets = total_ko_targets
 
-    return args
+    return args, input_genome_data
 
 
 def check_output_dir(args):
@@ -159,6 +165,8 @@ def check_path(path, flag):
             report_missing_pfam_targets_file(path, flag)
         if flag == "-K":
             report_missing_ko_targets_file(path, flag)
+        if flag == "-m":
+            report_missing_mapping_file(path, flag)
 
 
 def check_expected_single_column_input(path, flag, get_count=False):
@@ -233,13 +241,118 @@ def check_for_duplicates(path, flag):
     return path
 
 
-def check_mapping_file(args):
-    ## NEEDED ##
-    # check for problem_chars='()*&^#$@!/\|[]'
-    # check and fix windows line-endings
-    # check for duplicate desired labels (might need to exit if this happens)
-        # don't forget to check the related github issue for this
-    pass
+def check_mapping_file(args, input_genome_data, flag = "-m"):
+
+    check_path(args.mapping_file, flag)
+    mapping_file_problems = check_mapping_file_problem_chars_and_fields(args.mapping_file)
+    if mapping_file_problems:
+        report_problem_with_mapping_file(mapping_file_problems, args.mapping_file, flag = "-m")
+
+    args.mapping_file = check_line_endings(args.mapping_file, flag)
+
+    args.mapping_dict = make_mapping_dict(args.mapping_file)
+
+    check_all_mapping_file_entries_are_in_input_genomes(args, input_genome_data)
+
+
+
+def check_mapping_file_problem_chars_and_fields(path):
+
+    problematic_chars='()*&^#$@!/\\|[]:;'
+    errors = []
+    with open(path, 'r') as f:
+        for lineno, line in enumerate(f, start=1):
+            line = line.rstrip("\n")
+            columns = line.split('\t')
+
+            # Check if the number of columns is either 2 or 3.
+            if len(columns) not in (2, 3):
+                errors.append(f"Line {lineno} has {len(columns)} column(s) (expected 2 or 3): {line}")
+
+            # Check each field for any problematic characters.
+            for i, field in enumerate(columns, start=1):
+                for char in problematic_chars:
+                    if char in field:
+                        errors.append(
+                            f"Line {lineno}, column {i} contains at least one problematic character '{char}': {field}"
+                        )
+                        break
+    return errors
+
+
+def make_mapping_dict(path):
+    """
+    makes a dictionary mapping input genomes to the wanted labels
+    key = original-input-genome-label, value = wanted-label
+
+      1. Checks that every first-column entry is unique
+      2. Uses the first column as the key
+      3. If there are 2 columns, the value is the second column
+      4. If there are 3 columns and the second column is non-empty,
+         the value is "second-column_third-column" (joined with an underscore)
+      5. If there are 3 columns and the second column is empty,
+         the value is "first-column_third-column" (joined with an underscore)
+    """
+
+    df = pd.read_csv(path, sep="\t", header=None, dtype=str).fillna("")
+
+    # checking none of the first column entries are duplicates
+    if df[0].duplicated().any():
+        report_message(
+            f'The mapping file "{path}" (passed to `-m`) has some duplicate entries in the first column.'
+            ' Please address that and try again.'
+        )
+        report_early_exit()
+
+    mapping_dict = {}
+    for idx, row in df.iterrows():
+        key = row[0].strip()
+        col2 = row[1].strip() if len(row) > 1 else ""
+        col3 = row[2].strip() if len(row) > 2 else ""
+
+        if col3:
+            if col2:
+                value = f"{col2}_{col3}"
+            else:
+                value = f"{key}_{col3}"
+        else:
+            value = col2
+
+        value = value.replace(" ", "_")
+        mapping_dict[key] = value
+
+    # checking none of the desired labels are duplicates
+    counts = Counter(mapping_dict.values())
+    duplicates = [val for val, count in counts.items() if count > 1]
+    if duplicates:
+        report_message(
+            f'The mapping file "{path}" (passed to `-m`) specifies to have duplicate output genome labels.'
+            f' Problematic ones include:'
+        )
+        report_message(f'{"\n".join(duplicates)}', ii="    ", si="    ")
+        report_message(
+            f'Each input genome must map to a unique label. Please address that and try again.'
+        )
+        report_early_exit()
+
+    return mapping_dict
+
+
+def check_all_mapping_file_entries_are_in_input_genomes(args, input_genome_data):
+    entries_in_mapping_file = set(args.mapping_dict.keys())
+    # taking the basenames here because some inputs might have full/rel paths, but the mapping file shouldn't
+    entries_in_input_genomes = set([os.path.basename(genome) for genome in input_genome_data.all_input_genomes])
+    missing_keys = entries_in_mapping_file - entries_in_input_genomes
+    if missing_keys:
+        report_message(
+            f'The mapping file "{args.mapping_file}" (passed to `-m`) specifies some input-genomes that are not found in any of the the input-genome sources.'
+            f' Problematic ones include:'
+        )
+        report_message(f'{"\n".join(missing_keys)}', ii="    ", si="    ")
+        report_message(
+            f'Each input genome in the mapping file must be present in one of the input-genome sources. Please address this and try again.'
+        )
+        report_early_exit()
 
 
 def check_for_required_dbs(args):
@@ -283,6 +396,7 @@ def track_tools_used(args):
 
 
 def check_input_genomes_amount(total_input_genomes, args):
+    print(total_input_genomes)
     if total_input_genomes >= 1000 and total_input_genomes < 12500 and not args.no_super5:
         message = many_genomes_notice(total_input_genomes)
         report_notice(message)

@@ -1,4 +1,4 @@
-## next: checks on mapping file (including making sure all specified are found as inputs), create temp directory
+## next: create temp directory
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 

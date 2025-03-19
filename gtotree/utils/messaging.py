@@ -29,12 +29,10 @@ def color_text(text, color = 'green'):
         return text
 
 
-def wprint(text, width = 80):
-    # print(textwrap.fill(text, width = 80, initial_indent = "  ",
-        #   subsequent_indent = "  ", break_on_hyphens = False))
+def wprint(text, width = 80, ii = "  ", si = "  "):
     wrapper = textwrap.TextWrapper(width=width,
-                                   initial_indent="  ",
-                                   subsequent_indent="  ",
+                                   initial_indent=ii,
+                                   subsequent_indent=si,
                                    break_on_hyphens=False)
     # Split the text into lines (or paragraphs)
     paragraphs = text.splitlines()
@@ -44,9 +42,10 @@ def wprint(text, width = 80):
     print("\n".join(wrapped_paragraphs))
 
 
-def report_message(message, color = "yellow"):
-    print("")
-    wprint(color_text(message, color))
+def report_message(message, color = "yellow", width = 80, ii = "  ", si = "  ", newline = True):
+    if newline:
+        print("")
+    wprint(color_text(message, color), width = width, ii = ii, si = si)
 
 
 def report_missing_input_genomes_file(path, flag):
@@ -62,6 +61,20 @@ def report_missing_pfam_targets_file(path, flag):
 def report_missing_ko_targets_file(path, flag):
     report_message(f'You specified "{path}" as a source of KO targets to search each genome for (passed to `{flag}`), but that file can\'t be found.')
     report_early_exit()
+
+
+def report_missing_mapping_file(path, flag):
+    report_message(f'You specified "{path}" as a mapping file to use (passed to `{flag}`), but that file can\'t be found.')
+    report_early_exit()
+
+
+def report_problem_with_mapping_file(mapping_file_problems, path, flag = "-m"):
+    report_message(f'Unfortunately, there were problems detected in the mapping file "{path}" (passed to `{flag}`):\n')
+    for problem in mapping_file_problems:
+        report_message(problem, width = 100, ii = "    ", si = "    ", newline=False)
+    report_message("Please correct these issues and try again!")
+    report_early_exit()
+
 
 def stdout_and_log(*args, log_file="gtotree-runlog.txt", sep=" ", end="\n\n", flush=False, log_only=False, restart_log=False):
     message = sep.join(str(arg) for arg in args) + end

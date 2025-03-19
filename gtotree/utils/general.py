@@ -44,11 +44,13 @@ class InputGenomeData:
     genbank_files: List[str] = field(default_factory=list)
     fasta_files: List[str] = field(default_factory=list)
     amino_acid_files: List[str] = field(default_factory=list)
+    all_input_genomes: List[str] = field(default_factory=list)
 
     removed_ncbi_accessions: List[str] = field(default_factory=list)
     removed_genbank_files: List[str] = field(default_factory=list)
     removed_fasta_files: List[str] = field(default_factory=list)
     removed_amino_acid_files: List[str] = field(default_factory=list)
+    removed_input_genomes: List[str] = field(default_factory=list)
 
     @property
     def num_ncbi_accessions(self) -> int:
@@ -65,6 +67,10 @@ class InputGenomeData:
     @property
     def num_amino_acid_files(self) -> int:
         return len(self.amino_acid_files)
+
+    @property
+    def num_input_genomes(self) -> int:
+        return len(self.all_input_genomes)
 
     # def add_ncbi_accession(self, accession: str):
     #     if accession not in self.ncbi_accessions:
@@ -103,6 +109,12 @@ class InputGenomeData:
             self.removed_amino_acid_files.append(filepath)
 
 
+    def remove_input_genome(self, filepath: str):
+        if filepath in self.all_input_genomes:
+            self.all_input_genomes.remove(filepath)
+            self.removed_input_genomes.append(filepath)
+
+
 def populate_input_genome_data(args):
     input_genome_data = InputGenomeData()
 
@@ -110,20 +122,24 @@ def populate_input_genome_data(args):
         with open(args.ncbi_accessions, "r") as f:
             entries_list = f.read().splitlines()
         input_genome_data.ncbi_accessions = entries_list
+        input_genome_data.all_input_genomes.extend(entries_list)
 
     if args.genbank_files:
         with open(args.genbank_files, "r") as f:
             entries_list = f.read().splitlines()
         input_genome_data.genbank_files = entries_list
+        input_genome_data.all_input_genomes.extend(entries_list)
 
     if args.fasta_files:
         with open(args.fasta_files, "r") as f:
             entries_list = f.read().splitlines()
         input_genome_data.fasta_files = entries_list
+        input_genome_data.all_input_genomes.extend(entries_list)
 
     if args.amino_acid_files:
         with open(args.amino_acid_files, "r") as f:
             entries_list = f.read().splitlines()
         input_genome_data.amino_acid_files = entries_list
+        input_genome_data.all_input_genomes.extend(entries_list)
 
     return input_genome_data

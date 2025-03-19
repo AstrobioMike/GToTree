@@ -47,7 +47,11 @@ def capture_stdout_to_log(log_file):
 @capture_stdout_to_log(lambda: log_file_var.get())
 def display_initial_run_info(args, input_genome_data):
 
+    time.sleep(1)
+
     print("\n ---------------------------------  RUN INFO  --------------------------------- \n")
+
+    time.sleep(1)
 
     report_message("  Input-genome sources include:")
 
@@ -60,12 +64,14 @@ def display_initial_run_info(args, input_genome_data):
     if args.amino_acid_files:
         print(f"      - Amino-acid files listed in {args.amino_acid_files} ({input_genome_data.num_amino_acid_files} genomes)")
 
-    total_input_genomes = input_genome_data.num_ncbi_accessions + input_genome_data.num_genbank_files + input_genome_data.num_fasta_files + input_genome_data.num_amino_acid_files
-    report_message(f"                           Total input genomes: {total_input_genomes}", "green")
+    report_message(f"                           Total input genomes: {input_genome_data.num_input_genomes}", "green")
+    time.sleep(1)
 
-    check_input_genomes_amount(total_input_genomes, args)
+    check_input_genomes_amount(input_genome_data.num_input_genomes, args)
 
     report_message("  HMM source to be used:")
     print(f"      - {args.hmm} ({get_number_of_targets(args.hmm_path)} targets)")
+    time.sleep(1)
 
     check_and_report_any_changed_default_behavior(args)
+    time.sleep(1)
