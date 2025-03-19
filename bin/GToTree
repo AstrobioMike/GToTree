@@ -1634,6 +1634,10 @@ if [ -n "$NCBI_acc_file" ]; then
         fi
     else
         if [ "$nucleotide" == 'false' ]; then
+
+            printf '\n\n   gtt-ncbi-parallel.sh "{}" "$tmp_dir" "$hmm_file" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"\n\n'
+            printf "\n\n   gtt-ncbi-parallel.sh \"{}\" \"$tmp_dir\" \"$hmm_file\" \"$num_cpus\" \"$hmm_target_genes_total\" \"$output_dir\" \"$best_hit_mode\" \"$additional_pfam_targets\" \"$http_flag\" \"${ko_targets}\" \"${target_KOs}\" \"${debug_flag}\"\n\n"
+
             cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel --quote -j "$num_jobs" -- gtt-ncbi-parallel.sh "{}" "$tmp_dir" "$hmm_file" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"
         else
             cat ${tmp_dir}/ncbi_accessions_info.tmp | parallel --quote -j "$num_jobs" -- gtt-ncbi-parallel-nt.sh "{}" "$tmp_dir" "$hmm_file" "$num_cpus" "$hmm_target_genes_total" "$output_dir" "$best_hit_mode" "$additional_pfam_targets" "$http_flag" "${ko_targets}" "${target_KOs}" "${debug_flag}"

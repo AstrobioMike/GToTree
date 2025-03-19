@@ -1,4 +1,4 @@
-## next: create temp directory
+## next: working on download and formatting ncbi input seqs
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
@@ -36,6 +36,12 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 # default lineage settings are D,P,C,S (no longer strain)
 # http is used instead of ftp always where available (used to be ftp by default with http option)
 # several output files and dirs had underscores changed to dashes (sorry, i now hate underscores when they're not necessary)
+# estimated percent completion and redundancy are no long provided
+    # (this was always just "free" info, but checkm2 is a much better way to do this, so i made the decision to stop providing it at all)
+
+
+### PLACES TO DEF IMPROVE ###
+# right now i'm reading the target-ncbi-accession-info.tsv for every genome when doing the download (in processing_genomes.py)
 
 
 ### IMPROVEMENTS to highlight in paper ###

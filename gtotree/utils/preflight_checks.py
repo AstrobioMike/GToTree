@@ -24,16 +24,16 @@ from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_data
 from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.kos.get_kofamscan_data import get_kofamscan_data
-from gtotree.utils.general import ToolsUsed, log_file_var, populate_input_genome_data
+from gtotree.utils.general import ToolsUsed, log_file_var, populate_genome_data
 
 
 def preflight_checks(args):
     check_for_essential_deps()
-    args, input_genome_data = primary_args_validation(args)
+    args, genome_data = primary_args_validation(args)
     check_for_required_dbs(args)
     tools_used = track_tools_used(args)
     args = setup_outputs_and_tmp_dir(args)
-    return args, input_genome_data, tools_used
+    return args, genome_data, tools_used
 
 
 def check_for_essential_deps():
@@ -58,8 +58,8 @@ def primary_args_validation(args):
     check_tree_program(args)
     checks_for_nucleotide_mode(args)
     args = check_output_dir(args)
-    args, input_genome_data = check_input_files(args)
-    return args, input_genome_data
+    args, genome_data = check_input_files(args)
+    return args, genome_data
 
 
 def check_for_minimum_args(args):
@@ -126,12 +126,12 @@ def check_input_files(args):
     if args.amino_acid_files:
         args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
 
-    input_genome_data = populate_input_genome_data(args)
+    genome_data = populate_genome_data(args)
 
     args = check_hmm_file(args)
 
     if args.mapping_file:
-        check_mapping_file(args, input_genome_data)
+        check_mapping_file(args, genome_data)
 
     if args.target_pfam_file:
         args.target_pfam_file, total_pfam_targets = check_expected_single_column_input(args.target_pfam_file, "-p", get_count=True)
@@ -141,7 +141,7 @@ def check_input_files(args):
         args.target_ko_file, total_ko_targets = check_expected_single_column_input(args.target_ko_file, "-K", get_count=True)
         args.total_ko_targets = total_ko_targets
 
-    return args, input_genome_data
+    return args, genome_data
 
 
 def check_output_dir(args):
@@ -242,7 +242,7 @@ def check_for_duplicates(path, flag):
     return path
 
 
-def check_mapping_file(args, input_genome_data, flag = "-m"):
+def check_mapping_file(args, genome_data, flag = "-m"):
 
     check_path(args.mapping_file, flag)
     mapping_file_problems = check_mapping_file_problem_chars_and_fields(args.mapping_file)
@@ -253,7 +253,7 @@ def check_mapping_file(args, input_genome_data, flag = "-m"):
 
     args.mapping_dict = make_mapping_dict(args.mapping_file)
 
-    check_all_mapping_file_entries_are_in_input_genomes(args, input_genome_data)
+    check_all_mapping_file_entries_are_in_input_genomes(args, genome_data)
 
 
 
@@ -339,10 +339,10 @@ def make_mapping_dict(path):
     return mapping_dict
 
 
-def check_all_mapping_file_entries_are_in_input_genomes(args, input_genome_data):
+def check_all_mapping_file_entries_are_in_input_genomes(args, genome_data):
     entries_in_mapping_file = set(args.mapping_dict.keys())
     # taking the basenames here because some inputs might have full/rel paths, but the mapping file shouldn't
-    entries_in_input_genomes = set([os.path.basename(genome) for genome in input_genome_data.all_input_genomes])
+    entries_in_input_genomes = set([os.path.basename(genome) for genome in genome_data.all_input_genomes])
     missing_keys = entries_in_mapping_file - entries_in_input_genomes
     if missing_keys:
         report_message(
@@ -404,7 +404,7 @@ def check_input_genomes_amount(total_input_genomes, args):
     if total_input_genomes <= 20:
         message = few_genomes_notice(total_input_genomes, args)
         report_notice(message)
-        time.sleep(5)
+        # time.sleep(5)
     if total_input_genomes >= 12500:
         message = absurd_number_of_genomes_notice(total_input_genomes)
         report_notice(message)
@@ -507,8 +507,13 @@ def check_and_report_any_changed_default_behavior(args):
 def setup_outputs_and_tmp_dir(args):
     run_files_dir = os.path.join(args.output, "run-files")
     os.makedirs(run_files_dir, exist_ok=True)
-
     args.run_files_dir = run_files_dir
+
+    if args.ncbi_accessions:
+        ncbi_downloads_dir = os.path.join(args.run_files_dir, "ncbi-downloads")
+        os.makedirs(ncbi_downloads_dir, exist_ok=True)
+        args.ncbi_downloads_dir = ncbi_downloads_dir
+
     log_file = os.path.join(args.output, "gtotree-runlog.txt")
     args.log_file = log_file
     log_file_var.set(log_file)

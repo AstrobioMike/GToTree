@@ -45,6 +45,9 @@ def check_ncbi_assembly_info_location_var_is_set():
     return(NCBI_data_dir)
 
 
+NCBI_assembly_summary_tab = os.path.join(os.environ['NCBI_assembly_data_dir'], "ncbi-assembly-info.tsv")
+
+
 def check_if_data_present_and_less_than_4_weeks_old(location):
 
     # seeing if present already and if it was downloaded less than 4 weeks ago

@@ -39,18 +39,19 @@ def download_with_tqdm(url, target, filename=None, urlopen=False):
 
 
 @dataclass
-class InputGenomeData:
+class GenomeData:
     ncbi_accessions: List[str] = field(default_factory=list)
     genbank_files: List[str] = field(default_factory=list)
     fasta_files: List[str] = field(default_factory=list)
     amino_acid_files: List[str] = field(default_factory=list)
     all_input_genomes: List[str] = field(default_factory=list)
+    all_remaining_genomes: List[str] = field(default_factory=list)
 
     removed_ncbi_accessions: List[str] = field(default_factory=list)
     removed_genbank_files: List[str] = field(default_factory=list)
     removed_fasta_files: List[str] = field(default_factory=list)
     removed_amino_acid_files: List[str] = field(default_factory=list)
-    removed_input_genomes: List[str] = field(default_factory=list)
+    all_removed_genomes: List[str] = field(default_factory=list)
 
     @property
     def num_ncbi_accessions(self) -> int:
@@ -72,6 +73,14 @@ class InputGenomeData:
     def num_input_genomes(self) -> int:
         return len(self.all_input_genomes)
 
+    @property
+    def num_remaining_genomes(self) -> int:
+        return len(self.all_remaining_genomes)
+
+    @property
+    def num_removed_genomes(self) -> int:
+        return len(self.all_removed_genomes)
+
     # def add_ncbi_accession(self, accession: str):
     #     if accession not in self.ncbi_accessions:
     #         self.ncbi_accessions.append(accession)
@@ -91,55 +100,61 @@ class InputGenomeData:
     def remove_ncbi_accession(self, accession: str):
         if accession in self.ncbi_accessions:
             self.ncbi_accessions.remove(accession)
+            self.all_remaining_genomes.remove(accession)
             self.removed_ncbi_accessions.append(accession)
+            self.all_removed_genomes.append(accession)
 
     def remove_genbank_file(self, filepath: str):
         if filepath in self.genbank_files:
             self.genbank_files.remove(filepath)
+            self.all_remaining_genomes.remove(filepath)
             self.removed_genbank_files.append(filepath)
+            self.all_removed_genomes.append(filepath)
 
     def remove_fasta_file(self, filepath: str):
         if filepath in self.fasta_files:
             self.fasta_files.remove(filepath)
+            self.all_remaining_genomes.remove(filepath)
             self.removed_fasta_files.append(filepath)
+            self.all_removed_genomes.append(filepath)
 
     def remove_amino_acid_file(self, filepath: str):
         if filepath in self.amino_acid_files:
             self.amino_acid_files.remove(filepath)
+            self.all_remaining_genomes.remove(filepath)
             self.removed_amino_acid_files.append(filepath)
+            self.all_removed_genomes.append(filepath)
 
 
-    def remove_input_genome(self, filepath: str):
-        if filepath in self.all_input_genomes:
-            self.all_input_genomes.remove(filepath)
-            self.removed_input_genomes.append(filepath)
-
-
-def populate_input_genome_data(args):
-    input_genome_data = InputGenomeData()
+def populate_genome_data(args):
+    genome_data = GenomeData()
 
     if args.ncbi_accessions:
         with open(args.ncbi_accessions, "r") as f:
             entries_list = f.read().splitlines()
-        input_genome_data.ncbi_accessions = entries_list
-        input_genome_data.all_input_genomes.extend(entries_list)
+        genome_data.ncbi_accessions = entries_list
+        genome_data.all_input_genomes.extend(entries_list)
+        genome_data.all_remaining_genomes.extend(entries_list)
 
     if args.genbank_files:
         with open(args.genbank_files, "r") as f:
             entries_list = f.read().splitlines()
-        input_genome_data.genbank_files = entries_list
-        input_genome_data.all_input_genomes.extend(entries_list)
+        genome_data.genbank_files = entries_list
+        genome_data.all_input_genomes.extend(entries_list)
+        genome_data.all_remaining_genomes.extend(entries_list)
 
     if args.fasta_files:
         with open(args.fasta_files, "r") as f:
             entries_list = f.read().splitlines()
-        input_genome_data.fasta_files = entries_list
-        input_genome_data.all_input_genomes.extend(entries_list)
+        genome_data.fasta_files = entries_list
+        genome_data.all_input_genomes.extend(entries_list)
+        genome_data.all_remaining_genomes.extend(entries_list)
 
     if args.amino_acid_files:
         with open(args.amino_acid_files, "r") as f:
             entries_list = f.read().splitlines()
-        input_genome_data.amino_acid_files = entries_list
-        input_genome_data.all_input_genomes.extend(entries_list)
+        genome_data.amino_acid_files = entries_list
+        genome_data.all_input_genomes.extend(entries_list)
+        genome_data.all_remaining_genomes.extend(entries_list)
 
-    return input_genome_data
+    return genome_data

@@ -45,7 +45,10 @@ def wprint(text, width = 80, ii = "  ", si = "  "):
 def report_message(message, color = "yellow", width = 80, ii = "  ", si = "  ", newline = True):
     if newline:
         print("")
-    wprint(color_text(message, color), width = width, ii = ii, si = si)
+    if color:
+        wprint(color_text(message, color), width = width, ii = ii, si = si)
+    else:
+        wprint(message, width = width, ii = ii, si = si)
 
 
 def report_missing_input_genomes_file(path, flag):
@@ -98,11 +101,12 @@ def report_early_exit(message = None, color = "red", suggest_help = False):
     sys.exit(1)
 
 
+
 def report_notice(message, color = "yellow"):
     print("")
-    print(color_text("  ********************************** NOTICE **********************************  ", "yellow"))
+    print(color_text("  ********************************** NOTICE **********************************  ", color))
     print(message)
-    print(color_text("  ****************************************************************************  ", "yellow"))
+    print(color_text("  ****************************************************************************  ", color))
 
 
 ### specific notices
