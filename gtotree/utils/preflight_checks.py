@@ -3,6 +3,7 @@ import sys
 import shutil
 import time
 import pandas as pd
+import tempfile
 from collections import Counter
 from gtotree.utils.messaging import (report_message,
                                      report_early_exit,
@@ -396,7 +397,6 @@ def track_tools_used(args):
 
 
 def check_input_genomes_amount(total_input_genomes, args):
-    print(total_input_genomes)
     if total_input_genomes >= 1000 and total_input_genomes < 12500 and not args.no_super5:
         message = many_genomes_notice(total_input_genomes)
         report_notice(message)
@@ -507,14 +507,28 @@ def check_and_report_any_changed_default_behavior(args):
 def setup_outputs_and_tmp_dir(args):
     run_files_dir = os.path.join(args.output, "run-files")
     os.makedirs(run_files_dir, exist_ok=True)
+
     args.run_files_dir = run_files_dir
     log_file = os.path.join(args.output, "gtotree-runlog.txt")
     args.log_file = log_file
     log_file_var.set(log_file)
+
     full_execution_command = f"{' '.join(sys.argv)}"
     stdout_and_log(gtotree_header(), log_file=args.log_file, log_only=True, restart_log=True)
     stdout_and_log("    Command entered:\n       ", full_execution_command, log_file=args.log_file, log_only=True)
 
-    # os.makedirs("gtotree-tmp")
+    if args.tmp_dir:
+        try:
+            os.makedirs(args.tmp_dir, exist_ok=True)
+            tmp_dir = tempfile.mkdtemp(dir = args.tmp_dir)
+            args.tmp_dir = tmp_dir
+        except OSError:
+            report_message(f"We could not create a temporary directory in the location you specified: {args.tmp_dir}")
+            report_message("Maybe you don't have write permissions there?")
+            report_early_exit()
+    else:
+        tmp_dir = tempfile.mkdtemp(prefix = "gtotree-tmp-", dir = args.output)
+        args.tmp_dir = tmp_dir
+
     return args
 

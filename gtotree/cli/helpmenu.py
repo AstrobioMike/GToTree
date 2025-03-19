@@ -33,7 +33,7 @@ helpmenu += f"""
 
       {color_text("Output directory specification:", "yellow")}
 
-        - [-o <str>] default: GToTree_output
+        - [-o <str>] default: gtotree-output
                   Specify the desired output directory.
 
 
@@ -203,6 +203,10 @@ helpmenu += f"""
         - [-F ] force overwrite; default: false
                   Provide this flag with no arguments if you'd like to force
                   overwriting the output directory if it exists.
+
+        - [--tmp-dir <path>] temporary directory location; default: <output-dir>/gtotree-tmp-*
+                  If you want to specify where the temporary working directory will
+                  be created, you can provide the path to this parameter.
 
         - [-d ] debug mode; default: false
                   Provide this flag with no arguments if you'd like to keep the

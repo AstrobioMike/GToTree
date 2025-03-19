@@ -69,6 +69,7 @@ def parser():
     opt.add_argument("-X", "--no-super5", action="store_true")
     opt.add_argument("-P", "--use-http", action="store_true")
     opt.add_argument("-F", "--force-overwrite", action="store_true")
+    opt.add_argument("--tmp-dir", default=None)
     opt.add_argument("-d", "--debug", action="store_true")
 
     if len(sys.argv) == 1:
