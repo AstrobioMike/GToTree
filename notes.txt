@@ -1,10 +1,15 @@
 ## next: working on download and formatting ncbi input seqs
+    # with snakemake, right now it counts "all" job, so when it comes to something it doesn't need to do
+    # it still displays the progress bar and fills it partway when rule "all" is done
+    # i should add things to genome_data that track how many are done/ready, so i can check that before launching the snakemake part
 
+ 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
 conda activate gtotree-dev
 conda install tqdm=4.67.1
 conda install pyhmmer=0.11.0
+conda install snakemake=8.30.0
 pip install -e gtotree/
 
 # example test
@@ -20,12 +25,10 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 ### TO DO ###
 
-# add checks for mapping file (preflight_checks.py)
-
 # switch to only using http when available 
     # affects:
         # get_ncbi_assembly_tables.py (DONE)
-        # ncbi assembly downloads
+        # ncbi assembly downloads (DONE)
         # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree)
 
 

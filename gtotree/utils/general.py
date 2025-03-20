@@ -1,9 +1,14 @@
+import os
 import sys
+import json #type: ignore
+import argparse
 from dataclasses import dataclass, field
 from typing import List
 from tqdm import tqdm # type: ignore
+import subprocess
 import urllib.request
 import contextvars
+from pkg_resources import resource_filename
 from gtotree.utils.messaging import report_notice, many_genomes_notice
 
 log_file_var = contextvars.ContextVar("log_file", default = "gtotree-runlog.txt")
@@ -158,3 +163,61 @@ def populate_genome_data(args):
         genome_data.all_remaining_genomes.extend(entries_list)
 
     return genome_data
+
+
+def write_args(args):
+    args_path = args.tmp_dir + "/args.json"
+    with open(args_path, "w") as f:
+        json.dump(args.__dict__, f)
+    return args_path
+
+
+def read_args(args_path):
+    with open(args_path, "r") as f:
+        args_dict = json.load(f)
+    args = argparse.Namespace(**args_dict)
+    return args
+
+
+def write_genome_data(genome_data, args):
+    genome_data_path = args.tmp_dir + "/genome-data.json"
+    with open(genome_data_path, "w") as f:
+        json.dump(genome_data.__dict__, f)
+    return genome_data_path
+
+
+def read_genome_data(genome_data_path):
+    with open(genome_data_path, "r") as f:
+        genome_data_dict = json.load(f)
+    genome_data = GenomeData(**genome_data_dict)
+    return genome_data
+
+
+def get_snakefile_path(basename):
+    return resource_filename("gtotree", f"smk/{basename}")
+
+
+def touch(path):
+    with open(path, 'a'):
+        os.utime(path, None)
+
+
+def run_snakemake(cmd, num_jobs, description):
+    print("")
+    with tqdm(total=num_jobs, desc=description, ncols = 90) as pbar:
+        result = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        for line in iter(result.stdout.readline, ""):
+            # sys.stdout.write(line)
+            # sys.stdout.flush()
+            if "Finished job" in line:
+                pbar.update(1)
+
+        result.wait()
+
+    return result

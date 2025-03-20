@@ -3,9 +3,15 @@ import urllib.request
 import gzip
 import shutil
 import os
+import subprocess
 from gtotree.utils.messaging import report_message, report_notice
 from gtotree.utils.ncbi.parse_assembly_summary_file import parse_assembly_summary
 from gtotree.utils.ncbi.get_ncbi_assembly_tables import NCBI_assembly_summary_tab
+from gtotree.utils.general import (write_genome_data,
+                                   get_snakefile_path,
+                                   write_args,
+                                   run_snakemake
+                                  )
 
 def process_genomes(args, genome_data):
     process_ncbi_genomes(args, genome_data)
@@ -16,8 +22,9 @@ def process_ncbi_genomes(args, genome_data):
 
         report_message("\n ##############################################################################"
                         " ####          Working on the genomes provided as NCBI accessions          ####"
-                        " ##############################################################################"
-                    , color = None)
+                        " ##############################################################################",
+                       color = None
+                       )
         ncbi_accs_not_found = parse_assembly_summary(NCBI_assembly_summary_tab, genome_data.ncbi_accessions, args)
         if ncbi_accs_not_found:
             report_notice(f"    {len(ncbi_accs_not_found)} accession(s) not successfully found at NCBI.\n"
@@ -26,12 +33,29 @@ def process_ncbi_genomes(args, genome_data):
             for acc in ncbi_accs_not_found:
                 genome_data.remove_ncbi_accession(acc)
 
-        for acc in genome_data.ncbi_accessions:
+        # writing genome_data object to file so it can be passed to snakemake
+        genome_data_path = write_genome_data(genome_data, args)
+        snakefile = get_snakefile_path("process-ncbi-accessions.smk")
+        args_path = write_args(args)
 
-            downloaded = prepare_accession(acc, args, genome_data)
-            if not downloaded:
-                genome_data.remove_ncbi_accession(acc)
-                continue
+        cmd = [
+            "snakemake",
+            "--snakefile", snakefile,
+            "--cores", f"{args.num_jobs}",
+            "--default-resources", f"tmpdir='{args.tmp_dir}'",
+            "--config",
+            f"genome_data_path={genome_data_path}",
+            f"args_path={args_path}"
+        ]
+
+        result = run_snakemake(cmd, genome_data.num_ncbi_accessions, "Processing NCBI accessions")
+
+        # for acc in genome_data.ncbi_accessions:
+
+        #     downloaded = prepare_accession(acc, args, genome_data)
+        #     if not downloaded:
+        #         genome_data.remove_ncbi_accession(acc)
+        #         continue
 
             # scan_genome()
 
@@ -67,9 +91,6 @@ def download_and_unzip_accession(link, filepath):
     with gzip.open(tmp_gzip, 'rb') as f_in, open(filepath, 'wb') as f_out:
         shutil.copyfileobj(f_in, f_out)
     os.remove(tmp_gzip)
-
-
-
 
 
 def get_base_link(acc, args):
