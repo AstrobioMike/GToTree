@@ -3,66 +3,62 @@ import urllib.request
 import gzip
 import shutil
 import os
-import subprocess
-from gtotree.utils.messaging import report_message, report_notice
+import time
+from gtotree.utils.messaging import (report_message,
+                                     report_notice,
+                                     report_ncbi_processing)
 from gtotree.utils.ncbi.parse_assembly_summary_file import parse_assembly_summary
 from gtotree.utils.ncbi.get_ncbi_assembly_tables import NCBI_assembly_summary_tab
-from gtotree.utils.general import (write_genome_data,
+from gtotree.utils.general import (write_run_data,
+                                   read_run_data,
                                    get_snakefile_path,
                                    write_args,
-                                   run_snakemake
-                                  )
+                                   run_snakemake)
 
-def process_genomes(args, genome_data):
-    process_ncbi_genomes(args, genome_data)
+def process_genomes(args, run_data):
+    process_ncbi_genomes(args, run_data)
 
 
-def process_ncbi_genomes(args, genome_data):
+def process_ncbi_genomes(args, run_data):
     if args.ncbi_accessions:
 
-        report_message("\n ##############################################################################"
-                        " ####          Working on the genomes provided as NCBI accessions          ####"
-                        " ##############################################################################",
-                       color = None
-                       )
-        ncbi_accs_not_found = parse_assembly_summary(NCBI_assembly_summary_tab, genome_data.ncbi_accessions, args)
-        if ncbi_accs_not_found:
-            report_notice(f"    {len(ncbi_accs_not_found)} accession(s) not successfully found at NCBI.\n"
-                          f"    Reported in {args.run_files_dir}/ncbi-accessions-not-found.txt")
+        report_ncbi_processing()
 
-            for acc in ncbi_accs_not_found:
-                genome_data.remove_ncbi_accession(acc)
+        run_data = parse_assembly_summary(NCBI_assembly_summary_tab, run_data, args)
 
-        # writing genome_data object to file so it can be passed to snakemake
-        genome_data_path = write_genome_data(genome_data, args)
-        snakefile = get_snakefile_path("process-ncbi-accessions.smk")
-        args_path = write_args(args)
+        if set(run_data.ncbi_accessions) != set(run_data.ncbi_accessions_done):
+            # writing run_data and args objects to files so they can be accessed by snakemake
+            run_data_path = write_run_data(run_data, args)
+            snakefile = get_snakefile_path("process-ncbi-accessions.smk")
+            args_path = write_args(args)
 
-        cmd = [
-            "snakemake",
-            "--snakefile", snakefile,
-            "--cores", f"{args.num_jobs}",
-            "--default-resources", f"tmpdir='{args.tmp_dir}'",
-            "--config",
-            f"genome_data_path={genome_data_path}",
-            f"args_path={args_path}"
-        ]
+            cmd = [
+                "snakemake",
+                "--snakefile", snakefile,
+                "--cores", f"{args.num_jobs}",
+                "--default-resources", f"tmpdir='{args.tmp_dir}'",
+                "--config",
+                f"run_data_path={run_data_path}",
+                f"args_path={args_path}"
+            ]
 
-        result = run_snakemake(cmd, genome_data.num_ncbi_accessions, "Processing NCBI accessions")
+            result = run_snakemake(cmd, run_data.num_ncbi_accessions, "Processing NCBI accessions")
+            run_data = read_run_data(args)
 
-        # for acc in genome_data.ncbi_accessions:
-
-        #     downloaded = prepare_accession(acc, args, genome_data)
-        #     if not downloaded:
-        #         genome_data.remove_ncbi_accession(acc)
-        #         continue
-
-            # scan_genome()
+        print(run_data)
 
 ##### MIGHT WANT TO HANDLE ALL CONVERSIONS IN HERE TOO (E.G., GTT-RENAME-FASTA, GTT-FILTER-SEQS-BY-LENGTH,
 ##### PRODIGAL WHEN NEEDED, ETC.) AND JUST GET TO FINAL AMINO-ACID FILES
-def prepare_accession(acc, args, genome_data):
+        # if not run_data.ncbi_hmm_searches_done:
+            # scan_genome() # this should be re-usable for all genomes, not just NCBI ones
+            ## maybe i should get all genomes to amino-acid files first, then do the hmm search
+            ## this way, i can do the hmm searches on all at once with one snakemake call
+
+def prepare_accession(acc, args, run_data):
     base_link, acc_assembly_str = get_base_link(acc, args)
+
+    # if acc == "GCF_000153765.1": ## for testing
+    #     return False
 
     # trying amino acids first
     try:
@@ -70,7 +66,7 @@ def prepare_accession(acc, args, genome_data):
         amino_acid_filepath = args.ncbi_downloads_dir + "/" + acc + "_protein.faa"
 
         download_and_unzip_accession(amino_acid_link, amino_acid_filepath)
-        downloaded = True
+        done = True
     except:
         # then trying nucleotides
         try:
@@ -78,11 +74,11 @@ def prepare_accession(acc, args, genome_data):
             nucleotide_file = args.ncbi_downloads_dir + "/" + acc + "_genomic.fna"
 
             download_and_unzip_accession(nucleotide_link, nucleotide_file)
-            downloaded = True
+            done = True
         except:
-            downloaded = False
+            done = False
 
-    return downloaded
+    return done
 
 
 def download_and_unzip_accession(link, filepath):

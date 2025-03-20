@@ -1,5 +1,6 @@
 import textwrap
 import sys
+import time
 from importlib.metadata import version
 
 tty_colors = {
@@ -104,9 +105,9 @@ def report_early_exit(message = None, color = "red", suggest_help = False):
 
 def report_notice(message, color = "yellow"):
     print("")
-    print(color_text("  ********************************** NOTICE **********************************  ", color))
+    print(color_text("  *********************************** NOTICE ***********************************  ", color))
     print(message)
-    print(color_text("  ****************************************************************************  ", color))
+    print(color_text("  ******************************************************************************  ", color))
 
 
 ### specific notices
@@ -168,3 +169,12 @@ def absurd_number_of_genomes_notice(total_input_genomes):
     continue with our regularly scheduled program 60 seconds after this message
     was displayed :)"""
     )
+
+
+def report_ncbi_processing():
+    report_message("\n ##############################################################################"
+                    " ####          Working on the genomes provided as NCBI accessions          ####"
+                    " ##############################################################################",
+                    color = None
+                    )
+    time.sleep(1)

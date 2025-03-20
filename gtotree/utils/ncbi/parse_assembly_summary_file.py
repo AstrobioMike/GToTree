@@ -1,6 +1,7 @@
-from gtotree.utils.messaging import wprint, color_text, report_message
+import time
+from gtotree.utils.messaging import report_notice
 
-def parse_assembly_summary(assembly_summary_file, wanted_accessions, args):
+def parse_assembly_summary(assembly_summary_file, run_data, args):
     """
     parse NCBI's assembly summary file down to the provided wanted accessions
 
@@ -33,8 +34,11 @@ def parse_assembly_summary(assembly_summary_file, wanted_accessions, args):
         - HTTP path (built from the downloaded accession and assembly name; in case ftp path is empty, which does rarely happen)
     """
 
+    if run_data.ncbi_sub_table_done:
+        return run_data
+
     wanted_dict = {}
-    for acc in wanted_accessions:
+    for acc in run_data.ncbi_accessions:
         root_acc = acc.strip().split(".")[0]
         wanted_dict[root_acc] = acc.strip()
 
@@ -74,13 +78,24 @@ def parse_assembly_summary(assembly_summary_file, wanted_accessions, args):
                     ]) + "\n"
                     out_file.write(out_line)
 
-    not_found = set(wanted_accessions) - found
+    not_found = set(run_data.ncbi_accessions) - found
 
     with open(args.run_files_dir + "/ncbi-accessions-not-found.txt", "w") as not_found_file:
         for acc in not_found:
             not_found_file.write(acc + "\n")
 
-    return list(not_found)
+    run_data.ncbi_accs_not_found = list(not_found)
+    run_data.ncbi_sub_table_done = True
+
+    if run_data.ncbi_accs_not_found:
+        report_notice(f"    {len(run_data.ncbi_accs_not_found)} accession(s) not successfully found at NCBI.\n"
+                        f"    Reported in {args.run_files_dir}/ncbi-accessions-not-found.txt")
+        time.sleep(1)
+
+        for acc in run_data.ncbi_accs_not_found:
+            run_data.remove_ncbi_accession(acc)
+
+    return run_data
 
 
 def build_base_link(dl_acc, assembly_name):

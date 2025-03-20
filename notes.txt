@@ -1,9 +1,5 @@
 ## next: working on download and formatting ncbi input seqs
-    # with snakemake, right now it counts "all" job, so when it comes to something it doesn't need to do
-    # it still displays the progress bar and fills it partway when rule "all" is done
-    # i should add things to genome_data that track how many are done/ready, so i can check that before launching the snakemake part
 
- 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
 conda activate gtotree-dev
@@ -19,13 +15,13 @@ GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f f
 
 gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -j 4 -t -P
 
-### OVERALL NOTES ### 
+### OVERALL NOTES ###
 # execute snakemake workflows from within the output gtotree dir (so .snakemake dirs won't ever conflict with each other)
 
 
 ### TO DO ###
 
-# switch to only using http when available 
+# switch to only using http when available
     # affects:
         # get_ncbi_assembly_tables.py (DONE)
         # ncbi assembly downloads (DONE)
@@ -41,6 +37,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 # several output files and dirs had underscores changed to dashes (sorry, i now hate underscores when they're not necessary)
 # estimated percent completion and redundancy are no long provided
     # (this was always just "free" info, but checkm2 is a much better way to do this, so i made the decision to stop providing it at all)
+# --resume flag added (will be set automatically if the same output dir but no `-F` flag provided)
 
 
 ### PLACES TO DEF IMPROVE ###

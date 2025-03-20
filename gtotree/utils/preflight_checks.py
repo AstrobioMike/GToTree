@@ -24,16 +24,19 @@ from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_data
 from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.kos.get_kofamscan_data import get_kofamscan_data
-from gtotree.utils.general import ToolsUsed, log_file_var, populate_genome_data
+from gtotree.utils.general import (ToolsUsed,
+                                   log_file_var,
+                                   populate_run_data,
+                                   read_run_data)
 
 
 def preflight_checks(args):
     check_for_essential_deps()
-    args, genome_data = primary_args_validation(args)
+    args, run_data = primary_args_validation(args)
     check_for_required_dbs(args)
     tools_used = track_tools_used(args)
-    args = setup_outputs_and_tmp_dir(args)
-    return args, genome_data, tools_used
+    args, run_data = setup_outputs_and_tmp_dir(args, run_data)
+    return args, run_data, tools_used
 
 
 def check_for_essential_deps():
@@ -58,8 +61,8 @@ def primary_args_validation(args):
     check_tree_program(args)
     checks_for_nucleotide_mode(args)
     args = check_output_dir(args)
-    args, genome_data = check_input_files(args)
-    return args, genome_data
+    args, run_data = check_input_files(args)
+    return args, run_data
 
 
 def check_for_minimum_args(args):
@@ -126,12 +129,23 @@ def check_input_files(args):
     if args.amino_acid_files:
         args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
 
-    genome_data = populate_genome_data(args)
+    run_files_dir = os.path.join(args.output, "run-files")
+    os.makedirs(run_files_dir, exist_ok=True)
+    args.run_files_dir = run_files_dir
+
+    if args.resume:
+        try:
+            run_data = read_run_data(args)
+        except FileNotFoundError:
+            pass
+
+    if "run_data" not in locals():
+        run_data = populate_run_data(args)
 
     args = check_hmm_file(args)
 
     if args.mapping_file:
-        check_mapping_file(args, genome_data)
+        check_mapping_file(args, run_data)
 
     if args.target_pfam_file:
         args.target_pfam_file, total_pfam_targets = check_expected_single_column_input(args.target_pfam_file, "-p", get_count=True)
@@ -141,17 +155,17 @@ def check_input_files(args):
         args.target_ko_file, total_ko_targets = check_expected_single_column_input(args.target_ko_file, "-K", get_count=True)
         args.total_ko_targets = total_ko_targets
 
-    return args, genome_data
+    return args, run_data
 
 
 def check_output_dir(args):
     if os.path.exists(args.output):
         if not args.force_overwrite:
-            report_message(f'The output directory "{args.output}" already exists. '
-                           'Please choose a different directory or add the `-F` flag to try to continue a prior run.')
-            report_early_exit()
+            args.resume = True
         else:
-            args.output_already_existed = True
+            shutil.rmtree(args.output)
+            os.makedirs(args.output)
+        args.output_already_existed = True
     else:
         args.output_already_existed = False
     return args
@@ -242,7 +256,7 @@ def check_for_duplicates(path, flag):
     return path
 
 
-def check_mapping_file(args, genome_data, flag = "-m"):
+def check_mapping_file(args, run_data, flag = "-m"):
 
     check_path(args.mapping_file, flag)
     mapping_file_problems = check_mapping_file_problem_chars_and_fields(args.mapping_file)
@@ -253,7 +267,7 @@ def check_mapping_file(args, genome_data, flag = "-m"):
 
     args.mapping_dict = make_mapping_dict(args.mapping_file)
 
-    check_all_mapping_file_entries_are_in_input_genomes(args, genome_data)
+    check_all_mapping_file_entries_are_in_input_genomes(args, run_data)
 
 
 
@@ -339,10 +353,10 @@ def make_mapping_dict(path):
     return mapping_dict
 
 
-def check_all_mapping_file_entries_are_in_input_genomes(args, genome_data):
+def check_all_mapping_file_entries_are_in_input_genomes(args, run_data):
     entries_in_mapping_file = set(args.mapping_dict.keys())
     # taking the basenames here because some inputs might have full/rel paths, but the mapping file shouldn't
-    entries_in_input_genomes = set([os.path.basename(genome) for genome in genome_data.all_input_genomes])
+    entries_in_input_genomes = set([os.path.basename(genome) for genome in run_data.all_input_genomes])
     missing_keys = entries_in_mapping_file - entries_in_input_genomes
     if missing_keys:
         report_message(
@@ -430,14 +444,22 @@ def check_and_report_any_changed_default_behavior(args):
         args.muscle_threads != 5,
         args.no_super5,
         args.keep_gene_alignments,
-        args.force_overwrite,
+        args.resume and args.output_already_existed,
+        args.force_overwrite and args.output_already_existed,
         args.debug,
     ]
 
     if any(conditions):
         report_message("  Other options set:")
 
-    if args.output != "gtotree-output":
+    if args.resume and args.output_already_existed:
+        print(f"      - Attempting to resume a previous run with outputs in \"{args.output}\"")
+
+    if args.force_overwrite:
+        if args.output_already_existed:
+            print(f"      - The `-F` flag was provided, so this output directory is being overwritten: \"{args.output}\"")
+
+    if args.output != "gtotree-output" and not args.resume:
         print(f"      - The output directory has been set to: \"{args.output}\"")
 
     if args.mapping_file:
@@ -488,10 +510,6 @@ def check_and_report_any_changed_default_behavior(args):
     if args.keep_gene_alignments:
         print("      - Individual protein-alignment files will retained, due to the `-k` flag being provided")
 
-    if args.force_overwrite:
-        if args.output_already_existed:
-            print("      - A previously generated output directory is being used, as the `-F` flag was provided")
-
     if args.debug:
         print("      - Debug mode is enabled")
 
@@ -504,10 +522,7 @@ def check_and_report_any_changed_default_behavior(args):
     time.sleep(3)
 
 
-def setup_outputs_and_tmp_dir(args):
-    run_files_dir = os.path.join(args.output, "run-files")
-    os.makedirs(run_files_dir, exist_ok=True)
-    args.run_files_dir = run_files_dir
+def setup_outputs_and_tmp_dir(args, run_data):
 
     if args.ncbi_accessions:
         ncbi_downloads_dir = os.path.join(args.run_files_dir, "ncbi-downloads")
@@ -527,6 +542,7 @@ def setup_outputs_and_tmp_dir(args):
             os.makedirs(args.tmp_dir, exist_ok=True)
             tmp_dir = tempfile.mkdtemp(dir = args.tmp_dir)
             args.tmp_dir = tmp_dir
+            run_data.tmp_dir = tmp_dir
         except OSError:
             report_message(f"We could not create a temporary directory in the location you specified: {args.tmp_dir}")
             report_message("Maybe you don't have write permissions there?")
@@ -534,6 +550,8 @@ def setup_outputs_and_tmp_dir(args):
     else:
         tmp_dir = tempfile.mkdtemp(prefix = "gtotree-tmp-", dir = args.output)
         args.tmp_dir = tmp_dir
+        run_data.tmp_dir = tmp_dir
 
-    return args
+
+    return args, run_data
 

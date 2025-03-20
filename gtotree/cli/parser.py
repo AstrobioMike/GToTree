@@ -41,6 +41,7 @@ def parser():
 
     # --- Optional Inputs ---
     opt = parser.add_argument_group("Optional Inputs")
+
     opt.add_argument("-o", "--output", metavar="<dir>", type=str, default="gtotree-output")
     opt.add_argument("-m", "--mapping-file", metavar="<file>", type=str)
 
@@ -59,6 +60,7 @@ def parser():
     opt.add_argument("-p", "--target-pfam-file", metavar="<file>", type=str)
 
     # --- General Run Settings ---
+    opt.add_argument("-R", "--resume", action="store_true")
     opt.add_argument("-z", "--nucleotide-mode", action="store_true")
     opt.add_argument("-N", "--no-tree", action="store_true")
     opt.add_argument("-k", "--keep-gene-alignments", action="store_true")

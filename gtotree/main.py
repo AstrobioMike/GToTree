@@ -10,20 +10,20 @@ def main(args = None):
 
     print(gtotree_header())
 
-    args, genome_data, tools_used = preflight_checks(args)
+    args, run_data, tools_used = preflight_checks(args)
 
-    display_initial_run_info(args, genome_data)
+    display_initial_run_info(args, run_data)
 
-    process_genomes(args, genome_data)
+    process_genomes(args, run_data)
 
-    # filter_genes_by_length(args, genome_data)
+    # filter_genes_by_length(args, run_data)
 
-    # filter_genomes_with_too_few_hits(args, genome_data)
+    # filter_genomes_with_too_few_hits(args, run_data)
 
-    # generate_alignments(args, genome_data)
+    # generate_alignments(args, run_data)
 
-    # tree_building(args, genome_data)
+    # tree_building(args, run_data)
 
-    # summarize_results(args, genome_data)
+    # summarize_results(args, run_data)
 
-    # cleanup(args, genome_data)
+    # cleanup(args, run_data)

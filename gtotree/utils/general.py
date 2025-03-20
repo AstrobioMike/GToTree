@@ -44,11 +44,16 @@ def download_with_tqdm(url, target, filename=None, urlopen=False):
 
 
 @dataclass
-class GenomeData:
+class RunData:
     ncbi_accessions: List[str] = field(default_factory=list)
+    ncbi_accessions_done: List[str] = field(default_factory=list)
+    ncbi_accs_not_found: List[str] = field(default_factory=list)
     genbank_files: List[str] = field(default_factory=list)
+    genbank_files_done: List[str] = field(default_factory=list)
     fasta_files: List[str] = field(default_factory=list)
+    fasta_files_done: List[str] = field(default_factory=list)
     amino_acid_files: List[str] = field(default_factory=list)
+    amino_acid_files_done: List[str] = field(default_factory=list)
     all_input_genomes: List[str] = field(default_factory=list)
     all_remaining_genomes: List[str] = field(default_factory=list)
 
@@ -57,6 +62,10 @@ class GenomeData:
     removed_fasta_files: List[str] = field(default_factory=list)
     removed_amino_acid_files: List[str] = field(default_factory=list)
     all_removed_genomes: List[str] = field(default_factory=list)
+
+    ncbi_sub_table_done: bool = False
+    run_files_dir: str = ""
+    tmp_dir: str = ""
 
     @property
     def num_ncbi_accessions(self) -> int:
@@ -86,21 +95,21 @@ class GenomeData:
     def num_removed_genomes(self) -> int:
         return len(self.all_removed_genomes)
 
-    # def add_ncbi_accession(self, accession: str):
-    #     if accession not in self.ncbi_accessions:
-    #         self.ncbi_accessions.append(accession)
+    def add_done_ncbi_accession(self, accession: str):
+        if accession not in self.ncbi_accessions_done:
+            self.ncbi_accessions_done.append(accession)
 
-    # def add_genbank_file(self, filepath: str):
-    #     if filepath not in self.genbank_files:
-    #         self.genbank_files.append(filepath)
+    def add_done_genbank_file(self, filepath: str):
+        if filepath not in self.genbank_files_done:
+            self.genbank_files_done.append(filepath)
 
-    # def add_fasta_file(self, filepath: str):
-    #     if filepath not in self.fasta_files:
-    #         self.fasta_files.append(filepath)
+    def add_done_fasta_file(self, filepath: str):
+        if filepath not in self.fasta_files_done:
+            self.fasta_files_done.append(filepath)
 
-    # def add_amino_acid_file(self, filepath: str):
-    #     if filepath not in self.amino_acid_files:
-    #         self.amino_acid_files.append(filepath)
+    def add_done_amino_acid_file(self, filepath: str):
+        if filepath not in self.amino_acid_files_done:
+            self.amino_acid_files_done.append(filepath)
 
     def remove_ncbi_accession(self, accession: str):
         if accession in self.ncbi_accessions:
@@ -131,38 +140,40 @@ class GenomeData:
             self.all_removed_genomes.append(filepath)
 
 
-def populate_genome_data(args):
-    genome_data = GenomeData()
+def populate_run_data(args):
+    run_data = RunData()
 
     if args.ncbi_accessions:
         with open(args.ncbi_accessions, "r") as f:
             entries_list = f.read().splitlines()
-        genome_data.ncbi_accessions = entries_list
-        genome_data.all_input_genomes.extend(entries_list)
-        genome_data.all_remaining_genomes.extend(entries_list)
+        run_data.ncbi_accessions = entries_list
+        run_data.all_input_genomes.extend(entries_list)
+        run_data.all_remaining_genomes.extend(entries_list)
 
     if args.genbank_files:
         with open(args.genbank_files, "r") as f:
             entries_list = f.read().splitlines()
-        genome_data.genbank_files = entries_list
-        genome_data.all_input_genomes.extend(entries_list)
-        genome_data.all_remaining_genomes.extend(entries_list)
+        run_data.genbank_files = entries_list
+        run_data.all_input_genomes.extend(entries_list)
+        run_data.all_remaining_genomes.extend(entries_list)
 
     if args.fasta_files:
         with open(args.fasta_files, "r") as f:
             entries_list = f.read().splitlines()
-        genome_data.fasta_files = entries_list
-        genome_data.all_input_genomes.extend(entries_list)
-        genome_data.all_remaining_genomes.extend(entries_list)
+        run_data.fasta_files = entries_list
+        run_data.all_input_genomes.extend(entries_list)
+        run_data.all_remaining_genomes.extend(entries_list)
 
     if args.amino_acid_files:
         with open(args.amino_acid_files, "r") as f:
             entries_list = f.read().splitlines()
-        genome_data.amino_acid_files = entries_list
-        genome_data.all_input_genomes.extend(entries_list)
-        genome_data.all_remaining_genomes.extend(entries_list)
+        run_data.amino_acid_files = entries_list
+        run_data.all_input_genomes.extend(entries_list)
+        run_data.all_remaining_genomes.extend(entries_list)
 
-    return genome_data
+    run_data.run_files_dir = args.run_files_dir
+
+    return run_data
 
 
 def write_args(args):
@@ -179,18 +190,18 @@ def read_args(args_path):
     return args
 
 
-def write_genome_data(genome_data, args):
-    genome_data_path = args.tmp_dir + "/genome-data.json"
-    with open(genome_data_path, "w") as f:
-        json.dump(genome_data.__dict__, f)
-    return genome_data_path
+def write_run_data(run_data, args):
+    run_data_path = args.run_files_dir + "/genome-data.json"
+    with open(run_data_path, "w") as f:
+        json.dump(run_data.__dict__, f)
+    return run_data_path
 
 
-def read_genome_data(genome_data_path):
-    with open(genome_data_path, "r") as f:
-        genome_data_dict = json.load(f)
-    genome_data = GenomeData(**genome_data_dict)
-    return genome_data
+def read_run_data(args):
+    with open(args.run_files_dir + "/genome-data.json", "r") as f:
+        run_data_dict = json.load(f)
+    run_data = RunData(**run_data_dict)
+    return run_data
 
 
 def get_snakefile_path(basename):
@@ -202,9 +213,10 @@ def touch(path):
         os.utime(path, None)
 
 
-def run_snakemake(cmd, num_jobs, description):
+def run_snakemake(cmd, num_jobs, description, print_lines=False):
     print("")
-    with tqdm(total=num_jobs, desc=description, ncols = 90) as pbar:
+    num_finished = 0 # counting this so it doesn't flip the progress bar when it counts the final "all" rule
+    with tqdm(total=num_jobs, desc="    " + description, ncols = 78) as pbar:
         result = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -213,10 +225,12 @@ def run_snakemake(cmd, num_jobs, description):
             bufsize=1
         )
         for line in iter(result.stdout.readline, ""):
-            # sys.stdout.write(line)
-            # sys.stdout.flush()
             if "Finished job" in line:
-                pbar.update(1)
+                num_finished += 1
+                if num_finished <= num_jobs:
+                    pbar.update(1)
+            if print_lines:
+                print(line, end="")
 
         result.wait()
 
