@@ -39,7 +39,7 @@ for seq_record in SeqIO.parse(in_fasta, "fasta"):
 
 
 if not args.quiet:
-  
+
   perc = round(float(kept) / float(total) * 100, 2)
   print("\n\tRetained " + str(kept) + " sequences of the initial " + str(total) + " (" + str(perc) + "%).\n")
 

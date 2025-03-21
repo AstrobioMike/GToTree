@@ -1,5 +1,16 @@
-## next: working on download and formatting ncbi input seqs
-    # up to filtering and then renaming them, i should probably combine those into one module (utils/seqs.py maybe)
+## next: need to fix some of the logging not being captured currently for ncbi accs (like NOTICEs, probably don't need progress bar)
+    # working on fetching and formatting genbank inputs
+    # fasta inputs
+    # amino-acid inputs
+    # hmm search
+    # filtering hits
+    # filtering genomes
+    # alignments
+    # concatenation and renaming
+    # treeing
+    # optional ko search
+    # optional pfam search
+    # implement nucleotide mode :(
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
@@ -17,7 +28,12 @@ GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f f
 gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -j 4 -t -P
 
 ### OVERALL NOTES ###
-# execute snakemake workflows from within the output gtotree dir (so .snakemake dirs won't ever conflict with each other)
+# need some check and handling if the input files changed when doing a resume
+# when a resume is done, may want to just try snakemake workflows on inputs that failed the prior runs
+# might not be using gnu parallel anymore due to snakemake files, so check that at the end
+    # oh, add snakemake to definite citations
+# since multiple logs may be created with --resume function, might need to add functionality to back up a log that exists to a sub-dir,
+    # maybe with a time/date stamp of when first run appended to the name
 
 
 ### TO DO ###

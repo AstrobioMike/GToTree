@@ -1,0 +1,2 @@
+GToTree-test-data/GCF_000020585.3_ASM2058v3_protein.faa
+GToTree-test-data/GCF_001886455.1_ASM188645v1_protein.faa.gz

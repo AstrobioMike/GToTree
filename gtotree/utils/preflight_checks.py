@@ -34,9 +34,9 @@ def preflight_checks(args):
     check_for_essential_deps()
     args, run_data = primary_args_validation(args)
     check_for_required_dbs(args)
-    tools_used = track_tools_used(args)
+    run_data = track_tools_used(args, run_data)
     args, run_data = setup_outputs(args, run_data)
-    return args, run_data, tools_used
+    return args, run_data
 
 
 def check_for_essential_deps():
@@ -131,7 +131,7 @@ def check_input_files(args):
 
     if args.resume:
         try:
-            run_data = read_run_data(args)
+            run_data = read_run_data(args.run_files_dir + "/genome-data.json")
         except FileNotFoundError:
             pass
 
@@ -165,7 +165,8 @@ def check_output_dir(args):
     else:
         args.output_already_existed = False
 
-    args.run_files_dir = os.path.join(args.output, "run-files")
+    args.run_files_dir_rel = os.path.join(args.output, "run-files")
+    args.run_files_dir = os.path.abspath(args.run_files_dir_rel)
 
     return args
 
@@ -380,7 +381,7 @@ def check_for_required_dbs(args):
         get_kofamscan_data()
 
 
-def track_tools_used(args):
+def track_tools_used(args, run_data):
 
     tools_used = ToolsUsed()
 
@@ -406,7 +407,9 @@ def track_tools_used(args):
     if args.target_ko_file:
         tools_used.kofamscan_used = True
 
-    return tools_used
+    run_data.tools_used = tools_used
+
+    return run_data
 
 
 def check_input_genomes_amount(total_input_genomes, args):
@@ -428,18 +431,20 @@ def setup_outputs(args, run_data):
 
     os.makedirs(args.run_files_dir, exist_ok=True)
 
-    # a place for snakemake logs
-    snakemake_logs_dir = os.path.join(args.run_files_dir, "snakemake-logs")
+    snakemake_logs_dir_rel = os.path.join(args.run_files_dir_rel, "snakemake-logs")
+    snakemake_logs_dir = os.path.abspath(snakemake_logs_dir_rel)
     os.makedirs(snakemake_logs_dir, exist_ok=True)
     run_data.snakemake_logs_dir = snakemake_logs_dir
+    run_data.snakemake_logs_dir_rel = snakemake_logs_dir_rel
 
     if args.ncbi_accessions:
-        ncbi_downloads_dir = os.path.join(args.run_files_dir, "ncbi-downloads")
+        ncbi_downloads_dir_rel = os.path.join(args.run_files_dir, "ncbi-downloads")
+        ncbi_downloads_dir = os.path.abspath(ncbi_downloads_dir_rel)
         os.makedirs(ncbi_downloads_dir, exist_ok=True)
-        args.ncbi_downloads_dir = ncbi_downloads_dir
         run_data.ncbi_downloads_dir = ncbi_downloads_dir
+        run_data.ncbi_downloads_dir_rel = ncbi_downloads_dir_rel
 
-    log_file = os.path.join(args.output, "gtotree-runlog.txt")
+    log_file = os.path.abspath(os.path.join(args.output, "gtotree-runlog.txt"))
     args.log_file = log_file
     run_data.log_file = log_file
     log_file_var.set(log_file)
@@ -449,6 +454,9 @@ def setup_outputs(args, run_data):
     stdout_and_log("    Command entered:\n       ", full_execution_command, log_file=args.log_file, log_only=True)
 
     args, run_data = setup_tmp_dir(args, run_data)
+
+    run_data.all_input_genome_AA_files_dir = os.path.join(args.tmp_dir, "input-genome-AA-files")
+    os.makedirs(run_data.all_input_genome_AA_files_dir, exist_ok=True)
 
     return args, run_data
 

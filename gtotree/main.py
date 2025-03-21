@@ -10,17 +10,23 @@ def main(args = None):
 
     print(gtotree_header())
 
-    args, run_data, tools_used = preflight_checks(args)
+    args, run_data = preflight_checks(args)
 
     display_initial_run_info(args, run_data)
 
     process_genomes(args, run_data)
+
+    # optional ko searching
+
+    # optional pfam searching
 
     # filter_genes_by_length(args, run_data)
 
     # filter_genomes_with_too_few_hits(args, run_data)
 
     # generate_alignments(args, run_data)
+
+    # concatenate and rename
 
     # tree_building(args, run_data)
 

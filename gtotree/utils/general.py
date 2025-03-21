@@ -1,9 +1,10 @@
+# import inspect
 import os
 import sys
 import shutil
 import json #type: ignore
 import argparse
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import List
 from tqdm import tqdm # type: ignore
 import subprocess
@@ -49,6 +50,7 @@ class RunData:
     ncbi_accessions: List[str] = field(default_factory=list)
     ncbi_accessions_done: List[str] = field(default_factory=list)
     ncbi_accs_not_found: List[str] = field(default_factory=list)
+    ncbi_accs_not_downloaded: List[str] = field(default_factory=list)
     genbank_files: List[str] = field(default_factory=list)
     genbank_files_done: List[str] = field(default_factory=list)
     fasta_files: List[str] = field(default_factory=list)
@@ -66,10 +68,17 @@ class RunData:
 
     ncbi_sub_table_path: str = ""
     ncbi_downloads_dir: str = ""
+    ncbi_downloads_dir_rel: str = ""
     run_files_dir: str = ""
+    run_files_dir_rel: str = ""
+    run_data_path: str = ""
+    all_input_genome_AA_files_dir: str = ""
     tmp_dir: str = ""
     log_file: str = ""
     snakemake_logs_dir: str = ""
+    snakemake_logs_dir_rel: str = ""
+
+    tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
     @property
     def num_ncbi_accessions(self) -> int:
@@ -115,6 +124,10 @@ class RunData:
         if filepath not in self.amino_acid_files_done:
             self.amino_acid_files_done.append(filepath)
 
+    def add_ncbi_acc_not_downloaded(self, accession: str):
+        if accession not in self.ncbi_accs_not_downloaded:
+            self.ncbi_accs_not_downloaded.append(accession)
+
     def remove_ncbi_accession(self, accession: str):
         if accession in self.ncbi_accessions:
             self.ncbi_accessions.remove(accession)
@@ -142,6 +155,13 @@ class RunData:
             self.all_remaining_genomes.remove(filepath)
             self.removed_amino_acid_files.append(filepath)
             self.all_removed_genomes.append(filepath)
+
+    # def __setattr__(self, name, value):
+    #     """Debug when an attribute is changed."""
+    #     stack = inspect.stack()
+    #     caller = stack[1]  # Get the function that triggered the change
+    #     print(f"Setting `{name}` to `{value}` in {caller.filename}:{caller.lineno}, function {caller.function}")
+    #     super().__setattr__(name, value)
 
 
 def populate_run_data(args):
@@ -176,6 +196,8 @@ def populate_run_data(args):
         run_data.all_remaining_genomes.extend(entries_list)
 
     run_data.run_files_dir = args.run_files_dir
+    run_data.run_files_dir_rel = args.run_files_dir_rel
+    run_data.run_data_path = run_data.run_files_dir + "/genome-data.json"
 
     return run_data
 
@@ -195,18 +217,23 @@ def read_args(args_path):
 
 
 def write_run_data(run_data):
-    run_data_path = run_data.run_files_dir + "/genome-data.json"
-    with open(run_data_path, "w") as f:
-        json.dump(run_data.__dict__, f)
-    return run_data_path
+    with open(run_data.run_data_path, "w") as f:
+        json.dump(asdict(run_data), f, indent=2)
 
 
 def read_run_data(path):
     try:
         with open(path, "r") as f:
             run_data_dict = json.load(f)
+
+        if "tools_used" in run_data_dict and run_data_dict["tools_used"] is not None:
+            run_data_dict["tools_used"] = ToolsUsed(**run_data_dict["tools_used"])
+        else:
+            run_data_dict["tools_used"] = ToolsUsed()
+
         run_data = RunData(**run_data_dict)
         return run_data
+
     except FileNotFoundError:
         pass
 
@@ -225,6 +252,7 @@ def run_snakemake(cmd, run_data, description, print_lines=False):
     num_jobs = run_data.num_ncbi_accessions
     num_finished = 0 # counting this so it doesn't flip the progress bar when it counts the final "all" rule
     snakemake_log = f"{run_data.snakemake_logs_dir}/{description.replace(' ', '-').lower()}.log"
+    cmd += ["--directory", run_data.run_files_dir]
     with open(snakemake_log, "w") as log_file, tqdm(total=num_jobs, desc="    " + description, ncols = 78) as pbar:
         process = subprocess.Popen(
             cmd,

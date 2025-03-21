@@ -110,6 +110,13 @@ def report_notice(message, color = "yellow"):
     print(color_text("  ******************************************************************************  ", color))
 
 
+def report_update(message, color = "green"):
+    print("")
+    print(color_text("  *********************************** UPDATE ***********************************  ", color))
+    print(message)
+    print(color_text("  ******************************************************************************  ", color))
+
+
 ### specific notices
 def check_and_report_any_changed_default_behavior(args):
 
@@ -272,10 +279,10 @@ def report_processing_stage(stage = ["ncbi", "genbank",
                                      "filter-genomes", "align",
                                      "tree"]):
     if stage == "ncbi":
-        message = ("\n ##############################################################################"
-                    " ####          Preprocessing the genomes provided as NCBI accessions          ####"
-                    " ##############################################################################")
-    report_message(message, color = None)
+        message = ("\n\n  ##############################################################################\n"
+                    "  ####        Preprocessing the genomes provided as NCBI accessions         ####\n"
+                    "  ##############################################################################")
+    print(message)
     time.sleep(1)
 
 
@@ -284,3 +291,32 @@ def report_snakemake_failure(description, snakemake_log):
     report_message(f"Snakemake failed while running the \"{description}\" workflow. Check the log at:")
     print(color_text(f"    {snakemake_log}", "yellow"))
     report_early_exit()
+
+
+def report_ncbi_accs_not_found(num_accs, path):
+    report_notice(f"    {num_accs} accession(s) not successfully found at NCBI.\n"
+                f"    Reported in {path}/ncbi-accessions-not-found.txt")
+    time.sleep(1)
+
+
+def report_ncbi_update(run_data):
+    num_not_found_at_ncbi = len(run_data.ncbi_accs_not_found)
+    num_not_downloaded = len(run_data.ncbi_accs_not_downloaded)
+    num_prepared = len(run_data.ncbi_accessions_done)
+    num_removed = len(run_data.removed_ncbi_accessions)
+    num_input = num_removed + num_prepared
+
+    if num_removed == 0:
+        message = (f"    {color_text(f"All {num_input} input accessions were successfully downloaded and prepared!", "green")}")
+    else:
+        message = f"    Of the input genomes provided as NCBI accessions:\n\n"
+        if num_not_found_at_ncbi > 0:
+            message += (f"      {color_text(f"{num_not_found_at_ncbi} not found at NCBI", "yellow")}, reported in:\n"
+                        f"        {run_data.run_files_dir_rel}/ncbi-accessions-not-found.txt\n\n")
+        if num_not_downloaded > 0:
+            message += (f"      {color_text(f"{num_not_downloaded} not successfully downloaded", "yellow")}, reported in:\n"
+                        f"        {run_data.run_files_dir_rel}/ncbi-accessions-not-downloaded.txt\n\n")
+        if num_removed > 0:
+            message += (f"    {color_text(f"Overall, {num_prepared} of the input {num_input} accessions were successfully downloaded\n    and prepared.", "yellow")}")
+
+    report_update(message)

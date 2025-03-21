@@ -1,5 +1,5 @@
 import time
-from gtotree.utils.messaging import report_notice
+from gtotree.utils.messaging import report_notice, report_ncbi_accs_not_found
 
 def parse_assembly_summary(assembly_summary_file, run_data):
     """
@@ -82,20 +82,17 @@ def parse_assembly_summary(assembly_summary_file, run_data):
 
     not_found = set(run_data.ncbi_accessions) - found
 
-    with open(run_data.run_files_dir + "/ncbi-accessions-not-found.txt", "w") as not_found_file:
-        for acc in not_found:
-            not_found_file.write(acc + "\n")
+    if len(not_found) > 0:
+        with open(run_data.run_files_dir + "/ncbi-accessions-not-found.txt", "w") as not_found_file:
+            for acc in not_found:
+                not_found_file.write(acc + "\n")
+                run_data.remove_ncbi_accession(acc)
 
-    run_data.ncbi_accs_not_found = list(not_found)
+        run_data.ncbi_accs_not_found = list(not_found)
+
+        report_ncbi_accs_not_found(len(run_data.ncbi_accs_not_found), run_data.run_files_dir_rel)
+
     run_data.ncbi_sub_table_path = ncbi_sub_table_path
-
-    if run_data.ncbi_accs_not_found:
-        report_notice(f"    {len(run_data.ncbi_accs_not_found)} accession(s) not successfully found at NCBI.\n"
-                        f"    Reported in {run_data.run_files_dir}/ncbi-accessions-not-found.txt")
-        time.sleep(1)
-
-        for acc in run_data.ncbi_accs_not_found:
-            run_data.remove_ncbi_accession(acc)
 
     return run_data
 

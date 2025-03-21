@@ -1,0 +1,2 @@
+GToTree-test-data/fasta_files/GCA_000009925.1_ASM992v1_genomic.fna.gz
+GToTree-test-data/fasta_files/GCA_000012825.1_ASM1282v1_genomic.fna
