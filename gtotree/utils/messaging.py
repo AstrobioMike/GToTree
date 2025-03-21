@@ -111,6 +111,101 @@ def report_notice(message, color = "yellow"):
 
 
 ### specific notices
+def check_and_report_any_changed_default_behavior(args):
+
+    conditions = [
+        args.output != "gtotree-output",
+        args.mapping_file,
+        args.nucleotide_mode,
+        args.no_tree,
+        args.add_gtdb_tax,
+        args.add_ncbi_tax,
+        args.lineage != "Domain,Phylum,Class,Species",
+        args.tree_program != "FastTreeMP",
+        args.best_hit,
+        args.seq_length_cutoff != 0.2,
+        args.genome_hits_cutoff != 0.5,
+        args.num_jobs != 1,
+        args.num_hmm_cpus != 2,
+        args.muscle_threads != 5,
+        args.no_super5,
+        args.keep_gene_alignments,
+        args.resume and args.output_already_existed,
+        args.force_overwrite and args.output_already_existed,
+        args.debug,
+    ]
+
+    if any(conditions):
+        report_message("  Other options set:")
+
+    if args.resume and args.output_already_existed:
+        print(f"      - Attempting to resume a previous run with outputs in \"{args.output}\"")
+
+    if args.force_overwrite:
+        if args.output_already_existed:
+            print(f"      - The `-F` flag was provided, so this output directory is being overwritten: \"{args.output}\"")
+
+    if args.output != "gtotree-output" and not args.resume:
+        print(f"      - The output directory has been set to: \"{args.output}\"")
+
+    if args.mapping_file:
+        print(f"      - Labels of the specified input genomes will be modified based on: \"{args.mapping_file}\"")
+
+    if args.nucleotide_mode:
+        print("      - Working towards nucleotie alignments, as the `-z` flag was provided\n"
+              "          (amino-acid seqs are still used for HMM-searching of target genes)")
+
+    if args.no_tree:
+        print("      - Only generating alignment, and no tree, as the `-N` flag was provided")
+
+    if args.add_gtdb_tax:
+        print("      - GTDB taxonomic info will be added to labels where possible")
+        if args.add_ncbi_tax:
+            print("      - NCBI taxonomic info will be added where possible when GTDB is not")
+
+    if args.add_ncbi_tax and not args.add_gtdb_tax:
+        print("      - NCBI taxonomic info will be added to labels where possible")
+
+    if args.lineage != "Domain,Phylum,Class,Species":
+        print(f"      - Lineage info added to labels will be: \"{args.lineage}\"")
+
+    if args.tree_program != "FastTreeMP":
+        print(f"      - The treeing program used will be: \"{args.tree_program}\"")
+
+    if args.best_hit:
+        print("      - Running in \"best-hit\" mode")
+
+    if args.seq_length_cutoff != 0.2:
+        print(f"      - Gene-length filtering cutoff threshold (`-c`) has been set to: {args.seq_length_cutoff}")
+
+    if args.genome_hits_cutoff != 0.5:
+        print(f"      - Genome minimum gene-copy threshold (`-G`) has been set to: {args.genome_hits_cutoff}")
+
+    if args.num_jobs != 1:
+        print(f"      - The number of jobs to run during parallelizable steps has been set to: {args.num_jobs}")
+
+    if args.num_hmm_cpus != 2:
+        print(f"      - The number of CPUs used for `hmmsearch` calls will be: {args.num_hmm_cpus}")
+
+    if args.muscle_threads != 5:
+        print(f"      - The number of threads used for `muscle` calls will be: {args.muscle_threads}")
+
+    if args.no_super5:
+        print("      - The 'super5' muscle algorithm will not be used even with greater than 1,000 input genomes")
+
+    if args.keep_gene_alignments:
+        print("      - Individual protein-alignment files will retained, due to the `-k` flag being provided")
+
+    if args.debug:
+        print("      - Debug mode is enabled")
+
+    if args.target_pfam_file:
+        print(f"      - Genomes will be searched for Pfams listed in: {args.target_pfam_file} ({args.total_pfam_targets} targets)")
+
+    if args.target_ko_file:
+        print(f"      - Genomes will be searched for KOs listed in: {args.target_ko_file} ({args.total_ko_targets} targets)")
+
+
 def many_genomes_notice(total_input_genomes):
     return (
     f"""    We seem to be aiming to work with {total_input_genomes} genomes. This is quite a bit, and
@@ -171,10 +266,21 @@ def absurd_number_of_genomes_notice(total_input_genomes):
     )
 
 
-def report_ncbi_processing():
-    report_message("\n ##############################################################################"
-                    " ####          Working on the genomes provided as NCBI accessions          ####"
-                    " ##############################################################################",
-                    color = None
-                    )
+def report_processing_stage(stage = ["ncbi", "genbank",
+                                     "fasta", "amino-acid",
+                                     "hmm", "filter-seqs",
+                                     "filter-genomes", "align",
+                                     "tree"]):
+    if stage == "ncbi":
+        message = ("\n ##############################################################################"
+                    " ####          Preprocessing the genomes provided as NCBI accessions          ####"
+                    " ##############################################################################")
+    report_message(message, color = None)
     time.sleep(1)
+
+
+def report_snakemake_failure(description, snakemake_log):
+    time.sleep(1)
+    report_message(f"Snakemake failed while running the \"{description}\" workflow. Check the log at:")
+    print(color_text(f"    {snakemake_log}", "yellow"))
+    report_early_exit()

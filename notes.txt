@@ -1,4 +1,5 @@
 ## next: working on download and formatting ncbi input seqs
+    # up to filtering and then renaming them, i should probably combine those into one module (utils/seqs.py maybe)
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 

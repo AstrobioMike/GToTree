@@ -1,17 +1,17 @@
 from gtotree.utils.general import (read_run_data,
                                    write_run_data,
                                    read_args,
+                                   run_prodigal,
                                    touch)
 from gtotree.utils.processing_genomes import prepare_accession
 
-args = read_args(config['args_path'])
-run_data = read_run_data(args)
+run_data = read_run_data(config['run_data_path'])
 
 accessions = run_data.ncbi_accessions
 
 rule all:
     input:
-        expand(f"{args.ncbi_downloads_dir}/{{acc}}.done", acc=accessions)
+        expand(f"{run_data.ncbi_downloads_dir}/{{acc}}.done", acc=accessions)
     run:
         for file in input:
             with open(file, 'r') as f:
@@ -24,15 +24,20 @@ rule all:
                     else:
                         run_data.remove_ncbi_accession(acc)
 
-        write_run_data(run_data, args)
+        write_run_data(run_data)
 
 
 rule process_ncbi_accessions:
     output:
-        f"{args.ncbi_downloads_dir}/{{acc}}.done"
+        f"{run_data.ncbi_downloads_dir}/{{acc}}.done"
     run:
-        done = prepare_accession(wildcards.acc, args, run_data)
-        # done = filter and rename seqs
+        done, nt = prepare_accession(wildcards.acc, run_data)
+        if done and nt:
+            print(f"\n\n DOING {wildcards.acc} \n\n")
+            done = run_prodigal(wildcards.acc, run_data, "ncbi")
+        # gtt-filter
+        # gtt-rename
+        # done = filter and rename seqs()
         # more?
 
         with open(output[0], 'w') as f:

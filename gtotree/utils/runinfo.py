@@ -1,12 +1,11 @@
 import re
 import sys
 import contextlib
-import time
-from gtotree.utils.messaging import report_message
+from gtotree.utils.messaging import (report_message,
+                                     check_and_report_any_changed_default_behavior)
 from gtotree.utils.general import log_file_var
 from gtotree.utils.hmm_handling import get_number_of_targets
-from gtotree.utils.preflight_checks import (check_input_genomes_amount,
-                                            check_and_report_any_changed_default_behavior)
+from gtotree.utils.preflight_checks import check_input_genomes_amount
 
 
 class Tee:
@@ -74,4 +73,4 @@ def display_initial_run_info(args, run_data):
     # time.sleep(1)
 
     check_and_report_any_changed_default_behavior(args)
-    # time.sleep(1)
+    # time.sleep(3)

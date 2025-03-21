@@ -1,7 +1,7 @@
 import time
 from gtotree.utils.messaging import report_notice
 
-def parse_assembly_summary(assembly_summary_file, run_data, args):
+def parse_assembly_summary(assembly_summary_file, run_data):
     """
     parse NCBI's assembly summary file down to the provided wanted accessions
 
@@ -34,7 +34,7 @@ def parse_assembly_summary(assembly_summary_file, run_data, args):
         - HTTP path (built from the downloaded accession and assembly name; in case ftp path is empty, which does rarely happen)
     """
 
-    if run_data.ncbi_sub_table_done:
+    if run_data.ncbi_sub_table_path:
         return run_data
 
     wanted_dict = {}
@@ -44,7 +44,9 @@ def parse_assembly_summary(assembly_summary_file, run_data, args):
 
     found = set()
 
-    with open(args.tmp_dir + "/ncbi-accessions-info.tsv", "w") as out_file:
+    ncbi_sub_table_path = run_data.tmp_dir + "/ncbi-accessions-info.tsv"
+
+    with open(ncbi_sub_table_path, "w") as out_file:
         out_file.write("input_accession\tfound_accession\tassembly_name\ttaxid\torganism_name\tinfraspecific_name\tversion_status\tassembly_level\thttp_base_link\n")
         with open(assembly_summary_file, "r") as assemblies:
             for line in assemblies:
@@ -80,16 +82,16 @@ def parse_assembly_summary(assembly_summary_file, run_data, args):
 
     not_found = set(run_data.ncbi_accessions) - found
 
-    with open(args.run_files_dir + "/ncbi-accessions-not-found.txt", "w") as not_found_file:
+    with open(run_data.run_files_dir + "/ncbi-accessions-not-found.txt", "w") as not_found_file:
         for acc in not_found:
             not_found_file.write(acc + "\n")
 
     run_data.ncbi_accs_not_found = list(not_found)
-    run_data.ncbi_sub_table_done = True
+    run_data.ncbi_sub_table_path = ncbi_sub_table_path
 
     if run_data.ncbi_accs_not_found:
         report_notice(f"    {len(run_data.ncbi_accs_not_found)} accession(s) not successfully found at NCBI.\n"
-                        f"    Reported in {args.run_files_dir}/ncbi-accessions-not-found.txt")
+                        f"    Reported in {run_data.run_files_dir}/ncbi-accessions-not-found.txt")
         time.sleep(1)
 
         for acc in run_data.ncbi_accs_not_found:

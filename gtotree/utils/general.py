@@ -1,5 +1,6 @@
 import os
 import sys
+import shutil
 import json #type: ignore
 import argparse
 from dataclasses import dataclass, field
@@ -9,7 +10,7 @@ import subprocess
 import urllib.request
 import contextvars
 from pkg_resources import resource_filename
-from gtotree.utils.messaging import report_notice, many_genomes_notice
+from gtotree.utils.messaging import report_early_exit, report_snakemake_failure
 
 log_file_var = contextvars.ContextVar("log_file", default = "gtotree-runlog.txt")
 
@@ -63,9 +64,12 @@ class RunData:
     removed_amino_acid_files: List[str] = field(default_factory=list)
     all_removed_genomes: List[str] = field(default_factory=list)
 
-    ncbi_sub_table_done: bool = False
+    ncbi_sub_table_path: str = ""
+    ncbi_downloads_dir: str = ""
     run_files_dir: str = ""
     tmp_dir: str = ""
+    log_file: str = ""
+    snakemake_logs_dir: str = ""
 
     @property
     def num_ncbi_accessions(self) -> int:
@@ -190,18 +194,21 @@ def read_args(args_path):
     return args
 
 
-def write_run_data(run_data, args):
-    run_data_path = args.run_files_dir + "/genome-data.json"
+def write_run_data(run_data):
+    run_data_path = run_data.run_files_dir + "/genome-data.json"
     with open(run_data_path, "w") as f:
         json.dump(run_data.__dict__, f)
     return run_data_path
 
 
-def read_run_data(args):
-    with open(args.run_files_dir + "/genome-data.json", "r") as f:
-        run_data_dict = json.load(f)
-    run_data = RunData(**run_data_dict)
-    return run_data
+def read_run_data(path):
+    try:
+        with open(path, "r") as f:
+            run_data_dict = json.load(f)
+        run_data = RunData(**run_data_dict)
+        return run_data
+    except FileNotFoundError:
+        pass
 
 
 def get_snakefile_path(basename):
@@ -213,18 +220,23 @@ def touch(path):
         os.utime(path, None)
 
 
-def run_snakemake(cmd, num_jobs, description, print_lines=False):
+def run_snakemake(cmd, run_data, description, print_lines=False):
     print("")
+    num_jobs = run_data.num_ncbi_accessions
     num_finished = 0 # counting this so it doesn't flip the progress bar when it counts the final "all" rule
-    with tqdm(total=num_jobs, desc="    " + description, ncols = 78) as pbar:
-        result = subprocess.Popen(
+    snakemake_log = f"{run_data.snakemake_logs_dir}/{description.replace(' ', '-').lower()}.log"
+    with open(snakemake_log, "w") as log_file, tqdm(total=num_jobs, desc="    " + description, ncols = 78) as pbar:
+        process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1
         )
-        for line in iter(result.stdout.readline, ""):
+        for line in iter(process.stdout.readline, ""):
+            log_file.write(line)
+            log_file.flush()
+
             if "Finished job" in line:
                 num_finished += 1
                 if num_finished <= num_jobs:
@@ -232,6 +244,41 @@ def run_snakemake(cmd, num_jobs, description, print_lines=False):
             if print_lines:
                 print(line, end="")
 
-        result.wait()
+        process.wait()
 
-    return result
+        if process.returncode != 0:
+            report_snakemake_failure(description, snakemake_log)
+            report_early_exit()
+
+
+def run_prodigal(id, run_data, group = ["ncbi", "fasta", "genbank"]):
+
+    if group == "ncbi":
+        in_path = f"{run_data.ncbi_downloads_dir}/{id}_genomic.fna"
+        out_path = f"{run_data.ncbi_downloads_dir}/{id}_protein.faa"
+    elif group == "fasta":
+        report_early_exit(f"    Prodigal not yet implemented for fasta files.")
+    elif group == "genbank":
+        report_early_exit(f"    Prodigal not yet implemented for genbank files.")
+    else:
+        report_early_exit(f"    Prodigal not yet implemented for \"{group}\".")
+
+    prodigal_cmd = [
+        "prodigal",
+        "-c",
+        "-q",
+        "-i", f"{in_path}",
+        "-a", f"{out_path}.tmp",
+    ]
+
+    remove_ast_cmd = f"tr -d '*' < {out_path}.tmp > {out_path}"
+
+    try:
+        subprocess.run(prodigal_cmd, stdout=subprocess.DEVNULL)
+        subprocess.run(remove_ast_cmd, shell=True)
+        shutil.rmtree(f"{out_path}.tmp")
+        done = True
+    except:
+        done = False
+
+    return done

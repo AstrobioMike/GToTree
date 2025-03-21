@@ -35,7 +35,7 @@ def preflight_checks(args):
     args, run_data = primary_args_validation(args)
     check_for_required_dbs(args)
     tools_used = track_tools_used(args)
-    args, run_data = setup_outputs_and_tmp_dir(args, run_data)
+    args, run_data = setup_outputs(args, run_data)
     return args, run_data, tools_used
 
 
@@ -129,10 +129,6 @@ def check_input_files(args):
     if args.amino_acid_files:
         args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
 
-    run_files_dir = os.path.join(args.output, "run-files")
-    os.makedirs(run_files_dir, exist_ok=True)
-    args.run_files_dir = run_files_dir
-
     if args.resume:
         try:
             run_data = read_run_data(args)
@@ -168,6 +164,9 @@ def check_output_dir(args):
         args.output_already_existed = True
     else:
         args.output_already_existed = False
+
+    args.run_files_dir = os.path.join(args.output, "run-files")
+
     return args
 
 
@@ -425,117 +424,46 @@ def check_input_genomes_amount(total_input_genomes, args):
         time.sleep(60)
 
 
-def check_and_report_any_changed_default_behavior(args):
+def setup_outputs(args, run_data):
 
-    conditions = [
-        args.output != "gtotree-output",
-        args.mapping_file,
-        args.nucleotide_mode,
-        args.no_tree,
-        args.add_gtdb_tax,
-        args.add_ncbi_tax,
-        args.lineage != "Domain,Phylum,Class,Species",
-        args.tree_program != "FastTreeMP",
-        args.best_hit,
-        args.seq_length_cutoff != 0.2,
-        args.genome_hits_cutoff != 0.5,
-        args.num_jobs != 1,
-        args.num_hmm_cpus != 2,
-        args.muscle_threads != 5,
-        args.no_super5,
-        args.keep_gene_alignments,
-        args.resume and args.output_already_existed,
-        args.force_overwrite and args.output_already_existed,
-        args.debug,
-    ]
+    os.makedirs(args.run_files_dir, exist_ok=True)
 
-    if any(conditions):
-        report_message("  Other options set:")
-
-    if args.resume and args.output_already_existed:
-        print(f"      - Attempting to resume a previous run with outputs in \"{args.output}\"")
-
-    if args.force_overwrite:
-        if args.output_already_existed:
-            print(f"      - The `-F` flag was provided, so this output directory is being overwritten: \"{args.output}\"")
-
-    if args.output != "gtotree-output" and not args.resume:
-        print(f"      - The output directory has been set to: \"{args.output}\"")
-
-    if args.mapping_file:
-        print(f"      - Labels of the specified input genomes will be modified based on: \"{args.mapping_file}\"")
-
-    if args.nucleotide_mode:
-        print("      - Working towards nucleotie alignments, as the `-z` flag was provided\n"
-              "          (amino-acid seqs are still used for HMM-searching of target genes)")
-
-    if args.no_tree:
-        print("      - Only generating alignment, and no tree, as the `-N` flag was provided")
-
-    if args.add_gtdb_tax:
-        print("      - GTDB taxonomic info will be added to labels where possible")
-        if args.add_ncbi_tax:
-            print("      - NCBI taxonomic info will be added where possible when GTDB is not")
-
-    if args.add_ncbi_tax and not args.add_gtdb_tax:
-        print("      - NCBI taxonomic info will be added to labels where possible")
-
-    if args.lineage != "Domain,Phylum,Class,Species":
-        print(f"      - Lineage info added to labels will be: \"{args.lineage}\"")
-
-    if args.tree_program != "FastTreeMP":
-        print(f"      - The treeing program used will be: \"{args.tree_program}\"")
-
-    if args.best_hit:
-        print("      - Running in \"best-hit\" mode")
-
-    if args.seq_length_cutoff != 0.2:
-        print(f"      - Gene-length filtering cutoff threshold (`-c`) has been set to: {args.seq_length_cutoff}")
-
-    if args.genome_hits_cutoff != 0.5:
-        print(f"      - Genome minimum gene-copy threshold (`-G`) has been set to: {args.genome_hits_cutoff}")
-
-    if args.num_jobs != 1:
-        print(f"      - The number of jobs to run during parallelizable steps has been set to: {args.num_jobs}")
-
-    if args.num_hmm_cpus != 2:
-        print(f"      - The number of CPUs used for `hmmsearch` calls will be: {args.num_hmm_cpus}")
-
-    if args.muscle_threads != 5:
-        print(f"      - The number of threads used for `muscle` calls will be: {args.muscle_threads}")
-
-    if args.no_super5:
-        print("      - The 'super5' muscle algorithm will not be used even with greater than 1,000 input genomes")
-
-    if args.keep_gene_alignments:
-        print("      - Individual protein-alignment files will retained, due to the `-k` flag being provided")
-
-    if args.debug:
-        print("      - Debug mode is enabled")
-
-    if args.target_pfam_file:
-        print(f"      - Genomes will be searched for Pfams listed in: {args.target_pfam_file} ({args.total_pfam_targets} targets)")
-
-    if args.target_ko_file:
-        print(f"      - Genomes will be searched for KOs listed in: {args.target_ko_file} ({args.total_ko_targets} targets)")
-
-    time.sleep(3)
-
-
-def setup_outputs_and_tmp_dir(args, run_data):
+    # a place for snakemake logs
+    snakemake_logs_dir = os.path.join(args.run_files_dir, "snakemake-logs")
+    os.makedirs(snakemake_logs_dir, exist_ok=True)
+    run_data.snakemake_logs_dir = snakemake_logs_dir
 
     if args.ncbi_accessions:
         ncbi_downloads_dir = os.path.join(args.run_files_dir, "ncbi-downloads")
         os.makedirs(ncbi_downloads_dir, exist_ok=True)
         args.ncbi_downloads_dir = ncbi_downloads_dir
+        run_data.ncbi_downloads_dir = ncbi_downloads_dir
 
     log_file = os.path.join(args.output, "gtotree-runlog.txt")
     args.log_file = log_file
+    run_data.log_file = log_file
     log_file_var.set(log_file)
 
     full_execution_command = f"{' '.join(sys.argv)}"
     stdout_and_log(gtotree_header(), log_file=args.log_file, log_only=True, restart_log=True)
     stdout_and_log("    Command entered:\n       ", full_execution_command, log_file=args.log_file, log_only=True)
+
+    args, run_data = setup_tmp_dir(args, run_data)
+
+    return args, run_data
+
+
+def setup_tmp_dir(args, run_data):
+
+    if args.resume:
+        if run_data.tmp_dir:
+            args.tmp_dir = run_data.tmp_dir
+        else:
+            tmp_dir = tempfile.mkdtemp(prefix = "gtt-tmp-", dir = args.output)
+            args.tmp_dir = tmp_dir
+            run_data.tmp_dir = tmp_dir
+
+        return args, run_data
 
     if args.tmp_dir:
         try:
@@ -548,10 +476,8 @@ def setup_outputs_and_tmp_dir(args, run_data):
             report_message("Maybe you don't have write permissions there?")
             report_early_exit()
     else:
-        tmp_dir = tempfile.mkdtemp(prefix = "gtotree-tmp-", dir = args.output)
+        tmp_dir = tempfile.mkdtemp(prefix = "gtt-tmp-", dir = args.output)
         args.tmp_dir = tmp_dir
         run_data.tmp_dir = tmp_dir
 
-
     return args, run_data
-
