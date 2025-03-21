@@ -21,6 +21,8 @@ conda install snakemake=8.30.0
 pip install -e gtotree/
 
 # example test
+rm -rf gtotree-output/ ; gtotree2 -a ncbi-accessions.txt -H Universal -j 4
+
 gtotree2 -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -j 4 -t -P
 
 GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -j 4 -t -P -F
