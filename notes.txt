@@ -1,6 +1,5 @@
-## next: # made a shit show out of given and full paths working on the genbank preprocessing, it's all broken currently
-    # working on fetching and formatting genbank inputs
-    # fasta inputs
+## next: 
+    # working on fasta inputs
     # amino-acid inputs
     # hmm search
     # filtering hits
@@ -30,7 +29,12 @@ GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f f
 gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -j 4 -t -P
 
 ### OVERALL NOTES ###
+# need a lot of testing on resume functionality
+    # one thing i see happening is when i give ncbi accs and genbank files, on a second start it is still running some snakemake for ncbi
+    # OH, i think that's happening because one failed 
+    # it is not appropriately calculating how many it would do though (it's listing 2 instead of 1 job)
 # need some check and handling if the input files changed when doing a resume
+    # maybe just check and require they haven't changed at all, or a new run is needed
 # when a resume is done, may want to just try snakemake workflows on inputs that failed the prior runs
 # might not be using gnu parallel anymore due to snakemake files, so check that at the end
     # oh, add snakemake to definite citations
@@ -57,6 +61,8 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 # estimated percent completion and redundancy are no long provided
     # (this was always just "free" info, but checkm2 is a much better way to do this, so i made the decision to stop providing it at all)
 # --resume flag added (will be set automatically if the same output dir but no `-F` flag provided)
+# taxids are no longer searched for in input genbank files, they will only be found/used for provided input ncbi-accessions
+    # if this is actually a feature that benefitted anyone, i'll add it back in on request :)
 
 
 ### PLACES TO DEF IMPROVE ###

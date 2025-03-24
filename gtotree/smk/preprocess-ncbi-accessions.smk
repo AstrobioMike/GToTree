@@ -3,7 +3,7 @@ from gtotree.utils.general import (read_run_data,
                                    read_args,
                                    run_prodigal)
 from gtotree.utils.seqs import filter_and_rename_fasta
-from gtotree.utils.genome_processing import prepare_accession
+from gtotree.utils.preprocessing_genomes import prepare_accession
 
 run_data = read_run_data(config['run_data_path'])
 if run_data is None:
@@ -47,7 +47,7 @@ rule process_ncbi_accessions:
 
         if done:
             downloaded = True
-            filter_and_rename_fasta(wildcards.acc, run_data)
+            filter_and_rename_fasta(wildcards.acc, run_data, run_data.ncbi_downloads_dir)
         else:
             downloaded = False
 

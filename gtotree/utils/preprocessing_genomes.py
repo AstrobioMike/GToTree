@@ -3,16 +3,15 @@ import urllib.request
 import gzip
 import shutil
 import os
-import subprocess
 from gtotree.utils.messaging import (report_ncbi_update,
+                                     report_genbank_update,
                                      report_processing_stage)
 from gtotree.utils.ncbi.parse_assembly_summary_file import parse_assembly_summary
 from gtotree.utils.ncbi.get_ncbi_assembly_tables import NCBI_assembly_summary_tab
 from gtotree.utils.general import (write_run_data,
                                    read_run_data,
                                    get_snakefile_path,
-                                   run_snakemake,
-                                   gunzip_if_needed)
+                                   run_snakemake)
 
 
 def preprocess_genomes(args, run_data):
@@ -102,9 +101,8 @@ def preprocess_genbank_genomes(args, run_data):
     if args.genbank_files:
 
         report_processing_stage("genbank")
-        print(run_data)
 
-        if set(run_data.genbank_files) != set(run_data.genbank_files_done):
+        if run_data.any_incomplete_genbank_files():
             # writing run_data and args objects to files so they can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-genbank-files.smk")
@@ -119,10 +117,17 @@ def preprocess_genbank_genomes(args, run_data):
                 f"run_data_path={run_data.run_data_path}"
             ]
 
-            run_snakemake(cmd, run_data.num_genbank_files, run_data, description, print_lines=True)
+            run_snakemake(cmd, run_data.num_genbank_files, run_data, description)
+
             run_data = read_run_data(run_data.run_data_path)
-            print(run_data)
+            capture_failed_genbank_files(run_data)
 
-            # capture_failed_genbank_inputs(run_data)
+        report_genbank_update(run_data)
 
-        # report_genbank_update(run_data)
+
+def capture_failed_genbank_files(run_data):
+    failed_genbank_files_list = run_data.incomplete_genbank_files()
+    if len(failed_genbank_files_list) > 0:
+        with open(run_data.run_files_dir + "/genbank-files-not-parsed.txt", "w") as not_parsed_file:
+            for entry in failed_genbank_files_list:
+                not_parsed_file.write(entry + "\n")

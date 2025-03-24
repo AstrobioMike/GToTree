@@ -361,6 +361,30 @@ def report_ncbi_update(run_data):
             message += (f"      {color_text(f"{num_not_downloaded} not successfully downloaded", "yellow")}, reported in:\n"
                         f"        {run_data.run_files_dir_rel}/ncbi-accessions-not-downloaded.txt\n\n")
         if num_removed > 0:
-            message += (f"    {color_text(f"Overall, {num_prepared} of the input {num_input} accessions were successfully downloaded\n    and prepared.", "yellow")}")
+            message += (f"    {color_text(f"Overall, {num_prepared} of the input {num_input} accessions were successfully downloaded and\n    prepared.", "yellow")}")
+
+    report_update(message)
+
+
+def report_genbank_update(run_data):
+    num_input = run_data.num_genbank_files
+    num_failed = len(run_data.incomplete_genbank_files())
+    num_prodigal_used = len(run_data.genbank_files_with_prodigal_used())
+
+    if num_failed == 0 and num_prodigal_used == 0:
+        message = (f"    {color_text(f"All {num_input} input genbank files were successfully parsed and prepared!", "green")}")
+    elif num_failed == 0:
+        message = (f"    {color_text(f"All {num_input} input genbank files were successfully parsed and prepared!", "green")}\n\n")
+    else:
+        message = f"    Of the input genomes provided as genbank files:\n\n"
+    if num_prodigal_used > 0 and num_failed == 0:
+        message += (f"      {color_text(f"{num_prodigal_used} had no CDS entries", "yellow")}, so prodigal was used on the nucleotide sequences.")
+    elif num_prodigal_used > 0:
+        message += (f"      {color_text(f"{num_prodigal_used} had no CDS entries", "yellow")}, so prodigal was used on the nucleotide sequences.\n\n")
+    if num_failed > 0:
+        message += (f"      {color_text(f"{num_failed} failed to be successfully parsed", "yellow")}, reported in:\n"
+                    f"        {run_data.run_files_dir_rel}/genbank-files-not-parsed.txt\n\n")
+    if num_failed > 0:
+        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} genbank files were successfully parsed and\n    prepared.", "yellow")}")
 
     report_update(message)

@@ -5,13 +5,15 @@ from gtotree.utils.general import (read_run_data,
                                    gunzip_if_needed,
                                    run_prodigal,
                                    touch)
-from gtotree.utils.seqs import filter_and_rename_fasta
+from gtotree.utils.seqs import (extract_filter_and_rename_cds_amino_acids_from_gb,
+                                extract_fasta_from_gb,
+                                filter_and_rename_fasta)
 
 run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-genbank_dict = {os.path.basename(f): f for f in run_data.genbank_files_full_paths}
+genbank_dict = {gf.basename: gf for gf in run_data.genbank_files}
 genbank_basenames = list(genbank_dict.keys())
 
 rule all:
@@ -19,21 +21,24 @@ rule all:
         expand(f"{run_data.genbank_processing_dir}/{{gb_file}}.done", gb_file=genbank_basenames)
     run:
         for gb_basename in genbank_basenames:
-            path = genbank_dict[gb_basename]
+            gf = genbank_dict[gb_basename]
+            path = gf.full_path
             status_path = f"{run_data.genbank_processing_dir}/{gb_basename}.done"
             with open(status_path, 'r') as f:
                 for line in f:
-                    gb_basename, status, prodigal_used = line.strip().split('\t')
+                    gb_file, status, prodigal_used, was_gzipped = line.strip().split('\t')
 
                     if int(status):
-                        if gb_basename.endswith('.gz'):
-                            run_data.replace_in_list('genbank_files_full_paths', path, path[:-3])
-                            path = path[:-3]
-                        run_data.add_done_genbank_file(path)
+                        if int(was_gzipped):
+                            gf.full_path = path[:-3]
+                            gf.basename = os.path.basename(gf.full_path)
+                            gf.mark_was_gzipped()
+                        gf.mark_done()
                     else:
-                        run_data.remove_genbank_file(path)
+                        gf.mark_removed()
 
                     if int(prodigal_used):
+                        gf.mark_prodigal_used()
                         run_data.tools_used.prodigal_used = True
 
         write_run_data(run_data)
@@ -43,23 +48,24 @@ rule process_genbank_files:
     output:
         f"{run_data.genbank_processing_dir}/{{gb_file}}.done"
     run:
-        path = genbank_dict[wildcards.gb_file]
-        path = gunzip_if_needed(path)
-        done = True
-        prodigal_used = False
-        # try to get amino acids
-        # if not, get fasta and run prodigal
+        gf = genbank_dict[wildcards.gb_file]
+        path = gf.full_path
+        path, was_gzipped = gunzip_if_needed(path)
+        if was_gzipped:
+            gf.full_path = path
+            gf.basename = os.path.basename(path)
+        done = extract_filter_and_rename_cds_amino_acids_from_gb(gf.basename, path, run_data)
 
-        #     done = run_prodigal(wildcards.gb_file, run_data, "genbank")
-        #     prodigal_used = True
-        # else:
-        #     prodigal_used = False
-
-        # if done:
-        #     downloaded = True
-        #     filter_and_rename_fasta(wildcards.acc, run_data)
-        # else:
-        #     downloaded = False
+        if not done:
+            extract_fasta_from_gb(gf.basename, path, run_data)
+            done = run_prodigal(gf.basename, run_data, "genbank")
+            prodigal_used = True
+            if done:
+                filter_and_rename_fasta(gf.basename, run_data, run_data.genbank_processing_dir)
+            else:
+                prodigal_used = False
+        else:
+            prodigal_used = False
 
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.gb_file}\t{int(done)}\t{int(prodigal_used)}\n')
+            f.write(f'{wildcards.gb_file}\t{int(done)}\t{int(prodigal_used)}\t{int(was_gzipped)}\n')

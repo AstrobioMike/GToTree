@@ -44,20 +44,44 @@ def download_with_tqdm(url, target, filename=None, urlopen=False):
 
 
 @dataclass
+class GenomeFile:
+    full_path: str
+    provided_path: str
+    basename: str
+    done: bool = False
+    removed: bool = False
+    prodigal_used: bool = False
+    was_gzipped: bool = False
+
+    @classmethod
+    def from_path(cls, path: str, base_dir: str = None):
+        full_path = os.path.abspath(path)
+        provided_path = path
+        basename = os.path.basename(full_path)
+        return cls(full_path, provided_path, basename)
+
+    def mark_done(self, value=True):
+        self.done = value
+
+    def mark_removed(self, value=True):
+        self.removed = value
+
+    def mark_prodigal_used(self, value=True):
+        self.prodigal_used = value
+
+    def mark_was_gzipped(self, value=True):
+        self.was_gzipped = value
+
+
+@dataclass
 class RunData:
     ncbi_accessions: List[str] = field(default_factory=list)
     ncbi_accessions_done: List[str] = field(default_factory=list)
     ncbi_accs_not_found: List[str] = field(default_factory=list)
     ncbi_accs_not_downloaded: List[str] = field(default_factory=list)
-    genbank_files: List[str] = field(default_factory=list)
-    genbank_files_full_paths: List[str] = field(default_factory=list)
-    genbank_files_done: List[str] = field(default_factory=list)
-    fasta_files: List[str] = field(default_factory=list)
-    fasta_files_full_paths: List[str] = field(default_factory=list)
-    fasta_files_done: List[str] = field(default_factory=list)
-    amino_acid_files: List[str] = field(default_factory=list)
-    amino_acid_files_full_paths: List[str] = field(default_factory=list)
-    amino_acid_files_done: List[str] = field(default_factory=list)
+    genbank_files: List[GenomeFile] = field(default_factory=list)
+    fasta_files: List[GenomeFile] = field(default_factory=list)
+    amino_acid_files: List[GenomeFile] = field(default_factory=list)
     all_input_genomes: List[str] = field(default_factory=list)
     all_remaining_genomes: List[str] = field(default_factory=list)
 
@@ -115,38 +139,19 @@ class RunData:
         if accession not in self.ncbi_accessions_done:
             self.ncbi_accessions_done.append(accession)
 
-    def add_done_genbank_file(self, filepath: str):
-        # if filepath not in self.genbank_files_done:
-        #     self.genbank_files_done.append(filepath)
-        print(f"\n\n{filepath}\n\n")
-        print(f"\n\n{self.genbank_files}\n\n")
-        print(f"\n\n{self.all_remaining_genomes}\n\n")
+    def add_genbank_file(self, filepath):
+        gf = GenomeFile.from_path(filepath)
+        if gf not in self.genbank_files:
+            self.genbank_files.append(gf)
 
-        if filepath in self.genbank_files:
-            candidate = filepath
-        else:
-            target = os.path.basename(filepath)
-            for f in self.genbank_files:
-                if os.path.basename(f) == target:
-                    candidate = f
-                if os.path.basename(f)[:-3] == target:
-                    candidate = f
-                    break
+    def incomplete_genbank_files(self) -> List[GenomeFile]:
+        return [gf.provided_path for gf in self.genbank_files if not gf.done]
 
-        if candidate:
-            try:
-                self.genbank_files.remove(candidate)
-            except:
-                self.genbank_files.remove(candidate[:-3])
-            try:
-                self.all_remaining_genomes.remove(candidate)
-            except:
-                self.all_remaining_genomes.remove(candidate[:-3])
-            self.removed_genbank_files.append(candidate)
-            self.all_removed_genomes.append(candidate)
+    def any_incomplete_genbank_files(self) -> bool:
+        return any(not gf.done for gf in self.genbank_files)
 
-        if candidate not in self.genbank_files_done:
-            self.genbank_files_done.append(candidate)
+    def genbank_files_with_prodigal_used(self) -> List[GenomeFile]:
+        return [gf for gf in self.genbank_files if gf.prodigal_used]
 
     def add_done_fasta_file(self, filepath: str):
         if filepath not in self.fasta_files_done:
@@ -167,22 +172,6 @@ class RunData:
             self.removed_ncbi_accessions.append(accession)
             self.all_removed_genomes.append(accession)
 
-    def remove_genbank_file(self, filepath: str):
-        if filepath in self.genbank_files:
-            candidate = filepath
-        else:
-            target = os.path.basename(filepath)
-            for f in self.genbank_files:
-                if os.path.basename(f) == target:
-                    candidate = f
-                    break
-
-        if candidate:
-            self.genbank_files.remove(candidate)
-            self.all_remaining_genomes.remove(candidate)
-            self.removed_genbank_files.append(candidate)
-            self.all_removed_genomes.append(candidate)
-
     def remove_fasta_file(self, filepath: str):
         if filepath in self.fasta_files:
             candidate = filepath
@@ -200,73 +189,11 @@ class RunData:
             self.all_removed_genomes.append(candidate)
 
     def remove_amino_acid_file(self, filepath: str):
-        # if filepath in self.amino_acid_files:
-        #     self.amino_acid_files.remove(filepath)
-        #     self.all_remaining_genomes.remove(filepath)
-        #     self.removed_amino_acid_files.append(filepath)
-        #     self.all_removed_genomes.append(filepath)
-
         if filepath in self.amino_acid_files:
-            candidate = filepath
-        else:
-            target = os.path.basename(filepath)
-            for f in self.amino_acid_files:
-                if os.path.basename(f) == target:
-                    candidate = f
-                    break
-
-        if candidate:
-            self.amino_acid_files.remove(candidate)
-            self.all_remaining_genomes.remove(candidate)
-            self.removed_amino_acid_files.append(candidate)
-            self.all_removed_genomes.append(candidate)
-
-    def replace_in_list(self, list_attr, old_value, new_value):
-        # current_list = getattr(self, list_attr, None)
-        # if current_list is None:
-        #     raise AttributeError(f"'{list_attr}' is not an attribute of RunData.")
-        # try:
-        #     index = current_list.index(old_value)
-        #     current_list[index] = new_value
-        # except ValueError:
-        #     print(f"Value '{old_value}' not found in '{list_attr}'. No replacement made.")
-        # index = self.all_remaining_genomes.index(old_value)
-        # self.all_remaining_genomes[index] = new_value
-        current_list = getattr(self, list_attr, None)
-        if current_list is None:
-            raise AttributeError(f"'{list_attr}' is not an attribute of RunData.")
-
-        replaced = False
-        try:
-            index = current_list.index(old_value)
-            current_list[index] = new_value
-            replaced = True
-        except ValueError:
-            old_basename = os.path.basename(old_value)
-            for i, item in enumerate(current_list):
-                if os.path.basename(item) == old_basename:
-                    current_list[i] = new_value
-                    replaced = True
-                    break
-        if not replaced:
-            raise ValueError(f"Value '{old_value}' not found in '{list_attr}'. No replacement made.")
-
-        # Now update in all_remaining_genomes.
-        replaced = False
-        try:
-            index = self.all_remaining_genomes.index(old_value)
-            self.all_remaining_genomes[index] = new_value
-            replaced = True
-        except ValueError:
-            old_basename = os.path.basename(old_value)
-            for i, item in enumerate(self.all_remaining_genomes):
-                if os.path.basename(item) == old_basename:
-                    self.all_remaining_genomes[i] = new_value
-                    replaced = True
-                    break
-        if not replaced:
-            print(f"Value '{old_value}' not found in 'all_remaining_genomes'. No replacement made.")
-
+            self.amino_acid_files.remove(filepath)
+            self.all_remaining_genomes.remove(filepath)
+            self.removed_amino_acid_files.append(filepath)
+            self.all_removed_genomes.append(filepath)
 
 
     # def __setattr__(self, name, value):
@@ -290,23 +217,23 @@ def populate_run_data(args):
     if args.genbank_files:
         with open(args.genbank_files, "r") as f:
             entries_list = f.read().splitlines()
-        run_data.genbank_files = entries_list
-        run_data.all_input_genomes.extend(entries_list)
-        run_data.all_remaining_genomes.extend(entries_list)
+        run_data.genbank_files = [GenomeFile.from_path(entry) for entry in entries_list]
+        run_data.all_input_genomes.extend([gf.full_path for gf in run_data.genbank_files])
+        run_data.all_remaining_genomes.extend([gf.full_path for gf in run_data.genbank_files])
 
     if args.fasta_files:
         with open(args.fasta_files, "r") as f:
             entries_list = f.read().splitlines()
-        run_data.fasta_files = entries_list
-        run_data.all_input_genomes.extend(entries_list)
-        run_data.all_remaining_genomes.extend(entries_list)
+        run_data.fasta_files = [GenomeFile.from_path(entry) for entry in entries_list]
+        run_data.all_input_genomes.extend([gf.full_path for gf in run_data.fasta_files])
+        run_data.all_remaining_genomes.extend([gf.full_path for gf in run_data.fasta_files])
 
     if args.amino_acid_files:
         with open(args.amino_acid_files, "r") as f:
             entries_list = f.read().splitlines()
-        run_data.amino_acid_files = entries_list
-        run_data.all_input_genomes.extend(entries_list)
-        run_data.all_remaining_genomes.extend(entries_list)
+        run_data.amino_acid_files = [GenomeFile.from_path(entry) for entry in entries_list]
+        run_data.all_input_genomes.extend([gf.full_path for gf in run_data.amino_acid_files])
+        run_data.all_remaining_genomes.extend([gf.full_path for gf in run_data.amino_acid_files])
 
     run_data.run_files_dir = args.run_files_dir
     run_data.run_files_dir_rel = args.run_files_dir_rel
@@ -338,6 +265,13 @@ def read_run_data(path):
     try:
         with open(path, "r") as f:
             run_data_dict = json.load(f)
+
+        if "genbank_files" in run_data_dict:
+            run_data_dict["genbank_files"] = [GenomeFile(**gf) if isinstance(gf, dict) else gf for gf in run_data_dict["genbank_files"]]
+        if "fasta_files" in run_data_dict:
+            run_data_dict["fasta_files"] = [GenomeFile(**gf) if isinstance(gf, dict) else gf for gf in run_data_dict["fasta_files"]]
+        if "amino_acid_files" in run_data_dict:
+            run_data_dict["amino_acid_files"] = [GenomeFile(**gf) if isinstance(gf, dict) else gf for gf in run_data_dict["amino_acid_files"]]
 
         if "tools_used" in run_data_dict and run_data_dict["tools_used"] is not None:
             run_data_dict["tools_used"] = ToolsUsed(**run_data_dict["tools_used"])
@@ -397,8 +331,9 @@ def run_prodigal(id, run_data, group = ["ncbi", "fasta", "genbank"]):
         in_path = f"{run_data.ncbi_downloads_dir}/{id}_genomic.fna"
         out_path = f"{run_data.ncbi_downloads_dir}/{id}_protein.faa"
     elif group == "genbank":
-        in_path = f"{id}"
-        out_path = f"{run_data.genbank_processing_dir}/{os.basename(id)}_protein.faa"
+        in_path = f"{run_data.genbank_processing_dir}/{id}.fasta"
+        out_path = f"{run_data.genbank_processing_dir}/{id}_protein.faa"
+        print(f"\n\n    {out_path}\n\n")
     elif group == "fasta":
         report_early_exit(f"    Prodigal not yet implemented for fasta files.")
     else:
@@ -411,15 +346,20 @@ def run_prodigal(id, run_data, group = ["ncbi", "fasta", "genbank"]):
         "-i", f"{in_path}",
         "-a", f"{out_path}.tmp",
     ]
+    print(f"\n\n    {prodigal_cmd}\n\n")
 
     remove_ast_cmd = f"tr -d '*' < {out_path}.tmp > {out_path}"
 
     try:
         subprocess.run(prodigal_cmd, stdout=subprocess.DEVNULL)
         subprocess.run(remove_ast_cmd, shell=True)
-        shutil.rmtree(f"{out_path}.tmp")
+        os.remove(f"{out_path}.tmp")
         done = True
     except:
+        done = False
+
+    if os.path.getsize(out_path) == 0:
+        os.remove(out_path)
         done = False
 
     return done
@@ -430,6 +370,13 @@ def gunzip_if_needed(path):
         gunzipped_path = path[:-3]
         with gzip.open(path, 'rb') as f_in, open(gunzipped_path, 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
-        return gunzipped_path
+        return gunzipped_path, True
     else:
-        return path
+        return path, False
+
+
+def remove_file_if_exists(path):
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
