@@ -1,46 +1,11 @@
-import re
 import sys
 import contextlib
 from gtotree.utils.messaging import (report_message,
-                                     check_and_report_any_changed_default_behavior)
-from gtotree.utils.general import log_file_var
+                                     check_and_report_any_changed_default_behavior,
+                                     capture_stdout_to_log)
+from gtotree.utils.context import log_file_var
 from gtotree.utils.hmm_handling import get_number_of_targets
 from gtotree.utils.preflight_checks import check_input_genomes_amount
-
-
-class Tee:
-    def __init__(self, *files):
-        self.files = files
-
-    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
-
-    def write(self, s):
-        for f in self.files:
-            if hasattr(f, "isatty") and f.isatty():
-                f.write(s)
-            else:
-                f.write(self.ansi_escape.sub("", s))
-
-    def flush(self):
-        for f in self.files:
-            f.flush()
-
-    def isatty(self):
-        if self.files and hasattr(self.files[0], "isatty"):
-            return self.files[0].isatty()
-        return False
-
-
-def capture_stdout_to_log(log_file):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            file_path = log_file() if callable(log_file) else log_file
-            with open(file_path, 'a') as f:
-                tee = Tee(sys.stdout, f)
-                with contextlib.redirect_stdout(tee):
-                    return func(*args, **kwargs)
-        return wrapper
-    return decorator
 
 
 @capture_stdout_to_log(lambda: log_file_var.get())
@@ -48,28 +13,29 @@ def display_initial_run_info(args, run_data):
 
     # time.sleep(1)
 
-    print("\n  ---------------------------------  RUN INFO  ---------------------------------  \n")
+    print("\n  ---------------------------------  RUN INFO  ---------------------------------  \n", flush=True)
 
     # time.sleep(1)
 
     report_message("  Input-genome sources include:")
 
     if args.ncbi_accessions:
-        print(f"      - NCBI accessions listed in {args.ncbi_accessions} ({run_data.num_ncbi_accessions} genomes)")
+        print(f"      - NCBI accessions listed in {args.ncbi_accessions} ({run_data.num_ncbi_accessions} genomes)", flush=True)
     if args.genbank_files:
-        print(f"      - Genbank files listed in {args.genbank_files} ({run_data.num_genbank_files} genomes)")
+        print(f"      - Genbank files listed in {args.genbank_files} ({run_data.num_genbank_files} genomes)", flush=True)
     if args.fasta_files:
-        print(f"      - Fasta files listed in {args.fasta_files} ({run_data.num_fasta_files} genomes)")
+        print(f"      - Fasta files listed in {args.fasta_files} ({run_data.num_fasta_files} genomes)", flush=True)
     if args.amino_acid_files:
-        print(f"      - Amino-acid files listed in {args.amino_acid_files} ({run_data.num_amino_acid_files} genomes)")
+        print(f"      - Amino-acid files listed in {args.amino_acid_files} ({run_data.num_amino_acid_files} genomes)", flush=True)
 
     report_message(f"                           Total input genomes: {run_data.num_input_genomes}", "green")
     # time.sleep(1)
 
-    check_input_genomes_amount(run_data.num_input_genomes, args)
+    with contextlib.redirect_stdout(sys.__stdout__):
+        check_input_genomes_amount(run_data.num_input_genomes, args)
 
     report_message("  HMM source to be used:")
-    print(f"      - {args.hmm} ({get_number_of_targets(args.hmm_path)} targets)")
+    print(f"      - {args.hmm} ({get_number_of_targets(args.hmm_path)} targets)", flush=True)
     # time.sleep(1)
 
     check_and_report_any_changed_default_behavior(args)

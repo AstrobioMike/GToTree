@@ -11,14 +11,16 @@ from gtotree.utils.ncbi.get_ncbi_assembly_tables import NCBI_assembly_summary_ta
 from gtotree.utils.general import (write_run_data,
                                    read_run_data,
                                    get_snakefile_path,
-                                   write_args,
-                                   run_snakemake)
-
-def process_genomes(args, run_data):
-    process_ncbi_genomes(args, run_data)
+                                   run_snakemake,
+                                   gunzip_if_needed)
 
 
-def process_ncbi_genomes(args, run_data):
+def preprocess_genomes(args, run_data):
+    preprocess_ncbi_genomes(args, run_data)
+    preprocess_genbank_genomes(args, run_data)
+
+
+def preprocess_ncbi_genomes(args, run_data):
     if args.ncbi_accessions:
 
         report_processing_stage("ncbi")
@@ -28,8 +30,8 @@ def process_ncbi_genomes(args, run_data):
         if set(run_data.ncbi_accessions) != set(run_data.ncbi_accessions_done):
             # writing run_data and args objects to files so they can be accessed by snakemake
             write_run_data(run_data)
-            snakefile = get_snakefile_path("process-ncbi-accessions.smk")
-            description = "Processing NCBI accessions"
+            snakefile = get_snakefile_path("preprocess-ncbi-accessions.smk")
+            description = "Preprocessing NCBI accessions"
 
             cmd = [
                 "snakemake",
@@ -40,7 +42,7 @@ def process_ncbi_genomes(args, run_data):
                 f"run_data_path={run_data.run_data_path}"
             ]
 
-            run_snakemake(cmd, run_data, description)
+            run_snakemake(cmd, run_data.num_ncbi_accessions, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
             capture_ncbi_failed_downloads(run_data)
@@ -94,3 +96,33 @@ def capture_ncbi_failed_downloads(run_data):
         with open(run_data.run_files_dir + "/ncbi-accessions-not-downloaded.txt", "w") as not_downloaded_file:
             for acc in run_data.ncbi_accs_not_downloaded:
                 not_downloaded_file.write(acc + "\n")
+
+
+def preprocess_genbank_genomes(args, run_data):
+    if args.genbank_files:
+
+        report_processing_stage("genbank")
+        print(run_data)
+
+        if set(run_data.genbank_files) != set(run_data.genbank_files_done):
+            # writing run_data and args objects to files so they can be accessed by snakemake
+            write_run_data(run_data)
+            snakefile = get_snakefile_path("preprocess-genbank-files.smk")
+            description = "Preprocessing genbank files"
+
+            cmd = [
+                "snakemake",
+                "--snakefile", snakefile,
+                "--cores", f"{args.num_jobs}",
+                "--default-resources", f"tmpdir='{args.tmp_dir}'",
+                "--config",
+                f"run_data_path={run_data.run_data_path}"
+            ]
+
+            run_snakemake(cmd, run_data.num_genbank_files, run_data, description, print_lines=True)
+            run_data = read_run_data(run_data.run_data_path)
+            print(run_data)
+
+            # capture_failed_genbank_inputs(run_data)
+
+        # report_genbank_update(run_data)

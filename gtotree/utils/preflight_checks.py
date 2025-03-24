@@ -25,9 +25,9 @@ from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.kos.get_kofamscan_data import get_kofamscan_data
 from gtotree.utils.general import (ToolsUsed,
-                                   log_file_var,
                                    populate_run_data,
                                    read_run_data)
+from gtotree.utils.context import log_file_var
 
 
 def preflight_checks(args):
@@ -62,6 +62,7 @@ def primary_args_validation(args):
     checks_for_nucleotide_mode(args)
     args = check_output_dir(args)
     args, run_data = check_input_files(args)
+    run_data = add_full_paths_to_run_data(args, run_data)
     return args, run_data
 
 
@@ -429,6 +430,11 @@ def check_input_genomes_amount(total_input_genomes, args):
 
 def setup_outputs(args, run_data):
 
+    log_file = os.path.abspath(os.path.join(args.output, "gtotree-runlog.txt"))
+    args.log_file = log_file
+    run_data.log_file = log_file
+    log_file_var.set(log_file)
+
     os.makedirs(args.run_files_dir, exist_ok=True)
 
     snakemake_logs_dir_rel = os.path.join(args.run_files_dir_rel, "snakemake-logs")
@@ -441,13 +447,8 @@ def setup_outputs(args, run_data):
         ncbi_downloads_dir_rel = os.path.join(args.run_files_dir, "ncbi-downloads")
         ncbi_downloads_dir = os.path.abspath(ncbi_downloads_dir_rel)
         os.makedirs(ncbi_downloads_dir, exist_ok=True)
-        run_data.ncbi_downloads_dir = ncbi_downloads_dir
         run_data.ncbi_downloads_dir_rel = ncbi_downloads_dir_rel
-
-    log_file = os.path.abspath(os.path.join(args.output, "gtotree-runlog.txt"))
-    args.log_file = log_file
-    run_data.log_file = log_file
-    log_file_var.set(log_file)
+        run_data.ncbi_downloads_dir = ncbi_downloads_dir
 
     full_execution_command = f"{' '.join(sys.argv)}"
     stdout_and_log(gtotree_header(), log_file=args.log_file, log_only=True, restart_log=True)
@@ -488,4 +489,24 @@ def setup_tmp_dir(args, run_data):
         args.tmp_dir = tmp_dir
         run_data.tmp_dir = tmp_dir
 
+    if args.genbank_files:
+        genbank_processing_dir_rel = os.path.join(args.tmp_dir, "genbank-files")
+        genbank_processing_dir = os.path.abspath(genbank_processing_dir_rel)
+        os.makedirs(genbank_processing_dir, exist_ok=True)
+        run_data.genbank_processing_dir_rel = genbank_processing_dir_rel
+        run_data.genbank_processing_dir = genbank_processing_dir
+
+
     return args, run_data
+
+
+def add_full_paths_to_run_data(args, run_data):
+
+    if args.genbank_files:
+        run_data.genbank_files_full_paths = [os.path.abspath(genbank) for genbank in run_data.genbank_files]
+    if args.fasta_files:
+        run_data.fasta_files_full_paths = [os.path.abspath(fasta) for fasta in run_data.fasta_files]
+    if args.amino_acid_files:
+        run_data.amino_acid_files_full_paths = [os.path.abspath(aa) for aa in run_data.amino_acid_files]
+
+    return run_data

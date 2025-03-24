@@ -1,4 +1,4 @@
-## next: need to fix some of the logging not being captured currently for ncbi accs (like NOTICEs, probably don't need progress bar)
+## next: # made a shit show out of given and full paths working on the genbank preprocessing, it's all broken currently
     # working on fetching and formatting genbank inputs
     # fasta inputs
     # amino-acid inputs

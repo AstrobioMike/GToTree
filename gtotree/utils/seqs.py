@@ -1,5 +1,4 @@
 from Bio import SeqIO
-import shutil
 
 def filter_and_rename_fasta(prefix, run_data, max_length = 99999):
 

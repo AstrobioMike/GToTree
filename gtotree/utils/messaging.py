@@ -1,7 +1,10 @@
 import textwrap
 import sys
 import time
+import re
+import contextlib
 from importlib.metadata import version
+from gtotree.utils.context import log_file_var
 
 tty_colors = {
     'green' : '\033[0;32m%s\033[0m',
@@ -35,17 +38,49 @@ def wprint(text, width = 80, ii = "  ", si = "  "):
                                    initial_indent=ii,
                                    subsequent_indent=si,
                                    break_on_hyphens=False)
-    # Split the text into lines (or paragraphs)
     paragraphs = text.splitlines()
-    # Wrap each paragraph individually
     wrapped_paragraphs = [wrapper.fill(par) if par.strip() else par for par in paragraphs]
-    # Join them back preserving newlines
-    print("\n".join(wrapped_paragraphs))
+    print("\n".join(wrapped_paragraphs), flush=True)
+
+
+class Tee:
+    def __init__(self, *files):
+        self.files = files
+
+    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+
+    def write(self, s):
+        for f in self.files:
+            if hasattr(f, "isatty") and f.isatty():
+                f.write(s)
+            else:
+                f.write(self.ansi_escape.sub("", s))
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+    def isatty(self):
+        if self.files and hasattr(self.files[0], "isatty"):
+            return self.files[0].isatty()
+        return False
+
+
+def capture_stdout_to_log(log_file):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            file_path = log_file() if callable(log_file) else log_file
+            with open(file_path, 'a') as f:
+                tee = Tee(sys.stdout, f)
+                with contextlib.redirect_stdout(tee):
+                    return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def report_message(message, color = "yellow", width = 80, ii = "  ", si = "  ", newline = True):
     if newline:
-        print("")
+        print("", flush=True)
     if color:
         wprint(color_text(message, color), width = width, ii = ii, si = si)
     else:
@@ -102,7 +137,7 @@ def report_early_exit(message = None, color = "red", suggest_help = False):
     sys.exit(1)
 
 
-
+@capture_stdout_to_log(lambda: log_file_var.get())
 def report_notice(message, color = "yellow"):
     print("")
     print(color_text("  *********************************** NOTICE ***********************************  ", color))
@@ -110,6 +145,7 @@ def report_notice(message, color = "yellow"):
     print(color_text("  ******************************************************************************  ", color))
 
 
+@capture_stdout_to_log(lambda: log_file_var.get())
 def report_update(message, color = "green"):
     print("")
     print(color_text("  *********************************** UPDATE ***********************************  ", color))
@@ -273,14 +309,22 @@ def absurd_number_of_genomes_notice(total_input_genomes):
     )
 
 
-def report_processing_stage(stage = ["ncbi", "genbank",
-                                     "fasta", "amino-acid",
-                                     "hmm", "filter-seqs",
-                                     "filter-genomes", "align",
-                                     "tree"]):
+@capture_stdout_to_log(lambda: log_file_var.get())
+def report_processing_stage(stage):
+    allowed_stages = ["ncbi", "genbank", "fasta", "amino-acid",
+                      "hmm", "filter-seqs", "filter-genomes",
+                      "align", "tree"]
+
+    if stage not in allowed_stages:
+        raise ValueError(f"Invalid stage: {stage}. Must be one of: {', '.join(allowed_stages)}")
+
     if stage == "ncbi":
         message = ("\n\n  ##############################################################################\n"
                     "  ####        Preprocessing the genomes provided as NCBI accessions         ####\n"
+                    "  ##############################################################################")
+    elif stage == "genbank":
+        message = ("\n\n  ##############################################################################\n"
+                    "  ####         Preprocessing the genomes provided as Genbank files          ####\n"
                     "  ##############################################################################")
     print(message)
     time.sleep(1)

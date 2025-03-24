@@ -1,13 +1,11 @@
 from gtotree.utils.general import (read_run_data,
                                    write_run_data,
                                    read_args,
-                                   run_prodigal,
-                                   touch)
+                                   run_prodigal)
 from gtotree.utils.seqs import filter_and_rename_fasta
-from gtotree.utils.processing_genomes import prepare_accession
+from gtotree.utils.genome_processing import prepare_accession
 
 run_data = read_run_data(config['run_data_path'])
-print(f"Loading run_data from: {config['run_data_path']}")
 if run_data is None:
     raise ValueError("Run data not found")
 
