@@ -190,6 +190,7 @@ def check_expected_single_column_input(path, flag, get_count=False):
     check_for_whitespace(path, flag)
     path = check_line_endings(path, flag)
     path = check_for_duplicates(path, flag)
+    check_inputs_exist(path, flag)
 
     if get_count:
         with open(path, 'r') as f:
@@ -254,6 +255,17 @@ def check_for_duplicates(path, flag):
         time.sleep(2)
 
     return path
+
+
+def check_inputs_exist(path, flag):
+    if flag in ["-g", "-f", "-A"]:
+        # checking that all the input files actually exist
+        with open(path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not os.path.exists(line):
+                    report_message(f'The specified input-genome file "{line}" (passed to `{flag}`) does not exist.')
+                    report_early_exit()
 
 
 def check_mapping_file(args, run_data, flag = "-m"):
@@ -385,8 +397,6 @@ def track_tools_used(args, run_data):
 
     tools_used = ToolsUsed()
 
-    if args.num_jobs > 1:
-        tools_used.parallel_used = True
     if args.fasta_files:
         tools_used.prodigal_used = True
     if args.add_ncbi_tax:
@@ -454,12 +464,16 @@ def setup_outputs(args, run_data):
         run_data.ncbi_downloads_dir = ncbi_downloads_dir
 
     if args.genbank_files:
-        genbank_processing_dir_rel = os.path.join(args.tmp_dir, "genbank-files")
-        genbank_processing_dir = os.path.abspath(genbank_processing_dir_rel)
+        genbank_processing_dir = os.path.join(args.tmp_dir, "genbank-files")
+        genbank_processing_dir = os.path.abspath(genbank_processing_dir)
         os.makedirs(genbank_processing_dir, exist_ok=True)
-        run_data.genbank_processing_dir_rel = genbank_processing_dir_rel
         run_data.genbank_processing_dir = genbank_processing_dir
 
+    if args.fasta_files:
+        fasta_processing_dir = os.path.join(args.tmp_dir, "fasta-files")
+        fasta_processing_dir = os.path.abspath(fasta_processing_dir)
+        os.makedirs(fasta_processing_dir, exist_ok=True)
+        run_data.fasta_processing_dir = fasta_processing_dir
 
     run_data.all_input_genome_AA_files_dir = os.path.join(args.tmp_dir, "input-genome-AA-files")
     os.makedirs(run_data.all_input_genome_AA_files_dir, exist_ok=True)

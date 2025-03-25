@@ -16,7 +16,6 @@ from gtotree.utils.messaging import report_early_exit, report_snakemake_failure
 
 @dataclass
 class ToolsUsed:
-    parallel_used: bool = False
     prodigal_used: bool = False
     taxonkit_used: bool = False
     gtdb_used: bool = False
@@ -77,6 +76,7 @@ class GenomeFile:
 class RunData:
     ncbi_accessions: List[str] = field(default_factory=list)
     ncbi_accessions_done: List[str] = field(default_factory=list)
+    ncbi_accs_not_done: List[str] = field(default_factory=list)
     ncbi_accs_not_found: List[str] = field(default_factory=list)
     ncbi_accs_not_downloaded: List[str] = field(default_factory=list)
     genbank_files: List[GenomeFile] = field(default_factory=list)
@@ -95,7 +95,8 @@ class RunData:
     ncbi_downloads_dir: str = ""
     ncbi_downloads_dir_rel: str = ""
     genbank_processing_dir: str = ""
-    genbank_processing_dir_rel: str = ""
+    fasta_processing_dir: str = ""
+    amino_acid_processing_dir: str = ""
     run_files_dir: str = ""
     run_files_dir_rel: str = ""
     run_data_path: str = ""
@@ -112,8 +113,24 @@ class RunData:
         return len(self.ncbi_accessions)
 
     @property
+    def num_ncbi_accs_not_done(self) -> int:
+        return len(self.ncbi_accs_not_done)
+
+    @property
     def num_genbank_files(self) -> int:
         return len(self.genbank_files)
+
+    @property
+    def num_incomplete_genbank_files(self) -> int:
+        return len([gf for gf in self.genbank_files if not gf.done and not gf.removed])
+
+    @property
+    def num_incomplete_fasta_files(self) -> int:
+        return len([gf for gf in self.fasta_files if not gf.done and not gf.removed])
+
+    @property
+    def num_incomplete_amino_acid_files(self) -> int:
+        return len([gf for gf in self.amino_acid_files if not gf.done and not gf.removed])
 
     @property
     def num_fasta_files(self) -> int:
@@ -138,17 +155,54 @@ class RunData:
     def add_done_ncbi_accession(self, accession: str):
         if accession not in self.ncbi_accessions_done:
             self.ncbi_accessions_done.append(accession)
+        if accession in self.removed_ncbi_accessions:
+            self.removed_ncbi_accessions.remove(accession)
+        if accession in self.all_removed_genomes:
+            self.all_removed_genomes.remove(accession)
+        if accession not in self.all_remaining_genomes:
+            self.all_remaining_genomes.append(accession)
 
     def add_genbank_file(self, filepath):
         gf = GenomeFile.from_path(filepath)
         if gf not in self.genbank_files:
             self.genbank_files.append(gf)
 
+    def add_fasta_file(self, filepath):
+        gf = GenomeFile.from_path(filepath)
+        if gf not in self.fasta_files:
+            self.fasta_files.append(gf)
+
+    def add_amino_acid_file(self, filepath):
+        gf = GenomeFile.from_path(filepath)
+        if gf not in self.amino_acid_files:
+            self.amino_acid_files.append(gf)
+
     def incomplete_genbank_files(self) -> List[GenomeFile]:
-        return [gf.provided_path for gf in self.genbank_files if not gf.done]
+        return [gf.provided_path for gf in self.genbank_files if not gf.done and not gf.removed]
+
+    def incomplete_fasta_files(self) -> List[GenomeFile]:
+        return [gf.provided_path for gf in self.fasta_files if not gf.done and not gf.removed]
+
+    def incomplete_amino_acid_files(self) -> List[GenomeFile]:
+        return [gf.provided_path for gf in self.amino_acid_files if not gf.done and not gf.removed]
+
+    def failed_genbank_files(self) -> List[GenomeFile]:
+        return [gf.provided_path for gf in self.genbank_files if not gf.done and gf.removed]
+
+    def failed_fasta_files(self) -> List[GenomeFile]:
+        return [gf.provided_path for gf in self.fasta_files if not gf.done and gf.removed]
+
+    def failed_amino_acid_files(self) -> List[GenomeFile]:
+        return [gf.provided_path for gf in self.amino_acid_files if not gf.done and gf.removed]
 
     def any_incomplete_genbank_files(self) -> bool:
-        return any(not gf.done for gf in self.genbank_files)
+        return any(not gf.done and not gf.removed for gf in self.genbank_files)
+
+    def any_incomplete_fasta_files(self) -> bool:
+        return any(not gf.done and not gf.removed for gf in self.fasta_files)
+
+    def any_incomplete_amino_acid_files(self) -> bool:
+        return any(not gf.done and not gf.removed for gf in self.amino_acid_files)
 
     def genbank_files_with_prodigal_used(self) -> List[GenomeFile]:
         return [gf for gf in self.genbank_files if gf.prodigal_used]
@@ -164,6 +218,14 @@ class RunData:
     def add_ncbi_acc_not_downloaded(self, accession: str):
         if accession not in self.ncbi_accs_not_downloaded:
             self.ncbi_accs_not_downloaded.append(accession)
+        if accession not in self.ncbi_accs_not_done:
+            self.ncbi_accs_not_done.append(accession)
+
+    def add_ncbi_acc_not_found(self, accession: str):
+        if accession not in self.ncbi_accs_not_found:
+            self.ncbi_accs_not_found.append(accession)
+        if accession in self.ncbi_accs_not_done:
+            self.ncbi_accs_not_done.remove(accession)
 
     def remove_ncbi_accession(self, accession: str):
         if accession in self.ncbi_accessions:
@@ -225,6 +287,8 @@ def populate_run_data(args):
         with open(args.fasta_files, "r") as f:
             entries_list = f.read().splitlines()
         run_data.fasta_files = [GenomeFile.from_path(entry) for entry in entries_list]
+        for gf in run_data.fasta_files:
+            gf.prodigal_used = True
         run_data.all_input_genomes.extend([gf.full_path for gf in run_data.fasta_files])
         run_data.all_remaining_genomes.extend([gf.full_path for gf in run_data.fasta_files])
 
@@ -325,7 +389,7 @@ def run_snakemake(cmd, tqdm_jobs, run_data, description, print_lines=False):
             report_early_exit()
 
 
-def run_prodigal(id, run_data, group = ["ncbi", "fasta", "genbank"]):
+def run_prodigal(id, run_data, full_inpath = None, group = ["ncbi", "fasta", "genbank"]):
 
     if group == "ncbi":
         in_path = f"{run_data.ncbi_downloads_dir}/{id}_genomic.fna"
@@ -335,7 +399,8 @@ def run_prodigal(id, run_data, group = ["ncbi", "fasta", "genbank"]):
         out_path = f"{run_data.genbank_processing_dir}/{id}_protein.faa"
         print(f"\n\n    {out_path}\n\n")
     elif group == "fasta":
-        report_early_exit(f"    Prodigal not yet implemented for fasta files.")
+        in_path = full_inpath
+        out_path = f"{run_data.fasta_processing_dir}/{id}_protein.faa"
     else:
         report_early_exit(f"    Prodigal not yet implemented for \"{group}\".")
 

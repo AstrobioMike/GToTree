@@ -1,5 +1,4 @@
 ## next: 
-    # working on fasta inputs
     # amino-acid inputs
     # hmm search
     # filtering hits
@@ -30,9 +29,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 ### OVERALL NOTES ###
 # need a lot of testing on resume functionality
-    # one thing i see happening is when i give ncbi accs and genbank files, on a second start it is still running some snakemake for ncbi
-    # OH, i think that's happening because one failed 
-    # it is not appropriately calculating how many it would do though (it's listing 2 instead of 1 job)
+    # if i count on the resume flag for operating, i may need to make sure it makes sense up front (like does the run-data.json exist)
 # need some check and handling if the input files changed when doing a resume
     # maybe just check and require they haven't changed at all, or a new run is needed
 # when a resume is done, may want to just try snakemake workflows on inputs that failed the prior runs
@@ -40,7 +37,9 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # oh, add snakemake to definite citations
 # since multiple logs may be created with --resume function, might need to add functionality to back up a log that exists to a sub-dir,
     # maybe with a time/date stamp of when first run appended to the name
-
+# eventually look into putting a block for this prodigal failure: "at least 100000 bases for training." (search original files)
+    # maybe just make a check that input genomes are greater than 100,000 bases (if that consistently triggers it)
+# check prodigal being marked as used at high-level, initial preflight_checks.py, when fasta files were provided
 
 ### TO DO ###
 
@@ -62,11 +61,12 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # (this was always just "free" info, but checkm2 is a much better way to do this, so i made the decision to stop providing it at all)
 # --resume flag added (will be set automatically if the same output dir but no `-F` flag provided)
 # taxids are no longer searched for in input genbank files, they will only be found/used for provided input ncbi-accessions
-    # if this is actually a feature that benefitted anyone, i'll add it back in on request :)
-
+    # if this is actually a feature that benefitted anyone, i'll add it back in upon request :)
+# the order of processing changed slightly from v1 to v2, so the output report messages vary a little
+    # in v1, each genome was downloaded/parsed and scanned for the target genes in one pass
+    # in v2, all input genomes are prepared for each input source, then all are searched together
 
 ### PLACES TO DEF IMPROVE ###
-# right now i'm reading the target-ncbi-accession-info.tsv for every genome when doing the download (in processing_genomes.py)
 
 
 ### IMPROVEMENTS to highlight in paper ###

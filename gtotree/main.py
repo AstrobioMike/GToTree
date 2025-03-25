@@ -14,7 +14,7 @@ def main(args = None):
 
     display_initial_run_info(args, run_data)
 
-    preprocess_genomes(args, run_data)
+    args, run_data = preprocess_genomes(args, run_data)
 
     # hmm_searching(args, run_data)
 

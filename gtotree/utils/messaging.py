@@ -324,7 +324,11 @@ def report_processing_stage(stage):
                     "  ##############################################################################")
     elif stage == "genbank":
         message = ("\n\n  ##############################################################################\n"
-                    "  ####         Preprocessing the genomes provided as Genbank files          ####\n"
+                    "  ####         Preprocessing the genomes provided as genbank files          ####\n"
+                    "  ##############################################################################")
+    elif stage == "fasta":
+        message = ("\n\n  ##############################################################################\n"
+                    "  ####          Preprocessing the genomes provided as fasta files           ####\n"
                     "  ##############################################################################")
     print(message)
     time.sleep(1)
@@ -368,7 +372,7 @@ def report_ncbi_update(run_data):
 
 def report_genbank_update(run_data):
     num_input = run_data.num_genbank_files
-    num_failed = len(run_data.incomplete_genbank_files())
+    num_failed = len(run_data.failed_genbank_files())
     num_prodigal_used = len(run_data.genbank_files_with_prodigal_used())
 
     if num_failed == 0 and num_prodigal_used == 0:
@@ -386,5 +390,20 @@ def report_genbank_update(run_data):
                     f"        {run_data.run_files_dir_rel}/genbank-files-not-parsed.txt\n\n")
     if num_failed > 0:
         message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} genbank files were successfully parsed and\n    prepared.", "yellow")}")
+
+    report_update(message)
+
+
+def report_fasta_update(run_data):
+    num_input = run_data.num_fasta_files
+    num_failed = len(run_data.failed_fasta_files())
+
+    if num_failed == 0:
+        message = (f"    {color_text(f"All {num_input} input fasta files were successfully parsed and prepared!", "green")}")
+    else:
+        message = f"    Of the input genomes provided as fasta files:\n\n"
+        message += (f"      {color_text(f"{num_failed} failed to be successfully preprocessed", "yellow")}, reported in:\n"
+                    f"        {run_data.run_files_dir_rel}/failed-fasta-files.txt\n\n")
+        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} fasta files were successfully preprocessed.", "yellow")}")
 
     report_update(message)
