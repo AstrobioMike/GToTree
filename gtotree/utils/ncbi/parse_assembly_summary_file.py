@@ -38,7 +38,7 @@ def parse_assembly_summary(assembly_summary_file, run_data):
         return run_data
 
     wanted_dict = {}
-    for acc in run_data.ncbi_accessions:
+    for acc in run_data.input_ncbi_accessions:
         root_acc = acc.strip().split(".")[0]
         wanted_dict[root_acc] = acc.strip()
 
@@ -80,7 +80,7 @@ def parse_assembly_summary(assembly_summary_file, run_data):
                     ]) + "\n"
                     out_file.write(out_line)
 
-    not_found = set(run_data.ncbi_accessions) - found
+    not_found = set(run_data.input_ncbi_accessions) - found
 
     if len(not_found) > 0:
         with open(run_data.run_files_dir + "/ncbi-accessions-not-found.txt", "w") as not_found_file:

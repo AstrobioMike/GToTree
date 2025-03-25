@@ -58,7 +58,7 @@ rule process_genbank_files:
 
         if not done:
             extract_fasta_from_gb(gf.basename, path, run_data)
-            done = run_prodigal(gf.basename, run_data, "genbank")
+            done = run_prodigal(gf.basename, run_data, path, "genbank")
             prodigal_used = True
             if done:
                 filter_and_rename_fasta(gf.basename, run_data, run_data.genbank_processing_dir)

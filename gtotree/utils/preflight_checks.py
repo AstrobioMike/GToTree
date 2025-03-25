@@ -452,8 +452,10 @@ def setup_outputs(args, run_data):
 
     args, run_data = setup_tmp_dir(args, run_data)
 
-    snakemake_logs_dir = os.path.join(args.tmp_dir, "snakemake-logs")
+    snakemake_logs_dir_rel = os.path.join(args.output, "snakemake-logs")
+    snakemake_logs_dir = os.path.abspath(snakemake_logs_dir_rel)
     os.makedirs(snakemake_logs_dir, exist_ok=True)
+    run_data.snakemake_logs_dir_rel = snakemake_logs_dir_rel
     run_data.snakemake_logs_dir = snakemake_logs_dir
 
     if args.ncbi_accessions:
@@ -464,16 +466,22 @@ def setup_outputs(args, run_data):
         run_data.ncbi_downloads_dir = ncbi_downloads_dir
 
     if args.genbank_files:
-        genbank_processing_dir = os.path.join(args.tmp_dir, "genbank-files")
+        genbank_processing_dir = os.path.join(args.tmp_dir, "genbank-processing")
         genbank_processing_dir = os.path.abspath(genbank_processing_dir)
         os.makedirs(genbank_processing_dir, exist_ok=True)
         run_data.genbank_processing_dir = genbank_processing_dir
 
     if args.fasta_files:
-        fasta_processing_dir = os.path.join(args.tmp_dir, "fasta-files")
+        fasta_processing_dir = os.path.join(args.tmp_dir, "fasta-processing")
         fasta_processing_dir = os.path.abspath(fasta_processing_dir)
         os.makedirs(fasta_processing_dir, exist_ok=True)
         run_data.fasta_processing_dir = fasta_processing_dir
+
+    if args.amino_acid_files:
+        AA_processing_dir = os.path.join(args.tmp_dir, "amino-acid-processing")
+        AA_processing_dir = os.path.abspath(AA_processing_dir)
+        os.makedirs(AA_processing_dir, exist_ok=True)
+        run_data.AA_processing_dir = AA_processing_dir
 
     run_data.all_input_genome_AA_files_dir = os.path.join(args.tmp_dir, "input-genome-AA-files")
     os.makedirs(run_data.all_input_genome_AA_files_dir, exist_ok=True)

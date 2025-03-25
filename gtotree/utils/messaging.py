@@ -136,11 +136,14 @@ def report_early_exit(message = None, color = "red", suggest_help = False):
     print("\nExiting for now :(\n")
     sys.exit(1)
 
+@capture_stdout_to_log(lambda: log_file_var.get())
+def add_border():
+    print("\n -------------------------------------------------------------------------------- ")
 
 @capture_stdout_to_log(lambda: log_file_var.get())
 def report_notice(message, color = "yellow"):
     print("")
-    print(color_text("  *********************************** NOTICE ***********************************  ", color))
+    print(f"{color_text("  ***********************************", color)} NOTICE {color_text("***********************************  ", color)}")
     print(message)
     print(color_text("  ******************************************************************************  ", color))
 
@@ -148,7 +151,7 @@ def report_notice(message, color = "yellow"):
 @capture_stdout_to_log(lambda: log_file_var.get())
 def report_update(message, color = "green"):
     print("")
-    print(color_text("  *********************************** UPDATE ***********************************  ", color))
+    print(f"{color_text("  ***********************************", color)} UPDATE {color_text("***********************************  ", color)}")
     print(message)
     print(color_text("  ******************************************************************************  ", color))
 
@@ -312,31 +315,43 @@ def absurd_number_of_genomes_notice(total_input_genomes):
 @capture_stdout_to_log(lambda: log_file_var.get())
 def report_processing_stage(stage):
     allowed_stages = ["ncbi", "genbank", "fasta", "amino-acid",
-                      "hmm", "filter-seqs", "filter-genomes",
-                      "align", "tree"]
+                      "preprocessing-update", "hmm", "filter-seqs",
+                      "filter-genomes", "align", "tree"]
 
     if stage not in allowed_stages:
         raise ValueError(f"Invalid stage: {stage}. Must be one of: {', '.join(allowed_stages)}")
 
     if stage == "ncbi":
-        message = ("\n\n  ##############################################################################\n"
+        message = ("\n  ##############################################################################\n"
                     "  ####        Preprocessing the genomes provided as NCBI accessions         ####\n"
                     "  ##############################################################################")
     elif stage == "genbank":
-        message = ("\n\n  ##############################################################################\n"
+        message = ("\n  ##############################################################################\n"
                     "  ####         Preprocessing the genomes provided as genbank files          ####\n"
                     "  ##############################################################################")
     elif stage == "fasta":
-        message = ("\n\n  ##############################################################################\n"
+        message = ("\n  ##############################################################################\n"
                     "  ####          Preprocessing the genomes provided as fasta files           ####\n"
                     "  ##############################################################################")
+    elif stage == "amino-acid":
+        message = ("\n  ##############################################################################\n"
+                    "  ####        Preprocessing the genomes provided as amino-acid files        ####\n"
+                    "  ##############################################################################")
+    elif stage == "preprocessing-update":
+        message = ("\n  ##############################################################################\n"
+                    "  ####                Summary of input-genome preprocessing                 ####\n"
+                    "  ##############################################################################")
+    else:
+        report_early_exit(f"Invalid stage ('{stage}'provided to `report_processing_stage`")
+
+    add_border()
     print(message)
     time.sleep(1)
 
 
 def report_snakemake_failure(description, snakemake_log):
     time.sleep(1)
-    report_message(f"Snakemake failed while running the \"{description}\" workflow. Check the log at:")
+    report_message(f"Snakemake failed while running the \"{description}\" workflow. Check the log at:", width = 90)
     print(color_text(f"    {snakemake_log}", "yellow"))
     report_early_exit()
 
@@ -348,16 +363,16 @@ def report_ncbi_accs_not_found(num_accs, path):
 
 
 def report_ncbi_update(run_data):
+    num_input = run_data.num_input_ncbi_accessions
     num_not_found_at_ncbi = len(run_data.ncbi_accs_not_found)
     num_not_downloaded = len(run_data.ncbi_accs_not_downloaded)
     num_prepared = len(run_data.ncbi_accessions_done)
     num_removed = len(run_data.removed_ncbi_accessions)
-    num_input = num_removed + num_prepared
 
     if num_removed == 0:
         message = (f"    {color_text(f"All {num_input} input accessions were successfully downloaded and prepared!", "green")}")
     else:
-        message = f"    Of the input genomes provided as NCBI accessions:\n\n"
+        message = f"    Of the input genomes provided as {color_text("NCBI accessions", "yellow")}:\n\n"
         if num_not_found_at_ncbi > 0:
             message += (f"      {color_text(f"{num_not_found_at_ncbi} not found at NCBI", "yellow")}, reported in:\n"
                         f"        {run_data.run_files_dir_rel}/ncbi-accessions-not-found.txt\n\n")
@@ -380,7 +395,7 @@ def report_genbank_update(run_data):
     elif num_failed == 0:
         message = (f"    {color_text(f"All {num_input} input genbank files were successfully parsed and prepared!", "green")}\n\n")
     else:
-        message = f"    Of the input genomes provided as genbank files:\n\n"
+        message = f"    Of the input genomes provided as {color_text("genbank files", "yellow")}:\n\n"
     if num_prodigal_used > 0 and num_failed == 0:
         message += (f"      {color_text(f"{num_prodigal_used} had no CDS entries", "yellow")}, so prodigal was used on the nucleotide sequences.")
     elif num_prodigal_used > 0:
@@ -399,11 +414,41 @@ def report_fasta_update(run_data):
     num_failed = len(run_data.failed_fasta_files())
 
     if num_failed == 0:
-        message = (f"    {color_text(f"All {num_input} input fasta files were successfully parsed and prepared!", "green")}")
+        message = (f"    {color_text(f"All {num_input} input fasta files were successfully prepared!", "green")}")
     else:
-        message = f"    Of the input genomes provided as fasta files:\n\n"
+        message = f"    Of the input genomes provided as {color_text("fasta files", "yellow")}:\n\n"
         message += (f"      {color_text(f"{num_failed} failed to be successfully preprocessed", "yellow")}, reported in:\n"
                     f"        {run_data.run_files_dir_rel}/failed-fasta-files.txt\n\n")
         message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} fasta files were successfully preprocessed.", "yellow")}")
 
+    report_update(message)
+
+def report_AA_update(run_data):
+    num_input = run_data.num_amino_acid_files
+    num_failed = len(run_data.failed_amino_acid_files())
+
+    if num_failed == 0:
+        message = (f"    {color_text(f"All {num_input} input amino-acid files were successfully prepared!", "green")}")
+    else:
+        message = f"    Of the input genomes provided as {color_text("amino-acid files", "yellow")}:\n\n"
+        message += (f"      {color_text(f"{num_failed} failed to be successfully preprocessed", "yellow")}, reported in:\n"
+                    f"        {run_data.run_files_dir_rel}/failed-amino-acid-files.txt\n\n")
+        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} amino-acid files were successfully preprocessed.", "yellow")}")
+
+    report_update(message)
+
+
+def report_genome_preprocessing_update(run_data):
+    num_input = run_data.num_input_genomes
+    num_removed = run_data.num_removed_genomes
+    num_remaining = run_data.num_remaining_genomes
+
+    if num_input == num_remaining:
+        message = (f"    {color_text(f"All {num_input} input genomes were successfully preprocessed!\n\n", "green")}")
+    else:
+        message = f"    Of all the input genomes provided:\n\n"
+        message += (f"      {color_text(f"{num_removed} failed preprocessing", "yellow")} as described above.\n\n")
+        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully preprocessed.\n\n", "yellow")}")
+
+    message += f"                           Moving forward with those :)"
     report_update(message)

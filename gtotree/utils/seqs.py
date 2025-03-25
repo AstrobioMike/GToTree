@@ -1,14 +1,16 @@
 
 from Bio import SeqIO
-import os
 from gtotree.utils.general import remove_file_if_exists
 
-def filter_and_rename_fasta(prefix, run_data, in_path, max_length = 99999):
+def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_length = 99999):
 
     num = 0
-    infile = f"{in_path}/{prefix}_protein.faa"
-    outfile = f"{run_data.all_input_genome_AA_files_dir}/{prefix}.faa"
-    with open(outfile, "w") as outfile, open(infile, "r") as infile:
+    if full_path:
+        infile = in_path
+    else:
+        infile = f"{in_path}/{prefix}_protein.faa"
+    outpath = f"{run_data.all_input_genome_AA_files_dir}/{prefix}.faa"
+    with open(outpath, "w") as outfile, open(infile, "r") as infile:
 
         for record in SeqIO.parse(infile, "fasta"):
 
@@ -17,6 +19,12 @@ def filter_and_rename_fasta(prefix, run_data, in_path, max_length = 99999):
                 header = f">{prefix}_{num}"
                 outfile.write(f"{header}\n{record.seq}\n")
 
+    if num == 0:
+        remove_file_if_exists(outpath)
+        return False
+
+    else:
+        return True
 
 def extract_filter_and_rename_cds_amino_acids_from_gb(prefix, input_gb, run_data, max_length = 99999):
 

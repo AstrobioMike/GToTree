@@ -3,10 +3,12 @@ import urllib.request
 import gzip
 import shutil
 import os
-from gtotree.utils.messaging import (report_ncbi_update,
+from gtotree.utils.messaging import (report_processing_stage,
+                                     report_ncbi_update,
                                      report_genbank_update,
                                      report_fasta_update,
-                                     report_processing_stage)
+                                     report_AA_update,
+                                     report_genome_preprocessing_update)
 from gtotree.utils.ncbi.parse_assembly_summary_file import parse_assembly_summary
 from gtotree.utils.ncbi.get_ncbi_assembly_tables import NCBI_assembly_summary_tab
 from gtotree.utils.general import (write_run_data,
@@ -19,6 +21,8 @@ def preprocess_genomes(args, run_data):
     run_data = preprocess_ncbi_genomes(args, run_data)
     run_data = preprocess_genbank_genomes(args, run_data)
     run_data = preprocess_fasta_genomes(args, run_data)
+    run_data = preprocess_amino_acid_files(args, run_data)
+    genome_preprocessing_update(run_data)
 
     return args, run_data
 
@@ -29,8 +33,9 @@ def preprocess_ncbi_genomes(args, run_data):
         report_processing_stage("ncbi")
 
         run_data = parse_assembly_summary(NCBI_assembly_summary_tab, run_data)
+        combined_other_set = set(run_data.ncbi_accessions_done) | set(run_data.ncbi_accs_not_found)
 
-        if set(run_data.ncbi_accessions) != set(run_data.ncbi_accessions_done) and set(run_data.ncbi_accs_not_done) != set(run_data.ncbi_accs_not_found):
+        if set(run_data.remaining_ncbi_accessions) != combined_other_set:
             # writing run_data and args objects to files so they can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-ncbi-accessions.smk")
@@ -48,7 +53,7 @@ def preprocess_ncbi_genomes(args, run_data):
             if args.resume:
                 run_snakemake(cmd, run_data.num_ncbi_accs_not_done, run_data, description)
             else:
-                run_snakemake(cmd, run_data.num_ncbi_accessions, run_data, description)
+                run_snakemake(cmd, run_data.num_remaining_ncbi_accessions, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
             run_data = capture_ncbi_failed_downloads(run_data)
@@ -104,7 +109,6 @@ def capture_ncbi_failed_downloads(run_data):
         with open(run_data.run_files_dir + "/ncbi-accessions-not-downloaded.txt", "w") as not_downloaded_file:
             for acc in run_data.ncbi_accs_not_downloaded:
                 not_downloaded_file.write(acc + "\n")
-                run_data.add_ncbi_acc_not_found(acc)
     return run_data
 
 
@@ -144,7 +148,7 @@ def capture_failed_genbank_files(run_data):
         with open(run_data.run_files_dir + "/genbank-files-not-parsed.txt", "w") as not_parsed_file:
             for entry in failed_genbank_files_list:
                 not_parsed_file.write(entry + "\n")
-
+                run_data.remove_genbank_file(entry)
 
 def preprocess_fasta_genomes(args, run_data):
     if args.fasta_files:
@@ -182,3 +186,49 @@ def capture_failed_fasta_files(run_data):
         with open(run_data.run_files_dir + "/failed-fasta-files.txt", "w") as failed_fastas_file:
             for entry in failed_fasta_files_list:
                 failed_fastas_file.write(entry + "\n")
+                run_data.remove_fasta_file(entry)
+
+
+def preprocess_amino_acid_files(args, run_data):
+    if args.amino_acid_files:
+
+        report_processing_stage("amino-acid")
+
+        if run_data.any_incomplete_amino_acid_files():
+            # writing run_data and args objects to files so they can be accessed by snakemake
+            write_run_data(run_data)
+            snakefile = get_snakefile_path("preprocess-amino-acid-files.smk")
+            description = "Preprocessing amino-acid files"
+
+            cmd = [
+                "snakemake",
+                "--snakefile", snakefile,
+                "--cores", f"{args.num_jobs}",
+                "--default-resources", f"tmpdir='{args.tmp_dir}'",
+                "--config",
+                f"run_data_path={run_data.run_data_path}"
+            ]
+
+            run_snakemake(cmd, run_data.num_incomplete_amino_acid_files, run_data, description)
+
+            run_data = read_run_data(run_data.run_data_path)
+            capture_failed_amino_acid_files(run_data)
+
+        report_AA_update(run_data)
+
+    return run_data
+
+
+def capture_failed_amino_acid_files(run_data):
+    failed_amino_acid_files_list = run_data.failed_amino_acid_files()
+    if len(failed_amino_acid_files_list) > 0:
+        with open(run_data.run_files_dir + "/failed-amino-acid-files.txt", "w") as failed_amino_acids_file:
+            for entry in failed_amino_acid_files_list:
+                failed_amino_acids_file.write(entry + "\n")
+                run_data.remove_amino_acid_file(entry)
+
+
+def genome_preprocessing_update(run_data):
+    report_processing_stage("preprocessing-update")
+    report_genome_preprocessing_update(run_data)
+

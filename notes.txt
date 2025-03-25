@@ -1,5 +1,9 @@
 ## next: 
-    # amino-acid inputs
+    # can/should i make a class for the ncbi accs like i have for the genome files (or use the same one)...
+    # work on grabbing all remaining genomes (AA files) and associating them with IDs
+        # maybe a new class to hold these (or just a dict)
+        # but if i make a class, i can add all the info i want to put in the final summary table
+        # may need to fix naming of final AA files by stripping prefixes (or doing that earlier)
     # hmm search
     # filtering hits
     # filtering genomes
@@ -8,6 +12,8 @@
     # treeing
     # optional ko search
     # optional pfam search
+    # move snakemake logs dir to tmp dir after run finished
+        # this is so it's easily findable if there is a problem while running
     # implement nucleotide mode :(
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
@@ -28,6 +34,7 @@ GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f f
 gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -j 4 -t -P
 
 ### OVERALL NOTES ###
+# add a stop at "Summary of input-genome preprocessing" to check there are more than 3 as needed to make a tree
 # need a lot of testing on resume functionality
     # if i count on the resume flag for operating, i may need to make sure it makes sense up front (like does the run-data.json exist)
 # need some check and handling if the input files changed when doing a resume
@@ -39,7 +46,8 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # maybe with a time/date stamp of when first run appended to the name
 # eventually look into putting a block for this prodigal failure: "at least 100000 bases for training." (search original files)
     # maybe just make a check that input genomes are greater than 100,000 bases (if that consistently triggers it)
-# check prodigal being marked as used at high-level, initial preflight_checks.py, when fasta files were provided
+# eventually add a check that nucleotide fasta inputs are nucleotide and not amino acid, and vice versa
+# eventually do something with gunzipped files we generated (probably delete them, leaving the originals)
 
 ### TO DO ###
 

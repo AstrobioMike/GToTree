@@ -9,7 +9,7 @@ run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-accessions = run_data.ncbi_accessions
+accessions = run_data.remaining_ncbi_accessions
 
 rule all:
     input:
