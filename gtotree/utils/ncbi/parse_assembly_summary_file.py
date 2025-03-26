@@ -86,7 +86,6 @@ def parse_assembly_summary(assembly_summary_file, run_data):
         with open(run_data.run_files_dir + "/ncbi-accessions-not-found.txt", "w") as not_found_file:
             for acc in not_found:
                 not_found_file.write(acc + "\n")
-                run_data.remove_ncbi_accession(acc)
 
         report_ncbi_accs_not_found(len(not_found), run_data.run_files_dir_rel)
 

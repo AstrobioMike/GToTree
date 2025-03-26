@@ -19,8 +19,6 @@ from gtotree.utils.general import (write_run_data,
 
 def preprocess_genomes(args, run_data):
 
-    print(run_data)
-
     run_data = preprocess_ncbi_genomes(args, run_data)
     run_data = preprocess_genbank_genomes(args, run_data)
     run_data = preprocess_fasta_genomes(args, run_data)
@@ -28,9 +26,7 @@ def preprocess_genomes(args, run_data):
 
     genome_preprocessing_update(run_data)
 
-    print(run_data)
-
-    return args, run_data
+    return run_data
 
 
 def preprocess_ncbi_genomes(args, run_data):
@@ -43,21 +39,12 @@ def preprocess_ncbi_genomes(args, run_data):
         ncbi_accs_remaining = len(run_data.remaining_ncbi_accs())
 
         if ncbi_accs_remaining > 0:
-            # writing run_data and args objects to files so they can be accessed by snakemake
+            # writing run_data to file so it can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-ncbi-accessions.smk")
             description = "Preprocessing NCBI accessions"
 
-            cmd = [
-                "snakemake",
-                "--snakefile", snakefile,
-                "--cores", f"{args.num_jobs}",
-                "--default-resources", f"tmpdir='{args.tmp_dir}'",
-                "--config",
-                f"run_data_path={run_data.run_data_path}"
-            ]
-
-            run_snakemake(cmd, ncbi_accs_remaining, run_data, description)
+            run_snakemake(snakefile, ncbi_accs_remaining, args, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
             run_data = capture_ncbi_failed_downloads(run_data)
@@ -74,12 +61,6 @@ def prepare_accession(acc, run_data):
     try:
         amino_acid_link = base_link + acc_assembly_str + "_protein.faa.gz"
         amino_acid_filepath = run_data.ncbi_downloads_dir + "/" + acc + "_protein.faa"
-
-
-        if acc == "GCF_000153765.1":
-            amino_acid_link = "https://wrong"
-
-
         download_and_unzip_accession(amino_acid_link, amino_acid_filepath)
         done = True
         nt = False
@@ -88,12 +69,6 @@ def prepare_accession(acc, run_data):
         try:
             nucleotide_link = base_link + acc_assembly_str + "_genomic.fna.gz"
             nucleotide_file = run_data.ncbi_downloads_dir + "/" + acc + "_genomic.fna"
-
-
-            if acc == "GCF_000153765.1":
-                nucleotide_link = "https://wrong"
-
-
             download_and_unzip_accession(nucleotide_link, nucleotide_file)
             done = True
             nt = True
@@ -134,21 +109,14 @@ def preprocess_genbank_genomes(args, run_data):
         report_processing_stage("genbank")
 
         if run_data.any_incomplete_genbank_files():
-            # writing run_data and args objects to files so they can be accessed by snakemake
+            # writing run_data to file so it can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-genbank-files.smk")
             description = "Preprocessing genbank files"
 
-            cmd = [
-                "snakemake",
-                "--snakefile", snakefile,
-                "--cores", f"{args.num_jobs}",
-                "--default-resources", f"tmpdir='{args.tmp_dir}'",
-                "--config",
-                f"run_data_path={run_data.run_data_path}"
-            ]
-
-            run_snakemake(cmd, run_data.num_incomplete_genbank_files, run_data, description)
+            run_snakemake(snakefile,
+                          run_data.num_incomplete_genbank_files,
+                          args, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
             capture_failed_genbank_files(run_data)
@@ -159,12 +127,11 @@ def preprocess_genbank_genomes(args, run_data):
 
 
 def capture_failed_genbank_files(run_data):
-    failed_genbank_files_list = run_data.failed_genbank_files()
+    failed_genbank_files_list = run_data.get_failed_genbank_paths()
     if len(failed_genbank_files_list) > 0:
         with open(run_data.run_files_dir + "/genbank-files-not-parsed.txt", "w") as not_parsed_file:
             for entry in failed_genbank_files_list:
                 not_parsed_file.write(entry + "\n")
-                run_data.remove_genbank_file(entry)
 
 def preprocess_fasta_genomes(args, run_data):
     if args.fasta_files:
@@ -172,21 +139,14 @@ def preprocess_fasta_genomes(args, run_data):
         report_processing_stage("fasta")
 
         if run_data.any_incomplete_fasta_files():
-            # writing run_data and args objects to files so they can be accessed by snakemake
+            # writing run_data to file so it can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-fasta-files.smk")
             description = "Preprocessing fasta files"
 
-            cmd = [
-                "snakemake",
-                "--snakefile", snakefile,
-                "--cores", f"{args.num_jobs}",
-                "--default-resources", f"tmpdir='{args.tmp_dir}'",
-                "--config",
-                f"run_data_path={run_data.run_data_path}"
-            ]
-
-            run_snakemake(cmd, run_data.num_incomplete_fasta_files, run_data, description)
+            run_snakemake(snakefile,
+                          run_data.num_incomplete_fasta_files,
+                          args, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
             capture_failed_fasta_files(run_data)
@@ -197,12 +157,11 @@ def preprocess_fasta_genomes(args, run_data):
 
 
 def capture_failed_fasta_files(run_data):
-    failed_fasta_files_list = run_data.failed_fasta_files()
+    failed_fasta_files_list = run_data.get_failed_fasta_paths()
     if len(failed_fasta_files_list) > 0:
         with open(run_data.run_files_dir + "/failed-fasta-files.txt", "w") as failed_fastas_file:
             for entry in failed_fasta_files_list:
                 failed_fastas_file.write(entry + "\n")
-                run_data.remove_fasta_file(entry)
 
 
 def preprocess_amino_acid_files(args, run_data):
@@ -211,21 +170,14 @@ def preprocess_amino_acid_files(args, run_data):
         report_processing_stage("amino-acid")
 
         if run_data.any_incomplete_amino_acid_files():
-            # writing run_data and args objects to files so they can be accessed by snakemake
+            # writing run_data to file so it can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-amino-acid-files.smk")
             description = "Preprocessing amino-acid files"
 
-            cmd = [
-                "snakemake",
-                "--snakefile", snakefile,
-                "--cores", f"{args.num_jobs}",
-                "--default-resources", f"tmpdir='{args.tmp_dir}'",
-                "--config",
-                f"run_data_path={run_data.run_data_path}"
-            ]
-
-            run_snakemake(cmd, run_data.num_incomplete_amino_acid_files, run_data, description)
+            run_snakemake(snakefile,
+                          run_data.num_incomplete_amino_acid_files,
+                          args, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
             capture_failed_amino_acid_files(run_data)
@@ -236,16 +188,14 @@ def preprocess_amino_acid_files(args, run_data):
 
 
 def capture_failed_amino_acid_files(run_data):
-    failed_amino_acid_files_list = run_data.failed_amino_acid_files()
+    failed_amino_acid_files_list = run_data.get_failed_amino_acid_paths()
     if len(failed_amino_acid_files_list) > 0:
         with open(run_data.run_files_dir + "/failed-amino-acid-files.txt", "w") as failed_amino_acids_file:
             for entry in failed_amino_acid_files_list:
                 failed_amino_acids_file.write(entry + "\n")
-                run_data.remove_amino_acid_file(entry)
 
 
 def genome_preprocessing_update(run_data):
     report_processing_stage("preprocessing-update")
     run_data.update_all_input_genomes()
     report_genome_preprocessing_update(run_data)
-

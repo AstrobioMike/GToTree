@@ -6,7 +6,7 @@ from gtotree.utils.general import download_with_tqdm
 import pyhmmer #type: ignore
 
 
-def check_hmm_file(args):
+def check_hmm_file(args, run_data):
     if args.hmm == "Universal":
         hmm_arg = "Universal-Hug-et-al"
         args.hmm = "Universal-Hug-et-al"
@@ -21,12 +21,12 @@ def check_hmm_file(args):
 
     # getting hmm path
     if os.path.isfile(hmm_file): # handles if user-provided full path
-        args.hmm_path = hmm_file
+        run_data.hmm_path = hmm_file
     else:
         # getting hmm from prepackaged table
-        args.hmm_path = get_hmm_path(hmm_file, args.hmm)
+        run_data.hmm_path = get_hmm_path(hmm_file, args.hmm)
 
-    return args
+    return run_data
 
 
 def get_hmm_path(hmm_file, hmm_arg):
@@ -76,7 +76,6 @@ def get_target_hmm_url(hmm_file, hmm_arg):
         report_message("You can see the available gene-sets packaged with GToTree by running `gtt-hmms`.")
         report_early_exit()
     return target_hmm_url
-
 
 
 def get_number_of_targets(hmm_path):

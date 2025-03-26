@@ -41,13 +41,13 @@ helpmenu += f"""
 
         - [-m <file>] mapping file specifying desired genome labels
                   A two- or three-column tab-delimited file where column 1 holds
-                  either the file name or NCBI accession of the genome to name
-                  (depending on the input source), column 2 holds the desired
-                  new genome label, and column 3 holds something to be appended
-                  toeither initial or modified labels (e.g. useful for "tagging"
-                  genomes in the tree based on some characteristic). Columns 2
-                  or 3 can be empty, and the file does not need to include all
-                  input genomes.
+                  either the input NCBI accession or input filename basename of
+                  the genome to re-label (depending on the input source), column
+                  2 holds the desired new genome label, and column 3 holds
+                  something to be appended to either the initial or modified
+                  labels (e.g. useful for "tagging" genomes in the tree based
+                  on some characteristic). Columns 2 or 3 can be empty, and the
+                  file does not need to include all input genomes.
 
 
       {color_text("Options for adding taxonomy information:", "yellow")}

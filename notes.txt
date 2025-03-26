@@ -1,14 +1,17 @@
 ## next: 
-    # continue working on fuller RunData and GenomeData class implementation, removing old lists i was included in RunData
-        # next finish removing ncbi-related lists, accounting for all needed ones with main class functions or attributes, then move onto genbank inputs
-        # maybe next: look at the lists in the RunData object and see what can be replaced with a function, then update all places used
-    # need to fix mapping file check and other business with new object stuff
-        # go through and add an attribute called "mapping" to the GenomeData objects
     # hmm search
+        # i'm up to the first results table being produced
+        # i need to create a list in the run_data during preflight hmm-checking that holds all target SCGs
+        # then get back to following the gtt-amino-acid-serial with esl-index/fetch and whatnot
+        # want to get the entire genome done in the same snakefile, meaning to the stage where the genes are pulled out
+        # "all" rule should combine them all into their own fasta for each target-SCG i think
+            # (look into how filtering-hits works first)
     # filtering hits
     # filtering genomes
     # alignments
     # concatenation and renaming
+        # for mapping file:
+            # use run_data.mapping_dict to iterate over the run_data.all_input_genomes classes and adjust the names of alignments if needed
     # treeing
     # optional ko search
     # optional pfam search

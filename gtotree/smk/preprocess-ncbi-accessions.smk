@@ -1,6 +1,5 @@
 from gtotree.utils.general import (read_run_data,
                                    write_run_data,
-                                   read_args,
                                    run_prodigal)
 from gtotree.utils.seqs import filter_and_rename_fasta
 from gtotree.utils.preprocessing_genomes import prepare_accession

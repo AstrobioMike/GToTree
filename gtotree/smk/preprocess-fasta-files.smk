@@ -1,11 +1,9 @@
 import os
 from gtotree.utils.general import (read_run_data,
                                    write_run_data,
-                                   read_args,
                                    gunzip_if_needed,
-                                   run_prodigal,
-                                   touch)
-from gtotree.utils.seqs import (filter_and_rename_fasta)
+                                   run_prodigal)
+from gtotree.utils.seqs import filter_and_rename_fasta
 
 run_data = read_run_data(config['run_data_path'])
 if run_data is None:
@@ -22,6 +20,7 @@ rule all:
             fasta = fasta_dict[fasta_basename]
             path = fasta.full_path
             status_path = f"{run_data.fasta_processing_dir}/{fasta_basename}.done"
+
             with open(status_path, 'r') as f:
                 for line in f:
                     fasta_file, status, was_gzipped, final_AA_path = line.strip().split('\t')

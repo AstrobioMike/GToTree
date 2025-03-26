@@ -68,7 +68,7 @@ do
     fi
 
     printf "      Performing HMM search...\n"
-      
+
     ### running hmm search ###
     hmmsearch --cut_ga --cpu $num_cpus --tblout ${tmp_dir}/${assembly}_curr_hmm_hits.tmp $hmm_file ${tmp_dir}/${assembly}_genes.tmp > /dev/null
 

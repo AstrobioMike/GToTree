@@ -19,7 +19,7 @@ from gtotree.utils.messaging import (report_message,
                                      gtotree_header,
                                      stdout_and_log
                                      )
-from gtotree.utils.hmm_handling import check_hmm_file
+from gtotree.utils.hmms.scg_hmm_setup import check_hmm_file
 from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_data
 from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
@@ -138,10 +138,10 @@ def check_input_files(args):
     if "run_data" not in locals():
         run_data = populate_run_data(args)
 
-    args = check_hmm_file(args)
+    run_data = check_hmm_file(args, run_data)
 
     if args.mapping_file:
-        check_mapping_file(args, run_data)
+        args, run_data = check_mapping_file(args, run_data)
 
     if args.target_pfam_file:
         args.target_pfam_file, total_pfam_targets = check_expected_single_column_input(args.target_pfam_file, "-p", get_count=True)
@@ -150,6 +150,8 @@ def check_input_files(args):
     if args.target_ko_file:
         args.target_ko_file, total_ko_targets = check_expected_single_column_input(args.target_ko_file, "-K", get_count=True)
         args.total_ko_targets = total_ko_targets
+
+    run_data.num_hmm_cpus = args.num_hmm_cpus
 
     return args, run_data
 
@@ -277,10 +279,15 @@ def check_mapping_file(args, run_data, flag = "-m"):
 
     args.mapping_file = check_line_endings(args.mapping_file, flag)
 
-    args.mapping_dict = make_mapping_dict(args.mapping_file)
+    run_data.mapping_file_path = args.mapping_file
 
-    check_all_mapping_file_entries_are_in_input_genomes(args, run_data)
+    mapping_dict = make_mapping_dict(run_data.mapping_file_path)
 
+    check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data)
+
+    run_data.mapping_dict = mapping_dict
+
+    return args, run_data
 
 
 def check_mapping_file_problem_chars_and_fields(path):
@@ -365,19 +372,19 @@ def make_mapping_dict(path):
     return mapping_dict
 
 
-def check_all_mapping_file_entries_are_in_input_genomes(args, run_data):
-    entries_in_mapping_file = set(args.mapping_dict.keys())
+def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
+    entries_in_mapping_file = set(mapping_dict.keys())
     # taking the basenames here because some inputs might have full/rel paths, but the mapping file shouldn't
-    entries_in_input_genomes = set([os.path.basename(genome) for genome in run_data.get_all_input_genome_ids()])
+    entries_in_input_genomes = set(run_data.get_all_input_genome_basenames())
     missing_keys = entries_in_mapping_file - entries_in_input_genomes
     if missing_keys:
         report_message(
-            f'The mapping file "{args.mapping_file}" (passed to `-m`) specifies some input-genomes that are not found in any of the the input-genome sources.'
+            f'The mapping file "{run_data.mapping_file_path}" (passed to `-m`) specifies some input-genomes that are not found in any of the the input-genome sources.'
             f' Problematic ones include:'
         )
         report_message(f'{"\n".join(missing_keys)}', ii="    ", si="    ")
         report_message(
-            f'Each input genome in the mapping file must be present in one of the input-genome sources. Please address this and try again.'
+            f"Each input genome in the mapping file must be present in one of the input-genome sources (with the basename of the file if it's a path). Please address this and try again."
         )
         report_early_exit()
 
@@ -485,6 +492,8 @@ def setup_outputs(args, run_data):
 
     run_data.ready_genome_AA_files_dir = os.path.join(args.tmp_dir, "ready-genome-AA-files")
     os.makedirs(run_data.ready_genome_AA_files_dir, exist_ok=True)
+    run_data.hmm_results_dir = os.path.join(args.tmp_dir, "hmm-results")
+    os.makedirs(run_data.hmm_results_dir, exist_ok=True)
 
     return args, run_data
 

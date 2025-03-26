@@ -1,10 +1,8 @@
 import os
 from gtotree.utils.general import (read_run_data,
                                    write_run_data,
-                                   read_args,
-                                   gunzip_if_needed,
-                                   touch)
-from gtotree.utils.seqs import (filter_and_rename_fasta)
+                                   gunzip_if_needed)
+from gtotree.utils.seqs import filter_and_rename_fasta
 
 run_data = read_run_data(config['run_data_path'])
 if run_data is None:

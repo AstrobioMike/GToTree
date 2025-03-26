@@ -1,10 +1,8 @@
 import os
 from gtotree.utils.general import (read_run_data,
                                    write_run_data,
-                                   read_args,
                                    gunzip_if_needed,
-                                   run_prodigal,
-                                   touch)
+                                   run_prodigal)
 from gtotree.utils.seqs import (extract_filter_and_rename_cds_amino_acids_from_gb,
                                 extract_fasta_from_gb,
                                 filter_and_rename_fasta)

@@ -315,7 +315,7 @@ def absurd_number_of_genomes_notice(total_input_genomes):
 @capture_stdout_to_log(lambda: log_file_var.get())
 def report_processing_stage(stage):
     allowed_stages = ["ncbi", "genbank", "fasta", "amino-acid",
-                      "preprocessing-update", "hmm", "filter-seqs",
+                      "preprocessing-update", "hmm-search", "filter-seqs",
                       "filter-genomes", "align", "tree"]
 
     if stage not in allowed_stages:
@@ -340,6 +340,10 @@ def report_processing_stage(stage):
     elif stage == "preprocessing-update":
         message = ("\n  ##############################################################################\n"
                     "  ####                Summary of input-genome preprocessing                 ####\n"
+                    "  ##############################################################################")
+    elif stage == "hmm-search":
+        message = ("\n  ##############################################################################\n"
+                    "  ####            Searching genomes for target single-copy genes            ####\n"
                     "  ##############################################################################")
     else:
         report_early_exit(f"Invalid stage ('{stage}'provided to `report_processing_stage`")
@@ -366,7 +370,7 @@ def report_ncbi_update(run_data):
     num_input = len(run_data.ncbi_accs)
     num_not_found_at_ncbi = len(run_data.get_ncbi_accs_not_found())
     num_not_downloaded = len(run_data.get_ncbi_accs_not_downloaded())
-    num_prepared = len(run_data.done_ncbi_accs())
+    num_prepared = len(run_data.get_done_ncbi_accs())
     num_removed = len(run_data.get_removed_ncbi_accs())
 
     if num_removed == 0:
@@ -386,9 +390,9 @@ def report_ncbi_update(run_data):
 
 
 def report_genbank_update(run_data):
-    num_input = run_data.num_genbank_files
-    num_failed = len(run_data.failed_genbank_files())
-    num_prodigal_used = len(run_data.genbank_files_with_prodigal_used())
+    num_input = len(run_data.genbank_files)
+    num_failed = len(run_data.get_failed_genbank_ids())
+    num_prodigal_used = len(run_data.get_prodigal_used_genbank_ids())
 
     if num_failed == 0 and num_prodigal_used == 0:
         message = (f"    {color_text(f"All {num_input} input genbank files were successfully parsed and prepared!", "green")}")
@@ -410,8 +414,8 @@ def report_genbank_update(run_data):
 
 
 def report_fasta_update(run_data):
-    num_input = run_data.num_fasta_files
-    num_failed = len(run_data.failed_fasta_files())
+    num_input = len(run_data.fasta_files)
+    num_failed = len(run_data.get_failed_fasta_ids())
 
     if num_failed == 0:
         message = (f"    {color_text(f"All {num_input} input fasta files were successfully prepared!", "green")}")
@@ -424,8 +428,8 @@ def report_fasta_update(run_data):
     report_update(message)
 
 def report_AA_update(run_data):
-    num_input = run_data.num_amino_acid_files
-    num_failed = len(run_data.failed_amino_acid_files())
+    num_input = len(run_data.amino_acid_files)
+    num_failed = len(run_data.get_failed_amino_acid_ids())
 
     if num_failed == 0:
         message = (f"    {color_text(f"All {num_input} input amino-acid files were successfully prepared!", "green")}")
@@ -439,7 +443,7 @@ def report_AA_update(run_data):
 
 
 def report_genome_preprocessing_update(run_data):
-    num_input = len(run_data.all_input_genomes_obj)
+    num_input = len(run_data.all_input_genomes)
     num_removed = len(run_data.get_all_removed_input_genomes())
     num_remaining = num_input - num_removed
 

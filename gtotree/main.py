@@ -3,6 +3,7 @@ from gtotree.utils.preflight_checks import preflight_checks
 from gtotree.utils.messaging import gtotree_header
 from gtotree.utils.runinfo import display_initial_run_info
 from gtotree.utils.preprocessing_genomes import preprocess_genomes
+from gtotree.utils.hmms.hmm_searching import search_hmms
 
 def main(args = None):
     if args is None:
@@ -14,9 +15,9 @@ def main(args = None):
 
     display_initial_run_info(args, run_data)
 
-    args, run_data = preprocess_genomes(args, run_data)
+    run_data = preprocess_genomes(args, run_data)
 
-    # hmm_searching(args, run_data)
+    run_data = search_hmms(args, run_data)
 
     # optional ko searching
 
