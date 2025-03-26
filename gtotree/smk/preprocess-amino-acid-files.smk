@@ -10,7 +10,7 @@ run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-AA_dict = {gf.basename: gf for gf in run_data.amino_acid_files}
+AA_dict = {gd.basename: gd for gd in run_data.amino_acid_files}
 AA_basenames = list(AA_dict.keys())
 
 rule all:

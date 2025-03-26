@@ -1,9 +1,5 @@
 ## next: 
-    # can/should i make a class for the ncbi accs like i have for the genome files (or use the same one)...
-    # work on grabbing all remaining genomes (AA files) and associating them with IDs
-        # maybe a new class to hold these (or just a dict)
-        # but if i make a class, i can add all the info i want to put in the final summary table
-        # may need to fix naming of final AA files by stripping prefixes (or doing that earlier)
+    # continue working on fuller RunData and GenomeData class implementation, removing old lists i was included in RunData
     # hmm search
     # filtering hits
     # filtering genomes

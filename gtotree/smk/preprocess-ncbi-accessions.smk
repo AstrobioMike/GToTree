@@ -9,27 +9,29 @@ run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-accessions = run_data.remaining_ncbi_accessions
+accession_dict = {gd.id: gd for gd in run_data.ncbi_accs if gd.was_found and not gd.done}
+accessions = list(accession_dict.keys())
 
 rule all:
     input:
         expand(f"{run_data.ncbi_downloads_dir}/{{acc}}.done", acc=accessions)
     run:
-        for file in input:
-            with open(file, 'r') as f:
+        for acc in accessions:
+            acc_gd = accession_dict[acc]
+            status_path = f"{run_data.ncbi_downloads_dir}/{acc}.done"
+            with open(status_path, 'r') as f:
                 for line in f:
-                    acc, status, downloaded, prodigal_used = line.strip().split('\t')
+                    acc, status, downloaded, prodigal_used, final_AA_path = line.strip().split('\t')
 
                     if int(status):
-                        run_data.add_done_ncbi_accession(acc)
+                        acc_gd.mark_done()
+                        acc_gd.final_AA_path = final_AA_path
                     else:
-                        run_data.remove_ncbi_accession(acc)
+                        acc_gd.mark_removed()
 
-                    if not int(downloaded):
-                        run_data.add_ncbi_acc_not_downloaded(acc)
+                    acc_gd.was_downloaded = True if int(downloaded) else False
 
-                    if int(prodigal_used):
-                        run_data.tools_used.prodigal_used = True
+                    acc_gd.prodigal_used = True if int(prodigal_used) else False
 
         write_run_data(run_data)
 
@@ -38,18 +40,19 @@ rule process_ncbi_accessions:
     output:
         f"{run_data.ncbi_downloads_dir}/{{acc}}.done"
     run:
+        acc_gd = accession_dict[wildcards.acc]
         done, nt = prepare_accession(wildcards.acc, run_data)
+        downloaded = True if done else False
         if done and nt:
-            done = run_prodigal(wildcards.acc, run_data, "ncbi")
+            done = run_prodigal(acc_gd.id, run_data, "ncbi")
             prodigal_used = True
         else:
             prodigal_used = False
 
         if done:
-            downloaded = True
-            filter_and_rename_fasta(wildcards.acc, run_data, run_data.ncbi_downloads_dir)
+            done, final_AA_path = filter_and_rename_fasta(acc_gd.id, run_data, run_data.ncbi_downloads_dir)
         else:
-            downloaded = False
+            final_AA_path = None
 
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.acc}\t{int(done)}\t{int(downloaded)}\t{int(prodigal_used)}\n')
+            f.write(f'{wildcards.acc}\t{int(done)}\t{int(downloaded)}\t{int(prodigal_used)}\t{final_AA_path}\n')

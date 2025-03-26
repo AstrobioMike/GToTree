@@ -11,7 +11,7 @@ run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-fasta_dict = {gf.basename: gf for gf in run_data.fasta_files}
+fasta_dict = {gd.basename: gd for gd in run_data.fasta_files}
 fasta_basenames = list(fasta_dict.keys())
 
 rule all:
@@ -51,9 +51,6 @@ rule process_fasta_files:
             os.remove(path)
 
         if done:
-            print(fasta.id)
-            print(run_data)
-            print(run_data.fasta_processing_dir)
             done, final_AA_path = filter_and_rename_fasta(fasta.id, run_data, run_data.fasta_processing_dir)
         else:
             final_AA_path = None

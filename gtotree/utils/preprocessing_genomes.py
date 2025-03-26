@@ -38,9 +38,10 @@ def preprocess_ncbi_genomes(args, run_data):
         report_processing_stage("ncbi")
 
         run_data = parse_assembly_summary(NCBI_assembly_summary_tab, run_data)
-        combined_other_set = set(run_data.ncbi_accessions_done) | set(run_data.ncbi_accs_not_found)
 
-        if set(run_data.remaining_ncbi_accessions) != combined_other_set:
+        ncbi_accs_remaining = len(run_data.remaining_ncbi_accs())
+
+        if ncbi_accs_remaining > 0:
             # writing run_data and args objects to files so they can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-ncbi-accessions.smk")
@@ -55,10 +56,7 @@ def preprocess_ncbi_genomes(args, run_data):
                 f"run_data_path={run_data.run_data_path}"
             ]
 
-            if args.resume:
-                run_snakemake(cmd, run_data.num_ncbi_accs_not_done, run_data, description)
-            else:
-                run_snakemake(cmd, run_data.num_remaining_ncbi_accessions, run_data, description)
+            run_snakemake(cmd, ncbi_accs_remaining, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
             run_data = capture_ncbi_failed_downloads(run_data)

@@ -88,9 +88,16 @@ def parse_assembly_summary(assembly_summary_file, run_data):
                 not_found_file.write(acc + "\n")
                 run_data.remove_ncbi_accession(acc)
 
+        report_ncbi_accs_not_found(len(not_found), run_data.run_files_dir_rel)
         run_data.ncbi_accs_not_found = list(not_found)
 
-        report_ncbi_accs_not_found(len(run_data.ncbi_accs_not_found), run_data.run_files_dir_rel)
+
+    for acc_gd in run_data.ncbi_accs:
+        if acc_gd.id in not_found:
+            acc_gd.was_found = False
+            acc_gd.removed = True
+        else:
+            acc_gd.was_found = True
 
     run_data.ncbi_sub_table_path = ncbi_sub_table_path
 

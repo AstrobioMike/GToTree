@@ -53,6 +53,8 @@ class GenomeData:
     removed: bool = False
     prodigal_used: bool = False
     was_gzipped: bool = False
+    was_found: bool = None
+    was_downloaded: bool = None
 
     @classmethod
     def from_path(cls, path: str):
@@ -77,7 +79,7 @@ class GenomeData:
     def from_acc(cls, acc: str):
         full_path = None
         provided_path = None
-        basename = None
+        basename = acc
         id = acc
 
         return cls(id, full_path, provided_path, basename)
@@ -104,6 +106,7 @@ class RunData:
     ncbi_accs_not_done: List[str] = field(default_factory=list)
     ncbi_accs_not_found: List[str] = field(default_factory=list)
     ncbi_accs_not_downloaded: List[str] = field(default_factory=list)
+    ncbi_accs: List[GenomeData] = field(default_factory=list)
     genbank_files: List[GenomeData] = field(default_factory=list)
     fasta_files: List[GenomeData] = field(default_factory=list)
     amino_acid_files: List[GenomeData] = field(default_factory=list)
@@ -125,7 +128,7 @@ class RunData:
     run_files_dir: str = ""
     run_files_dir_rel: str = ""
     run_data_path: str = ""
-    all_input_genome_AA_files_dir: str = ""
+    ready_genome_AA_files_dir: str = ""
     tmp_dir: str = ""
     log_file: str = ""
     snakemake_logs_dir: str = ""
@@ -151,15 +154,15 @@ class RunData:
 
     @property
     def num_incomplete_genbank_files(self) -> int:
-        return len([gf for gf in self.genbank_files if not gf.done and not gf.removed])
+        return len([gd for gd in self.genbank_files if not gd.done and not gd.removed])
 
     @property
     def num_incomplete_fasta_files(self) -> int:
-        return len([gf for gf in self.fasta_files if not gf.done and not gf.removed])
+        return len([gd for gd in self.fasta_files if not gd.done and not gd.removed])
 
     @property
     def num_incomplete_amino_acid_files(self) -> int:
-        return len([gf for gf in self.amino_acid_files if not gf.done and not gf.removed])
+        return len([gd for gd in self.amino_acid_files if not gd.done and not gd.removed])
 
     @property
     def num_fasta_files(self) -> int:
@@ -205,49 +208,58 @@ class RunData:
             self.all_removed_genomes.append(accession)
 
     def add_genbank_file(self, filepath):
-        gf = GenomeData.from_path(filepath)
-        if gf not in self.genbank_files:
-            self.genbank_files.append(gf)
+        gd = GenomeData.from_path(filepath)
+        if gd not in self.genbank_files:
+            self.genbank_files.append(gd)
 
     def add_fasta_file(self, filepath):
-        gf = GenomeData.from_path(filepath)
-        if gf not in self.fasta_files:
-            self.fasta_files.append(gf)
+        gd = GenomeData.from_path(filepath)
+        if gd not in self.fasta_files:
+            self.fasta_files.append(gd)
 
     def add_amino_acid_file(self, filepath):
-        gf = GenomeData.from_path(filepath)
-        if gf not in self.amino_acid_files:
-            self.amino_acid_files.append(gf)
+        gd = GenomeData.from_path(filepath)
+        if gd not in self.amino_acid_files:
+            self.amino_acid_files.append(gd)
+
+    def found_ncbi_accs(self) -> List[GenomeData]:
+        return [gd for gd in self.ncbi_accs if gd.was_found]
+
+    def remaining_ncbi_accs(self) -> List[GenomeData]:
+        return [gd for gd in self.ncbi_accs if not gd.done and not gd.removed]
+
+    def done_ncbi_accs(self) -> List[GenomeData]:
+        return [gd for gd in self.ncbi_accs if gd.done]
 
     def incomplete_genbank_files(self) -> List[GenomeData]:
-        return [gf.provided_path for gf in self.genbank_files if not gf.done and not gf.removed]
+        return [gd.provided_path for gd in self.genbank_files if not gd.done and not gd.removed]
 
     def incomplete_fasta_files(self) -> List[GenomeData]:
-        return [gf.provided_path for gf in self.fasta_files if not gf.done and not gf.removed]
+        return [gd.provided_path for gd in self.fasta_files if not gd.done and not gd.removed]
 
     def incomplete_amino_acid_files(self) -> List[GenomeData]:
-        return [gf.provided_path for gf in self.amino_acid_files if not gf.done and not gf.removed]
+        return [gd.provided_path for gd in self.amino_acid_files if not gd.done and not gd.removed]
 
     def failed_genbank_files(self) -> List[GenomeData]:
-        return [gf.provided_path for gf in self.genbank_files if not gf.done and gf.removed]
+        return [gd.provided_path for gd in self.genbank_files if not gd.done and gd.removed]
 
     def failed_fasta_files(self) -> List[GenomeData]:
-        return [gf.provided_path for gf in self.fasta_files if not gf.done and gf.removed]
+        return [gd.provided_path for gd in self.fasta_files if not gd.done and gd.removed]
 
     def failed_amino_acid_files(self) -> List[GenomeData]:
-        return [gf.provided_path for gf in self.amino_acid_files if not gf.done and gf.removed]
+        return [gd.provided_path for gd in self.amino_acid_files if not gd.done and gd.removed]
 
     def any_incomplete_genbank_files(self) -> bool:
-        return any(not gf.done and not gf.removed for gf in self.genbank_files)
+        return any(not gd.done and not gd.removed for gd in self.genbank_files)
 
     def any_incomplete_fasta_files(self) -> bool:
-        return any(not gf.done and not gf.removed for gf in self.fasta_files)
+        return any(not gd.done and not gd.removed for gd in self.fasta_files)
 
     def any_incomplete_amino_acid_files(self) -> bool:
-        return any(not gf.done and not gf.removed for gf in self.amino_acid_files)
+        return any(not gd.done and not gd.removed for gd in self.amino_acid_files)
 
     def genbank_files_with_prodigal_used(self) -> List[GenomeData]:
-        return [gf for gf in self.genbank_files if gf.prodigal_used]
+        return [gd for gd in self.genbank_files if gd.prodigal_used]
 
     def add_done_fasta_file(self, filepath: str):
         if filepath not in self.fasta_files_done:
@@ -261,16 +273,16 @@ class RunData:
         candidate = None
         full_path = os.path.abspath(filepath)
 
-        for gf in self.genbank_files:
-            if gf.full_path == full_path:
-                candidate = gf.provided_path
+        for gd in self.genbank_files:
+            if gd.full_path == full_path:
+                candidate = gd.provided_path
                 break
 
         if candidate is None:
             target = os.path.basename(filepath)
-            for gf in self.genbank_files:
-                if gf.basename == target:
-                    candidate = gf.provided_path
+            for gd in self.genbank_files:
+                if gd.basename == target:
+                    candidate = gd.provided_path
                     break
 
         if candidate:
@@ -288,16 +300,16 @@ class RunData:
         candidate = None
         full_path = os.path.abspath(filepath)
 
-        for gf in self.fasta_files:
-            if gf.full_path == full_path:
-                candidate = gf.provided_path
+        for gd in self.fasta_files:
+            if gd.full_path == full_path:
+                candidate = gd.provided_path
                 break
 
         if candidate is None:
             target = os.path.basename(filepath)
-            for gf in self.fasta_files:
-                if gf.basename == target:
-                    candidate = gf.provided_path
+            for gd in self.fasta_files:
+                if gd.basename == target:
+                    candidate = gd.provided_path
                     break
 
         if candidate:
@@ -315,16 +327,16 @@ class RunData:
         candidate = None
         full_path = os.path.abspath(filepath)
 
-        for gf in self.amino_acid_files:
-            if gf.full_path == full_path:
-                candidate = gf.provided_path
+        for gd in self.amino_acid_files:
+            if gd.full_path == full_path:
+                candidate = gd.provided_path
                 break
 
         if candidate is None:
             target = os.path.basename(filepath)
-            for gf in self.amino_acid_files:
-                if gf.basename == target:
-                    candidate = gf.provided_path
+            for gd in self.amino_acid_files:
+                if gd.basename == target:
+                    candidate = gd.provided_path
                     break
 
         if candidate:
@@ -353,6 +365,7 @@ def populate_run_data(args):
     if args.ncbi_accessions:
         with open(args.ncbi_accessions, "r") as f:
             entries_list = f.read().splitlines()
+        run_data.ncbi_accs = [GenomeData.from_acc(entry) for entry in entries_list]
         run_data.input_ncbi_accessions = entries_list
         run_data.remaining_ncbi_accessions = entries_list
         run_data.all_input_genomes.extend(entries_list)
@@ -362,24 +375,24 @@ def populate_run_data(args):
         with open(args.genbank_files, "r") as f:
             entries_list = f.read().splitlines()
         run_data.genbank_files = [GenomeData.from_path(entry) for entry in entries_list]
-        run_data.all_input_genomes.extend([gf.full_path for gf in run_data.genbank_files])
-        run_data.all_remaining_genomes.extend([gf.full_path for gf in run_data.genbank_files])
+        run_data.all_input_genomes.extend([gd.full_path for gd in run_data.genbank_files])
+        run_data.all_remaining_genomes.extend([gd.full_path for gd in run_data.genbank_files])
 
     if args.fasta_files:
         with open(args.fasta_files, "r") as f:
             entries_list = f.read().splitlines()
         run_data.fasta_files = [GenomeData.from_path(entry) for entry in entries_list]
-        for gf in run_data.fasta_files:
-            gf.prodigal_used = True
-        run_data.all_input_genomes.extend([gf.full_path for gf in run_data.fasta_files])
-        run_data.all_remaining_genomes.extend([gf.full_path for gf in run_data.fasta_files])
+        for gd in run_data.fasta_files:
+            gd.prodigal_used = True
+        run_data.all_input_genomes.extend([gd.full_path for gd in run_data.fasta_files])
+        run_data.all_remaining_genomes.extend([gd.full_path for gd in run_data.fasta_files])
 
     if args.amino_acid_files:
         with open(args.amino_acid_files, "r") as f:
             entries_list = f.read().splitlines()
         run_data.amino_acid_files = [GenomeData.from_path(entry) for entry in entries_list]
-        run_data.all_input_genomes.extend([gf.full_path for gf in run_data.amino_acid_files])
-        run_data.all_remaining_genomes.extend([gf.full_path for gf in run_data.amino_acid_files])
+        run_data.all_input_genomes.extend([gd.full_path for gd in run_data.amino_acid_files])
+        run_data.all_remaining_genomes.extend([gd.full_path for gd in run_data.amino_acid_files])
 
     run_data.run_files_dir = args.run_files_dir
     run_data.run_files_dir_rel = args.run_files_dir_rel
@@ -412,12 +425,14 @@ def read_run_data(path):
         with open(path, "r") as f:
             run_data_dict = json.load(f)
 
+        if "ncbi_accs" in run_data_dict:
+            run_data_dict["ncbi_accs"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["ncbi_accs"]]
         if "genbank_files" in run_data_dict:
-            run_data_dict["genbank_files"] = [GenomeData(**gf) if isinstance(gf, dict) else gf for gf in run_data_dict["genbank_files"]]
+            run_data_dict["genbank_files"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["genbank_files"]]
         if "fasta_files" in run_data_dict:
-            run_data_dict["fasta_files"] = [GenomeData(**gf) if isinstance(gf, dict) else gf for gf in run_data_dict["fasta_files"]]
+            run_data_dict["fasta_files"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["fasta_files"]]
         if "amino_acid_files" in run_data_dict:
-            run_data_dict["amino_acid_files"] = [GenomeData(**gf) if isinstance(gf, dict) else gf for gf in run_data_dict["amino_acid_files"]]
+            run_data_dict["amino_acid_files"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["amino_acid_files"]]
 
         if "tools_used" in run_data_dict and run_data_dict["tools_used"] is not None:
             run_data_dict["tools_used"] = ToolsUsed(**run_data_dict["tools_used"])

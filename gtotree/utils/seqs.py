@@ -9,7 +9,7 @@ def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_le
         infile = in_path
     else:
         infile = f"{in_path}/{prefix}_protein.faa"
-    outpath = f"{run_data.all_input_genome_AA_files_dir}/{prefix}.faa"
+    outpath = f"{run_data.ready_genome_AA_files_dir}/{prefix}.faa"
     with open(outpath, "w") as outfile, open(infile, "r") as infile:
 
         for record in SeqIO.parse(infile, "fasta"):
@@ -29,7 +29,7 @@ def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_le
 def extract_filter_and_rename_cds_amino_acids_from_gb(prefix, input_gb, run_data, max_length = 99999):
 
     num = 0
-    output_file = f"{run_data.all_input_genome_AA_files_dir}/{prefix}.faa"
+    output_file = f"{run_data.ready_genome_AA_files_dir}/{prefix}.faa"
     note_terms_to_exclude = ["frameshifted", "internal stop", "incomplete"]
     location_terms_to_exclude = ["join", "<", ">"]
 

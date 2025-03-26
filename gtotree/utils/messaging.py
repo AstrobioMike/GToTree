@@ -366,7 +366,7 @@ def report_ncbi_update(run_data):
     num_input = run_data.num_input_ncbi_accessions
     num_not_found_at_ncbi = len(run_data.ncbi_accs_not_found)
     num_not_downloaded = len(run_data.ncbi_accs_not_downloaded)
-    num_prepared = len(run_data.ncbi_accessions_done)
+    num_prepared = len(run_data.done_ncbi_accs())
     num_removed = len(run_data.removed_ncbi_accessions)
 
     if num_removed == 0:

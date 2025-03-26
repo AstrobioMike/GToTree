@@ -13,7 +13,7 @@ run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-genbank_dict = {gf.basename: gf for gf in run_data.genbank_files}
+genbank_dict = {gd.basename: gd for gd in run_data.genbank_files}
 genbank_basenames = list(genbank_dict.keys())
 
 rule all:

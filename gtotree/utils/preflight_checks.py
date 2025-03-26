@@ -483,8 +483,8 @@ def setup_outputs(args, run_data):
         os.makedirs(AA_processing_dir, exist_ok=True)
         run_data.AA_processing_dir = AA_processing_dir
 
-    run_data.all_input_genome_AA_files_dir = os.path.join(args.tmp_dir, "input-genome-AA-files")
-    os.makedirs(run_data.all_input_genome_AA_files_dir, exist_ok=True)
+    run_data.ready_genome_AA_files_dir = os.path.join(args.tmp_dir, "ready-genome-AA-files")
+    os.makedirs(run_data.ready_genome_AA_files_dir, exist_ok=True)
 
     return args, run_data
 
