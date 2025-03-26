@@ -363,11 +363,11 @@ def report_ncbi_accs_not_found(num_accs, path):
 
 
 def report_ncbi_update(run_data):
-    num_input = run_data.num_input_ncbi_accessions
-    num_not_found_at_ncbi = len(run_data.ncbi_accs_not_found)
-    num_not_downloaded = len(run_data.ncbi_accs_not_downloaded)
+    num_input = len(run_data.ncbi_accs)
+    num_not_found_at_ncbi = len(run_data.get_ncbi_accs_not_found())
+    num_not_downloaded = len(run_data.get_ncbi_accs_not_downloaded())
     num_prepared = len(run_data.done_ncbi_accs())
-    num_removed = len(run_data.removed_ncbi_accessions)
+    num_removed = len(run_data.get_removed_ncbi_accs())
 
     if num_removed == 0:
         message = (f"    {color_text(f"All {num_input} input accessions were successfully downloaded and prepared!", "green")}")
@@ -377,7 +377,7 @@ def report_ncbi_update(run_data):
             message += (f"      {color_text(f"{num_not_found_at_ncbi} not found at NCBI", "yellow")}, reported in:\n"
                         f"        {run_data.run_files_dir_rel}/ncbi-accessions-not-found.txt\n\n")
         if num_not_downloaded > 0:
-            message += (f"      {color_text(f"{num_not_downloaded} not successfully downloaded", "yellow")}, reported in:\n"
+            message += (f"      {color_text(f"{num_not_downloaded} found but not successfully downloaded", "yellow")}, reported in:\n"
                         f"        {run_data.run_files_dir_rel}/ncbi-accessions-not-downloaded.txt\n\n")
         if num_removed > 0:
             message += (f"    {color_text(f"Overall, {num_prepared} of the input {num_input} accessions were successfully downloaded and\n    prepared.", "yellow")}")
@@ -439,9 +439,9 @@ def report_AA_update(run_data):
 
 
 def report_genome_preprocessing_update(run_data):
-    num_input = run_data.num_input_genomes
-    num_removed = run_data.num_removed_genomes
-    num_remaining = run_data.num_remaining_genomes
+    num_input = len(run_data.all_input_genomes_obj)
+    num_removed = len(run_data.get_all_removed_input_genomes())
+    num_remaining = num_input - num_removed
 
     if num_input == num_remaining:
         message = (f"    {color_text(f"All {num_input} input genomes were successfully preprocessed!\n\n", "green")}")

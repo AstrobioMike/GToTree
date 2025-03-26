@@ -1,5 +1,9 @@
 ## next: 
     # continue working on fuller RunData and GenomeData class implementation, removing old lists i was included in RunData
+        # next finish removing ncbi-related lists, accounting for all needed ones with main class functions or attributes, then move onto genbank inputs
+        # maybe next: look at the lists in the RunData object and see what can be replaced with a function, then update all places used
+    # need to fix mapping file check and other business with new object stuff
+        # go through and add an attribute called "mapping" to the GenomeData objects
     # hmm search
     # filtering hits
     # filtering genomes

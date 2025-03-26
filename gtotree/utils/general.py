@@ -100,16 +100,17 @@ class GenomeData:
 
 @dataclass
 class RunData:
-    input_ncbi_accessions: List[str] = field(default_factory=list)
     remaining_ncbi_accessions: List[str] = field(default_factory=list)
     ncbi_accessions_done: List[str] = field(default_factory=list)
     ncbi_accs_not_done: List[str] = field(default_factory=list)
-    ncbi_accs_not_found: List[str] = field(default_factory=list)
     ncbi_accs_not_downloaded: List[str] = field(default_factory=list)
+
     ncbi_accs: List[GenomeData] = field(default_factory=list)
     genbank_files: List[GenomeData] = field(default_factory=list)
     fasta_files: List[GenomeData] = field(default_factory=list)
     amino_acid_files: List[GenomeData] = field(default_factory=list)
+    all_input_genomes_obj: List[GenomeData] = field(default_factory=list)
+
     all_input_genomes: List[str] = field(default_factory=list)
     all_remaining_genomes: List[str] = field(default_factory=list)
 
@@ -135,10 +136,6 @@ class RunData:
     snakemake_logs_dir_rel: str = ""
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
-
-    @property
-    def num_input_ncbi_accessions(self) -> int:
-        return len(self.input_ncbi_accessions)
 
     @property
     def num_remaining_ncbi_accessions(self) -> int:
@@ -184,6 +181,13 @@ class RunData:
     def num_removed_genomes(self) -> int:
         return len(self.all_removed_genomes)
 
+    def update_all_input_genomes(self):
+        self.all_input_genomes_obj = []
+        self.all_input_genomes_obj.extend(self.ncbi_accs)
+        self.all_input_genomes_obj.extend(self.genbank_files)
+        self.all_input_genomes_obj.extend(self.fasta_files)
+        self.all_input_genomes_obj.extend(self.amino_acid_files)
+
     def add_done_ncbi_accession(self, accession: str):
         if accession not in self.ncbi_accessions_done:
             self.ncbi_accessions_done.append(accession)
@@ -222,11 +226,39 @@ class RunData:
         if gd not in self.amino_acid_files:
             self.amino_acid_files.append(gd)
 
+
+    def get_all_input_genome_ids(self) -> List[str]:
+        return [gd.id for gd in self.all_input_genomes_obj]
+
+    def get_input_ncbi_accs(self) -> List[str]:
+        return [gd.id for gd in self.ncbi_accs]
+
+    def get_input_genbank_ids(self) -> List[str]:
+        return [gd.id for gd in self.genbank_files]
+
+    def get_input_fasta_ids(self) -> List[str]:
+        return [gd.id for gd in self.fasta_files]
+
+    def get_input_amino_acid_ids(self) -> List[str]:
+        return [gd.id for gd in self.amino_acid_files]
+
     def found_ncbi_accs(self) -> List[GenomeData]:
         return [gd for gd in self.ncbi_accs if gd.was_found]
 
     def remaining_ncbi_accs(self) -> List[GenomeData]:
         return [gd for gd in self.ncbi_accs if not gd.done and not gd.removed]
+
+    def get_ncbi_accs_not_downloaded(self) -> List[str]:
+        return [gd.id for gd in self.ncbi_accs if gd.was_downloaded is False]
+
+    def get_ncbi_accs_not_found(self) -> List[str]:
+        return [gd.id for gd in self.ncbi_accs if gd.was_found is False]
+
+    def get_removed_ncbi_accs(self) -> List[str]:
+        return [gd.id for gd in self.ncbi_accs if gd.removed]
+
+    def get_all_removed_input_genomes(self) -> List[str]:
+        return [gd.id for gd in self.all_input_genomes_obj if gd.removed]
 
     def done_ncbi_accs(self) -> List[GenomeData]:
         return [gd for gd in self.ncbi_accs if gd.done]
@@ -366,7 +398,6 @@ def populate_run_data(args):
         with open(args.ncbi_accessions, "r") as f:
             entries_list = f.read().splitlines()
         run_data.ncbi_accs = [GenomeData.from_acc(entry) for entry in entries_list]
-        run_data.input_ncbi_accessions = entries_list
         run_data.remaining_ncbi_accessions = entries_list
         run_data.all_input_genomes.extend(entries_list)
         run_data.all_remaining_genomes.extend(entries_list)
@@ -394,6 +425,7 @@ def populate_run_data(args):
         run_data.all_input_genomes.extend([gd.full_path for gd in run_data.amino_acid_files])
         run_data.all_remaining_genomes.extend([gd.full_path for gd in run_data.amino_acid_files])
 
+    run_data.update_all_input_genomes()
     run_data.run_files_dir = args.run_files_dir
     run_data.run_files_dir_rel = args.run_files_dir_rel
     run_data.run_data_path = run_data.run_files_dir + "/genome-data.json"
@@ -433,6 +465,8 @@ def read_run_data(path):
             run_data_dict["fasta_files"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["fasta_files"]]
         if "amino_acid_files" in run_data_dict:
             run_data_dict["amino_acid_files"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["amino_acid_files"]]
+        if "all_input_genomes_obj" in run_data_dict:
+            run_data_dict["all_input_genomes_obj"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["all_input_genomes_obj"]]
 
         if "tools_used" in run_data_dict and run_data_dict["tools_used"] is not None:
             run_data_dict["tools_used"] = ToolsUsed(**run_data_dict["tools_used"])
@@ -440,6 +474,7 @@ def read_run_data(path):
             run_data_dict["tools_used"] = ToolsUsed()
 
         run_data = RunData(**run_data_dict)
+        run_data.update_all_input_genomes()
         return run_data
 
     except FileNotFoundError:
@@ -489,7 +524,10 @@ def run_snakemake(cmd, tqdm_jobs, run_data, description, print_lines=False):
             report_early_exit()
 
 
-def run_prodigal(id, run_data, full_inpath = None, group = ["ncbi", "fasta", "genbank"]):
+def run_prodigal(id, run_data, full_inpath = None, group = None):
+    allowed_groups = ["ncbi", "fasta", "genbank"]
+    if group not in allowed_groups:
+        raise ValueError(f"Invalid group: {group}. Must be one of {', '.join(allowed_groups)}")
 
     if group == "ncbi":
         in_path = f"{run_data.ncbi_downloads_dir}/{id}_genomic.fna"

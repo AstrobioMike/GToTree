@@ -368,7 +368,7 @@ def make_mapping_dict(path):
 def check_all_mapping_file_entries_are_in_input_genomes(args, run_data):
     entries_in_mapping_file = set(args.mapping_dict.keys())
     # taking the basenames here because some inputs might have full/rel paths, but the mapping file shouldn't
-    entries_in_input_genomes = set([os.path.basename(genome) for genome in run_data.all_input_genomes])
+    entries_in_input_genomes = set([os.path.basename(genome) for genome in run_data.get_all_input_genome_ids()])
     missing_keys = entries_in_mapping_file - entries_in_input_genomes
     if missing_keys:
         report_message(

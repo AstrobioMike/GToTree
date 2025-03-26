@@ -21,15 +21,15 @@ def display_initial_run_info(args, run_data):
     report_message("  Input-genome sources include:")
 
     if args.ncbi_accessions:
-        print(f"      - NCBI accessions listed in {args.ncbi_accessions} ({run_data.num_input_ncbi_accessions} genomes)", flush=True)
+        print(f"      - NCBI accessions listed in {args.ncbi_accessions} ({len(run_data.get_input_ncbi_accs())} genomes)", flush=True)
     if args.genbank_files:
-        print(f"      - Genbank files listed in {args.genbank_files} ({run_data.num_genbank_files} genomes)", flush=True)
+        print(f"      - Genbank files listed in {args.genbank_files} ({len(run_data.get_input_genbank_ids())} genomes)", flush=True)
     if args.fasta_files:
-        print(f"      - Fasta files listed in {args.fasta_files} ({run_data.num_fasta_files} genomes)", flush=True)
+        print(f"      - Fasta files listed in {args.fasta_files} ({len(run_data.get_input_fasta_ids())} genomes)", flush=True)
     if args.amino_acid_files:
-        print(f"      - Amino-acid files listed in {args.amino_acid_files} ({run_data.num_amino_acid_files} genomes)", flush=True)
+        print(f"      - Amino-acid files listed in {args.amino_acid_files} ({len(run_data.input_amino_acid_ids())} genomes)", flush=True)
 
-    report_message(f"                           Total input genomes: {run_data.num_input_genomes}", "green")
+    report_message(f"                           Total input genomes: {len(run_data.all_input_genomes_obj)}", "green")
     # time.sleep(1)
 
     with contextlib.redirect_stdout(sys.__stdout__):

@@ -44,7 +44,7 @@ rule process_ncbi_accessions:
         done, nt = prepare_accession(wildcards.acc, run_data)
         downloaded = True if done else False
         if done and nt:
-            done = run_prodigal(acc_gd.id, run_data, "ncbi")
+            done = run_prodigal(acc_gd.id, run_data, group = "ncbi")
             prodigal_used = True
         else:
             prodigal_used = False

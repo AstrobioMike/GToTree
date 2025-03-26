@@ -25,6 +25,7 @@ def preprocess_genomes(args, run_data):
     run_data = preprocess_genbank_genomes(args, run_data)
     run_data = preprocess_fasta_genomes(args, run_data)
     run_data = preprocess_amino_acid_files(args, run_data)
+
     genome_preprocessing_update(run_data)
 
     print(run_data)
@@ -73,6 +74,12 @@ def prepare_accession(acc, run_data):
     try:
         amino_acid_link = base_link + acc_assembly_str + "_protein.faa.gz"
         amino_acid_filepath = run_data.ncbi_downloads_dir + "/" + acc + "_protein.faa"
+
+
+        if acc == "GCF_000153765.1":
+            amino_acid_link = "https://wrong"
+
+
         download_and_unzip_accession(amino_acid_link, amino_acid_filepath)
         done = True
         nt = False
@@ -81,6 +88,12 @@ def prepare_accession(acc, run_data):
         try:
             nucleotide_link = base_link + acc_assembly_str + "_genomic.fna.gz"
             nucleotide_file = run_data.ncbi_downloads_dir + "/" + acc + "_genomic.fna"
+
+
+            if acc == "GCF_000153765.1":
+                nucleotide_link = "https://wrong"
+
+
             download_and_unzip_accession(nucleotide_link, nucleotide_file)
             done = True
             nt = True
@@ -108,9 +121,9 @@ def get_base_link(acc, run_data):
 
 
 def capture_ncbi_failed_downloads(run_data):
-    if len(run_data.ncbi_accs_not_downloaded) > 0:
+    if len(run_data.get_ncbi_accs_not_downloaded()) > 0:
         with open(run_data.run_files_dir + "/ncbi-accessions-not-downloaded.txt", "w") as not_downloaded_file:
-            for acc in run_data.ncbi_accs_not_downloaded:
+            for acc in run_data.get_ncbi_accs_not_downloaded():
                 not_downloaded_file.write(acc + "\n")
     return run_data
 
@@ -233,5 +246,6 @@ def capture_failed_amino_acid_files(run_data):
 
 def genome_preprocessing_update(run_data):
     report_processing_stage("preprocessing-update")
+    run_data.update_all_input_genomes()
     report_genome_preprocessing_update(run_data)
 
