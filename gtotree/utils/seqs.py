@@ -21,10 +21,10 @@ def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_le
 
     if num == 0:
         remove_file_if_exists(outpath)
-        return False
+        return False, None
 
     else:
-        return True
+        return True, outpath
 
 def extract_filter_and_rename_cds_amino_acids_from_gb(prefix, input_gb, run_data, max_length = 99999):
 
@@ -57,12 +57,12 @@ def extract_filter_and_rename_cds_amino_acids_from_gb(prefix, input_gb, run_data
                             outfile.write(f"{header}\n{translation[0]}\n")
         if num == 0:
             remove_file_if_exists(output_file)
-            return False
+            return False, None
         else:
-            return True
+            return True, output_file
     except:
         remove_file_if_exists(output_file)
-        return False
+        return False, None
 
 
 def extract_fasta_from_gb(prefix, input_gb, run_data):

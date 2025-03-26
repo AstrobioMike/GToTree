@@ -18,11 +18,16 @@ from gtotree.utils.general import (write_run_data,
 
 
 def preprocess_genomes(args, run_data):
+
+    print(run_data)
+
     run_data = preprocess_ncbi_genomes(args, run_data)
     run_data = preprocess_genbank_genomes(args, run_data)
     run_data = preprocess_fasta_genomes(args, run_data)
     run_data = preprocess_amino_acid_files(args, run_data)
     genome_preprocessing_update(run_data)
+
+    print(run_data)
 
     return args, run_data
 

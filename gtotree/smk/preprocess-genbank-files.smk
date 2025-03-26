@@ -21,24 +21,23 @@ rule all:
         expand(f"{run_data.genbank_processing_dir}/{{gb_file}}.done", gb_file=genbank_basenames)
     run:
         for gb_basename in genbank_basenames:
-            gf = genbank_dict[gb_basename]
-            path = gf.full_path
+            gb = genbank_dict[gb_basename]
+            path = gb.full_path
             status_path = f"{run_data.genbank_processing_dir}/{gb_basename}.done"
             with open(status_path, 'r') as f:
                 for line in f:
-                    gb_file, status, prodigal_used, was_gzipped = line.strip().split('\t')
+                    gb_file, status, prodigal_used, was_gzipped, final_AA_path = line.strip().split('\t')
 
                     if int(status):
                         if int(was_gzipped):
-                            gf.full_path = path[:-3]
-                            gf.basename = os.path.basename(gf.full_path)
-                            gf.mark_was_gzipped()
-                        gf.mark_done()
+                            gb.mark_was_gzipped()
+                        gb.mark_done()
+                        gb.final_AA_path = final_AA_path
                     else:
-                        gf.mark_removed()
+                        gb.mark_removed()
 
                     if int(prodigal_used):
-                        gf.mark_prodigal_used()
+                        gb.mark_prodigal_used()
                         run_data.tools_used.prodigal_used = True
 
         write_run_data(run_data)
@@ -48,24 +47,24 @@ rule process_genbank_files:
     output:
         f"{run_data.genbank_processing_dir}/{{gb_file}}.done"
     run:
-        gf = genbank_dict[wildcards.gb_file]
-        path = gf.full_path
-        path, was_gzipped = gunzip_if_needed(path)
-        if was_gzipped:
-            gf.full_path = path
-            gf.basename = os.path.basename(path)
-        done = extract_filter_and_rename_cds_amino_acids_from_gb(gf.basename, path, run_data)
+        gb = genbank_dict[wildcards.gb_file]
+        path, was_gzipped = gunzip_if_needed(gb.full_path)
+
+        done, final_AA_path = extract_filter_and_rename_cds_amino_acids_from_gb(gb.id, path, run_data)
 
         if not done:
-            extract_fasta_from_gb(gf.basename, path, run_data)
-            done = run_prodigal(gf.basename, run_data, path, "genbank")
+            extract_fasta_from_gb(gb.id, path, run_data)
+            done = run_prodigal(gb.id, run_data, path, "genbank")
             prodigal_used = True
             if done:
-                filter_and_rename_fasta(gf.basename, run_data, run_data.genbank_processing_dir)
+                done, final_AA_path = filter_and_rename_fasta(gb.id, run_data, run_data.genbank_processing_dir)
             else:
                 prodigal_used = False
         else:
             prodigal_used = False
 
+        if was_gzipped:
+            os.remove(path)
+
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.gb_file}\t{int(done)}\t{int(prodigal_used)}\t{int(was_gzipped)}\n')
+            f.write(f'{wildcards.gb_file}\t{int(done)}\t{int(prodigal_used)}\t{int(was_gzipped)}\t{final_AA_path}\n')

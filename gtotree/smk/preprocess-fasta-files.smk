@@ -24,17 +24,17 @@ rule all:
             status_path = f"{run_data.fasta_processing_dir}/{fasta_basename}.done"
             with open(status_path, 'r') as f:
                 for line in f:
-                    fasta_file, status, was_gzipped = line.strip().split('\t')
+                    fasta_file, status, was_gzipped, final_AA_path = line.strip().split('\t')
 
                     if int(status):
                         if int(was_gzipped):
-                            fasta.full_path = path[:-3]
-                            fasta.basename = os.path.basename(fasta.full_path)
                             fasta.mark_was_gzipped()
                         fasta.mark_done()
+                        fasta.final_AA_path = final_AA_path
                     else:
                         fasta.mark_removed()
 
+        run_data.tools_used.prodigal_used = True
         write_run_data(run_data)
 
 
@@ -43,17 +43,20 @@ rule process_fasta_files:
         f"{run_data.fasta_processing_dir}/{{fasta_file}}.done"
     run:
         fasta = fasta_dict[wildcards.fasta_file]
-        path = fasta.full_path
-        path, was_gzipped = gunzip_if_needed(path)
+        path, was_gzipped = gunzip_if_needed(fasta.full_path)
+
+        done = run_prodigal(fasta.id, run_data, path, "fasta")
 
         if was_gzipped:
-            fasta.full_path = path
-            fasta.basename = os.path.basename(path)
-
-        done = run_prodigal(fasta.basename, run_data, fasta.full_path, "fasta")
+            os.remove(path)
 
         if done:
-            filter_and_rename_fasta(fasta.basename, run_data, run_data.fasta_processing_dir)
+            print(fasta.id)
+            print(run_data)
+            print(run_data.fasta_processing_dir)
+            done, final_AA_path = filter_and_rename_fasta(fasta.id, run_data, run_data.fasta_processing_dir)
+        else:
+            final_AA_path = None
 
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.fasta_file}\t{int(done)}\t{int(was_gzipped)}\n')
+            f.write(f'{wildcards.fasta_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\n')

@@ -23,14 +23,13 @@ rule all:
             status_path = f"{run_data.AA_processing_dir}/{AA_basename}.done"
             with open(status_path, 'r') as f:
                 for line in f:
-                    AA_file, status, was_gzipped = line.strip().split('\t')
+                    AA_file, status, was_gzipped, final_AA_path = line.strip().split('\t')
 
                     if int(status):
                         if int(was_gzipped):
-                            AA.full_path = path[:-3]
-                            AA.basename = os.path.basename(AA.full_path)
                             AA.mark_was_gzipped()
                         AA.mark_done()
+                        AA.final_AA_path = final_AA_path
                     else:
                         AA.mark_removed()
 
@@ -42,14 +41,11 @@ rule process_AA_files:
         f"{run_data.AA_processing_dir}/{{AA_file}}.done"
     run:
         AA = AA_dict[wildcards.AA_file]
-        path = AA.full_path
-        path, was_gzipped = gunzip_if_needed(path)
+        path, was_gzipped = gunzip_if_needed(AA.full_path)
 
+        done, final_AA_path = filter_and_rename_fasta(AA.id, run_data, path, full_path = True)
         if was_gzipped:
-            AA.full_path = path
-            AA.basename = os.path.basename(path)
-
-        done = filter_and_rename_fasta(AA.basename, run_data, AA.full_path, full_path = True)
+            os.remove(path)
 
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.AA_file}\t{int(done)}\t{int(was_gzipped)}\n')
+            f.write(f'{wildcards.AA_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\n')
