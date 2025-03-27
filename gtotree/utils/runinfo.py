@@ -4,7 +4,6 @@ from gtotree.utils.messaging import (report_message,
                                      check_and_report_any_changed_default_behavior,
                                      capture_stdout_to_log)
 from gtotree.utils.context import log_file_var
-from gtotree.utils.hmms.scg_hmm_setup import get_number_of_targets
 from gtotree.utils.preflight_checks import check_input_genomes_amount
 
 
@@ -35,7 +34,7 @@ def display_initial_run_info(args, run_data):
         check_input_genomes_amount(len(run_data.all_input_genomes), args)
 
     report_message("  Single-copy gene HMM source to be used:")
-    print(f"      - {args.hmm} ({get_number_of_targets(run_data.hmm_path)} targets)", flush=True)
+    print(f"      - {args.hmm} ({len(run_data.initial_SCG_targets)} targets)", flush=True)
     # time.sleep(1)
 
     check_and_report_any_changed_default_behavior(args)

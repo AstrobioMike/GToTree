@@ -1,11 +1,9 @@
 ## next: 
     # hmm search
-        # i'm up to the first results table being produced
-        # i need to create a list in the run_data during preflight hmm-checking that holds all target SCGs
+        # i'm up to the first results table being produced and have a dict with SCG: hit_gene_id
         # then get back to following the gtt-amino-acid-serial with esl-index/fetch and whatnot
         # want to get the entire genome done in the same snakefile, meaning to the stage where the genes are pulled out
         # "all" rule should combine them all into their own fasta for each target-SCG i think
-            # (look into how filtering-hits works first)
     # filtering hits
     # filtering genomes
     # alignments
@@ -15,6 +13,9 @@
     # treeing
     # optional ko search
     # optional pfam search
+    # build output tables
+        # capture number of genes per genome from the filter_and_rename function output by returning the num variable
+            # then write it to the .done file and stick it in the GenomeData class in the "all" rule
     # move snakemake logs dir to tmp dir after run finished
         # this is so it's easily findable if there is a problem while running
     # implement nucleotide mode :(
@@ -92,9 +93,14 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # gtt-subset...
     # new prepackaged HMMs based on GTDB taxonomy
     # in tandem scanning of target KOs or pfams, files for added vizualization in iToL
+    # pre-built HMMs stored remotely and downloaded when used, to slim package size and install time
+
 
 ### """
-# In its first 6 years, the original GToTree received over 500 citations and had tens of thousands of Conda installs. It has been
-# successfully used and maintained over this time, despite its foundation being a main runner of ~4,000 lines of BASH and dozens of independent python
-# and BASH helper scripts with a lot of redundancy in its code base. This was purely a consequence of my capabilities at the time.
+# In its first 6 years, the original GToTree received over 500 citations and has been
+# successfully regularly maintained over this time despite its foundation being a main runner 
+# of ~4,000 lines of BASH and dozens of independent python and BASH helper scripts with a lot 
+# of redundancy in its code base. Among several other improvements and feature additions, GToTree 
+# has now been rewritten from the ground up in python with its major stages being powered by 
+# Snakemake workflows - enabling the resuming of failed or interrupted runs.
 ### """

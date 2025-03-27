@@ -53,7 +53,7 @@ def parser():
     # --- Filtering Settings ---
     opt.add_argument("-c", "--seq-length-cutoff", metavar="<float>", type=float, default=0.2)
     opt.add_argument("-G", "--genome-hits-cutoff", metavar="<float>", type=float, default=0.5)
-    opt.add_argument("-B", "--best-hit", action="store_true")
+    opt.add_argument("-B", "--best-hit-mode", action="store_true")
 
     # --- Addtional Target Searching ---
     opt.add_argument("-K", "--target-ko-file", metavar="<file>", type=str)

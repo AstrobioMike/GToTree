@@ -1,6 +1,6 @@
 from gtotree.utils.general import (read_run_data,
-                                   write_run_data,
-                                   run_prodigal)
+                                   write_run_data)
+from gtotree.utils.preprocessing_genomes import run_prodigal
 from gtotree.utils.seqs import filter_and_rename_fasta
 from gtotree.utils.preprocessing_genomes import prepare_accession
 
@@ -8,7 +8,7 @@ run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-accession_dict = {gd.id: gd for gd in run_data.ncbi_accs if gd.was_found and not gd.done}
+accession_dict = {gd.id: gd for gd in run_data.ncbi_accs if gd.was_found and not gd.preprocessing_done}
 accessions = list(accession_dict.keys())
 
 rule all:
@@ -23,7 +23,7 @@ rule all:
                     acc, status, downloaded, prodigal_used, final_AA_path = line.strip().split('\t')
 
                     if int(status):
-                        acc_gd.mark_done()
+                        acc_gd.mark_preprocessing_done()
                         acc_gd.final_AA_path = final_AA_path
                     else:
                         acc_gd.mark_removed()

@@ -3,7 +3,9 @@ import urllib.request
 import gzip
 import shutil
 import os
-from gtotree.utils.messaging import (report_processing_stage,
+import subprocess
+from gtotree.utils.messaging import (report_early_exit,
+                                     report_processing_stage,
                                      report_ncbi_update,
                                      report_genbank_update,
                                      report_fasta_update,
@@ -36,15 +38,15 @@ def preprocess_ncbi_genomes(args, run_data):
 
         run_data = parse_assembly_summary(NCBI_assembly_summary_tab, run_data)
 
-        ncbi_accs_remaining = len(run_data.remaining_ncbi_accs())
+        num_ncbi_accs_remaining = len(run_data.remaining_ncbi_accs())
 
-        if ncbi_accs_remaining > 0:
+        if num_ncbi_accs_remaining > 0:
             # writing run_data to file so it can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-ncbi-accessions.smk")
             description = "Preprocessing NCBI accessions"
 
-            run_snakemake(snakefile, ncbi_accs_remaining, args, run_data, description)
+            run_snakemake(snakefile, num_ncbi_accs_remaining, args, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
             run_data = capture_ncbi_failed_downloads(run_data)
@@ -108,14 +110,16 @@ def preprocess_genbank_genomes(args, run_data):
 
         report_processing_stage("genbank")
 
-        if run_data.any_incomplete_genbank_files():
+        num_genbank_files_remaining = len([gd for gd in run_data.genbank_files if not gd.preprocessing_done and not gd.removed])
+
+        if num_genbank_files_remaining > 0:
             # writing run_data to file so it can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-genbank-files.smk")
             description = "Preprocessing genbank files"
 
             run_snakemake(snakefile,
-                          run_data.num_incomplete_genbank_files,
+                          num_genbank_files_remaining,
                           args, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
@@ -138,14 +142,16 @@ def preprocess_fasta_genomes(args, run_data):
 
         report_processing_stage("fasta")
 
-        if run_data.any_incomplete_fasta_files():
+        num_fasta_files_remaining = len([fd for fd in run_data.fasta_files if not fd.preprocessing_done and not fd.removed])
+
+        if num_fasta_files_remaining > 0:
             # writing run_data to file so it can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-fasta-files.smk")
             description = "Preprocessing fasta files"
 
             run_snakemake(snakefile,
-                          run_data.num_incomplete_fasta_files,
+                          num_fasta_files_remaining,
                           args, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
@@ -169,14 +175,16 @@ def preprocess_amino_acid_files(args, run_data):
 
         report_processing_stage("amino-acid")
 
-        if run_data.any_incomplete_amino_acid_files():
+        num_AA_files_remaining = len([fd for fd in run_data.amino_acid_files if not fd.preprocessing_done and not fd.removed])
+
+        if num_AA_files_remaining > 0:
             # writing run_data to file so it can be accessed by snakemake
             write_run_data(run_data)
             snakefile = get_snakefile_path("preprocess-amino-acid-files.smk")
             description = "Preprocessing amino-acid files"
 
             run_snakemake(snakefile,
-                          run_data.num_incomplete_amino_acid_files,
+                          num_AA_files_remaining,
                           args, run_data, description)
 
             run_data = read_run_data(run_data.run_data_path)
@@ -199,3 +207,47 @@ def genome_preprocessing_update(run_data):
     report_processing_stage("preprocessing-update")
     run_data.update_all_input_genomes()
     report_genome_preprocessing_update(run_data)
+
+
+def run_prodigal(id, run_data, full_inpath = None, group = None):
+    allowed_groups = ["ncbi", "fasta", "genbank"]
+    if group not in allowed_groups:
+        raise ValueError(f"Invalid group: {group}. Must be one of {', '.join(allowed_groups)}")
+
+    if group == "ncbi":
+        in_path = f"{run_data.ncbi_downloads_dir}/{id}_genomic.fna"
+        out_path = f"{run_data.ncbi_downloads_dir}/{id}_protein.faa"
+    elif group == "genbank":
+        in_path = f"{run_data.genbank_processing_dir}/{id}.fasta"
+        out_path = f"{run_data.genbank_processing_dir}/{id}_protein.faa"
+        print(f"\n\n    {out_path}\n\n")
+    elif group == "fasta":
+        in_path = full_inpath
+        out_path = f"{run_data.fasta_processing_dir}/{id}_protein.faa"
+    else:
+        report_early_exit(f"    Prodigal not yet implemented for \"{group}\".")
+
+    prodigal_cmd = [
+        "prodigal",
+        "-c",
+        "-q",
+        "-i", f"{in_path}",
+        "-a", f"{out_path}.tmp",
+    ]
+    print(f"\n\n    {prodigal_cmd}\n\n")
+
+    remove_ast_cmd = f"tr -d '*' < {out_path}.tmp > {out_path}"
+
+    try:
+        subprocess.run(prodigal_cmd, stdout=subprocess.DEVNULL)
+        subprocess.run(remove_ast_cmd, shell=True)
+        os.remove(f"{out_path}.tmp")
+        done = True
+    except:
+        done = False
+
+    if os.path.getsize(out_path) == 0:
+        os.remove(out_path)
+        done = False
+
+    return done

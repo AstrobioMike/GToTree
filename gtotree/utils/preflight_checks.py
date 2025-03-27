@@ -307,10 +307,12 @@ def check_mapping_file_problem_chars_and_fields(path):
             for i, field in enumerate(columns, start=1):
                 for char in problematic_chars:
                     if char in field:
-                        errors.append(
-                            f"Line {lineno}, column {i} contains at least one problematic character '{char}': {field}"
-                        )
-                        break
+                        # this is a special case for the "/" character, which is allowed in the first column
+                        if not i == 1 and char == "/":
+                            errors.append(
+                                f"Line {lineno}, column {i} contains at least one problematic character ('{char}'):\n  {field}"
+                            )
+                            break
     return errors
 
 
@@ -360,8 +362,8 @@ def make_mapping_dict(path):
     duplicates = [val for val, count in counts.items() if count > 1]
     if duplicates:
         report_message(
-            f'The mapping file "{path}" (passed to `-m`) specifies to have duplicate output genome labels.'
-            f' Problematic ones include:'
+            f'The mapping file "{path}" (passed to `-m`) specifies to have duplicate output genome labels.\n\n'
+            f'Problematic ones include:'
         )
         report_message(f'{"\n".join(duplicates)}', ii="    ", si="    ")
         report_message(
@@ -375,16 +377,16 @@ def make_mapping_dict(path):
 def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
     entries_in_mapping_file = set(mapping_dict.keys())
     # taking the basenames here because some inputs might have full/rel paths, but the mapping file shouldn't
-    entries_in_input_genomes = set(run_data.get_all_input_genome_basenames())
+    entries_in_input_genomes = set(run_data.get_all_input_genome_provided_paths())
     missing_keys = entries_in_mapping_file - entries_in_input_genomes
     if missing_keys:
         report_message(
-            f'The mapping file "{run_data.mapping_file_path}" (passed to `-m`) specifies some input-genomes that are not found in any of the the input-genome sources.'
-            f' Problematic ones include:'
+            f'The mapping file "{run_data.mapping_file_path}" (passed to `-m`) specifies some input genomes that are not found in any of the the input-genome sources.\n\n'
+            f'Problematic ones include:'
         )
         report_message(f'{"\n".join(missing_keys)}', ii="    ", si="    ")
         report_message(
-            f"Each input genome in the mapping file must be present in one of the input-genome sources (with the basename of the file if it's a path). Please address this and try again."
+            f"Each input genome in the mapping file (column 1) must be present in one of the input-genome sources. Please address this and try again."
         )
         report_early_exit()
 
@@ -494,6 +496,8 @@ def setup_outputs(args, run_data):
     os.makedirs(run_data.ready_genome_AA_files_dir, exist_ok=True)
     run_data.hmm_results_dir = os.path.join(args.tmp_dir, "hmm-results")
     os.makedirs(run_data.hmm_results_dir, exist_ok=True)
+
+    run_data.best_hit_mode = args.best_hit_mode
 
     return args, run_data
 

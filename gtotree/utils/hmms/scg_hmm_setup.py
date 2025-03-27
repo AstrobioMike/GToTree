@@ -26,6 +26,8 @@ def check_hmm_file(args, run_data):
         # getting hmm from prepackaged table
         run_data.hmm_path = get_hmm_path(hmm_file, args.hmm)
 
+    run_data.initial_SCG_targets = get_SCG_hmm_targets(run_data.hmm_path)
+
     return run_data
 
 
@@ -78,7 +80,8 @@ def get_target_hmm_url(hmm_file, hmm_arg):
     return target_hmm_url
 
 
-def get_number_of_targets(hmm_path):
+def get_SCG_hmm_targets(hmm_path):
     with pyhmmer.plan7.HMMFile(hmm_path) as hmm_file:
-        number_of_targets = len(list(hmm_file))
-    return number_of_targets
+        hmms = list(hmm_file)
+    SCG_targets = [hmm.name.decode() for hmm in hmms]
+    return SCG_targets

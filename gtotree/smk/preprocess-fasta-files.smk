@@ -1,15 +1,15 @@
 import os
 from gtotree.utils.general import (read_run_data,
                                    write_run_data,
-                                   gunzip_if_needed,
-                                   run_prodigal)
+                                   gunzip_if_needed)
+from gtotree.utils.preprocessing_genomes import run_prodigal
 from gtotree.utils.seqs import filter_and_rename_fasta
 
 run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-fasta_dict = {gd.basename: gd for gd in run_data.fasta_files}
+fasta_dict = {gd.basename: gd for gd in run_data.fasta_files if not gd.preprocessing_done and not gd.removed}
 fasta_basenames = list(fasta_dict.keys())
 
 rule all:
@@ -28,7 +28,7 @@ rule all:
                     if int(status):
                         if int(was_gzipped):
                             fasta.mark_was_gzipped()
-                        fasta.mark_done()
+                        fasta.mark_preprocessing_done()
                         fasta.final_AA_path = final_AA_path
                     else:
                         fasta.mark_removed()

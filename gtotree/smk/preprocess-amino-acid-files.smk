@@ -8,7 +8,7 @@ run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-AA_dict = {gd.basename: gd for gd in run_data.amino_acid_files}
+AA_dict = {gd.basename: gd for gd in run_data.amino_acid_files if not gd.preprocessing_done and not gd.removed}
 AA_basenames = list(AA_dict.keys())
 
 rule all:
@@ -26,7 +26,7 @@ rule all:
                     if int(status):
                         if int(was_gzipped):
                             AA.mark_was_gzipped()
-                        AA.mark_done()
+                        AA.mark_preprocessing_done()
                         AA.final_AA_path = final_AA_path
                     else:
                         AA.mark_removed()

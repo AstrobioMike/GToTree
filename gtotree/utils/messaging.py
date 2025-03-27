@@ -168,7 +168,7 @@ def check_and_report_any_changed_default_behavior(args):
         args.add_ncbi_tax,
         args.lineage != "Domain,Phylum,Class,Species",
         args.tree_program != "FastTreeMP",
-        args.best_hit,
+        args.best_hit_mode,
         args.seq_length_cutoff != 0.2,
         args.genome_hits_cutoff != 0.5,
         args.num_jobs != 1,
@@ -218,7 +218,7 @@ def check_and_report_any_changed_default_behavior(args):
     if args.tree_program != "FastTreeMP":
         print(f"      - The treeing program used will be: \"{args.tree_program}\"")
 
-    if args.best_hit:
+    if args.best_hit_mode:
         print("      - Running in \"best-hit\" mode")
 
     if args.seq_length_cutoff != 0.2:
@@ -355,8 +355,8 @@ def report_processing_stage(stage):
 
 def report_snakemake_failure(description, snakemake_log):
     time.sleep(1)
-    report_message(f"Snakemake failed while running the \"{description}\" workflow. Check the log at:", width = 90)
-    print(color_text(f"    {snakemake_log}", "yellow"))
+    report_message(f"\nSnakemake failed while running the \"{description}\" workflow.\n", width = 90, color = "red")
+    print(color_text(f"  Check the log at:\n    {snakemake_log}", "yellow"))
     report_early_exit()
 
 

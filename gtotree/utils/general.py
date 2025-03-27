@@ -5,6 +5,7 @@ import gzip
 import shutil
 import json #type: ignore
 import argparse
+import pandas as pd
 from dataclasses import dataclass, field, asdict
 from typing import List
 from tqdm import tqdm # type: ignore
@@ -48,7 +49,7 @@ class GenomeData:
     full_path: str
     provided_path: str
     basename: str
-    done: bool = False
+    preprocessing_done: bool = False
     final_AA_path: str = ""
     removed: bool = False
     prodigal_used: bool = False
@@ -57,6 +58,7 @@ class GenomeData:
     was_downloaded: bool = None
     mapping: str = None
     hmm_search_failed: bool = None
+    hmm_search_done: bool = False
 
     @classmethod
     def from_path(cls, path: str):
@@ -86,8 +88,8 @@ class GenomeData:
 
         return cls(id, full_path, provided_path, basename)
 
-    def mark_done(self, value=True):
-        self.done = value
+    def mark_preprocessing_done(self, value=True):
+        self.preprocessing_done = value
 
     def mark_removed(self, value=True):
         self.removed = value
@@ -101,6 +103,10 @@ class GenomeData:
 
     def mark_hmm_search_failed(self, value=True):
         self.hmm_search_failed = value
+
+    def mark_hmm_search_done(self, value=True):
+        self.hmm_search_done = value
+        self.hmm_search_failed = False
 
 
 @dataclass
@@ -124,26 +130,29 @@ class RunData:
     mapping_file_path: str = ""
     mapping_dict: dict = field(default_factory=dict)
     ready_genome_AA_files_dir: str = ""
+    initial_SCG_targets: list = field(default_factory=list)
+    final_SCG_targets: list = field(default_factory=list)
     hmm_results_dir: str = ""
     tmp_dir: str = ""
     log_file: str = ""
     snakemake_logs_dir: str = ""
     snakemake_logs_dir_rel: str = ""
     num_hmm_cpus: str = ""
+    best_hit_mode: bool = False
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
     @property
     def num_incomplete_genbank_files(self) -> int:
-        return len([gd for gd in self.genbank_files if not gd.done and not gd.removed])
+        return len([gd for gd in self.genbank_files if not gd.preprocessing_done and not gd.removed])
 
     @property
     def num_incomplete_fasta_files(self) -> int:
-        return len([gd for gd in self.fasta_files if not gd.done and not gd.removed])
+        return len([gd for gd in self.fasta_files if not gd.preprocessing_done and not gd.removed])
 
     @property
     def num_incomplete_amino_acid_files(self) -> int:
-        return len([gd for gd in self.amino_acid_files if not gd.done and not gd.removed])
+        return len([gd for gd in self.amino_acid_files if not gd.preprocessing_done and not gd.removed])
 
     def update_all_input_genomes(self):
         self.all_input_genomes = []
@@ -155,8 +164,14 @@ class RunData:
     def get_all_input_genome_ids(self) -> List[str]:
         return [gd.id for gd in self.all_input_genomes]
 
+    def get_all_input_genome_for_hmm_search(self) -> List[GenomeData]:
+        return [gd for gd in self.all_input_genomes if gd.preprocessing_done and not gd.hmm_search_done and not gd.removed]
+
     def get_all_input_genome_basenames(self) -> List[str]:
         return [gd.basename for gd in self.all_input_genomes]
+
+    def get_all_input_genome_provided_paths(self) -> List[str]:
+        return [gd.provided_path for gd in self.all_input_genomes]
 
     def get_input_ncbi_accs(self) -> List[str]:
         return [gd.id for gd in self.ncbi_accs]
@@ -174,7 +189,7 @@ class RunData:
         return [gd for gd in self.ncbi_accs if gd.was_found]
 
     def remaining_ncbi_accs(self) -> List[GenomeData]:
-        return [gd for gd in self.ncbi_accs if not gd.done and not gd.removed]
+        return [gd for gd in self.ncbi_accs if not gd.preprocessing_done and not gd.removed]
 
     def get_ncbi_accs_not_downloaded(self) -> List[str]:
         return [gd.id for gd in self.ncbi_accs if gd.was_downloaded is False]
@@ -192,7 +207,7 @@ class RunData:
         return [gd for gd in self.all_input_genomes if not gd.removed]
 
     def get_done_ncbi_accs(self) -> List[GenomeData]:
-        return [gd for gd in self.ncbi_accs if gd.done]
+        return [gd for gd in self.ncbi_accs if gd.preprocessing_done]
 
     def get_failed_genbank_ids(self) -> List[str]:
         return [gd.id for gd in self.genbank_files if gd.removed]
@@ -216,22 +231,22 @@ class RunData:
         return [gd.id for gd in self.genbank_files if gd.prodigal_used]
 
     def incomplete_genbank_files(self) -> List[GenomeData]:
-        return [gd.provided_path for gd in self.genbank_files if not gd.done and not gd.removed]
+        return [gd.provided_path for gd in self.genbank_files if not gd.preprocessing_done and not gd.removed]
 
     def incomplete_fasta_files(self) -> List[GenomeData]:
-        return [gd.provided_path for gd in self.fasta_files if not gd.done and not gd.removed]
+        return [gd.provided_path for gd in self.fasta_files if not gd.preprocessing_done and not gd.removed]
 
     def incomplete_amino_acid_files(self) -> List[GenomeData]:
-        return [gd.provided_path for gd in self.amino_acid_files if not gd.done and not gd.removed]
+        return [gd.provided_path for gd in self.amino_acid_files if not gd.preprocessing_done and not gd.removed]
 
     def any_incomplete_genbank_files(self) -> bool:
-        return any(not gd.done and not gd.removed for gd in self.genbank_files)
+        return any(not gd.preprocessing_done and not gd.removed for gd in self.genbank_files)
 
     def any_incomplete_fasta_files(self) -> bool:
-        return any(not gd.done and not gd.removed for gd in self.fasta_files)
+        return any(not gd.preprocessing_done and not gd.removed for gd in self.fasta_files)
 
     def any_incomplete_amino_acid_files(self) -> bool:
-        return any(not gd.done and not gd.removed for gd in self.amino_acid_files)
+        return any(not gd.preprocessing_done and not gd.removed for gd in self.amino_acid_files)
 
     def genbank_files_with_prodigal_used(self) -> List[GenomeData]:
         return [gd for gd in self.genbank_files if gd.prodigal_used]
@@ -378,50 +393,6 @@ def run_snakemake(snakefile, tqdm_jobs, args, run_data, description, print_lines
             report_early_exit()
 
 
-def run_prodigal(id, run_data, full_inpath = None, group = None):
-    allowed_groups = ["ncbi", "fasta", "genbank"]
-    if group not in allowed_groups:
-        raise ValueError(f"Invalid group: {group}. Must be one of {', '.join(allowed_groups)}")
-
-    if group == "ncbi":
-        in_path = f"{run_data.ncbi_downloads_dir}/{id}_genomic.fna"
-        out_path = f"{run_data.ncbi_downloads_dir}/{id}_protein.faa"
-    elif group == "genbank":
-        in_path = f"{run_data.genbank_processing_dir}/{id}.fasta"
-        out_path = f"{run_data.genbank_processing_dir}/{id}_protein.faa"
-        print(f"\n\n    {out_path}\n\n")
-    elif group == "fasta":
-        in_path = full_inpath
-        out_path = f"{run_data.fasta_processing_dir}/{id}_protein.faa"
-    else:
-        report_early_exit(f"    Prodigal not yet implemented for \"{group}\".")
-
-    prodigal_cmd = [
-        "prodigal",
-        "-c",
-        "-q",
-        "-i", f"{in_path}",
-        "-a", f"{out_path}.tmp",
-    ]
-    print(f"\n\n    {prodigal_cmd}\n\n")
-
-    remove_ast_cmd = f"tr -d '*' < {out_path}.tmp > {out_path}"
-
-    try:
-        subprocess.run(prodigal_cmd, stdout=subprocess.DEVNULL)
-        subprocess.run(remove_ast_cmd, shell=True)
-        os.remove(f"{out_path}.tmp")
-        done = True
-    except:
-        done = False
-
-    if os.path.getsize(out_path) == 0:
-        os.remove(out_path)
-        done = False
-
-    return done
-
-
 def gunzip_if_needed(path):
     if path.endswith(".gz"):
         gunzipped_path = path[:-3]
@@ -437,23 +408,3 @@ def remove_file_if_exists(path):
         os.remove(path)
     except FileNotFoundError:
         pass
-
-
-def run_hmm_search(id, run_data, inpath):
-    outpath = f"{run_data.hmm_results_dir}/{id}-hmm-hits.tmp"
-    cmd = [
-        "hmmsearch",
-        "--cut_ga",
-        "--cpu", f"{run_data.num_hmm_cpus}",
-        "--tblout", outpath,
-        run_data.hmm_path,
-        inpath
-    ]
-
-    try:
-        subprocess.run(cmd)
-        done = True
-    except:
-        done = False
-
-    return done
