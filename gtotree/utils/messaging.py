@@ -160,7 +160,7 @@ def report_update(message, color = "green"):
 def check_and_report_any_changed_default_behavior(args):
 
     conditions = [
-        args.output != "gtotree-output",
+        args.output_dir != "gtotree-output",
         args.mapping_file,
         args.nucleotide_mode,
         args.no_tree,
@@ -185,14 +185,14 @@ def check_and_report_any_changed_default_behavior(args):
         report_message("  Other options set:")
 
     if args.resume and args.output_already_existed:
-        print(f"      - Attempting to resume a previous run with outputs in \"{args.output}\"")
+        print(f"      - Attempting to resume a previous run with outputs in \"{args.output_dir}\"")
 
     if args.force_overwrite:
         if args.output_already_existed:
-            print(f"      - The `-F` flag was provided, so this output directory is being overwritten: \"{args.output}\"")
+            print(f"      - The `-F` flag was provided, so this output directory is being overwritten: \"{args.output_dir}\"")
 
-    if args.output != "gtotree-output" and not args.resume:
-        print(f"      - The output directory has been set to: \"{args.output}\"")
+    if args.output_dir != "gtotree-output" and not args.resume:
+        print(f"      - The output directory has been set to: \"{args.output_dir}\"")
 
     if args.mapping_file:
         print(f"      - Labels of the specified input genomes will be modified based on: \"{args.mapping_file}\"")

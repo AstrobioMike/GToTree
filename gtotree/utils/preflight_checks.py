@@ -157,17 +157,17 @@ def check_input_files(args):
 
 
 def check_output_dir(args):
-    if os.path.exists(args.output):
+    if os.path.exists(args.output_dir):
         if not args.force_overwrite:
             args.resume = True
         else:
-            shutil.rmtree(args.output)
-            os.makedirs(args.output)
+            shutil.rmtree(args.output_dir)
+            os.makedirs(args.output_dir)
         args.output_already_existed = True
     else:
         args.output_already_existed = False
 
-    args.run_files_dir_rel = os.path.join(args.output, "run-files")
+    args.run_files_dir_rel = os.path.join(args.output_dir, "run-files")
     args.run_files_dir = os.path.abspath(args.run_files_dir_rel)
 
     return args
@@ -448,7 +448,7 @@ def check_input_genomes_amount(total_input_genomes, args):
 
 def setup_outputs(args, run_data):
 
-    log_file = os.path.abspath(os.path.join(args.output, "gtotree-runlog.txt"))
+    log_file = os.path.abspath(os.path.join(args.output_dir, "gtotree-runlog.txt"))
     args.log_file = log_file
     run_data.log_file = log_file
     log_file_var.set(log_file)
@@ -461,7 +461,7 @@ def setup_outputs(args, run_data):
 
     args, run_data = setup_tmp_dir(args, run_data)
 
-    snakemake_logs_dir_rel = os.path.join(args.output, "snakemake-logs")
+    snakemake_logs_dir_rel = os.path.join(args.output_dir, "snakemake-logs")
     snakemake_logs_dir = os.path.abspath(snakemake_logs_dir_rel)
     os.makedirs(snakemake_logs_dir, exist_ok=True)
     run_data.snakemake_logs_dir_rel = snakemake_logs_dir_rel
@@ -496,8 +496,11 @@ def setup_outputs(args, run_data):
     os.makedirs(run_data.ready_genome_AA_files_dir, exist_ok=True)
     run_data.hmm_results_dir = os.path.join(args.tmp_dir, "hmm-results")
     os.makedirs(run_data.hmm_results_dir, exist_ok=True)
+    run_data.found_SCG_seqs_dir = os.path.join(args.tmp_dir, "found-SCG-seqs")
+    os.makedirs(run_data.found_SCG_seqs_dir, exist_ok=True)
 
     run_data.best_hit_mode = args.best_hit_mode
+    run_data.output_dir = os.path.abspath(args.output_dir)
 
     return args, run_data
 
@@ -508,7 +511,7 @@ def setup_tmp_dir(args, run_data):
         if run_data.tmp_dir:
             args.tmp_dir = run_data.tmp_dir
         else:
-            tmp_dir = tempfile.mkdtemp(prefix = "gtt-tmp-", dir = args.output)
+            tmp_dir = tempfile.mkdtemp(prefix = "gtt-tmp-", dir = args.output_dir)
             args.tmp_dir = tmp_dir
             run_data.tmp_dir = tmp_dir
 
@@ -525,7 +528,7 @@ def setup_tmp_dir(args, run_data):
             report_message("Maybe you don't have write permissions there?")
             report_early_exit()
     else:
-        tmp_dir = tempfile.mkdtemp(prefix = "gtt-tmp-", dir = args.output)
+        tmp_dir = tempfile.mkdtemp(prefix = "gtt-tmp-", dir = args.output_dir)
         args.tmp_dir = tmp_dir
         run_data.tmp_dir = tmp_dir
 

@@ -2,7 +2,11 @@ import os
 from gtotree.utils.general import (read_run_data,
                                    write_run_data)
 from gtotree.utils.hmms.hmm_searching import (run_hmm_search,
-                                             parse_hmmer_results)
+                                             parse_hmmer_results,
+                                             get_seqs,
+                                             write_out_SCG_hit_seqs,
+                                             start_combined_SCG_hit_count_tab,
+                                             add_to_combined_SCG_hit_count_tab)
 
 run_data = read_run_data(config['run_data_path'])
 if run_data is None:
@@ -13,45 +17,59 @@ genome_ids = list(genome_dict.keys())
 
 rule all:
     input:
-        expand(f"{run_data.hmm_results_dir}/{{ID}}.done", ID=genome_ids)
+        expand(f"{run_data.hmm_results_dir}/{{ID}}/done", ID=genome_ids)
     run:
+        start_combined_SCG_hit_count_tab(run_data)
         for ID in genome_ids:
             genome = genome_dict[ID]
-            status_path = f"{run_data.hmm_results_dir}/{ID}.done"
+            status_path = f"{run_data.hmm_results_dir}/{ID}/done"
 
             with open(status_path, 'r') as f:
                 for line in f:
-                    ID, hmm_search_failed = line.strip().split('\t')
+                    ID, hmm_search_failed, extract_seqs_failed = line.strip().split('\t')
 
                     if int(hmm_search_failed):
                         genome.mark_hmm_search_failed()
                         genome.mark_removed()
                     else:
-                        genome.mark_hmm_search_done()
+                        add_to_combined_SCG_hit_count_tab(genome.id, run_data)
+                        if int(extract_seqs_failed):
+                            genome.mark_extract_seqs_failed()
+                            genome.mark_removed()
+                        else:
+                            write_out_SCG_hit_seqs(genome.id, run_data)
+                            genome.mark_hmm_search_done()
 
         write_run_data(run_data)
 
 
 rule search_hmms:
     output:
-        f"{run_data.hmm_results_dir}/{{ID}}.done"
+        f"{run_data.hmm_results_dir}/{{ID}}/done"
     run:
         genome = genome_dict[wildcards.ID]
         AA_path = genome.final_AA_path
 
-        hmm_search_failed = run_hmm_search(wildcards.ID, run_data, AA_path)
-        dict_of_hit_counts, dict_of_hit_gene_ids = parse_hmmer_results(f"{run_data.hmm_results_dir}/{wildcards.ID}-hmm-hits.txt",
-                                                                       run_data)
+        out_dir = f"{run_data.hmm_results_dir}/{wildcards.ID}"
+        hmm_out_path = f"{out_dir}/SCG-hits-hmm.txt"
+        hmm_search_failed = run_hmm_search(wildcards.ID, run_data, AA_path, hmm_out_path)
 
-        ## esl-sfetch index
-        ## then iterate over dict_of_hit_gene_ids,
-            ## if gene_id present
-                ## esl-sfetch again to get the seq
-                ## rename header to genome_id
-                ## write to file (i think it's own for the genome right now, then have to merge in "all")
-                    ## maybe put in subdirectory for each genome to keep the number of files per dir down a bit
-        print(dict_of_hit_gene_ids)
+        if not hmm_search_failed:
+
+            dict_of_hit_counts, dict_of_hit_gene_ids = parse_hmmer_results(f"{out_dir}/SCG-hits-hmm.txt",
+                                                                        run_data)
+            with open(f"{out_dir}/SCG-hit-counts.txt", 'w') as f:
+                f.write(f"{genome.id}")
+                for count in dict_of_hit_counts.values():
+                    f.write(f"\t{count}")
+                f.write("\n")
+
+            hit_seqs_dict, extract_seqs_failed = get_seqs(dict_of_hit_gene_ids, AA_path)
+
+            if not extract_seqs_failed:
+                with open(f"{out_dir}/SCG-hits.fasta", 'w') as f:
+                    for gene_id, seq in hit_seqs_dict.items():
+                        f.write(f">{gene_id}\n{seq}\n")
 
         with open(output[0], 'w') as f:
-            f.write(f"{wildcards.ID}\t{int(hmm_search_failed)}\n")
-
+            f.write(f"{wildcards.ID}\t{int(hmm_search_failed)}\t{int(extract_seqs_failed)}\n")

@@ -42,7 +42,7 @@ def parser():
     # --- Optional Inputs ---
     opt = parser.add_argument_group("Optional Inputs")
 
-    opt.add_argument("-o", "--output", metavar="<dir>", type=str, default="gtotree-output")
+    opt.add_argument("-o", "--output_dir", metavar="<dir>", type=str, default="gtotree-output")
     opt.add_argument("-m", "--mapping-file", metavar="<file>", type=str)
 
     # --- Taxonomy Options ---

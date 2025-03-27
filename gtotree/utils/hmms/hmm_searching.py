@@ -1,5 +1,8 @@
-import pandas as pd
+import shutil
 import subprocess
+import pandas as pd
+from Bio import SeqIO
+import pyhmmer.easel as easel #type: ignore
 from gtotree.utils.messaging import (report_processing_stage,
                                      report_early_exit)
 from gtotree.utils.general import (write_run_data,
@@ -28,8 +31,7 @@ def search_hmms(args, run_data):
     return run_data
 
 
-def run_hmm_search(id, run_data, inpath):
-    outpath = f"{run_data.hmm_results_dir}/{id}-hmm-hits.txt"
+def run_hmm_search(id, run_data, inpath, outpath):
     cmd = [
         "hmmsearch",
         "--cut_ga",
@@ -79,3 +81,55 @@ def parse_hmmer_results(inpath, run_data):
             dict_of_hit_gene_ids[scg] = gene_id
 
     return dict_of_hit_counts, dict_of_hit_gene_ids
+
+
+def get_seqs(dict_of_hit_gene_ids, AA_path):
+
+    try:
+        hit_seqs_dict = dict.fromkeys(dict_of_hit_gene_ids.keys(), None)
+        reverse_lookup = {seq_id: target for target, seq_id in dict_of_hit_gene_ids.items()}
+        AA_alphabet = easel.Alphabet.amino()
+
+        with easel.SequenceFile(AA_path, digital=True, alphabet=AA_alphabet) as seq_file:
+            for seq in seq_file:
+                seq_id = seq.name.decode("utf8")
+                if seq_id in reverse_lookup:
+                    target_scg = reverse_lookup[seq_id]
+                    hit_seqs_dict[target_scg] = AA_alphabet.decode(seq)
+        extract_seqs_failed = False
+    except:
+        extract_seqs_failed = True
+        hit_seqs_dict = None
+
+    return hit_seqs_dict, extract_seqs_failed
+
+
+def start_combined_SCG_hit_count_tab(run_data):
+    out_file = f"{run_data.output_dir}/SCG-hit-counts.tsv"
+    with open(out_file, "w") as outfile:
+        outfile.write("assembly_id\t" + "\t".join(run_data.initial_SCG_targets) + "\n")
+
+
+def add_to_combined_SCG_hit_count_tab(genome_id, run_data):
+    table_file = f"{run_data.output_dir}/SCG-hit-counts.tsv"
+    row_to_add_file = f"{run_data.hmm_results_dir}/{genome_id}/SCG-hit-counts.txt"
+    with open(table_file, 'ab') as outfile:
+        with open(row_to_add_file, 'rb') as infile:
+            shutil.copyfileobj(infile, outfile)
+
+
+def write_out_SCG_hit_seqs(genome_id, run_data):
+    input_fasta = f"{run_data.hmm_results_dir}/{genome_id}/SCG-hits.fasta"
+    out_dir = f"{run_data.found_SCG_seqs_dir}"
+    output_paths = {target_SCG: f"{out_dir}/{target_SCG}.fasta" for target_SCG in run_data.initial_SCG_targets}
+
+    output_handles = {target: open(path, "a") for target, path in output_paths.items()}
+
+    with open(input_fasta, "r") as infile:
+        for record in SeqIO.parse(infile, "fasta"):
+            target = record.id
+            if target in output_handles:
+                output_handles[target].write(f">{genome_id}\n{record.seq}\n")
+
+    for handle in output_handles.values():
+        handle.close()

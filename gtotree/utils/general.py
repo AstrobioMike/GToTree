@@ -58,6 +58,7 @@ class GenomeData:
     was_downloaded: bool = None
     mapping: str = None
     hmm_search_failed: bool = None
+    extract_seqs_failed: bool = None
     hmm_search_done: bool = False
 
     @classmethod
@@ -104,6 +105,9 @@ class GenomeData:
     def mark_hmm_search_failed(self, value=True):
         self.hmm_search_failed = value
 
+    def mark_extract_seqs_failed(self, value=True):
+        self.extract_seqs_failed = value
+
     def mark_hmm_search_done(self, value=True):
         self.hmm_search_done = value
         self.hmm_search_failed = False
@@ -123,6 +127,7 @@ class RunData:
     genbank_processing_dir: str = ""
     fasta_processing_dir: str = ""
     AA_processing_dir: str = ""
+    output_dir: str = ""
     run_files_dir: str = ""
     run_files_dir_rel: str = ""
     run_data_path: str = ""
@@ -133,6 +138,7 @@ class RunData:
     initial_SCG_targets: list = field(default_factory=list)
     final_SCG_targets: list = field(default_factory=list)
     hmm_results_dir: str = ""
+    found_SCG_seqs_dir: str = ""
     tmp_dir: str = ""
     log_file: str = ""
     snakemake_logs_dir: str = ""

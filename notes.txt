@@ -1,24 +1,26 @@
 ## next: 
-    # hmm search
-        # i'm up to the first results table being produced and have a dict with SCG: hit_gene_id
-        # then get back to following the gtt-amino-acid-serial with esl-index/fetch and whatnot
-        # want to get the entire genome done in the same snakefile, meaning to the stage where the genes are pulled out
-        # "all" rule should combine them all into their own fasta for each target-SCG i think
     # filtering hits
+        # ensure all target SCGs have some genes in them, update run_data.final_SCG_targets
+        # module-ize gtt-count-bases-per-seq and gtt-filter-seqs-by-length and implement filtering on all SCG-sets
+        # this can probably be a workflow too, though maybe not needed... do a tqdm progress bar either way
+        # update
     # filtering genomes
+        # no workflow, but update
     # alignments
     # concatenation and renaming
         # for mapping file:
-            # use run_data.mapping_dict to iterate over the run_data.all_input_genomes classes and adjust the names of alignments if needed
+            # use run_data.mapping_dict to iterate over the run_data.all_input_genomes classes and adjust the names of headers in new alignment file if needed
     # treeing
+        # no workflow
     # optional ko search
     # optional pfam search
     # build output tables
         # capture number of genes per genome from the filter_and_rename function output by returning the num variable
             # then write it to the .done file and stick it in the GenomeData class in the "all" rule
     # move snakemake logs dir to tmp dir after run finished
-        # this is so it's easily findable if there is a problem while running
+        # kept in output dir during run is so it's easily findable if there is a problem while running
     # implement nucleotide mode :(
+    # unit tests..... :( :( :(
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
