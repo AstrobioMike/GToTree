@@ -501,6 +501,7 @@ def setup_outputs(args, run_data):
 
     run_data.best_hit_mode = args.best_hit_mode
     run_data.output_dir = os.path.abspath(args.output_dir)
+    run_data.seq_length_cutoff = args.seq_length_cutoff
 
     return args, run_data
 

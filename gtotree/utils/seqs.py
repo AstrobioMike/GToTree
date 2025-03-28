@@ -1,4 +1,4 @@
-
+import statistics
 from Bio import SeqIO
 from gtotree.utils.general import (remove_file_if_exists,
                                    check_file_exists_and_not_empty)
@@ -80,14 +80,14 @@ def extract_fasta_from_gb(prefix, input_gb, run_data):
             outfile.write(f">{prefix}_{num}\n{rec.seq}\n")
 
 
-def check_target_SCGs_have_seqs(run_data):
+def check_target_SCGs_have_seqs(run_data, ext):
 
     SCG_targets_present_at_start = run_data.remaining_SCG_targets
     SCG_targets_present_at_end = SCG_targets_present_at_start.copy()
     SCG_targets_missing = []
 
     for SCG in SCG_targets_present_at_start:
-        path = run_data.found_SCG_seqs_dir + f"/{SCG}.fasta"
+        path = run_data.found_SCG_seqs_dir + f"/{SCG}{ext}"
         present = check_file_exists_and_not_empty(path)
         if not present:
             SCG_targets_missing.append(SCG)
@@ -108,3 +108,37 @@ def check_target_SCGs_have_seqs(run_data):
         report_notice(message)
 
     return run_data
+
+
+def filter_seqs_by_length(path, cutoff):
+
+    # getting range allowed
+    lengths = [len(record.seq) for record in SeqIO.parse(path, "fasta")]
+    median = statistics.median(lengths)
+    min_length = round(median - (median * cutoff))
+    max_length = round(median + (median * cutoff))
+
+    # filtering and writing back out
+    records = list(SeqIO.parse(path, "fasta"))
+    genomes_with_hits_after_filtering = []
+    filtered_records = []
+    for record in records:
+        if min_length <= len(record.seq) <= max_length:
+            filtered_records.append(record)
+            genomes_with_hits_after_filtering.append(record.id)
+
+    out_path = path.rstrip(".fasta") + "-gene-filtered.fasta"
+    with open(out_path, "w") as out_handle:
+        SeqIO.write(filtered_records, out_handle, "fasta")
+
+    return genomes_with_hits_after_filtering
+
+
+def filter_seqs_by_genome_ids(path, ids_to_remove):
+
+    records = list(SeqIO.parse(path, "fasta"))
+    filtered_records = [record for record in records if record.id not in ids_to_remove]
+    out_path = path.rstrip("-gene-filtered.fasta") + "-genome-filtered.fasta"
+
+    with open(out_path, "w") as out_handle:
+        SeqIO.write(filtered_records, out_handle, "fasta")

@@ -347,7 +347,11 @@ def report_processing_stage(stage):
                     "  ##############################################################################")
     elif stage == "filter-genes":
         message = ("\n  ##############################################################################\n"
-                    "  ####                        Filtering genes by length                     ####\n"
+                    "  ####                      Filtering genes by length                       ####\n"
+                    "  ##############################################################################")
+    elif stage == "filter-genomes":
+        message = ("\n  ##############################################################################\n"
+                    "  ####                 Filtering genomes with too few hits                  ####\n"
                     "  ##############################################################################")
     else:
         report_early_exit(f"Invalid stage ('{stage}'provided to `report_processing_stage`")
@@ -470,4 +474,21 @@ def report_hmm_search_update(run_data):
         message = (f"{color_text(f"All {num_searched} genomes were successfully searched for target genes!".center(82), "green")}")
     else:
         message = f"    Of the {num_searched} input genomes, {num_successful} were successfully searched for the target genes.\n\n"
+    report_update(message)
+
+
+def report_genome_filtering_update(run_data):
+    num_removed_due_to_hit_cutoff = len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering())
+    num_remaining = len(run_data.get_all_remaining_input_genomes())
+    num_input = len(run_data.all_input_genomes)
+
+    if num_removed_due_to_hit_cutoff == 0:
+        message = (f"{color_text(f"No genomes were removed due to having too few SCG hits!".center(82), "green")}")
+    else:
+        message = f"    Of the input genomes remaining:\n\n"
+        message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few SCG hits", "yellow")}, reported in:\n"
+                    f"        {run_data.run_files_dir_rel}/genomes-removed-for-too-few-SCG-hits.txt\n\n")
+        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} made it through the preprocessing gauntlet.\n\n", "yellow")}")
+        message += "Moving onto alignments with those :)".center(82)
+
     report_update(message)

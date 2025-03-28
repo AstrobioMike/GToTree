@@ -12,7 +12,7 @@ run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-genome_dict = {gd.id: gd for gd in run_data.get_all_input_genome_for_hmm_search()}
+genome_dict = {gd.id: gd for gd in run_data.get_all_input_genomes_for_hmm_search()}
 genome_ids = list(genome_dict.keys())
 
 rule all:
@@ -26,19 +26,22 @@ rule all:
 
             with open(status_path, 'r') as f:
                 for line in f:
-                    ID, hmm_search_failed, extract_seqs_failed = line.strip().split('\t')
+                    ID, hmm_search_failed, extract_seqs_failed, num_SCG_hits = line.strip().split('\t')
 
                     if int(hmm_search_failed):
                         genome.mark_hmm_search_failed()
                         genome.mark_removed()
+                        genome.num_SCG_hits = 0
                     else:
                         add_to_combined_SCG_hit_count_tab(genome.id, run_data)
                         if int(extract_seqs_failed):
                             genome.mark_extract_seqs_failed()
+                            genome.num_SCG_hits = 0
                             genome.mark_removed()
                         else:
                             write_out_SCG_hit_seqs(genome.id, run_data)
                             genome.mark_hmm_search_done()
+                            genome.num_SCG_hits = int(num_SCG_hits)
 
         write_run_data(run_data)
 
@@ -56,8 +59,9 @@ rule search_hmms:
 
         if not hmm_search_failed:
 
-            dict_of_hit_counts, dict_of_hit_gene_ids = parse_hmmer_results(f"{out_dir}/SCG-hits-hmm.txt",
-                                                                        run_data)
+            dict_of_hit_counts, dict_of_hit_gene_ids, num_SCG_hits = parse_hmmer_results(f"{out_dir}/SCG-hits-hmm.txt",
+                                                                                         run_data)
+
             with open(f"{out_dir}/SCG-hit-counts.txt", 'w') as f:
                 f.write(f"{genome.id}")
                 for count in dict_of_hit_counts.values():
@@ -72,4 +76,4 @@ rule search_hmms:
                         f.write(f">{gene_id}\n{seq}\n")
 
         with open(output[0], 'w') as f:
-            f.write(f"{wildcards.ID}\t{int(hmm_search_failed)}\t{int(extract_seqs_failed)}\n")
+            f.write(f"{wildcards.ID}\t{int(hmm_search_failed)}\t{int(extract_seqs_failed)}\t{int(num_SCG_hits)}\n")

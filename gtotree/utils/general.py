@@ -51,7 +51,6 @@ class GenomeData:
     basename: str
     preprocessing_done: bool = False
     final_AA_path: str = ""
-    removed: bool = False
     prodigal_used: bool = False
     was_gzipped: bool = False
     was_found: bool = None
@@ -60,6 +59,10 @@ class GenomeData:
     hmm_search_failed: bool = None
     extract_seqs_failed: bool = None
     hmm_search_done: bool = False
+    num_SCG_hits: int = None
+    num_SCG_hits_after_filtering: int = None
+    reason_removed: str = None
+    removed: bool = False
 
     @classmethod
     def from_path(cls, path: str):
@@ -146,6 +149,9 @@ class RunData:
     snakemake_logs_dir_rel: str = ""
     num_hmm_cpus: str = ""
     best_hit_mode: bool = False
+    seq_length_cutoff: float = None
+    SCG_hits_filtered: bool = False
+    genomes_filtered_for_min_SCG_hits: bool = False
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
@@ -174,8 +180,14 @@ class RunData:
     def get_all_preprocessed_genomes(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.preprocessing_done]
 
-    def get_all_input_genome_for_hmm_search(self) -> List[GenomeData]:
+    def get_all_input_genomes_for_hmm_search(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.preprocessing_done and not gd.hmm_search_done and not gd.removed]
+
+    def get_all_input_genomes_for_filtering(self) -> List[GenomeData]:
+        return [gd for gd in self.all_input_genomes if gd.preprocessing_done and gd.hmm_search_done and not gd.removed]
+
+    def get_all_input_genomes_due_for_SCG_min_hit_filtering(self) -> List[GenomeData]:
+        return [gd for gd in self.all_input_genomes if gd.reason_removed == "too few SCG hits"]
 
     def get_all_input_genome_basenames(self) -> List[str]:
         return [gd.basename for gd in self.all_input_genomes]

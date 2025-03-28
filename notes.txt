@@ -1,18 +1,12 @@
 ## next: 
-    # filtering hits
-        # module-ize gtt-count-bases-per-seq and gtt-filter-seqs-by-length and implement filtering on all SCG-sets
-        # this can probably be a workflow too, though maybe not needed... do a tqdm progress bar either way
-        # update
-    # filtering genomes
-        # no workflow, but update
-    # alignments
+    # alignment, trimming, and inserting gap sequences
     # concatenation and renaming
         # for mapping file:
             # use run_data.mapping_dict to iterate over the run_data.all_input_genomes classes and adjust the names of headers in new alignment file if needed
     # treeing
         # no workflow
-    # optional ko search
-    # optional pfam search
+    # optional ko search (maybe perform these on all genomes still, or do first after preprocessing all genomes before dropping for other reasons)
+    # optional pfam search (maybe perform these on all genomes still, or do first after preprocessing all genomes before dropping for other reasons)
     # build output tables
         # capture number of genes per genome from the filter_and_rename function output by returning the num variable
             # then write it to the .done file and stick it in the GenomeData class in the "all" rule
@@ -21,10 +15,12 @@
     # implement nucleotide mode :(
     # unit tests..... :( :( :(
 
-    # add in check for if all target SCGs are still present at a few spots
-        # maybe at end of hmm-searching stage (DONE)
-        # maybe at end of gene-length filtering stage (you can lose all seqs with the filtering by median)
-        # maybe after genome-filtering to be sure we didn't drop one that had the only hit to a target SCG 
+    # add a GenomeData attribute for reason removed (genome.reason_removed)
+        # implemented, but i need to go back and use it for everything before too-few-hit-filtering
+
+    # add in checks for the total number of remaining genomes being >= 3
+        # at start, and then after genome filtering
+
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 

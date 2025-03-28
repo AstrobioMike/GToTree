@@ -16,7 +16,7 @@ def search_hmms(args, run_data):
 
     report_processing_stage("hmm-search")
 
-    num_genomes_to_search = len(run_data.get_all_input_genome_for_hmm_search())
+    num_genomes_to_search = len(run_data.get_all_input_genomes_for_hmm_search())
 
     if num_genomes_to_search > 0:
 
@@ -28,10 +28,10 @@ def search_hmms(args, run_data):
         run_snakemake(snakefile, num_genomes_to_search, args, run_data, description)
 
         run_data = read_run_data(run_data.run_data_path)
-        run_data = capture_hmm_search_failures(run_data)
+        capture_hmm_search_failures(run_data)
 
     report_hmm_search_update(run_data)
-    run_data = check_target_SCGs_have_seqs(run_data)
+    run_data = check_target_SCGs_have_seqs(run_data, ".fasta")
 
     return run_data
 
@@ -80,12 +80,15 @@ def parse_hmmer_results(inpath, run_data):
 
     dict_of_hit_gene_ids = dict.fromkeys(run_data.initial_SCG_targets, None)
 
+    num_SCG_hits = 0
     for scg, count in dict_of_hit_counts.items():
+        ## will need additional logic for best-hit mode
         if count == 1:
+            num_SCG_hits += 1
             gene_id = df.loc[df["target_SCG"] == scg, "gene_id"].iloc[0]
             dict_of_hit_gene_ids[scg] = gene_id
 
-    return dict_of_hit_counts, dict_of_hit_gene_ids
+    return dict_of_hit_counts, dict_of_hit_gene_ids, num_SCG_hits
 
 
 def get_seqs(dict_of_hit_gene_ids, AA_path):
@@ -145,4 +148,3 @@ def capture_hmm_search_failures(run_data):
         with open(run_data.run_files_dir + "/inputs-that-failed-at-the-hmm-search.txt", "w") as fail_file:
             for genome_id in run_data.get_failed_hmm_search_paths():
                 fail_file.write(genome_id + "\n")
-    return run_data
