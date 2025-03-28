@@ -137,6 +137,7 @@ def capture_failed_genbank_files(run_data):
             for entry in failed_genbank_files_list:
                 not_parsed_file.write(entry + "\n")
 
+
 def preprocess_fasta_genomes(args, run_data):
     if args.fasta_files:
 

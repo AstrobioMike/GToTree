@@ -4,12 +4,13 @@ import pandas as pd
 from Bio import SeqIO
 import pyhmmer.easel as easel #type: ignore
 from gtotree.utils.messaging import (report_processing_stage,
-                                     report_early_exit)
+                                     report_early_exit,
+                                     report_hmm_search_update)
 from gtotree.utils.general import (write_run_data,
                                    read_run_data,
                                    get_snakefile_path,
                                    run_snakemake)
-
+from gtotree.utils.seqs import check_target_SCGs_have_seqs
 
 def search_hmms(args, run_data):
 
@@ -27,6 +28,10 @@ def search_hmms(args, run_data):
         run_snakemake(snakefile, num_genomes_to_search, args, run_data, description)
 
         run_data = read_run_data(run_data.run_data_path)
+        run_data = capture_hmm_search_failures(run_data)
+
+    report_hmm_search_update(run_data)
+    run_data = check_target_SCGs_have_seqs(run_data)
 
     return run_data
 
@@ -133,3 +138,11 @@ def write_out_SCG_hit_seqs(genome_id, run_data):
 
     for handle in output_handles.values():
         handle.close()
+
+
+def capture_hmm_search_failures(run_data):
+    if len(run_data.get_failed_hmm_search_paths()) > 0:
+        with open(run_data.run_files_dir + "/inputs-that-failed-at-the-hmm-search.txt", "w") as fail_file:
+            for genome_id in run_data.get_failed_hmm_search_paths():
+                fail_file.write(genome_id + "\n")
+    return run_data

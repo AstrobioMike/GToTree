@@ -1,6 +1,9 @@
 
 from Bio import SeqIO
-from gtotree.utils.general import remove_file_if_exists
+from gtotree.utils.general import (remove_file_if_exists,
+                                   check_file_exists_and_not_empty)
+from gtotree.utils.messaging import (add_border,
+                                     report_notice)
 
 def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_length = 99999):
 
@@ -75,3 +78,33 @@ def extract_fasta_from_gb(prefix, input_gb, run_data):
         for rec in records:
             num += 1
             outfile.write(f">{prefix}_{num}\n{rec.seq}\n")
+
+
+def check_target_SCGs_have_seqs(run_data):
+
+    SCG_targets_present_at_start = run_data.remaining_SCG_targets
+    SCG_targets_present_at_end = SCG_targets_present_at_start.copy()
+    SCG_targets_missing = []
+
+    for SCG in SCG_targets_present_at_start:
+        path = run_data.found_SCG_seqs_dir + f"/{SCG}.fasta"
+        present = check_file_exists_and_not_empty(path)
+        if not present:
+            SCG_targets_missing.append(SCG)
+            SCG_targets_present_at_end.remove(SCG)
+
+    if len(SCG_targets_missing) > 0:
+        for SCG in SCG_targets_missing:
+            run_data.remaining_SCG_targets.remove(SCG)
+
+            if SCG not in run_data.removed_SCG_targets:
+                run_data.removed_SCG_targets.append(SCG)
+
+        run_data.remaining_SCG_targets = SCG_targets_present_at_end
+
+        add_border()
+        message = f"    Some target single-copy genes were not found or were filtered out of the\n"
+        message += f"    analysis.\n\n    At this point, these include:\n      {'\n      '.join(SCG_targets_missing)}"
+        report_notice(message)
+
+    return run_data

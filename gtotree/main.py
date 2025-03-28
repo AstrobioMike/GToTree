@@ -4,6 +4,7 @@ from gtotree.utils.messaging import gtotree_header
 from gtotree.utils.runinfo import display_initial_run_info
 from gtotree.utils.preprocessing_genomes import preprocess_genomes
 from gtotree.utils.hmms.hmm_searching import search_hmms
+from gtotree.utils.filtering_genes import filter_genes
 
 def main(args = None):
     if args is None:
@@ -19,19 +20,19 @@ def main(args = None):
 
     run_data = search_hmms(args, run_data)
 
-    # optional ko searching
-
-    # optional pfam searching
-
-    # filter_genes_by_length(args, run_data)
+    run_data = filter_genes(args, run_data)
 
     # filter_genomes_with_too_few_hits(args, run_data)
 
     # generate_alignments(args, run_data)
 
-    # concatenate and rename
+    # concatenate (and rename if needed)
 
     # tree_building(args, run_data)
+
+    # optional ko searching
+
+    # optional pfam searching
 
     # summarize_results(args, run_data)
 

@@ -136,7 +136,8 @@ class RunData:
     mapping_dict: dict = field(default_factory=dict)
     ready_genome_AA_files_dir: str = ""
     initial_SCG_targets: list = field(default_factory=list)
-    final_SCG_targets: list = field(default_factory=list)
+    remaining_SCG_targets: list = field(default_factory=list)
+    removed_SCG_targets: list = field(default_factory=list)
     hmm_results_dir: str = ""
     found_SCG_seqs_dir: str = ""
     tmp_dir: str = ""
@@ -169,6 +170,9 @@ class RunData:
 
     def get_all_input_genome_ids(self) -> List[str]:
         return [gd.id for gd in self.all_input_genomes]
+
+    def get_all_preprocessed_genomes(self) -> List[GenomeData]:
+        return [gd for gd in self.all_input_genomes if gd.preprocessing_done]
 
     def get_all_input_genome_for_hmm_search(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.preprocessing_done and not gd.hmm_search_done and not gd.removed]
@@ -232,6 +236,9 @@ class RunData:
 
     def get_failed_amino_acid_paths(self) -> List[str]:
         return [gd.provided_path for gd in self.amino_acid_files if gd.removed]
+
+    def get_failed_hmm_search_paths(self) -> List[str]:
+        return [gd.provided_path for gd in self.all_input_genomes if gd.preprocessing_done and not gd.hmm_search_done]
 
     def get_prodigal_used_genbank_ids(self) -> List[str]:
         return [gd.id for gd in self.genbank_files if gd.prodigal_used]
@@ -414,3 +421,12 @@ def remove_file_if_exists(path):
         os.remove(path)
     except FileNotFoundError:
         pass
+
+
+def check_file_exists_and_not_empty(path):
+    try:
+        if os.path.getsize(path) > 0:
+            return True
+    except FileNotFoundError:
+        pass
+    return False

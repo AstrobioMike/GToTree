@@ -27,6 +27,7 @@ def check_hmm_file(args, run_data):
         run_data.hmm_path = get_hmm_path(hmm_file, args.hmm)
 
     run_data.initial_SCG_targets = get_SCG_hmm_targets(run_data.hmm_path)
+    run_data.remaining_SCG_targets = run_data.initial_SCG_targets.copy()
 
     return run_data
 

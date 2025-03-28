@@ -1,6 +1,5 @@
 ## next: 
     # filtering hits
-        # ensure all target SCGs have some genes in them, update run_data.final_SCG_targets
         # module-ize gtt-count-bases-per-seq and gtt-filter-seqs-by-length and implement filtering on all SCG-sets
         # this can probably be a workflow too, though maybe not needed... do a tqdm progress bar either way
         # update
@@ -22,6 +21,11 @@
     # implement nucleotide mode :(
     # unit tests..... :( :( :(
 
+    # add in check for if all target SCGs are still present at a few spots
+        # maybe at end of hmm-searching stage (DONE)
+        # maybe at end of gene-length filtering stage (you can lose all seqs with the filtering by median)
+        # maybe after genome-filtering to be sure we didn't drop one that had the only hit to a target SCG 
+
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
 conda activate gtotree-dev
@@ -40,7 +44,7 @@ GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f f
 gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -j 4 -t -P
 
 ### OVERALL NOTES ###
-# add a stop at "Summary of input-genome preprocessing" to check there are more than 3 as needed to make a tree
+# add a stop at "Summary of input-genome preprocessing" to check there are 3 or more as needed to make a tree
 # need a lot of testing on resume functionality
     # if i count on the resume flag for operating, i may need to make sure it makes sense up front (like does the run-data.json exist)
 # need some check and handling if the input files changed when doing a resume
