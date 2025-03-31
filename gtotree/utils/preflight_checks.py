@@ -137,8 +137,7 @@ def check_input_files(args):
 
     if "run_data" not in locals():
         run_data = populate_run_data(args)
-
-    run_data = check_hmm_file(args, run_data)
+        run_data = check_hmm_file(args, run_data)
 
     if args.mapping_file:
         args, run_data = check_mapping_file(args, run_data)

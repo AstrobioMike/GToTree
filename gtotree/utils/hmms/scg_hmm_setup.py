@@ -2,7 +2,7 @@ import os
 import sys
 from gtotree.utils.messaging import wprint, color_text, report_message, report_early_exit
 import pandas as pd
-from gtotree.utils.general import download_with_tqdm
+from gtotree.utils.general import download_with_tqdm, SCGset
 import pyhmmer #type: ignore
 
 
@@ -26,8 +26,8 @@ def check_hmm_file(args, run_data):
         # getting hmm from prepackaged table
         run_data.hmm_path = get_hmm_path(hmm_file, args.hmm)
 
-    run_data.initial_SCG_targets = get_SCG_hmm_targets(run_data.hmm_path)
-    run_data.remaining_SCG_targets = run_data.initial_SCG_targets.copy()
+    initial_SCG_targets = get_SCG_hmm_targets(run_data.hmm_path)
+    run_data.SCG_targets = [SCGset.from_id(target) for target in initial_SCG_targets]
 
     return run_data
 

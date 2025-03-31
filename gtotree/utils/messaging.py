@@ -316,7 +316,7 @@ def absurd_number_of_genomes_notice(total_input_genomes):
 def report_processing_stage(stage):
     allowed_stages = ["ncbi", "genbank", "fasta", "amino-acid",
                       "preprocessing-update", "hmm-search", "filter-genes",
-                      "filter-genomes", "align", "tree"]
+                      "filter-genomes", "align-and-prepare-gene-sets", "tree"]
 
     if stage not in allowed_stages:
         raise ValueError(f"Invalid stage: {stage}. Must be one of: {', '.join(allowed_stages)}")
@@ -352,6 +352,10 @@ def report_processing_stage(stage):
     elif stage == "filter-genomes":
         message = ("\n  ##############################################################################\n"
                     "  ####                 Filtering genomes with too few hits                  ####\n"
+                    "  ##############################################################################")
+    elif stage == "align-and-prepare-gene-sets":
+        message = ("\n  ##############################################################################\n"
+                    "  ####                    Aligning and trimming SCG-sets                    ####\n"
                     "  ##############################################################################")
     else:
         report_early_exit(f"Invalid stage ('{stage}'provided to `report_processing_stage`")
@@ -461,7 +465,7 @@ def report_genome_preprocessing_update(run_data):
         message = f"    Of all the input genomes provided:\n\n"
         message += (f"      {color_text(f"{num_removed} failed preprocessing", "yellow")} as described above.\n\n")
         message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully preprocessed.\n\n", "yellow")}")
-        message += "Moving forward with those :)".center(82)
+        message += "Moving forward with SCG-hunting in those :)".center(82)
     report_update(message)
 
 

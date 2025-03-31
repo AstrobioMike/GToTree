@@ -117,12 +117,34 @@ class GenomeData:
 
 
 @dataclass
+class SCGset:
+    id: str
+    remaining: bool = None
+    gene_length_filtered: bool = None
+    reason_removed: str = None
+    removed: bool = None
+
+    @classmethod
+    def from_id(cls, id: str):
+        return cls(id, remaining=True, gene_length_filtered=False, removed=False)
+
+    def mark_removed(self, value=True):
+        self.removed = value
+        self.remaining = False
+
+    def mark_gene_length_filtered(self, value=True):
+        self.gene_length_filtered = value
+
+
+
+@dataclass
 class RunData:
     ncbi_accs: List[GenomeData] = field(default_factory=list)
     genbank_files: List[GenomeData] = field(default_factory=list)
     fasta_files: List[GenomeData] = field(default_factory=list)
     amino_acid_files: List[GenomeData] = field(default_factory=list)
     all_input_genomes: List[GenomeData] = field(default_factory=list)
+    SCG_targets: List[SCGset] = field(default_factory=list)
 
     ncbi_sub_table_path: str = ""
     ncbi_downloads_dir: str = ""
@@ -166,6 +188,16 @@ class RunData:
     @property
     def num_incomplete_amino_acid_files(self) -> int:
         return len([gd for gd in self.amino_acid_files if not gd.preprocessing_done and not gd.removed])
+
+
+    def get_all_SCG_targets_remaining(self) -> List[SCGset]:
+        return [scg for scg in self.SCG_targets if scg.remaining]
+
+    # def get_all_SCG_target_ids_remaining(self) -> List[str]:
+    #     return [scg.id for scg in self.SCG_targets if scg.remaining]
+
+    def get_all_SCG_targets_remaining_but_not_filtered(self) -> List[SCGset]:
+        return [scg for scg in self.SCG_targets if scg.remaining and not scg.gene_length_filtered]
 
     def update_all_input_genomes(self):
         self.all_input_genomes = []
@@ -358,6 +390,8 @@ def read_run_data(path):
         else:
             run_data_dict["tools_used"] = ToolsUsed()
 
+        if "SCG_targets" in run_data_dict:
+            run_data_dict["SCG_targets"] = [SCGset(**scg) if isinstance(scg, dict) else scg for scg in run_data_dict["SCG_targets"]]
         run_data = RunData(**run_data_dict)
         run_data.update_all_input_genomes()
         return run_data

@@ -10,18 +10,22 @@ if run_data is None:
 genome_dict = {gd.id: gd for gd in run_data.get_all_input_genomes_for_filtering()}
 genome_ids = list(genome_dict.keys())
 
+SCG_dict = {SCG.id: SCG for SCG in run_data.get_all_SCG_targets_remaining()}
+SCG_ids = list(SCG_dict.keys())
+
 rule all:
     input:
-        expand(f"{run_data.found_SCG_seqs_dir}/{{SCG}}.gene-filtered", SCG=run_data.remaining_SCG_targets)
+        expand(f"{run_data.found_SCG_seqs_dir}/{{SCG}}.gene-filtered", SCG=SCG_ids)
     run:
-        run_data.SCG_hits_filtered = True
-
         count_dict = {genome_id: 0 for genome_id in genome_ids}
-        for SCG in run_data.remaining_SCG_targets:
+        for SCG in SCG_ids:
             with open(f"{run_data.found_SCG_seqs_dir}/{SCG}.gene-filtered", 'r') as f:
                 for line in f:
                     genome_id = line.strip()
                     count_dict[genome_id] += 1
+
+            SCG_target = SCG_dict[SCG]
+            SCG_target.gene_length_filtered = True
 
         for genome_id, count in count_dict.items():
             genome = genome_dict[genome_id]
@@ -38,6 +42,7 @@ rule filter_genes:
         f"{run_data.found_SCG_seqs_dir}/{{SCG}}.gene-filtered"
     run:
         path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}.fasta"
+        print(f"\n\n\n{path}\n\n\n")
         genomes_with_hits_after_filtering = filter_seqs_by_length(path, run_data.seq_length_cutoff)
         with open(output[0], 'w') as f:
             for genome in genomes_with_hits_after_filtering:

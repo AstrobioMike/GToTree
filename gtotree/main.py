@@ -6,7 +6,7 @@ from gtotree.utils.preprocessing_genomes import preprocess_genomes
 from gtotree.utils.hmms.hmm_searching import search_hmms
 from gtotree.utils.filtering_genes import filter_genes
 from gtotree.utils.filtering_genomes import filter_genomes
-
+from gtotree.utils.aligning_and_preparing_genesets import align_and_prepare_gene_sets
 
 def main(args = None):
     if args is None:
@@ -25,11 +25,9 @@ def main(args = None):
     run_data = filter_genes(args, run_data)
 
     run_data = filter_genomes(args, run_data)
+
+    run_data = align_and_prepare_gene_sets(args, run_data)
     print(f"\n\n{run_data}\n\n")
-
-    # filter_genomes_with_too_few_hits(args, run_data)
-
-    # generate_alignments(args, run_data)
 
     # concatenate (and rename if needed)
 

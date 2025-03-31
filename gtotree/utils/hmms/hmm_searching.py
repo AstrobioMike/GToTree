@@ -69,8 +69,9 @@ def parse_hmmer_results(inpath, run_data):
 
     df = read_hmmer_results(inpath)
 
-    dict_of_hit_counts = dict.fromkeys(run_data.initial_SCG_targets, 0)
-    for scg in run_data.initial_SCG_targets:
+    remaining_SCG_targets = [SCG_target.id for SCG_target in run_data.get_all_SCG_targets_remaining()]
+    dict_of_hit_counts = dict.fromkeys(remaining_SCG_targets, 0)
+    for scg in remaining_SCG_targets:
         dict_of_hit_counts[scg] = df[df["target_SCG"] == scg].shape[0]
 
     if run_data.best_hit_mode:
@@ -78,7 +79,7 @@ def parse_hmmer_results(inpath, run_data):
     else:
         pass
 
-    dict_of_hit_gene_ids = dict.fromkeys(run_data.initial_SCG_targets, None)
+    dict_of_hit_gene_ids = dict.fromkeys(remaining_SCG_targets, None)
 
     num_SCG_hits = 0
     for scg, count in dict_of_hit_counts.items():
@@ -129,13 +130,17 @@ def add_to_combined_SCG_hit_count_tab(genome_id, run_data):
 def write_out_SCG_hit_seqs(genome_id, run_data):
     input_fasta = f"{run_data.hmm_results_dir}/{genome_id}/SCG-hits.fasta"
     out_dir = f"{run_data.found_SCG_seqs_dir}"
-    output_paths = {target_SCG: f"{out_dir}/{target_SCG}.fasta" for target_SCG in run_data.initial_SCG_targets}
+    remaining_SCG_targets = [SCG_target.id for SCG_target in run_data.get_all_SCG_targets_remaining()]
+    output_paths = {target_SCG: f"{out_dir}/{target_SCG}.fasta" for target_SCG in remaining_SCG_targets}
 
     output_handles = {target: open(path, "a") for target, path in output_paths.items()}
+
+    print(output_handles)
 
     with open(input_fasta, "r") as infile:
         for record in SeqIO.parse(infile, "fasta"):
             target = record.id
+            print(target)
             if target in output_handles:
                 output_handles[target].write(f">{genome_id}\n{record.seq}\n")
 

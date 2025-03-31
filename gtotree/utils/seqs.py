@@ -82,26 +82,19 @@ def extract_fasta_from_gb(prefix, input_gb, run_data):
 
 def check_target_SCGs_have_seqs(run_data, ext):
 
-    SCG_targets_present_at_start = run_data.remaining_SCG_targets
-    SCG_targets_present_at_end = SCG_targets_present_at_start.copy()
-    SCG_targets_missing = []
+    SCG_targets_present_at_start = run_data.get_all_SCG_targets_remaining()
+    new_SCG_targets_missing = []
 
-    for SCG in SCG_targets_present_at_start:
+    for SCG_obj in SCG_targets_present_at_start:
+        SCG = SCG_obj.id
         path = run_data.found_SCG_seqs_dir + f"/{SCG}{ext}"
         present = check_file_exists_and_not_empty(path)
         if not present:
-            SCG_targets_missing.append(SCG)
-            SCG_targets_present_at_end.remove(SCG)
+            SCG_obj.removed = True
+            SCG_obj.reason_removed = "no sequences found or remaining after length-filtering"
+            new_SCG_targets_missing.append(SCG)
 
-    if len(SCG_targets_missing) > 0:
-        for SCG in SCG_targets_missing:
-            run_data.remaining_SCG_targets.remove(SCG)
-
-            if SCG not in run_data.removed_SCG_targets:
-                run_data.removed_SCG_targets.append(SCG)
-
-        run_data.remaining_SCG_targets = SCG_targets_present_at_end
-
+    if len(new_SCG_targets_missing) > 0:
         add_border()
         message = f"    Some target single-copy genes were not found or were filtered out of the\n"
         message += f"    analysis.\n\n    At this point, these include:\n      {'\n      '.join(SCG_targets_missing)}"
@@ -142,3 +135,4 @@ def filter_seqs_by_genome_ids(path, ids_to_remove):
 
     with open(out_path, "w") as out_handle:
         SeqIO.write(filtered_records, out_handle, "fasta")
+

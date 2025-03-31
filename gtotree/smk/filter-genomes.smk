@@ -10,9 +10,12 @@ if run_data is None:
 
 genome_ids_to_remove = {gd.id for gd in run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering()}
 
+SCG_dict = {SCG.id: SCG for SCG in run_data.get_all_SCG_targets_remaining()}
+SCG_ids = list(SCG_dict.keys())
+
 rule all:
     input:
-        expand(f"{run_data.found_SCG_seqs_dir}/{{SCG}}.genome-filtered", SCG=run_data.remaining_SCG_targets)
+        expand(f"{run_data.found_SCG_seqs_dir}/{{SCG}}.genome-filtered", SCG=SCG_ids)
     run:
         run_data.genomes_filtered_for_min_SCG_hits = True
         for f in input:
