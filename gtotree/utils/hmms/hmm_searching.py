@@ -115,8 +115,9 @@ def get_seqs(dict_of_hit_gene_ids, AA_path):
 
 def start_combined_SCG_hit_count_tab(run_data):
     out_file = f"{run_data.output_dir}/SCG-hit-counts.tsv"
+    target_SCG_ids = [SCG_target.id for SCG_target in run_data.get_all_SCG_targets_remaining()]
     with open(out_file, "w") as outfile:
-        outfile.write("assembly_id\t" + "\t".join(run_data.initial_SCG_targets) + "\n")
+        outfile.write("assembly_id\t" + "\t".join(target_SCG_ids) + "\n")
 
 
 def add_to_combined_SCG_hit_count_tab(genome_id, run_data):

@@ -1,17 +1,22 @@
 ## next: 
-    # alignment, trimming, and inserting gap sequences
-    # concatenation and renaming
+    # cat'ing all alignments together
+        # module-ize gtt-cat-alignments and use that, since it also generates the partitions file
+        # no snakemake needed
+    # renaming if needed
         # for mapping file:
             # use run_data.mapping_dict to iterate over the run_data.all_input_genomes classes and adjust the names of headers in new alignment file if needed
     # treeing
         # no workflow
-    # optional ko search (maybe perform these on all genomes still, or do first after preprocessing all genomes before dropping for other reasons)
-    # optional pfam search (maybe perform these on all genomes still, or do first after preprocessing all genomes before dropping for other reasons)
     # build output tables
         # capture number of genes per genome from the filter_and_rename function output by returning the num variable
             # then write it to the .done file and stick it in the GenomeData class in the "all" rule
+    # build output summary (including citations.txt)
     # move snakemake logs dir to tmp dir after run finished
         # kept in output dir during run is so it's easily findable if there is a problem while running
+    # optional ko search
+        # perform this on all genomes still, after preprocessing before dropping for other reasons
+    # optional pfam search 
+        # perform this on all genomes still, after preprocessing before dropping for other reasons
     # implement nucleotide mode :(
     # unit tests..... :( :( :(
 
@@ -20,6 +25,12 @@
 
     # add in checks for the total number of remaining genomes being >= 3
         # at start, and then after genome filtering
+
+    # maybe add an ext variable somewhere so when working with amino acids we have .faa, and .fa when nucleotides in tmp outputs
+        # right now i just did .fasta so it covers both
+
+    # filter-genomes.smk currently runs whether it's needed or not
+        # this is because i needed to produce the output files, it's probably fine this way
 
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
@@ -44,10 +55,9 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 # need a lot of testing on resume functionality
     # if i count on the resume flag for operating, i may need to make sure it makes sense up front (like does the run-data.json exist)
 # need some check and handling if the input files changed when doing a resume
-    # maybe just check and require they haven't changed at all, or a new run is needed
+    # maybe just check and require they haven't changed at all, if so a totally new run is needed
 # when a resume is done, may want to just try snakemake workflows on inputs that failed the prior runs
-# might not be using gnu parallel anymore due to snakemake files, so check that at the end
-    # oh, add snakemake to definite citations
+# add snakemake to definite citations
 # since multiple logs may be created with --resume function, might need to add functionality to back up a log that exists to a sub-dir,
     # maybe with a time/date stamp of when first run appended to the name
 # eventually look into putting a block for this prodigal failure: "at least 100000 bases for training." (search original files)

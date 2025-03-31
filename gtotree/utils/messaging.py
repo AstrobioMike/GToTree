@@ -173,7 +173,7 @@ def check_and_report_any_changed_default_behavior(args):
         args.genome_hits_cutoff != 0.5,
         args.num_jobs != 1,
         args.num_hmm_cpus != 2,
-        args.muscle_threads != 5,
+        args.num_muscle_threads != 5,
         args.no_super5,
         args.keep_gene_alignments,
         args.resume and args.output_already_existed,
@@ -225,7 +225,7 @@ def check_and_report_any_changed_default_behavior(args):
         print(f"      - Gene-length filtering cutoff threshold (`-c`) has been set to: {args.seq_length_cutoff}")
 
     if args.genome_hits_cutoff != 0.5:
-        print(f"      - Genome minimum gene-copy threshold (`-G`) has been set to: {args.genome_hits_cutoff}")
+        print(f"      - Genome minimum target-gene-copy threshold (`-G`) has been set to: {args.genome_hits_cutoff}")
 
     if args.num_jobs != 1:
         print(f"      - The number of jobs to run during parallelizable steps has been set to: {args.num_jobs}")
@@ -233,7 +233,7 @@ def check_and_report_any_changed_default_behavior(args):
     if args.num_hmm_cpus != 2:
         print(f"      - The number of CPUs used for `hmmsearch` calls will be: {args.num_hmm_cpus}")
 
-    if args.muscle_threads != 5:
+    if args.num_muscle_threads != 5:
         print(f"      - The number of threads used for `muscle` calls will be: {args.muscle_threads}")
 
     if args.no_super5:
@@ -316,7 +316,8 @@ def absurd_number_of_genomes_notice(total_input_genomes):
 def report_processing_stage(stage):
     allowed_stages = ["ncbi", "genbank", "fasta", "amino-acid",
                       "preprocessing-update", "hmm-search", "filter-genes",
-                      "filter-genomes", "align-and-prepare-gene-sets", "tree"]
+                      "filter-genomes", "align-and-prepare-gene-sets",
+                      "concatenate-SCG-sets", "tree"]
 
     if stage not in allowed_stages:
         raise ValueError(f"Invalid stage: {stage}. Must be one of: {', '.join(allowed_stages)}")
@@ -356,6 +357,10 @@ def report_processing_stage(stage):
     elif stage == "align-and-prepare-gene-sets":
         message = ("\n  ##############################################################################\n"
                     "  ####                    Aligning and trimming SCG-sets                    ####\n"
+                    "  ##############################################################################")
+    elif stage == "concatenate-SCG-sets":
+        message = ("\n  ##############################################################################\n"
+                    "  ####            Concatenating all SCG-set alignments together             ####\n"
                     "  ##############################################################################")
     else:
         report_early_exit(f"Invalid stage ('{stage}'provided to `report_processing_stage`")

@@ -34,7 +34,7 @@ def display_initial_run_info(args, run_data):
         check_input_genomes_amount(len(run_data.all_input_genomes), args)
 
     report_message("  Single-copy gene HMM source to be used:")
-    print(f"      - {args.hmm} ({len(run_data.initial_SCG_targets)} targets)", flush=True)
+    print(f"      - {args.hmm} ({len(run_data.get_all_SCG_targets_remaining())} targets)", flush=True)
     # time.sleep(1)
 
     check_and_report_any_changed_default_behavior(args)

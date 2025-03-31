@@ -35,7 +35,7 @@ def preflight_checks(args):
     args, run_data = primary_args_validation(args)
     check_for_required_dbs(args)
     run_data = track_tools_used(args, run_data)
-    args, run_data = setup_outputs(args, run_data)
+    args, run_data = final_setups(args, run_data)
     return args, run_data
 
 
@@ -445,7 +445,7 @@ def check_input_genomes_amount(total_input_genomes, args):
         time.sleep(60)
 
 
-def setup_outputs(args, run_data):
+def final_setups(args, run_data):
 
     log_file = os.path.abspath(os.path.join(args.output_dir, "gtotree-runlog.txt"))
     args.log_file = log_file
@@ -501,6 +501,12 @@ def setup_outputs(args, run_data):
     run_data.best_hit_mode = args.best_hit_mode
     run_data.output_dir = os.path.abspath(args.output_dir)
     run_data.seq_length_cutoff = args.seq_length_cutoff
+
+    num_all_input_genomes = len(run_data.get_all_input_genome_ids())
+    if num_all_input_genomes > 1000 and not args.no_super5:
+        run_data.use_muscle_super5 = True
+
+    run_data.num_muscle_threads = args.num_muscle_threads
 
     return args, run_data
 

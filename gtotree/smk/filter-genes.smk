@@ -42,7 +42,6 @@ rule filter_genes:
         f"{run_data.found_SCG_seqs_dir}/{{SCG}}.gene-filtered"
     run:
         path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}.fasta"
-        print(f"\n\n\n{path}\n\n\n")
         genomes_with_hits_after_filtering = filter_seqs_by_length(path, run_data.seq_length_cutoff)
         with open(output[0], 'w') as f:
             for genome in genomes_with_hits_after_filtering:

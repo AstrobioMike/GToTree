@@ -1,5 +1,6 @@
 import statistics
 from Bio import SeqIO
+import subprocess
 from gtotree.utils.general import (remove_file_if_exists,
                                    check_file_exists_and_not_empty)
 from gtotree.utils.messaging import (add_border,
@@ -97,7 +98,7 @@ def check_target_SCGs_have_seqs(run_data, ext):
     if len(new_SCG_targets_missing) > 0:
         add_border()
         message = f"    Some target single-copy genes were not found or were filtered out of the\n"
-        message += f"    analysis.\n\n    At this point, these include:\n      {'\n      '.join(SCG_targets_missing)}"
+        message += f"    analysis.\n\n    At this point, these include:\n      {'\n      '.join(new_SCG_targets_missing)}"
         report_notice(message)
 
     return run_data
@@ -127,12 +128,70 @@ def filter_seqs_by_length(path, cutoff):
     return genomes_with_hits_after_filtering
 
 
-def filter_seqs_by_genome_ids(path, ids_to_remove):
+def filter_seqs_by_genome_ids(path, ids_to_remove, out_path):
 
     records = list(SeqIO.parse(path, "fasta"))
     filtered_records = [record for record in records if record.id not in ids_to_remove]
-    out_path = path.rstrip("-gene-filtered.fasta") + "-genome-filtered.fasta"
 
     with open(out_path, "w") as out_handle:
         SeqIO.write(filtered_records, out_handle, "fasta")
 
+
+def run_muscle(id, run_data, inpath, outpath, log_path):
+    if run_data.use_muscle_super5:
+        align_type = "-super5"
+    else:
+        align_type = "-align"
+
+    cmd = [
+        "muscle",
+        f"{align_type}",
+        f"{inpath}",
+        "-output",
+        f"{outpath}",
+        "-threads", f"{run_data.num_muscle_threads}"
+    ]
+
+    try:
+        with open(log_path, "w") as log_out:
+            subprocess.run(cmd, stdout=log_out, stderr=log_out, check=True)
+        muscle_failed = False
+    except Exception:
+        muscle_failed = True
+
+    return muscle_failed
+
+
+def run_trimal(inpath, output, log_path):
+
+    cmd = [
+        "trimal",
+        "-in", f"{inpath}",
+        "-out", f"{output}",
+        "-automated1"
+    ]
+
+    try:
+        with open(log_path, "w") as log_out:
+            subprocess.run(cmd, stdout=log_out, stderr=log_out, check=True)
+        trimal_failed = False
+    except:
+        trimal_failed = True
+
+    return trimal_failed
+
+
+def add_needed_gap_seqs(run_data, inpath, outpath):
+
+    all_needed_ids = run_data.get_all_remaining_input_genome_ids()
+    records = list(SeqIO.parse(inpath, "fasta"))
+    align_len = len(records[0].seq)
+    record_dict = {record.id: record for record in records}
+
+    with open(outpath, "w") as out_handle:
+        for req_id in all_needed_ids:
+            if req_id in record_dict:
+                out_handle.write(f">{req_id}\n{record_dict[req_id].seq}\n")
+            else:
+                seq = "-" * align_len
+                out_handle.write(f">{req_id}\n{seq}\n")

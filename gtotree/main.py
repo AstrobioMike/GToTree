@@ -6,7 +6,8 @@ from gtotree.utils.preprocessing_genomes import preprocess_genomes
 from gtotree.utils.hmms.hmm_searching import search_hmms
 from gtotree.utils.filtering_genes import filter_genes
 from gtotree.utils.filtering_genomes import filter_genomes
-from gtotree.utils.aligning_and_preparing_genesets import align_and_prepare_gene_sets
+from gtotree.utils.aligning_and_preparing_SCG_sets import align_and_prepare_SCG_sets
+from gtotree.utils.concatenating_SCG_sets import concatenate_SCG_sets
 
 def main(args = None):
     if args is None:
@@ -26,8 +27,12 @@ def main(args = None):
 
     run_data = filter_genomes(args, run_data)
 
-    run_data = align_and_prepare_gene_sets(args, run_data)
+    run_data = align_and_prepare_SCG_sets(args, run_data)
+
+    run_data = concatenate_SCG_sets(args, run_data)
+
     print(f"\n\n{run_data}\n\n")
+    print(f"\n\n{args}\n\n")
 
     # concatenate (and rename if needed)
 

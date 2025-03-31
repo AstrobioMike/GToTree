@@ -67,7 +67,7 @@ def parser():
     opt.add_argument("-T", "--tree-program", metavar="<str>", type=str, default="FastTreeMP")
     opt.add_argument("-j", "--num-jobs", metavar="<int>", type=int, default=1)
     opt.add_argument("-n", "--num-hmm-cpus", metavar="<int>", type=int, default=2)
-    opt.add_argument("-M", "--muscle-threads", metavar="<int>", type=int, default=5)
+    opt.add_argument("-M", "--num-muscle-threads", metavar="<int>", type=int, default=5)
     opt.add_argument("-X", "--no-super5", action="store_true")
     opt.add_argument("-P", "--use-http", action="store_true")
     opt.add_argument("-F", "--force-overwrite", action="store_true")

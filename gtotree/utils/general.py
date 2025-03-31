@@ -121,6 +121,9 @@ class SCGset:
     id: str
     remaining: bool = None
     gene_length_filtered: bool = None
+    aligned: bool = None
+    trimmed: bool = None
+    ready_for_cat: bool = None
     reason_removed: str = None
     removed: bool = None
 
@@ -160,9 +163,6 @@ class RunData:
     mapping_file_path: str = ""
     mapping_dict: dict = field(default_factory=dict)
     ready_genome_AA_files_dir: str = ""
-    initial_SCG_targets: list = field(default_factory=list)
-    remaining_SCG_targets: list = field(default_factory=list)
-    removed_SCG_targets: list = field(default_factory=list)
     hmm_results_dir: str = ""
     found_SCG_seqs_dir: str = ""
     tmp_dir: str = ""
@@ -174,6 +174,8 @@ class RunData:
     seq_length_cutoff: float = None
     SCG_hits_filtered: bool = False
     genomes_filtered_for_min_SCG_hits: bool = False
+    use_muscle_super5: bool = False
+    num_muscle_threads: int = 5
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
@@ -193,11 +195,11 @@ class RunData:
     def get_all_SCG_targets_remaining(self) -> List[SCGset]:
         return [scg for scg in self.SCG_targets if scg.remaining]
 
-    # def get_all_SCG_target_ids_remaining(self) -> List[str]:
-    #     return [scg.id for scg in self.SCG_targets if scg.remaining]
-
     def get_all_SCG_targets_remaining_but_not_filtered(self) -> List[SCGset]:
         return [scg for scg in self.SCG_targets if scg.remaining and not scg.gene_length_filtered]
+
+    def get_all_SCG_targets_remaining_but_not_aligned(self) -> List[SCGset]:
+        return [scg for scg in self.SCG_targets if scg.remaining and not scg.aligned]
 
     def update_all_input_genomes(self):
         self.all_input_genomes = []
@@ -259,6 +261,9 @@ class RunData:
 
     def get_all_remaining_input_genomes(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if not gd.removed]
+
+    def get_all_remaining_input_genome_ids(self) -> List[str]:
+        return [gd.id for gd in self.all_input_genomes if not gd.removed]
 
     def get_done_ncbi_accs(self) -> List[GenomeData]:
         return [gd for gd in self.ncbi_accs if gd.preprocessing_done]

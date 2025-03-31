@@ -1,4 +1,5 @@
 import os
+import shutil
 from gtotree.utils.general import (read_run_data,
                                    write_run_data,
                                    touch)
@@ -28,6 +29,12 @@ rule filter_genomes:
     output:
         f"{run_data.found_SCG_seqs_dir}/{{SCG}}.genome-filtered"
     run:
-        path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-gene-filtered.fasta"
-        filter_seqs_by_genome_ids(path, genome_ids_to_remove)
+        inpath = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-gene-filtered.fasta"
+        outpath = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-genome-filtered.fasta"
+
+        if len(genome_ids_to_remove) == 0:
+            shutil.copy(inpath, outpath)
+        else:
+            filter_seqs_by_genome_ids(path, genome_ids_to_remove, outpath)
+
         touch(output[0])
