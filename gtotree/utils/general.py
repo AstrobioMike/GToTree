@@ -176,6 +176,8 @@ class RunData:
     genomes_filtered_for_min_SCG_hits: bool = False
     use_muscle_super5: bool = False
     num_muscle_threads: int = 5
+    nucleotide_mode: bool = False
+    updating_headers: bool = False
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
@@ -200,6 +202,9 @@ class RunData:
 
     def get_all_SCG_targets_remaining_but_not_aligned(self) -> List[SCGset]:
         return [scg for scg in self.SCG_targets if scg.remaining and not scg.aligned]
+
+    def get_all_SCG_targets_ready_for_concatenation(self) -> List[SCGset]:
+        return [scg for scg in self.SCG_targets if scg.ready_for_cat and not scg.removed]
 
     def update_all_input_genomes(self):
         self.all_input_genomes = []
@@ -350,7 +355,7 @@ def populate_run_data(args):
     run_data.update_all_input_genomes()
     run_data.run_files_dir = args.run_files_dir
     run_data.run_files_dir_rel = args.run_files_dir_rel
-    run_data.run_data_path = run_data.run_files_dir + "/genome-data.json"
+    run_data.run_data_path = run_data.run_files_dir + "/run-data.json"
 
     return run_data
 

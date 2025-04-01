@@ -317,7 +317,7 @@ def report_processing_stage(stage):
     allowed_stages = ["ncbi", "genbank", "fasta", "amino-acid",
                       "preprocessing-update", "hmm-search", "filter-genes",
                       "filter-genomes", "align-and-prepare-gene-sets",
-                      "concatenate-SCG-sets", "tree"]
+                      "concatenate-SCG-sets", "updating-headers", "tree"]
 
     if stage not in allowed_stages:
         raise ValueError(f"Invalid stage: {stage}. Must be one of: {', '.join(allowed_stages)}")
@@ -356,11 +356,15 @@ def report_processing_stage(stage):
                     "  ##############################################################################")
     elif stage == "align-and-prepare-gene-sets":
         message = ("\n  ##############################################################################\n"
-                    "  ####                    Aligning and trimming SCG-sets                    ####\n"
+                    "  ####            Aligning, trimming, and/or preparing SCG-sets             ####\n"
                     "  ##############################################################################")
     elif stage == "concatenate-SCG-sets":
         message = ("\n  ##############################################################################\n"
                     "  ####            Concatenating all SCG-set alignments together             ####\n"
+                    "  ##############################################################################")
+    elif stage == "updating-headers":
+        message = ("\n  ##############################################################################\n"
+                    "  ####                   Adding more informative headers                    ####\n"
                     "  ##############################################################################")
     else:
         report_early_exit(f"Invalid stage ('{stage}'provided to `report_processing_stage`")

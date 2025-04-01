@@ -131,7 +131,7 @@ def check_input_files(args):
 
     if args.resume:
         try:
-            run_data = read_run_data(args.run_files_dir + "/genome-data.json")
+            run_data = read_run_data(args.run_files_dir + "/run-data.json")
         except FileNotFoundError:
             pass
 
@@ -507,6 +507,12 @@ def final_setups(args, run_data):
         run_data.use_muscle_super5 = True
 
     run_data.num_muscle_threads = args.num_muscle_threads
+    run_data.nucleotide_mode = args.nucleotide_mode
+
+    if len(run_data.mapping_dict) > 0 or args.add_ncbi_tax or args.add_gtdb_tax:
+        run_data.updating_headers = True
+    else:
+        run_data.updating_headers = False
 
     return args, run_data
 

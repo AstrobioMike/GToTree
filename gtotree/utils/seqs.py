@@ -1,3 +1,4 @@
+import os
 import statistics
 from Bio import SeqIO
 import subprocess
@@ -195,3 +196,59 @@ def add_needed_gap_seqs(run_data, inpath, outpath):
             else:
                 seq = "-" * align_len
                 out_handle.write(f">{req_id}\n{seq}\n")
+
+
+def concatenate_alignments(run_data):
+    SCGs_ready_for_cat = run_data.get_all_SCG_targets_ready_for_concatenation()
+    SCG_IDs_ready_for_cat = [SCG.id for SCG in SCGs_ready_for_cat]
+    SCG_paths_to_cat = [run_data.found_SCG_seqs_dir + f"/{SCG_id}-final.fasta" for SCG_id in SCG_IDs_ready_for_cat]
+
+    # initializing dictionary that will hold headers as keys and a list of all seqs to be cat'd as values
+    dict_of_genomes = {genome_id: [] for genome_id in run_data.get_all_remaining_input_genome_ids()}
+
+    # iterating through all files adding seqs to the dictionary
+    for file in SCG_paths_to_cat:
+        with open(file) as fasta:
+            curr_header=""
+            for line in fasta:
+                line = line.strip()
+                if line.startswith(">"):
+                    curr_header=line.lstrip(">")
+                else:
+                    dict_of_genomes[curr_header].append(line)
+
+    # writing out the concatenated (horizontally) alignment file
+    if not run_data.nucleotide_mode:
+        output_path = os.path.join(run_data.output_dir, "aligned-SCGs.faa")
+        spacer = "XXXXX"
+    else:
+        output_path = os.path.join(run_data.output_dir, "aligned-SCGs.fa")
+        spacer = "NNNNNN"
+
+    with open(output_path, "w") as out:
+        for header, seqs in dict_of_genomes.items():
+            out.write(">" + header + "\n")
+            out.write(spacer.join(seqs) + "\n")
+
+    return dict_of_genomes, SCG_IDs_ready_for_cat
+
+
+def gen_partitions_file(run_data, SCG_IDs, dict_of_genomes):
+
+    # all are same length, so just need one genome entry, then to count the bases per element in dict values list, and add for the spacers
+    # getting all alignment lengths
+    alignment_lengths_list = [len(x) for x in list(dict_of_genomes.values())[0]]
+
+    curr_start = 1
+    curr_stop = 0
+
+    mol_type = "AA" if not run_data.nucleotide_mode else "DNA"
+    spacer_addition = 6 if not run_data.nucleotide_mode else 7
+
+    with open(run_data.run_files_dir + "/partitions.txt", "w") as out:
+
+        for i in range(0,len(SCG_IDs)):
+            curr_stop = curr_start + alignment_lengths_list[i] - 1
+
+            out.write(f"{mol_type}, {SCG_IDs[i]} = {curr_start}-{curr_stop}\n")
+            curr_start = curr_stop + spacer_addition

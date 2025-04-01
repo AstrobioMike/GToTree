@@ -1,10 +1,6 @@
 ## next: 
-    # cat'ing all alignments together
-        # module-ize gtt-cat-alignments and use that, since it also generates the partitions file
-        # no snakemake needed
     # renaming if needed
         # for mapping file:
-            # use run_data.mapping_dict to iterate over the run_data.all_input_genomes classes and adjust the names of headers in new alignment file if needed
     # treeing
         # no workflow
     # build output tables
@@ -30,8 +26,16 @@
         # right now i just did .fasta so it covers both
 
     # filter-genomes.smk currently runs whether it's needed or not
-        # this is because i needed to produce the output files, it's probably fine this way
+        # this is because i needed to produce the output files whether the step overall is needed or not
+        # it's probably fine this way, but i guess i could check for the expected output files and only run it if
+            # they are not present...
 
+    # align-and-prepare-SCG-sets.smk runs whether it's needed or not
+        # not sure there's any reason to leave this one this way
+            # it isn't actually running all the alignments again if not needed, so it should be relatively quick
+            # but it's probably unnecessarily confusing
+
+    # maybe don't make --resume be auto, stop and tell the user to specify --resume or -F
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
@@ -106,6 +110,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # new prepackaged HMMs based on GTDB taxonomy
     # in tandem scanning of target KOs or pfams, files for added vizualization in iToL
     # pre-built HMMs stored remotely and downloaded when used, to slim package size and install time
+    # partitions.txt file produced suitable for mixed-model treeing like with iqtree
 
 
 ### """

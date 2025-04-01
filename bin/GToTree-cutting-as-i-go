@@ -132,38 +132,6 @@ fi
 # and adding header and writing to output directory
 cat <(printf "assembly_id\ttaxid\tnum_SCG_hits\tuniq_SCG_hits\tperc_comp\tperc_redund\tnum_SCG_hits_after_len_filt\tin_final_tree\n") ${tmp_dir}/building_genomes_tab.tmp > ${output_dir}/Genomes_summary_info.tsv
 
-#############################################################################
-############  FORMATTING TABLE FOR THOSE WITH >= 10% REDUNDANCY  ############
-#############################################################################
-
-if [ -f ${tmp_dir}/Genomes_with_questionable_redundancy_estimates.tmp ]; then
-    cat <(printf "assembly_id\tnum_SCG_hits\tuniq_SCG_hits\tperc_comp\tperc_redund\n") ${tmp_dir}/Genomes_with_questionable_redundancy_estimates.tmp > ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv
-fi
-
-#############################################################################
-#####################  CATTING ALL ALIGNMENTS TOGETHER  #####################
-#############################################################################
-printf "\n ############################################################################## \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-printf " ####                  Catting all alignments together                     ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-printf " ############################################################################## \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-curr_time=$(date +"%I:%M %p")
-duration=$SECONDS
-
-printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-# this concatenates the alignments and generates the partitions file for mixed model alignments
-if [ $nucleotide != 'false' ]; then
-    gtt-cat-alignments -t $tmp_dir -o $output_dir --nucleotides
-else
-    gtt-cat-alignments -t $tmp_dir -o $output_dir
-fi
-
-# storing genomes that made it through workflow to report at end
-genomes_retained=$(wc -l ${tmp_dir}/final_genomes_from_all_sources.tmp | sed "s/^ *//" | cut -d " " -f 1)
-
-printf "\n________________________________________________________________________________\n\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 #############################################################################
 ##############  ADDING MORE INFORMATIVE HEADERS IF SPECIFIED  ###############
