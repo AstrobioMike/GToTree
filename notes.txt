@@ -68,6 +68,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # maybe just make a check that input genomes are greater than 100,000 bases (if that consistently triggers it)
 # eventually add a check that nucleotide fasta inputs are nucleotide and not amino acid, and vice versa
 # eventually do something with gunzipped files we generated (probably delete them, leaving the originals)
+# bootstrapping not performed with IQTREE when fewer than 4 genomes
 
 ### TO DO ###
 
