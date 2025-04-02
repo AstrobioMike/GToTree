@@ -78,6 +78,19 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
         # ncbi assembly downloads (DONE)
         # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree)
 
+# add tree mid-point rooting, and write out a separate tree that is mid-point rooted
+#######
+# import sys
+# import dendropy
+
+# tree = dendropy.Tree.get(path = sys.argv[1], schema = "newick")
+
+# tree.reroot_at_midpoint()
+
+# tree.encode_bipartitions()
+
+# tree.write(path = f'{sys.argv[1]}-rooted.nwk', schema = "newick")
+########
 
 
 ### CHANGES ###
