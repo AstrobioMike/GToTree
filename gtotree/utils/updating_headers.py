@@ -1,5 +1,6 @@
 from gtotree.utils.messaging import report_processing_stage
 from gtotree.utils.gtdb.handle_gtdb_tax_info import update_mapping_dict_with_gtdb_tax_info
+from gtotree.utils.ncbi.handle_ncbi_tax_info import update_mapping_dict_with_ncbi_tax_info
 # from gtotree.utils.seqs
 
 def update_headers(args, run_data):
@@ -13,15 +14,8 @@ def update_headers(args, run_data):
         run_data = update_mapping_dict_with_gtdb_tax_info(args, run_data)
 
     if args.add_ncbi_tax:
-        # run_data = get_ncbi_tax_info(args, run_data)
-        pass
-    ### functions to update run_data.mapping_dict
-        # keep a master initial list of all entries that were renamed by user-provided mapping file
-            # so we know not to change those with taxonomic info
-    # run_data = update_with_ncbi_tax(run_data)
-        # only if no mapping_dict info from a specific mapping file for a given entry
-    # run_data = update_with_gtdb_tax(run_data)
-        # only if no mapping_dict info from a specific mapping file for a given entry
+        run_data = update_mapping_dict_with_ncbi_tax_info(args, run_data)
+
 
     ### at this point the run_data.mapping_dict should have all entries that need to be changed
     # run_data = create_modified_alignment_file(run_data)

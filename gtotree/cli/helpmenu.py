@@ -75,14 +75,13 @@ helpmenu += f"""
                   see helper script `gtt-get-accessions-from-GTDB` for help
                   getting input accessions based on GTDB taxonomy searches.
 
-        - [-L <str>] wanted lineage ranks; default: Domain,Phylum,Class,Species
+        - [-L <str>] wanted lineage ranks; default: Domain,Phylum,Class,Genus,Species
                   A comma-separated list of the taxonomic ranks you'd like added
                   to the labels if adding taxonomic information. E.g., all would
                   be "-L Domain,Phylum,Class,Order,Family,Genus,Species,Strain".
 
                   Note: Strain-level information is available through NCBI, but
-                  not GTDB. And "Species" names include the "Genus" and
-                  "Species".
+                  not GTDB.
 
 
       {color_text("Filtering settings:", "yellow")}

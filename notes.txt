@@ -1,13 +1,10 @@
 ## next: 
     # renaming if needed
-        # need to update run_data.mapping_dict with all other that need update (user mapping file already done)
-            # if initial-id is already a key in there, don't change it again
-            # gtdb
-                # need a function that takes run_data, returns run_data with mapping_dict updated
-            # ncbi/taxonkit
-                # taxids are in here: gtotree-output/gtt-tmp-0b6tuiza/ncbi-accessions-info.tsv
-                # need a function that grabs those, runs taxonkit, returns run_data with mapping_dict updated
+        # i'm up to swapping labels in the alignment
+        # figure out if i need to append original accessions somewhere
+            # or have a flag for this, i feel like this is needed but don't remember what GToTree currently does
         # swap labels in new alignment file
+
     # treeing
         # no workflow
     # build output tables

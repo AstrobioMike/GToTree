@@ -4,6 +4,8 @@ import pandas as pd
 def update_mapping_dict_with_gtdb_tax_info(args, run_data):
 
     sub_gtdb_tax_tab = subset_gtdb_info(run_data)
+    sub_gtdb_tax_tab = reformat_gtdb_tax_tab(sub_gtdb_tax_tab)
+
     for index, row in sub_gtdb_tax_tab.iterrows():
         curr_input_acc = row["input_acc"]
         if curr_input_acc in run_data.mapping_dict:
@@ -11,7 +13,8 @@ def update_mapping_dict_with_gtdb_tax_info(args, run_data):
         else:
             new_label = ""
             for rank in args.lineage.split(","):
-                new_label += row[rank.lower()] + "_"
+                if rank.lower() != "strain":
+                    new_label += row[rank.lower()] + "_"
 
             new_label = new_label[:-1]  # removing last underscore
             new_label = new_label.replace(" ", "_")
@@ -100,3 +103,13 @@ def get_input_acc(base_gtdb_acc, input_accs):
             return acc
 
     return None
+
+
+def reformat_gtdb_tax_tab(df):
+    # this is to remove redundancy in species
+    df['species'] = [
+        sp.removeprefix(genus + ' ')
+        for genus, sp in zip(df['genus'], df['species'])
+    ]
+
+    return(df)

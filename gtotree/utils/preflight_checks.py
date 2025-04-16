@@ -85,7 +85,7 @@ def check_lineage(args):
     lineage_list = args.lineage.split(",")
 
     for rank in lineage_list:
-        if rank not in accepted_ranks:
+        if rank.capitalize() not in accepted_ranks:
             report_message(f'You specified "{args.lineage}" to the `-L` argument, but "{rank}" is not an accepted taxonomic rank.')
             print(f"\n  Accepted ranks are any combination of the below entered as a comma-delimited list:\n        {'\n        '.join(accepted_ranks)}")
             report_early_exit()
