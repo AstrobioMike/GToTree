@@ -38,7 +38,7 @@ def preprocess_ncbi_genomes(args, run_data):
 
         run_data = parse_assembly_summary(NCBI_assembly_summary_tab, run_data)
 
-        num_ncbi_accs_remaining = len(run_data.remaining_ncbi_accs())
+        num_ncbi_accs_remaining = len(run_data.get_ncbi_accs_for_snakemake_preprocessing())
 
         if num_ncbi_accs_remaining > 0:
             # writing run_data to file so it can be accessed by snakemake

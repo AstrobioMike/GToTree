@@ -1,10 +1,12 @@
 from setuptools import setup, find_packages
 
+with open("README.md", "r") as fh:
+    long_desc = fh.read()
 setup(
     name="GToTree",
     version="2.0.0",
     description="A user-friendly workflow for phylogenomics",
-    long_description=open("README.md").read(),
+    long_description=long_desc,
     long_description_content_type="text/markdown",
     author="AstrobioMike",
     url="https://github.com/AstrobioMike/GToTree",

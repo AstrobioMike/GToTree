@@ -26,13 +26,13 @@ def main(args = None):
 
     run_data = filter_genes(args, run_data)
 
-    run_data = filter_genomes(args, run_data)
+#    run_data = filter_genomes(args, run_data)
 
-    run_data = align_and_prepare_SCG_sets(args, run_data)
+#    run_data = align_and_prepare_SCG_sets(args, run_data)
 
     run_data = concatenate_SCG_sets(run_data)
 
-    run_data = update_headers(run_data)
+    run_data = update_headers(args, run_data)
 
     print(f"\n\n{run_data}\n\n")
     print(f"\n\n{args}\n\n")

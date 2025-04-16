@@ -1,13 +1,20 @@
 from gtotree.utils.messaging import report_processing_stage
+from gtotree.utils.gtdb.handle_gtdb_tax_info import update_mapping_dict_with_gtdb_tax_info
 # from gtotree.utils.seqs
 
-def update_headers(run_data):
+def update_headers(args, run_data):
 
     if not run_data.updating_headers:
         return run_data
 
     report_processing_stage("updating-headers")
 
+    if args.add_gtdb_tax:
+        run_data = update_mapping_dict_with_gtdb_tax_info(args, run_data)
+
+    if args.add_ncbi_tax:
+        # run_data = get_ncbi_tax_info(args, run_data)
+        pass
     ### functions to update run_data.mapping_dict
         # keep a master initial list of all entries that were renamed by user-provided mapping file
             # so we know not to change those with taxonomic info

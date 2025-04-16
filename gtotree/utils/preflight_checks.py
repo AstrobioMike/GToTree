@@ -286,6 +286,9 @@ def check_mapping_file(args, run_data, flag = "-m"):
 
     run_data.mapping_dict = mapping_dict
 
+    # storing this so we are sure not to change any of these if we are adding taxonomic info later
+    run_data.initial_mapping_IDs_from_user = list(mapping_dict.keys())
+
     return args, run_data
 
 
@@ -376,7 +379,7 @@ def make_mapping_dict(path):
 def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
     entries_in_mapping_file = set(mapping_dict.keys())
     # taking the basenames here because some inputs might have full/rel paths, but the mapping file shouldn't
-    entries_in_input_genomes = set(run_data.get_all_input_genome_provided_paths())
+    entries_in_input_genomes = set(run_data.get_all_input_genome_provided_paths()) | set(run_data.get_input_ncbi_accs())
     missing_keys = entries_in_mapping_file - entries_in_input_genomes
     if missing_keys:
         report_message(

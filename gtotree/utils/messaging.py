@@ -356,7 +356,7 @@ def report_processing_stage(stage):
                     "  ##############################################################################")
     elif stage == "align-and-prepare-gene-sets":
         message = ("\n  ##############################################################################\n"
-                    "  ####            Aligning, trimming, and/or preparing SCG-sets             ####\n"
+                    "  ####              Aligning, trimming, and preparing SCG-sets              ####\n"
                     "  ##############################################################################")
     elif stage == "concatenate-SCG-sets":
         message = ("\n  ##############################################################################\n"
@@ -371,7 +371,7 @@ def report_processing_stage(stage):
 
     add_border()
     print(message)
-    time.sleep(1)
+    # time.sleep(1)
 
 
 def report_snakemake_failure(description, snakemake_log):

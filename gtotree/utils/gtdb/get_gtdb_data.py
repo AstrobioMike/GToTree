@@ -12,7 +12,7 @@ import os
 import pandas as pd
 import urllib
 import argparse
-from gtotree.utils.messaging import wprint, color_text, report_message, report_early_exit
+from gtotree.utils.messaging import wprint, color_text
 from gtotree.utils.general import download_with_tqdm
 
 
@@ -59,14 +59,14 @@ def gen_gtdb_tab(location):
     """ downloads and parses the GTDB info tables """
 
     # getting archaea
-    arc_link = "https://data.gtdb.ecogenomic.org/releases/latest/ar53_metadata.tsv.gz"
+    arc_link = "https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar53_metadata.tsv.gz"
     arc_tsv_gz = download_with_tqdm(arc_link, "        GTDB archaeal data")
     arc_tab = pd.read_csv(arc_tsv_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     arc_tab.rename(columns={arc_tab.columns[0]:"accession"}, inplace=True)
     arc_tab.dropna(inplace=True, how="all")
 
     # getting bacteria
-    bac_link = "https://data.gtdb.ecogenomic.org/releases/latest/bac120_metadata.tsv.gz"
+    bac_link = "https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tsv.gz"
     bac_tsv_gz = download_with_tqdm(bac_link, "        GTDB bacterial data")
     bac_tab = pd.read_csv(bac_tsv_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     bac_tab.rename(columns={bac_tab.columns[0]:"accession"}, inplace=True)
@@ -111,7 +111,7 @@ def gen_gtdb_tab(location):
     # writing out
     gtdb_tab.to_csv(location + "GTDB-arc-and-bac-metadata.tsv", index=False, sep="\t")
 
-    gtdb_version_info = urllib.request.urlretrieve("https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt", location + "GTDB-version-info.txt")
+    gtdb_version_info = urllib.request.urlretrieve("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/VERSION.txt", location + "GTDB-version-info.txt")
 
 
 def check_and_or_get_gtdb_files(GTDB_dir):
@@ -119,7 +119,7 @@ def check_and_or_get_gtdb_files(GTDB_dir):
 
     if os.path.exists(GTDB_dir + "GTDB-arc-and-bac-metadata.tsv") and os.path.exists(GTDB_dir + "GTDB-version-info.txt"):
 
-        sys.exit(0)
+        return None
 
     # generating when table doesn't exist yet
     else:

@@ -162,6 +162,7 @@ class RunData:
     hmm_path: str = ""
     mapping_file_path: str = ""
     mapping_dict: dict = field(default_factory=dict)
+    initial_mapping_IDs_from_user: List[str] = field(default_factory=list)
     ready_genome_AA_files_dir: str = ""
     hmm_results_dir: str = ""
     found_SCG_seqs_dir: str = ""
@@ -249,8 +250,11 @@ class RunData:
     def found_ncbi_accs(self) -> List[GenomeData]:
         return [gd for gd in self.ncbi_accs if gd.was_found]
 
+    def get_ncbi_accs_for_snakemake_preprocessing(self) -> List[GenomeData]:
+        return [gd for gd in self.ncbi_accs if gd.was_found and not gd.preprocessing_done and not gd.removed]
+
     def remaining_ncbi_accs(self) -> List[GenomeData]:
-        return [gd for gd in self.ncbi_accs if not gd.preprocessing_done and not gd.removed]
+        return [gd.id for gd in self.ncbi_accs if not gd.removed]
 
     def get_ncbi_accs_not_downloaded(self) -> List[str]:
         return [gd.id for gd in self.ncbi_accs if gd.was_downloaded is False]
@@ -436,7 +440,6 @@ def run_snakemake(snakefile, tqdm_jobs, args, run_data, description, print_lines
 
     bar_format = "      {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
     with open(snakemake_log, "w") as log_file, tqdm(total = tqdm_jobs, bar_format = bar_format, ncols = 76) as pbar:
-    # with open(snakemake_log, "w") as log_file, tqdm(total=tqdm_jobs, desc="      " + description, ncols = 74) as pbar:
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
