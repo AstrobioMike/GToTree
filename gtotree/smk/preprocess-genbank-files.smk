@@ -5,7 +5,7 @@ from gtotree.utils.general import (read_run_data,
 from gtotree.utils.seqs import (extract_filter_and_rename_cds_amino_acids_from_gb,
                                 extract_fasta_from_gb,
                                 filter_and_rename_fasta)
-from gtotree.utils.preprocessing_genomes import run_prodigal
+from gtotree.stages.preprocessing_genomes import run_prodigal
 
 run_data = read_run_data(config['run_data_path'])
 if run_data is None:

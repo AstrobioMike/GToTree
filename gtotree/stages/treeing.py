@@ -1,0 +1,13 @@
+from gtotree.utils.messaging import report_processing_stage
+from gtotree.utils.tree_program_handling import run_tree_building
+
+def make_tree(args, run_data):
+
+    if args.no_tree:
+        return run_data
+
+    report_processing_stage("treeing")
+
+    run_data = run_tree_building(args, run_data)
+
+    return run_data

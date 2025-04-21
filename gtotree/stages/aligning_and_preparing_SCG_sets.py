@@ -7,7 +7,7 @@ from gtotree.utils.seqs import check_target_SCGs_have_seqs
 
 def align_and_prepare_SCG_sets(args, run_data):
 
-    report_processing_stage("align-and-prepare-gene-sets")
+    report_processing_stage("align-and-prepare-SCG-sets")
 
     num_SCGs_to_align = len(run_data.get_all_SCG_targets_remaining())
 

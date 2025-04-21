@@ -463,11 +463,11 @@ def final_setups(args, run_data):
 
     args, run_data = setup_tmp_dir(args, run_data)
 
-    snakemake_logs_dir_rel = os.path.join(args.output_dir, "snakemake-logs")
-    snakemake_logs_dir = os.path.abspath(snakemake_logs_dir_rel)
-    os.makedirs(snakemake_logs_dir, exist_ok=True)
-    run_data.snakemake_logs_dir_rel = snakemake_logs_dir_rel
-    run_data.snakemake_logs_dir = snakemake_logs_dir
+    logs_dir_rel = os.path.join(args.output_dir, "logs")
+    logs_dir = os.path.abspath(logs_dir_rel)
+    os.makedirs(logs_dir, exist_ok=True)
+    run_data.logs_dir_rel = logs_dir_rel
+    run_data.logs_dir = logs_dir
 
     if args.ncbi_accessions:
         ncbi_downloads_dir_rel = os.path.join(args.tmp_dir, "ncbi-downloads")

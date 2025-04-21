@@ -1,14 +1,12 @@
 ## next: 
 
     # treeing
-        # no workflow needed, maybe print where the log is being written to so people know where to check if waiting awhile
+        # primary implementation done, add auto-mid-point-rooting
 
     # build output tables
         # capture number of genes per genome from the filter_and_rename function output by returning the num variable
             # then write it to the .done file and stick it in the GenomeData class in the "all" rule
     # build output summary (including citations.txt)
-    # move snakemake logs dir to tmp dir after run finished
-        # kept in output dir during run is so it's easily findable if there is a problem while running
     # optional ko search
         # perform this on all genomes still, after preprocessing before dropping for other reasons
     # optional pfam search 
@@ -40,6 +38,7 @@
         # and not resume is only for resuming, all needs to be the same; it's not for modifying and re-running anything
 
     # add auto mid-point rooting (unless an option was passed to *not* do that; and save initial tree anyway)
+        # can probably do this in stages.treeing
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 

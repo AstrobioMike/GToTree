@@ -126,7 +126,7 @@ def stdout_and_log(*args, log_file="gtotree-runlog.txt", sep=" ", end="\n\n", fl
         with open(log_file, "a") as f:
             f.write(message)
 
-
+@capture_stdout_to_log(lambda: log_file_var.get())
 def report_early_exit(message = None, color = "red", suggest_help = False):
     if message:
         print("")
@@ -314,70 +314,44 @@ def absurd_number_of_genomes_notice(total_input_genomes):
 
 @capture_stdout_to_log(lambda: log_file_var.get())
 def report_processing_stage(stage):
-    allowed_stages = ["ncbi", "genbank", "fasta", "amino-acid",
-                      "preprocessing-update", "hmm-search", "filter-genes",
-                      "filter-genomes", "align-and-prepare-gene-sets",
-                      "concatenate-SCG-sets", "updating-headers", "tree"]
 
-    if stage not in allowed_stages:
-        raise ValueError(f"Invalid stage: {stage}. Must be one of: {', '.join(allowed_stages)}")
+    stages_dict = {
+        "ncbi":                        "Preprocessing the genomes provided as NCBI accessions",
+        "genbank":                     "Preprocessing the genomes provided as genbank files",
+        "fasta":                       "Preprocessing the genomes provided as fasta files",
+        "amino-acid":                  "Preprocessing the genomes provided as amino-acid files",
+        "preprocessing-update":        "Summary of input-genome preprocessing",
+        "hmm-search":                  "Searching genomes for target single-copy genes",
+        "filter-genes":                "Filtering genes by length",
+        "filter-genomes":              "Filtering genomes with too few hits",
+        "align-and-prepare-SCG-sets":  "Aligning, trimming, and preparing SCG-sets",
+        "concatenate-SCG-sets":        "Concatenating all SCG-set alignments together",
+        "updating-headers":            "Adding more informative headers",
+        "treeing":                     "Making the phylogenomic tree",
+    }
 
-    if stage == "ncbi":
-        message = ("\n  ##############################################################################\n"
-                    "  ####        Preprocessing the genomes provided as NCBI accessions         ####\n"
-                    "  ##############################################################################")
-    elif stage == "genbank":
-        message = ("\n  ##############################################################################\n"
-                    "  ####         Preprocessing the genomes provided as genbank files          ####\n"
-                    "  ##############################################################################")
-    elif stage == "fasta":
-        message = ("\n  ##############################################################################\n"
-                    "  ####          Preprocessing the genomes provided as fasta files           ####\n"
-                    "  ##############################################################################")
-    elif stage == "amino-acid":
-        message = ("\n  ##############################################################################\n"
-                    "  ####        Preprocessing the genomes provided as amino-acid files        ####\n"
-                    "  ##############################################################################")
-    elif stage == "preprocessing-update":
-        message = ("\n  ##############################################################################\n"
-                    "  ####                Summary of input-genome preprocessing                 ####\n"
-                    "  ##############################################################################")
-    elif stage == "hmm-search":
-        message = ("\n  ##############################################################################\n"
-                    "  ####            Searching genomes for target single-copy genes            ####\n"
-                    "  ##############################################################################")
-    elif stage == "filter-genes":
-        message = ("\n  ##############################################################################\n"
-                    "  ####                      Filtering genes by length                       ####\n"
-                    "  ##############################################################################")
-    elif stage == "filter-genomes":
-        message = ("\n  ##############################################################################\n"
-                    "  ####                 Filtering genomes with too few hits                  ####\n"
-                    "  ##############################################################################")
-    elif stage == "align-and-prepare-gene-sets":
-        message = ("\n  ##############################################################################\n"
-                    "  ####              Aligning, trimming, and preparing SCG-sets              ####\n"
-                    "  ##############################################################################")
-    elif stage == "concatenate-SCG-sets":
-        message = ("\n  ##############################################################################\n"
-                    "  ####            Concatenating all SCG-set alignments together             ####\n"
-                    "  ##############################################################################")
-    elif stage == "updating-headers":
-        message = ("\n  ##############################################################################\n"
-                    "  ####                   Adding more informative headers                    ####\n"
-                    "  ##############################################################################")
-    else:
-        report_early_exit(f"Invalid stage ('{stage}'provided to `report_processing_stage`")
+    try:
+        desc = stages_dict[stage]
+    except KeyError:
+        allowed = ", ".join(stages_dict)
+        raise ValueError(f"Invalid stage: {stage!r}. Must be one of: {allowed!r}")
 
     add_border()
-    print(message)
+
+    width = 78
+    border = "#" * width
+    inner_width = width - 2 * len("####")
+    print()
+    print(f"  {border}")
+    print(f"  ####{desc.center(inner_width)}####")
+    print(f"  {border}")
     # time.sleep(1)
 
 
-def report_snakemake_failure(description, snakemake_log):
+def report_snakemake_failure(description, log):
     time.sleep(1)
     report_message(f"\nSnakemake failed while running the \"{description}\" workflow.\n", width = 90, color = "red")
-    print(color_text(f"  Check the log at:\n    {snakemake_log}", "yellow"))
+    print(color_text(f"  Check the log at:\n    {log}", "yellow"))
     report_early_exit()
 
 

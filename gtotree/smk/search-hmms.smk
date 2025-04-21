@@ -1,12 +1,12 @@
 import os
 from gtotree.utils.general import (read_run_data,
                                    write_run_data)
-from gtotree.utils.hmms.hmm_searching import (run_hmm_search,
-                                             parse_hmmer_results,
-                                             get_seqs,
-                                             write_out_SCG_hit_seqs,
-                                             start_combined_SCG_hit_count_tab,
-                                             add_to_combined_SCG_hit_count_tab)
+from gtotree.stages.hmm_searching import (run_hmm_search,
+                                          parse_hmmer_results,
+                                          get_seqs,
+                                          write_out_SCG_hit_seqs,
+                                          start_combined_SCG_hit_count_tab,
+                                          add_to_combined_SCG_hit_count_tab)
 
 run_data = read_run_data(config['run_data_path'])
 if run_data is None:

@@ -168,8 +168,8 @@ class RunData:
     found_SCG_seqs_dir: str = ""
     tmp_dir: str = ""
     log_file: str = ""
-    snakemake_logs_dir: str = ""
-    snakemake_logs_dir_rel: str = ""
+    logs_dir: str = ""
+    logs_dir_rel: str = ""
     num_hmm_cpus: str = ""
     best_hit_mode: bool = False
     seq_length_cutoff: float = None
@@ -181,6 +181,7 @@ class RunData:
     updating_headers: bool = False
     concatenated_alignment_path: str = ""
     final_alignment_path: str = ""
+    final_tree_path: str = ""
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
@@ -428,8 +429,8 @@ def touch(path):
 def run_snakemake(snakefile, tqdm_jobs, args, run_data, description, print_lines=False):
     print("")
     num_finished = 0 # counting this so it doesn't flip the progress bar when it counts the final "all" rule
-    snakemake_log = f"{run_data.snakemake_logs_dir}/{description.replace(' ', '-').lower()}.log"
-    snakemake_log_dir_rel = f"{run_data.snakemake_logs_dir_rel}/{description.replace(' ', '-').lower()}.log"
+    log = f"{run_data.logs_dir}/{description.replace(' ', '-').lower()}.log"
+    log_dir_rel = f"{run_data.logs_dir_rel}/{description.replace(' ', '-').lower()}.log"
 
     cmd = [
         "snakemake",
@@ -441,7 +442,7 @@ def run_snakemake(snakefile, tqdm_jobs, args, run_data, description, print_lines
     ]
 
     bar_format = "      {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
-    with open(snakemake_log, "w") as log_file, tqdm(total = tqdm_jobs, bar_format = bar_format, ncols = 76) as pbar:
+    with open(log, "w") as log_file, tqdm(total = tqdm_jobs, bar_format = bar_format, ncols = 76) as pbar:
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -463,7 +464,7 @@ def run_snakemake(snakefile, tqdm_jobs, args, run_data, description, print_lines
         process.wait()
 
         if process.returncode != 0:
-            report_snakemake_failure(description, snakemake_log_dir_rel)
+            report_snakemake_failure(description, log_dir_rel)
             report_early_exit()
 
 

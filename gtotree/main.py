@@ -2,13 +2,14 @@ from gtotree.cli.parser import parser
 from gtotree.utils.preflight_checks import preflight_checks
 from gtotree.utils.messaging import gtotree_header
 from gtotree.utils.runinfo import display_initial_run_info
-from gtotree.utils.preprocessing_genomes import preprocess_genomes
-from gtotree.utils.hmms.hmm_searching import search_hmms
-from gtotree.utils.filtering_genes import filter_genes
-from gtotree.utils.filtering_genomes import filter_genomes
-from gtotree.utils.aligning_and_preparing_SCG_sets import align_and_prepare_SCG_sets
-from gtotree.utils.concatenating_SCG_sets import concatenate_SCG_sets
-from gtotree.utils.updating_headers import update_headers
+from gtotree.stages.preprocessing_genomes import preprocess_genomes
+from gtotree.stages.hmm_searching import search_hmms
+from gtotree.stages.filtering_genes import filter_genes
+from gtotree.stages.filtering_genomes import filter_genomes
+from gtotree.stages.aligning_and_preparing_SCG_sets import align_and_prepare_SCG_sets
+from gtotree.stages.concatenating_SCG_sets import concatenate_SCG_sets
+from gtotree.stages.updating_headers import update_headers
+from gtotree.stages.treeing import make_tree
 
 def main(args = None):
     if args is None:
@@ -34,10 +35,10 @@ def main(args = None):
 
     run_data = update_headers(args, run_data)
 
+    run_data = make_tree(args, run_data)
+
     print(f"\n\n{run_data}\n\n")
     print(f"\n\n{args}\n\n")
-
-    # tree_building(args, run_data)
 
     # optional ko searching
 

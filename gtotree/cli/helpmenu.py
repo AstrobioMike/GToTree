@@ -133,9 +133,8 @@ helpmenu += f"""
       {color_text("General run settings:", "yellow")}
 
         - [-R | --resume] resume mode; default: false
-                  Provide this flag with no arguments if you'd like to try resume a
-                  previous run. This is on by default if the output directory already
-                  exists and the `-F` flag is not provided.
+                  Provide this flag with no arguments if you'd like to try to resume a
+                  previous run. This cannot be used if any inputs or options have changed.
 
         - [-z ] nucleotide mode; default: false
                   Make alignment and/or tree with nucleotide sequences instead
