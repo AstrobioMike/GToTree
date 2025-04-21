@@ -1,11 +1,12 @@
 from gtotree.utils.messaging import report_processing_stage
 from gtotree.utils.gtdb.handle_gtdb_tax_info import update_mapping_dict_with_gtdb_tax_info
 from gtotree.utils.ncbi.handle_ncbi_tax_info import update_mapping_dict_with_ncbi_tax_info
-# from gtotree.utils.seqs
+from gtotree.utils.seqs import swap_labels_in_alignment
 
 def update_headers(args, run_data):
 
     if not run_data.updating_headers:
+        run_data.final_alignment_path = run_data.concatenated_alignment_path
         return run_data
 
     report_processing_stage("updating-headers")
@@ -16,9 +17,6 @@ def update_headers(args, run_data):
     if args.add_ncbi_tax:
         run_data = update_mapping_dict_with_ncbi_tax_info(args, run_data)
 
-
-    ### at this point the run_data.mapping_dict should have all entries that need to be changed
-    # run_data = create_modified_alignment_file(run_data)
-        # write out to, e.g., os.path.join(run_data.output_dir, "aligned-SCGs-mod-names.faa")
+    run_data = swap_labels_in_alignment(run_data)
 
     return run_data

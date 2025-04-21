@@ -179,6 +179,8 @@ class RunData:
     num_muscle_threads: int = 5
     nucleotide_mode: bool = False
     updating_headers: bool = False
+    concatenated_alignment_path: str = ""
+    final_alignment_path: str = ""
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 

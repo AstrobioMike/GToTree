@@ -1,4 +1,5 @@
 import os
+import shutil
 import statistics
 from Bio import SeqIO
 import subprocess
@@ -230,7 +231,9 @@ def concatenate_alignments(run_data):
             out.write(">" + header + "\n")
             out.write(spacer.join(seqs) + "\n")
 
-    return dict_of_genomes, SCG_IDs_ready_for_cat
+    run_data.concatenated_alignment_path = output_path
+
+    return run_data, dict_of_genomes, SCG_IDs_ready_for_cat
 
 
 def gen_partitions_file(run_data, SCG_IDs, dict_of_genomes):
@@ -252,3 +255,27 @@ def gen_partitions_file(run_data, SCG_IDs, dict_of_genomes):
 
             out.write(f"{mol_type}, {SCG_IDs[i]} = {curr_start}-{curr_stop}\n")
             curr_start = curr_stop + spacer_addition
+
+
+def swap_labels_in_alignment(run_data):
+    if not run_data.nucleotide_mode:
+        orig_alignment_path = os.path.join(run_data.output_dir, "aligned-SCGs.faa")
+        backup_alignment_path = os.path.join(run_data.run_files_dir, "aligned-SCGs.faa")
+        new_alignment_path = os.path.join(run_data.output_dir, "aligned-SCGs-mod-names.faa")
+    else:
+        orig_alignment_path = os.path.join(run_data.output_dir, "aligned-SCGs.fa")
+        backup_alignment_path = os.path.join(run_data.run_files_dir, "aligned-SCGs.fa")
+        new_alignment_path = os.path.join(run_data.output_dir, "aligned-SCGs-mod-names.fa")
+
+    sequences = list(SeqIO.parse(orig_alignment_path, "fasta"))
+    with open(new_alignment_path, "w") as fh:
+        for seq in sequences:
+            if seq.id in run_data.mapping_dict:
+                seq.id = run_data.mapping_dict[seq.id]
+            fh.write(f">{seq.id}\n{str(seq.seq)}\n")
+
+    shutil.move(orig_alignment_path, backup_alignment_path)
+
+    run_data.final_alignment_path = new_alignment_path
+
+    return run_data

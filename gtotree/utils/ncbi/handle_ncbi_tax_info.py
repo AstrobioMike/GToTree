@@ -70,4 +70,4 @@ def reformat_ncbi_tax_tab(df):
         for full_sp, st in zip(orig_species, df['strain'])
     ]
 
-    return(df)
+    return df

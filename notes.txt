@@ -1,12 +1,8 @@
 ## next: 
-    # renaming if needed
-        # i'm up to swapping labels in the alignment
-        # figure out if i need to append original accessions somewhere
-            # or have a flag for this, i feel like this is needed but don't remember what GToTree currently does
-        # swap labels in new alignment file
 
     # treeing
-        # no workflow
+        # no workflow needed, maybe print where the log is being written to so people know where to check if waiting awhile
+
     # build output tables
         # capture number of genes per genome from the filter_and_rename function output by returning the num variable
             # then write it to the .done file and stick it in the GenomeData class in the "all" rule
@@ -26,8 +22,9 @@
     # add in checks for the total number of remaining genomes being >= 3
         # at start, and then after genome filtering
 
-    # maybe add an ext variable somewhere so when working with amino acids we have .faa, and .fa when nucleotides in tmp outputs
+    # maybe add an ext variable somewhere (could be in run_data) so when working with amino acids we have .faa, and .fa when nucleotides in tmp outputs
         # right now i just did .fasta so it covers both
+        # final outputs are named appropriately
 
     # filter-genomes.smk currently runs whether it's needed or not
         # this is because i needed to produce the output files whether the step overall is needed or not
@@ -39,8 +36,10 @@
             # it isn't actually running all the alignments again if not needed, so it should be relatively quick
             # but it's probably unnecessarily confusing
 
-    # maybe don't make --resume be auto, stop and tell the user to specify --resume or -F if the output dir exists
+    # maybe *don't* make --resume be auto (despite my earlier idea), stop and tell the user to specify --resume or -F if the output dir exists
+        # and not resume is only for resuming, all needs to be the same; it's not for modifying and re-running anything
 
+    # add auto mid-point rooting (unless an option was passed to *not* do that; and save initial tree anyway)
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
@@ -134,7 +133,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 ### """
 # In its first 6 years, the original GToTree received over 500 citations and has been
-# successfully regularly maintained over this time despite its foundation being a main runner 
+# successfully continually maintained over this time despite its foundation being a main runner 
 # of ~4,000 lines of BASH and dozens of independent python and BASH helper scripts with a lot 
 # of redundancy in its code base. Among several other improvements and feature additions, GToTree 
 # has now been rewritten from the ground up in python with its major stages being powered by 
