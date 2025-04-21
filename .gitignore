@@ -1,2 +1,5 @@
 .DS_Store
 notes.txt
+GToTree.egg-info/
+build/
+gtotree/

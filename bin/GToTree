@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.8.13"
+VERSION="v1.8.14"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -2752,7 +2752,8 @@ if [ -n "$new_file_to_genome_id_map" ] || [ $taxonkit_id_swap != "false" ] || [ 
         if [ $taxid_counts -gt 1 ]; then
 
             ## running taxonkit and adding to summary table ##
-            cut -f 2 ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | taxonkit lineage | taxonkit reformat -r NA | cut -f3 | tr ";" "\t" > ${tmp_dir}/lineages.tmp
+            taxonkit_reformat_pattern='{domain|superkingdom}\t{phylum}\t{class}\t{order}\t{family}\t{genus}\t{species}'
+            cut -f 2 ${output_dir}/Genomes_summary_info.tsv | tail -n +2 | taxonkit lineage | taxonkit reformat2 -r NA -f "${taxonkit_reformat_pattern}" | cut -f 3- | tr ";" "\t" > ${tmp_dir}/lineages.tmp
 
             cat <(printf "NCBI_domain\tNCBI_phylum\tNCBI_class\tNCBI_order\tNCBI_family\tNCBI_genus\tNCBI_species\n") ${tmp_dir}/lineages.tmp > ${tmp_dir}/lineages2.tmp
 
