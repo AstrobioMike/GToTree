@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.8.14 (21-Apr-2025)
+
+### Changed
+- change to taxonkit call when adding NCBI tax info (now using `reformat2` and a pattern) in order to deal with NCBI tax-structure update
+
+
 ## v1.8.13 (18-Mar-2025)
 
 ### Changed
