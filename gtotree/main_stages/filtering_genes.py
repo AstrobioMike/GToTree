@@ -21,6 +21,7 @@ def filter_genes(args, run_data):
         run_snakemake(snakefile, num_SCGs_to_filter_by_length, args, run_data, description)
 
         run_data = read_run_data(run_data.run_data_path)
-        run_data = check_target_SCGs_have_seqs(run_data, "-gene-filtered.fasta")
+
+    run_data = check_target_SCGs_have_seqs(run_data, "-gene-filtered.fasta")
 
     return run_data

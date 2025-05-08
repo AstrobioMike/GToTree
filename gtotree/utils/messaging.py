@@ -367,6 +367,7 @@ def report_processing_stage(stage):
         "concatenate-SCG-sets":        "Concatenating all SCG-set alignments together",
         "updating-headers":            "Adding more informative headers",
         "treeing":                     "Making the phylogenomic tree",
+        "done":                        "Done!!",
     }
 
     try:
@@ -377,13 +378,24 @@ def report_processing_stage(stage):
 
     add_border()
 
-    width = 78
-    border = "#" * width
-    inner_width = width - 2 * len("####")
-    print()
-    print(f"  {border}")
-    print(f"  ####{desc.center(inner_width)}####")
-    print(f"  {border}")
+    if stage == "done":
+        width = 82
+        border = "#" * width
+        bumper = "#" * 8
+        inner_width = width - 2 * len(bumper)
+        print()
+        print(f"{border}")
+        print(f"{bumper}{color_text(f"{desc.center(inner_width)}", "green")}{bumper}")
+        print(f"{border}")
+
+    else:
+        width = 78
+        border = "#" * width
+        inner_width = width - 2 * len("####")
+        print()
+        print(f"  {border}")
+        print(f"  ####{desc.center(inner_width)}####")
+        print(f"  {border}")
     # time.sleep(1)
 
 
@@ -500,7 +512,9 @@ def report_hmm_search_update(run_data):
         message = (f"{color_text(f"All {num_searched} genomes were successfully searched for target genes!".center(82), "green")}")
     else:
         message = f"    Of the {num_searched} input genomes, {num_successful} were successfully searched for the target genes.\n\n"
+
     report_update(message)
+
 
 
 def report_genome_filtering_update(run_data):
@@ -512,9 +526,37 @@ def report_genome_filtering_update(run_data):
         message = (f"{color_text(f"No genomes were removed due to having too few SCG hits!".center(82), "green")}")
     else:
         message = f"    Of the input genomes remaining:\n\n"
-        message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few SCG hits", "yellow")}, reported in:\n"
-                    f"        {run_data.run_files_dir_rel}/genomes-removed-for-too-few-SCG-hits.txt\n\n")
+        message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few SCG hits", "yellow")}, reported in:\n")
+        message += (f"        {run_data.run_files_dir_rel}/genomes-removed-for-too-few-SCG-hits.txt\n\n")
         message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} made it through the preprocessing gauntlet.\n\n", "yellow")}")
         message += "Moving onto alignments with those :)".center(82)
 
     report_update(message)
+
+
+def report_SCG_set_alignment_update(run_data):
+    total_SCG_targets = len(run_data.get_all_SCG_targets())
+    num_SCG_targets_remaining = len(run_data.get_all_SCG_targets_remaining())
+    num_SCG_targets_dropped = total_SCG_targets - num_SCG_targets_remaining
+
+    if num_SCG_targets_dropped == 0:
+        message = f"{color_text(f"All {total_SCG_targets} SCG-targets were successfully aligned and prepared!".center(82), 'green')}"
+    else:
+        message = (f"    Of the initial {total_SCG_targets} SCG-targets:\n\n")
+        message += (f"        {color_text(f"{num_SCG_targets_dropped} had no hits or were filtered out", 'yellow')}, reported in:\n")
+        message += (f"          {run_data.run_files_dir_rel}/SCG-targets-dropped-from-analysis.txt\n\n")
+        message += (f"Moving forward with the remaining {num_SCG_targets_remaining} :)".center(82))
+
+    report_update(message)
+
+
+def summarize_results(args, run_info):
+
+    report_processing_stage("done")
+
+    num_initial_genomes = len(run_info.get_all_input_genome_ids())
+    num_remaining_genomes = len(run_info.get_all_remaining_input_genome_ids())
+
+    print(f"\n  Overall, {num_remaining_genomes} of the initial {num_initial_genomes} genomes were retained (see notes below).\n")
+
+

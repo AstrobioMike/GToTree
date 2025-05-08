@@ -7,6 +7,7 @@ from gtotree.utils.helper_scripts.gtt_midpoint_root_tree import midpoint_root_tr
 
 def run_tree_building(args, run_data):
     orig_out_tree, final_out_tree = get_out_tree_file(run_data)
+
     try:
         builder = command_building_dict[args.tree_program]
     except KeyError:

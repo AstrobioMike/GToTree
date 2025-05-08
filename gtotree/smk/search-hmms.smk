@@ -1,7 +1,7 @@
 import os
 from gtotree.utils.general import (read_run_data,
                                    write_run_data)
-from gtotree.stages.hmm_searching import (run_hmm_search,
+from gtotree.main_stages.hmm_searching import (run_hmm_search,
                                           parse_hmmer_results,
                                           get_seqs,
                                           write_out_SCG_hit_seqs,

@@ -35,6 +35,6 @@ rule filter_genomes:
         if len(genome_ids_to_remove) == 0:
             shutil.copy(inpath, outpath)
         else:
-            filter_seqs_by_genome_ids(path, genome_ids_to_remove, outpath)
+            filter_seqs_by_genome_ids(inpath, genome_ids_to_remove, outpath)
 
         touch(output[0])

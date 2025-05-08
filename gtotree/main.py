@@ -1,6 +1,8 @@
 from gtotree.cli.parser import parser
 from gtotree.utils.preflight_checks import preflight_checks
-from gtotree.utils.messaging import gtotree_header, display_initial_run_info
+from gtotree.utils.messaging import (gtotree_header,
+                                     display_initial_run_info,
+                                     summarize_results)
 from gtotree.main_stages.preprocessing_genomes import preprocess_genomes
 from gtotree.main_stages.hmm_searching import search_hmms
 from gtotree.main_stages.filtering_genes import filter_genes
@@ -38,6 +40,8 @@ def main(args = None):
     run_data = make_tree(args, run_data)
 
     generate_citations_info(run_data)
+
+    summarize_results(args, run_data)
 
     # print(f"\n\n{run_data}\n\n")
     # print(f"\n\n{args}\n\n")

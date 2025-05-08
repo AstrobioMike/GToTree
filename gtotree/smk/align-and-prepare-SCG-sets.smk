@@ -40,7 +40,10 @@ rule all:
         for f in input:
             os.remove(f)
 
+        run_data.all_SCG_sets_aligned = True
+
         write_run_data(run_data)
+
 
 rule align:
     output:

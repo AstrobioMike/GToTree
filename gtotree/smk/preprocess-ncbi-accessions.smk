@@ -1,6 +1,6 @@
 from gtotree.utils.general import (read_run_data,
                                    write_run_data)
-from gtotree.stages.preprocessing_genomes import run_prodigal, prepare_accession
+from gtotree.main_stages.preprocessing_genomes import run_prodigal, prepare_accession
 from gtotree.utils.seqs import filter_and_rename_fasta
 
 run_data = read_run_data(config['run_data_path'])

@@ -1,9 +1,10 @@
 ## next: 
 
+    # build output summary
+
     # build output tables
         # capture number of genes per genome from the filter_and_rename function output by returning the num variable
             # then write it to the .done file and stick it in the GenomeData class in the "all" rule
-    # build output summary
     # optional ko search
         # perform this on all genomes still, after preprocessing before dropping for other reasons
     # optional pfam search 

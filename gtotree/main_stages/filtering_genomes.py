@@ -15,26 +15,28 @@ def filter_genomes(args, run_data):
     else:
         print(f"\n       Keeping those with hits to at least {cutoff}% of the total targeted SCGs.")
 
-    genomes = run_data.get_all_input_genomes_for_filtering()
-    num_remaining_SCG_targets = len([SCG.id for SCG in run_data.get_all_SCG_targets_remaining()])
-    min_num_SCG_hits = round(num_remaining_SCG_targets * args.genome_hits_cutoff)
-    genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_SCG_hits < min_num_SCG_hits]
+    if not run_data.genomes_filtered_for_min_SCG_hits:
 
-    for genome in genomes:
-        if genome.id in genome_ids_to_filter_out:
-            genome.removed = True
-            genome.reason_removed = "too few SCG hits"
+        genomes = run_data.get_all_input_genomes_for_filtering()
+        num_remaining_SCG_targets = len([SCG.id for SCG in run_data.get_all_SCG_targets_remaining()])
+        min_num_SCG_hits = round(num_remaining_SCG_targets * args.genome_hits_cutoff)
+        genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_SCG_hits < min_num_SCG_hits]
 
-    write_run_data(run_data)
-    snakefile = get_snakefile_path("filter-genomes.smk")
-    description = "Filtering genomes"
+        for genome in genomes:
+            if genome.id in genome_ids_to_filter_out:
+                genome.removed = True
+                genome.reason_removed = "too few SCG hits"
 
-    run_snakemake(snakefile, num_remaining_SCG_targets, args, run_data, description)
+        write_run_data(run_data)
+        snakefile = get_snakefile_path("filter-genomes.smk")
+        description = "Filtering genomes"
 
-    run_data = read_run_data(run_data.run_data_path)
-    capture_removed_genomes(run_data)
+        run_snakemake(snakefile, num_remaining_SCG_targets, args, run_data, description)
 
-    run_data = check_target_SCGs_have_seqs(run_data, "-genome-filtered.fasta")
+        run_data = read_run_data(run_data.run_data_path)
+        capture_removed_genomes(run_data)
+
+        run_data = check_target_SCGs_have_seqs(run_data, "-genome-filtered.fasta")
 
     report_genome_filtering_update(run_data)
 

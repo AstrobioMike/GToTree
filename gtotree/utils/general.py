@@ -14,7 +14,6 @@ import urllib.request
 from pkg_resources import resource_filename
 from gtotree.utils.messaging import report_early_exit, report_snakemake_failure
 
-
 @dataclass
 class ToolsUsed:
     prodigal_used: bool = False
@@ -141,6 +140,7 @@ class SCGset:
 
 
 
+
 @dataclass
 class RunData:
     ncbi_accs: List[GenomeData] = field(default_factory=list)
@@ -176,10 +176,12 @@ class RunData:
     seq_length_cutoff: float = None
     SCG_hits_filtered: bool = False
     genomes_filtered_for_min_SCG_hits: bool = False
+    all_SCG_sets_aligned: bool = False
+    updating_headers: bool = False
+    headers_updated: bool = False
     use_muscle_super5: bool = False
     num_muscle_threads: int = 5
     nucleotide_mode: bool = False
-    updating_headers: bool = False
     concatenated_alignment_path: str = ""
     final_alignment_path: str = ""
     original_tree_path: str = ""
@@ -199,9 +201,14 @@ class RunData:
     def num_incomplete_amino_acid_files(self) -> int:
         return len([gd for gd in self.amino_acid_files if not gd.preprocessing_done and not gd.removed])
 
+    def get_all_SCG_targets(self) -> List[SCGset]:
+        return [scg for scg in self.SCG_targets]
 
     def get_all_SCG_targets_remaining(self) -> List[SCGset]:
-        return [scg for scg in self.SCG_targets if scg.remaining]
+        return [scg for scg in self.SCG_targets if scg.remaining and not scg.removed]
+
+    def get_all_removed_SCG_targets(self) -> List:
+        return [scg.id for scg in self.SCG_targets if scg.removed]
 
     def get_all_SCG_targets_remaining_but_not_filtered(self) -> List[SCGset]:
         return [scg for scg in self.SCG_targets if scg.remaining and not scg.gene_length_filtered]
@@ -491,7 +498,8 @@ def check_file_exists_and_not_empty(path):
     try:
         if os.path.getsize(path) > 0:
             return True
+        else:
+            remove_file_if_exists(path)
     except FileNotFoundError:
         pass
     return False
-

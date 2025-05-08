@@ -8,6 +8,11 @@ def make_tree(args, run_data):
 
     report_processing_stage("treeing")
 
-    run_data = run_tree_building(args, run_data)
+    if run_data.final_tree_path is not None:
+        print("")
+        print(f"The tree was built with {args.tree_program}.".center(82))
+
+    else:
+        run_data = run_tree_building(args, run_data)
 
     return run_data

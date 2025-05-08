@@ -2,22 +2,35 @@ from gtotree.utils.general import (write_run_data,
                                    read_run_data,
                                    get_snakefile_path,
                                    run_snakemake)
-from gtotree.utils.messaging import report_processing_stage
-from gtotree.utils.seqs import check_target_SCGs_have_seqs
+from gtotree.utils.messaging import (report_processing_stage,
+                                    report_SCG_set_alignment_update)
 
 def align_and_prepare_SCG_sets(args, run_data):
 
     report_processing_stage("align-and-prepare-SCG-sets")
 
-    num_SCGs_to_align = len(run_data.get_all_SCG_targets_remaining())
+    if not run_data.all_SCG_sets_aligned:
 
-    if num_SCGs_to_align > 0:
-        write_run_data(run_data)
-        snakefile = get_snakefile_path("align-and-prepare-SCG-sets.smk")
-        description = "Aligning and preparing SCG sets"
+        num_SCGs_to_align = len(run_data.get_all_SCG_targets_remaining())
 
-        run_snakemake(snakefile, num_SCGs_to_align, args, run_data, description)
+        if num_SCGs_to_align > 0:
+            write_run_data(run_data)
+            snakefile = get_snakefile_path("align-and-prepare-SCG-sets.smk")
+            description = "Aligning and preparing SCG sets"
 
-        run_data = read_run_data(run_data.run_data_path)
+            run_snakemake(snakefile, num_SCGs_to_align, args, run_data, description)
+
+            run_data = read_run_data(run_data.run_data_path)
+
+    report_SCG_set_alignment_update(run_data)
 
     return run_data
+
+
+def write_out_removed_SCG_targets(run_data):
+
+    removed_SCG_targets = run_data.get_all_removed_SCG_targets()
+    if len(removed_SCG_targets) > 0:
+        with open(run_data.run_files_dir + "/SCG-targets-dropped-from-analysis.txt", "w") as fail_file:
+            for target in removed_SCG_targets:
+                fail_file.write(target + "\n")

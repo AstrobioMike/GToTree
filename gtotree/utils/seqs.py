@@ -86,7 +86,7 @@ def extract_fasta_from_gb(prefix, input_gb, run_data):
 
 def check_target_SCGs_have_seqs(run_data, ext):
 
-    SCG_targets_present_at_start = run_data.get_all_SCG_targets_remaining()
+    SCG_targets_present_at_start = run_data.get_all_SCG_targets()
     new_SCG_targets_missing = []
 
     for SCG_obj in SCG_targets_present_at_start:
@@ -101,7 +101,7 @@ def check_target_SCGs_have_seqs(run_data, ext):
     if len(new_SCG_targets_missing) > 0:
         add_border()
         message = f"    Some target single-copy genes were not found or were filtered out of the\n"
-        message += f"    analysis.\n\n    At this point, these include:\n      {'\n      '.join(new_SCG_targets_missing)}"
+        message += f"    analysis.\n\n    These include:\n      {'\n      '.join(new_SCG_targets_missing)}"
         report_notice(message)
 
     return run_data
