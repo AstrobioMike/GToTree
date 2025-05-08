@@ -19,7 +19,9 @@ rule all:
             status_path = f"{run_data.ncbi_downloads_dir}/{acc}.done"
             with open(status_path, 'r') as f:
                 for line in f:
-                    acc, status, downloaded, prodigal_used, final_AA_path = line.strip().split('\t')
+                    acc, status, downloaded, prodigal_used, final_AA_path, num_genes = line.strip().split('\t')
+
+                    acc_gd.num_genes = int(num_genes)
 
                     if int(status):
                         acc_gd.mark_preprocessing_done()
@@ -48,9 +50,9 @@ rule process_ncbi_accessions:
             prodigal_used = False
 
         if done:
-            done, final_AA_path = filter_and_rename_fasta(acc_gd.id, run_data, run_data.ncbi_downloads_dir)
+            done, final_AA_path, num_genes = filter_and_rename_fasta(acc_gd.id, run_data, run_data.ncbi_downloads_dir)
         else:
             final_AA_path = None
 
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.acc}\t{int(done)}\t{int(downloaded)}\t{int(prodigal_used)}\t{final_AA_path}\n')
+            f.write(f'{wildcards.acc}\t{int(done)}\t{int(downloaded)}\t{int(prodigal_used)}\t{final_AA_path}\t{num_genes}\n')

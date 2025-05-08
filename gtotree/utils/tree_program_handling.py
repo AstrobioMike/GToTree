@@ -1,22 +1,23 @@
 import os
 import shutil
 import subprocess
-from gtotree.utils.messaging import report_early_exit, report_notice
+from gtotree.utils.messaging import report_early_exit, report_notice, color_text
+from gtotree.utils.helper_scripts.gtt_midpoint_root_tree import midpoint_root_tree
 
 
 def run_tree_building(args, run_data):
-    out_tree = get_out_tree_file(run_data)
+    orig_out_tree, final_out_tree = get_out_tree_file(run_data)
     try:
         builder = command_building_dict[args.tree_program]
     except KeyError:
         report_early_exit(f"Tree building program {args.tree_program!r} not recognized.", suggest_help=True)
 
-    cmd, log_file = builder(args, run_data, out_tree)
+    cmd, log_file = builder(args, run_data, orig_out_tree)
 
     print(f"""
     The tree is being built with {args.tree_program}. You can check the log file for
     progress at:
-        {log_file}
+        {color_text(log_file, "yellow")}
     """)
 
     result = subprocess.run(cmd, shell=True)
@@ -25,16 +26,20 @@ def run_tree_building(args, run_data):
 
     if args.tree_program == "IQTREE":
         shutil.copyfile(os.path.join(run_data.run_files_dir, "iqtree-out", "iqtree.treefile"),
-                        out_tree)
+                        orig_out_tree)
 
-    run_data.final_tree_path = out_tree
+    run_data.original_tree_path = orig_out_tree
+    midpoint_root_tree(orig_out_tree, final_out_tree)
+    run_data.final_tree_path = final_out_tree
 
     return run_data
 
 
 def get_out_tree_file(run_data, suffix="aligned-SCGs"):
     base = f"{suffix}-mod-names" if run_data.updating_headers else suffix
-    return os.path.join(run_data.output_dir, f"{base}.tre")
+    orig_out_tree = os.path.join(run_data.run_files_dir, f"{base}.tre")
+    final_out_tree = os.path.join(run_data.output_dir, f"{base}.tre")
+    return orig_out_tree, final_out_tree
 
 
 def build_fasttree_cmd(args, run_data, out_tree):

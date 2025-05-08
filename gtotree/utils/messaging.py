@@ -6,6 +6,7 @@ import contextlib
 from importlib.metadata import version
 from gtotree.utils.context import log_file_var
 
+
 tty_colors = {
     'green' : '\033[0;32m%s\033[0m',
     'yellow' : '\033[0;33m%s\033[0m',
@@ -125,6 +126,44 @@ def stdout_and_log(*args, log_file="gtotree-runlog.txt", sep=" ", end="\n\n", fl
     else:
         with open(log_file, "a") as f:
             f.write(message)
+
+
+@capture_stdout_to_log(lambda: log_file_var.get())
+def display_initial_run_info(args, run_data):
+
+    # this is here instead of above to prevent circular import problems (in other words, i suck at this)
+    from gtotree.utils.preflight_checks import check_input_genomes_amount
+
+    # time.sleep(1)
+
+    print("\n ----------------------------------- RUN INFO ----------------------------------- \n", flush=True)
+
+    # time.sleep(1)
+
+    report_message("  Input-genome sources include:")
+
+    if args.ncbi_accessions:
+        print(f"      - NCBI accessions listed in {args.ncbi_accessions} ({len(run_data.get_input_ncbi_accs())} genomes)", flush=True)
+    if args.genbank_files:
+        print(f"      - Genbank files listed in {args.genbank_files} ({len(run_data.get_input_genbank_ids())} genomes)", flush=True)
+    if args.fasta_files:
+        print(f"      - Fasta files listed in {args.fasta_files} ({len(run_data.get_input_fasta_ids())} genomes)", flush=True)
+    if args.amino_acid_files:
+        print(f"      - Amino-acid files listed in {args.amino_acid_files} ({len(run_data.get_input_amino_acid_ids())} genomes)", flush=True)
+
+    report_message(f"                           Total input genomes: {len(run_data.all_input_genomes)}", "green")
+    # time.sleep(1)
+
+    with contextlib.redirect_stdout(sys.__stdout__):
+        check_input_genomes_amount(len(run_data.all_input_genomes), args)
+
+    report_message("  Single-copy gene HMM source to be used:")
+    print(f"      - {args.hmm} ({len(run_data.get_all_SCG_targets_remaining())} targets)", flush=True)
+    # time.sleep(1)
+
+    check_and_report_any_changed_default_behavior(args)
+    # time.sleep(3)
+
 
 @capture_stdout_to_log(lambda: log_file_var.get())
 def report_early_exit(message = None, color = "red", suggest_help = False):

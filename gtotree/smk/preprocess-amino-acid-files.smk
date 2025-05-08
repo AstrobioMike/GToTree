@@ -21,7 +21,9 @@ rule all:
             status_path = f"{run_data.AA_processing_dir}/{AA_basename}.done"
             with open(status_path, 'r') as f:
                 for line in f:
-                    AA_file, status, was_gzipped, final_AA_path = line.strip().split('\t')
+                    AA_file, status, was_gzipped, final_AA_path, num_genes = line.strip().split('\t')
+
+                    AA.num_genes = int(num_genes)
 
                     if int(status):
                         if int(was_gzipped):
@@ -41,9 +43,9 @@ rule process_AA_files:
         AA = AA_dict[wildcards.AA_file]
         path, was_gzipped = gunzip_if_needed(AA.full_path)
 
-        done, final_AA_path = filter_and_rename_fasta(AA.id, run_data, path, full_path = True)
+        done, final_AA_path, num_genes = filter_and_rename_fasta(AA.id, run_data, path, full_path = True)
         if was_gzipped:
             os.remove(path)
 
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.AA_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\n')
+            f.write(f'{wildcards.AA_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\t{num_genes}\n')

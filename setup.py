@@ -14,6 +14,7 @@ setup(
     entry_points={
         "console_scripts": [
             "gtotree2=gtotree.main:main",
+            "gtt-midpoint-root-tree=gtotree.utils.helper_scripts.gtt_midpoint_root_tree:main",
         ],
     },
     install_requires=[

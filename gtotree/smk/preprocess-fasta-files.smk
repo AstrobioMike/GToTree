@@ -23,7 +23,9 @@ rule all:
 
             with open(status_path, 'r') as f:
                 for line in f:
-                    fasta_file, status, was_gzipped, final_AA_path = line.strip().split('\t')
+                    fasta_file, status, was_gzipped, final_AA_path, num_genes = line.strip().split('\t')
+
+                    fasta.num_genes = int(num_genes)
 
                     if int(status):
                         if int(was_gzipped):
@@ -50,9 +52,9 @@ rule process_fasta_files:
             os.remove(path)
 
         if done:
-            done, final_AA_path = filter_and_rename_fasta(fasta.id, run_data, run_data.fasta_processing_dir)
+            done, final_AA_path, num_genes = filter_and_rename_fasta(fasta.id, run_data, run_data.fasta_processing_dir)
         else:
             final_AA_path = None
 
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.fasta_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\n')
+            f.write(f'{wildcards.fasta_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\t{num_genes}\n')

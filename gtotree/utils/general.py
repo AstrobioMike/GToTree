@@ -23,9 +23,9 @@ class ToolsUsed:
     fasttree_used: bool = False
     veryfasttree_used: bool = False
     iqtree_used: bool = False
-    universal_SCGs_used: bool = False
     pfam_db_used: bool = False
     kofamscan_used: bool = False
+    universal_SCGs_used: bool = False
 
 
 def download_with_tqdm(url, target, filename=None, urlopen=False):
@@ -59,6 +59,7 @@ class GenomeData:
     hmm_search_failed: bool = None
     extract_seqs_failed: bool = None
     hmm_search_done: bool = False
+    num_genes: int = None
     num_SCG_hits: int = None
     num_SCG_hits_after_filtering: int = None
     reason_removed: str = None
@@ -181,6 +182,7 @@ class RunData:
     updating_headers: bool = False
     concatenated_alignment_path: str = ""
     final_alignment_path: str = ""
+    original_tree_path: str = ""
     final_tree_path: str = ""
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
@@ -492,3 +494,4 @@ def check_file_exists_and_not_empty(path):
     except FileNotFoundError:
         pass
     return False
+

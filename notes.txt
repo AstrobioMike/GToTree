@@ -1,12 +1,9 @@
 ## next: 
 
-    # treeing
-        # primary implementation done, add auto-mid-point-rooting
-
     # build output tables
         # capture number of genes per genome from the filter_and_rename function output by returning the num variable
             # then write it to the .done file and stick it in the GenomeData class in the "all" rule
-    # build output summary (including citations.txt)
+    # build output summary
     # optional ko search
         # perform this on all genomes still, after preprocessing before dropping for other reasons
     # optional pfam search 
@@ -20,10 +17,6 @@
     # add in checks for the total number of remaining genomes being >= 3
         # at start, and then after genome filtering
 
-    # maybe add an ext variable somewhere (could be in run_data) so when working with amino acids we have .faa, and .fa when nucleotides in tmp outputs
-        # right now i just did .fasta so it covers both
-        # final outputs are named appropriately
-
     # filter-genomes.smk currently runs whether it's needed or not
         # this is because i needed to produce the output files whether the step overall is needed or not
         # it's probably fine this way, but i guess i could check for the expected output files and only run it if
@@ -35,10 +28,13 @@
             # but it's probably unnecessarily confusing
 
     # maybe *don't* make --resume be auto (despite my earlier idea), stop and tell the user to specify --resume or -F if the output dir exists
-        # and not resume is only for resuming, all needs to be the same; it's not for modifying and re-running anything
+        # and note that resume is only for resuming, all needs to be the same; it's not for modifying and re-running anything
+        # need to build in something to check nothing changed at a resume start
 
-    # add auto mid-point rooting (unless an option was passed to *not* do that; and save initial tree anyway)
-        # can probably do this in stages.treeing
+    # maybe add an ext variable somewhere (could be in run_data) so when working with amino acids we have .faa, and .fa when nucleotides in tmp outputs
+        # right now i just did .fasta so it covers both
+        # final outputs are named appropriately
+
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
@@ -46,6 +42,7 @@ conda activate gtotree-dev
 conda install tqdm=4.67.1
 conda install pyhmmer=0.11.0
 conda install snakemake=8.30.0
+conda install dendropy=5
 pip install -e gtotree/
 
 # example test
@@ -59,19 +56,17 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 ### OVERALL NOTES ###
 # add a stop at "Summary of input-genome preprocessing" to check there are 3 or more as needed to make a tree
-# need a lot of testing on resume functionality
+# need a lot of testing on "resume" functionality
     # if i count on the resume flag for operating, i may need to make sure it makes sense up front (like does the run-data.json exist)
 # need some check and handling if the input files changed when doing a resume
     # maybe just check and require they haven't changed at all, if so a totally new run is needed
 # when a resume is done, may want to just try snakemake workflows on inputs that failed the prior runs
-# add snakemake to definite citations
 # since multiple logs may be created with --resume function, might need to add functionality to back up a log that exists to a sub-dir,
     # maybe with a time/date stamp of when first run appended to the name
 # eventually look into putting a block for this prodigal failure: "at least 100000 bases for training." (search original files)
     # maybe just make a check that input genomes are greater than 100,000 bases (if that consistently triggers it)
 # eventually add a check that nucleotide fasta inputs are nucleotide and not amino acid, and vice versa
 # eventually do something with gunzipped files we generated (probably delete them, leaving the originals)
-# bootstrapping not performed with IQTREE when fewer than 4 genomes
 
 ### TO DO ###
 
@@ -79,21 +74,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # affects:
         # get_ncbi_assembly_tables.py (DONE)
         # ncbi assembly downloads (DONE)
-        # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree)
-
-# add tree mid-point rooting, and write out a separate tree that is mid-point rooted
-#######
-# import sys
-# import dendropy
-
-# tree = dendropy.Tree.get(path = sys.argv[1], schema = "newick")
-
-# tree.reroot_at_midpoint()
-
-# tree.encode_bipartitions()
-
-# tree.write(path = f'{sys.argv[1]}-rooted.nwk', schema = "newick")
-########
+        # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree; it rarely if ever changes)
 
 
 ### CHANGES ###
@@ -136,5 +117,6 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 # of ~4,000 lines of BASH and dozens of independent python and BASH helper scripts with a lot 
 # of redundancy in its code base. Among several other improvements and feature additions, GToTree 
 # has now been rewritten from the ground up in python with its major stages being powered by 
-# Snakemake workflows - enabling the resuming of failed or interrupted runs.
+# Snakemake workflows - enabling the resuming of failed or interrupted runs. This paper highlights
+# some of the new additions to GToTree since its initial launch.
 ### """
