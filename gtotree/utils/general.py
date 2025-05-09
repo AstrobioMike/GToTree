@@ -45,9 +45,11 @@ def download_with_tqdm(url, target, filename=None, urlopen=False):
 @dataclass
 class GenomeData:
     id: str
+    source: str
     full_path: str
     provided_path: str
     basename: str
+    taxid: str = None
     preprocessing_done: bool = False
     final_AA_path: str = ""
     prodigal_used: bool = False
@@ -60,15 +62,17 @@ class GenomeData:
     hmm_search_done: bool = False
     num_genes: int = None
     num_SCG_hits: int = None
+    num_unique_SCG_hits: int = None
     num_SCG_hits_after_filtering: int = None
     reason_removed: str = None
     removed: bool = False
 
     @classmethod
-    def from_path(cls, path: str):
+    def from_path(cls, path: str, source: str):
         full_path = os.path.abspath(path)
         provided_path = path
         basename = os.path.basename(full_path)
+        source = source
 
         extensions_to_remove = [".gb", ".gbff", ".fasta", ".fna", ".fa", ".faa"]
 
@@ -81,7 +85,11 @@ class GenomeData:
                 id = id[:-len(ext)]
                 break
 
-        return cls(id, full_path, provided_path, basename)
+        return cls(id=id,
+                   source=source,
+                   full_path=full_path,
+                   provided_path=provided_path,
+                   basename=basename)
 
     @classmethod
     def from_acc(cls, acc: str):
@@ -89,8 +97,13 @@ class GenomeData:
         provided_path = None
         basename = acc
         id = acc
+        source = "accession"
 
-        return cls(id, full_path, provided_path, basename)
+        return cls(id=id,
+                   source=source,
+                   full_path=full_path,
+                   provided_path=provided_path,
+                   basename=basename)
 
     def mark_preprocessing_done(self, value=True):
         self.preprocessing_done = value
@@ -157,6 +170,7 @@ class RunData:
     fasta_processing_dir: str = ""
     AA_processing_dir: str = ""
     output_dir: str = ""
+    output_dir_rel: str = ""
     run_files_dir: str = ""
     run_files_dir_rel: str = ""
     run_data_path: str = ""
@@ -354,19 +368,19 @@ def populate_run_data(args):
     if args.genbank_files:
         with open(args.genbank_files, "r") as f:
             entries_list = f.read().splitlines()
-        run_data.genbank_files = [GenomeData.from_path(entry) for entry in entries_list]
+        run_data.genbank_files = [GenomeData.from_path(entry, "genbank-file") for entry in entries_list]
 
     if args.fasta_files:
         with open(args.fasta_files, "r") as f:
             entries_list = f.read().splitlines()
-        run_data.fasta_files = [GenomeData.from_path(entry) for entry in entries_list]
+        run_data.fasta_files = [GenomeData.from_path(entry, "nt-fasta-file") for entry in entries_list]
         for gd in run_data.fasta_files:
             gd.prodigal_used = True
 
     if args.amino_acid_files:
         with open(args.amino_acid_files, "r") as f:
             entries_list = f.read().splitlines()
-        run_data.amino_acid_files = [GenomeData.from_path(entry) for entry in entries_list]
+        run_data.amino_acid_files = [GenomeData.from_path(entry, "aa-fasta-file") for entry in entries_list]
 
     run_data.update_all_input_genomes()
     run_data.run_files_dir = args.run_files_dir

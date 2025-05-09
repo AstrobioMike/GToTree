@@ -26,7 +26,8 @@ rule all:
 
             with open(status_path, 'r') as f:
                 for line in f:
-                    ID, hmm_search_failed, extract_seqs_failed, num_SCG_hits = line.strip().split('\t')
+                    (ID, hmm_search_failed, extract_seqs_failed,
+                    num_SCG_hits, num_unique_SCG_hits) = line.strip().split('\t')
 
                     if int(hmm_search_failed):
                         genome.mark_hmm_search_failed()
@@ -42,6 +43,7 @@ rule all:
                             write_out_SCG_hit_seqs(genome.id, run_data)
                             genome.mark_hmm_search_done()
                             genome.num_SCG_hits = int(num_SCG_hits)
+                            genome.num_unique_SCG_hits = int(num_unique_SCG_hits)
 
         write_run_data(run_data)
 
@@ -59,7 +61,8 @@ rule search_hmms:
 
         if not hmm_search_failed:
 
-            dict_of_hit_counts, dict_of_hit_gene_ids, num_SCG_hits = parse_hmmer_results(f"{out_dir}/SCG-hits-hmm.txt",
+            (dict_of_hit_counts, dict_of_hit_gene_ids,
+            num_SCG_hits, num_unique_SCG_hits) = parse_hmmer_results(f"{out_dir}/SCG-hits-hmm.txt",
                                                                                          run_data)
 
             with open(f"{out_dir}/SCG-hit-counts.txt", 'w') as f:
@@ -76,4 +79,4 @@ rule search_hmms:
                         f.write(f">{gene_id}\n{seq}\n")
 
         with open(output[0], 'w') as f:
-            f.write(f"{wildcards.ID}\t{int(hmm_search_failed)}\t{int(extract_seqs_failed)}\t{int(num_SCG_hits)}\n")
+            f.write(f"{wildcards.ID}\t{int(hmm_search_failed)}\t{int(extract_seqs_failed)}\t{int(num_SCG_hits)}\t{int(num_unique_SCG_hits)}\n")

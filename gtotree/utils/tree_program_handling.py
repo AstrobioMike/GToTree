@@ -38,7 +38,7 @@ def run_tree_building(args, run_data):
 
 def get_out_tree_file(run_data, suffix="aligned-SCGs"):
     output_tree_basename = os.path.basename(run_data.output_dir)
-    orig_out_tree = os.path.join(run_data.run_files_dir, f"{output_tree_basename}.tre")
+    orig_out_tree = os.path.join(run_data.run_files_dir, f"{output_tree_basename}-non-mid-point-rooted.tre")
     final_out_tree = os.path.join(run_data.output_dir, f"{output_tree_basename}.tre")
     return orig_out_tree, final_out_tree
 

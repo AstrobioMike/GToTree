@@ -21,16 +21,17 @@ def update_mapping_dict_with_ncbi_tax_info(args, run_data):
     sub_ncbi_tax_tab = reformat_ncbi_tax_tab(sub_ncbi_tax_tab)
 
     combined_tab = pd.concat([sub_ncbi_tab["input_accession"], sub_ncbi_tax_tab], axis=1)
+    combined_tab = combined_tab.rename(columns={"input_accession": "input_acc"})
     combined_tab.to_csv(sub_ncbi_tax_path, sep="\t", index=False)
 
     for index, row in combined_tab.iterrows():
-        curr_input_acc = row["input_accession"]
+        curr_input_acc = row["input_acc"]
         if curr_input_acc in run_data.mapping_dict:
             continue
         elif row['domain'] == "NA":
             continue
         else:
-            new_label = ""
+            new_label = f"{curr_input_acc}_"
             for rank in args.lineage.split(","):
                 new_label += row[rank.lower()] + "_"
 

@@ -90,9 +90,14 @@ def check_lineage(args):
             print(f"\n  Accepted ranks are any combination of the below entered as a comma-delimited list:\n        {'\n        '.join(accepted_ranks)}")
             report_early_exit()
 
-    if args.lineage != "Domain,Phylum,Class,Species" and not args.add_ncbi_tax and not args.add_gtdb_tax:
+    if args.lineage != "Domain,Phylum,Class,Genus,Species" and not args.add_ncbi_tax and not args.add_gtdb_tax:
         report_message("You've specified a custom lineage (`-L`), but neither the "
                        "`-t` nor `-D` flags were provided to indicate which taxonomy to use.")
+        report_early_exit(suggest_help=True)
+
+    if args.add_ncbi_tax and args.add_gtdb_tax:
+        report_message("You've specified to use both the NCBI and GTDB taxonomies. "
+                       "Please choose one or the other.")
         report_early_exit(suggest_help=True)
 
 
@@ -280,14 +285,16 @@ def check_mapping_file(args, run_data, flag = "-m"):
 
     run_data.mapping_file_path = args.mapping_file
 
-    mapping_dict = make_mapping_dict(run_data.mapping_file_path)
+    # this is to handle when resuming runs, so that we don't overwrite the mapping_dict
+    if len(run_data.mapping_dict) == 0:
+        mapping_dict = make_mapping_dict(run_data.mapping_file_path)
 
-    check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data)
+        check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data)
 
-    run_data.mapping_dict = mapping_dict
+        run_data.mapping_dict = mapping_dict
 
-    # storing this so we are sure not to change any of these if we are adding taxonomic info later
-    run_data.initial_mapping_IDs_from_user = list(mapping_dict.keys())
+        # storing this so we are sure not to change any of these if we are adding taxonomic info later
+        run_data.initial_mapping_IDs_from_user = list(mapping_dict.keys())
 
     return args, run_data
 
@@ -468,6 +475,7 @@ def final_setups(args, run_data):
     os.makedirs(logs_dir, exist_ok=True)
     run_data.logs_dir_rel = logs_dir_rel
     run_data.logs_dir = logs_dir
+    run_data.output_dir_rel = args.output_dir
 
     if args.ncbi_accessions:
         ncbi_downloads_dir_rel = os.path.join(args.tmp_dir, "ncbi-downloads")

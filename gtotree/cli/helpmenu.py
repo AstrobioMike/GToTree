@@ -52,28 +52,23 @@ helpmenu += f"""
 
       {color_text("Options for adding taxonomy information:", "yellow")}
 
-        - [-t ] add NCBI taxonomy; default: false
-                  Provide this flag with no arguments if you'd like to add NCBI
-                  taxonomy info to the sequence headers for any genomes with
-                  NCBI taxids. This will will largely be effective for input
-                  genomes provided as NCBI accessions (provided to the `-a`
-                  argument), but any input GenBank files will also be searched
-                  for an NCBI taxid. See `-L` argument for specifying desired
-                  ranks.
-
         - [-D ] add GTDB taxonomy; default: false
                   Provide this flag with no arguments if you'd like to add
                   taxonomy from the Genome Taxonomy Database (GTDB;
-                  gtdb.ecogenomic.org). This will only be effective for input
-                  genomes provided as NCBI accessions (provided to the `-a`
-                  argument). This can be used in combination with the `-t` flag,
-                  in which case any input accessions not represented in the GTDB
-                  will have NCBI taxonomic infomation added (with '_NCBI'
-                  appended).
+                  gtdb.ecogenomic.org) to the sequence headers. This will
+                  only be effective for input genomes provided as NCBI accessions
+                  (provided to the `-a` argument). See the `-L` argument for
+                  specifying desired ranks.
 
-                  Note: See the `-L` argument for specifying desired ranks, and
-                  see helper script `gtt-get-accessions-from-GTDB` for help
-                  getting input accessions based on GTDB taxonomy searches.
+                  Note: See helper script `gtt-get-accessions-from-GTDB` for help
+                  getting input NCBI accessions based on GTDB taxonomy searches.
+
+        - [-t ] add NCBI taxonomy; default: false
+                  Provide this flag with no arguments if you'd like to add NCBI
+                  taxonomy info to the sequence headers. This will only be
+                  effective for input genomes provided as NCBI accessions (provided
+                  to the `-a` argument). See the `-L` argument for specifying
+                  desired ranks.
 
         - [-L <str>] wanted lineage ranks; default: Domain,Phylum,Class,Genus,Species
                   A comma-separated list of the taxonomic ranks you'd like added

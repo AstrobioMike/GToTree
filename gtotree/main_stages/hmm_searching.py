@@ -74,22 +74,25 @@ def parse_hmmer_results(inpath, run_data):
     for scg in remaining_SCG_targets:
         dict_of_hit_counts[scg] = df[df["target_SCG"] == scg].shape[0]
 
-    if run_data.best_hit_mode:
-        report_early_exit("Best hit mode not yet implemented!")
-    else:
-        pass
-
     dict_of_hit_gene_ids = dict.fromkeys(remaining_SCG_targets, None)
 
     num_SCG_hits = 0
+    num_unique_SCG_hits = 0
     for scg, count in dict_of_hit_counts.items():
-        ## will need additional logic for best-hit mode
+
         if count == 1:
             num_SCG_hits += 1
+            num_unique_SCG_hits += 1
             gene_id = df.loc[df["target_SCG"] == scg, "gene_id"].iloc[0]
             dict_of_hit_gene_ids[scg] = gene_id
 
-    return dict_of_hit_counts, dict_of_hit_gene_ids, num_SCG_hits
+        elif count > 1:
+            num_SCG_hits += 1
+            if run_data.best_hit_mode:
+                gene_id = df.loc[df["target_SCG"] == scg, "gene_id"].iloc[0]
+                dict_of_hit_gene_ids[scg] = gene_id
+
+    return dict_of_hit_counts, dict_of_hit_gene_ids, num_SCG_hits, num_unique_SCG_hits
 
 
 def get_seqs(dict_of_hit_gene_ids, AA_path):

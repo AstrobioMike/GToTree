@@ -1,5 +1,4 @@
-import time
-from gtotree.utils.messaging import report_notice, report_ncbi_accs_not_found
+from gtotree.utils.messaging import report_ncbi_accs_not_found
 
 def parse_assembly_summary(assembly_summary_file, run_data):
     """

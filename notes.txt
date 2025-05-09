@@ -2,9 +2,8 @@
 
     # build output summary
 
-    # build output tables
-        # capture number of genes per genome from the filter_and_rename function output by returning the num variable
-            # then write it to the .done file and stick it in the GenomeData class in the "all" rule
+    # build any other remaining output tables at this point (ko and pfam stuff can come later)
+
     # optional ko search
         # perform this on all genomes still, after preprocessing before dropping for other reasons
     # optional pfam search 
@@ -36,6 +35,11 @@
         # right now i just did .fasta so it covers both
         # final outputs are named appropriately
 
+    # test/look into message.get_path_rel_to_outdir()
+        # what happens when the output dir i provide to the gtotree call is a full path?
+        # check out what happens if there are multiple matches to key_dir in messaging.get_path_rel_to_outdir()
+            # e.g., if we are in a directory called gtotree-output and the output directory is also gtotree-output
+            # might need to adjust this (maybe even just searching for the last match, rather than any (or first from reverse order will work
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 

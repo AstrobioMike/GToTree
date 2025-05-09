@@ -11,7 +11,7 @@ def update_mapping_dict_with_gtdb_tax_info(args, run_data):
         if curr_input_acc in run_data.mapping_dict:
             continue
         else:
-            new_label = ""
+            new_label = f"{curr_input_acc}_"
             for rank in args.lineage.split(","):
                 if rank.lower() != "strain":
                     new_label += row[rank.lower()] + "_"

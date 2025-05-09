@@ -205,7 +205,7 @@ def check_and_report_any_changed_default_behavior(args):
         args.no_tree,
         args.add_gtdb_tax,
         args.add_ncbi_tax,
-        args.lineage != "Domain,Phylum,Class,Species",
+        args.lineage != "Domain,Phylum,Class,Genus,Species",
         args.tree_program != "FastTreeMP",
         args.best_hit_mode,
         args.seq_length_cutoff != 0.2,
@@ -251,7 +251,7 @@ def check_and_report_any_changed_default_behavior(args):
     if args.add_ncbi_tax and not args.add_gtdb_tax:
         print("      - NCBI taxonomic info will be added to labels where possible")
 
-    if args.lineage != "Domain,Phylum,Class,Species":
+    if args.lineage != "Domain,Phylum,Class,Genus,Species":
         print(f"      - Lineage info added to labels will be: \"{args.lineage}\"")
 
     if args.tree_program != "FastTreeMP":
@@ -526,8 +526,19 @@ def report_genome_filtering_update(run_data):
         message = (f"{color_text(f"No genomes were removed due to having too few SCG hits!".center(82), "green")}")
     else:
         message = f"    Of the input genomes remaining:\n\n"
-        message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few SCG hits", "yellow")}, reported in:\n")
+        if not run_data.best_hit_mode:
+            message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few unique SCG hits", "yellow")}, reported in:\n")
+        else:
+            message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few SCG hits", "yellow")}, reported in:\n")
         message += (f"        {run_data.run_files_dir_rel}/genomes-removed-for-too-few-SCG-hits.txt\n\n")
+
+        if not run_data.best_hit_mode:
+            message += (f"    If this is a problem for the genomes you're working with, you could\n")
+            message += (f"    consider running GToTree in \"best-hit\" mode or adjusting the `-G`\n")
+            message += (f"    parameter. See the help menu for more info.\n\n")
+        else:
+            message += (f"    If this is a problem for the genomes you're working with, you could\n")
+            message += (f"    consider adjusting the `-G` parameter. See the help menu for more info.\n\n")
         message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} made it through the preprocessing gauntlet.\n\n", "yellow")}")
         message += "Moving onto alignments with those :)".center(82)
 
@@ -559,4 +570,23 @@ def summarize_results(args, run_info):
 
     print(f"\n  Overall, {num_remaining_genomes} of the initial {num_initial_genomes} genomes were retained (see notes below).\n")
 
+    if not args.no_tree:
+        final_tree_path = get_path_rel_to_outdir(run_info.final_tree_path, args)
+        print(f"    Tree written to:\n        {color_text(final_tree_path, "green")}\n")
 
+    final_alignment_path = get_path_rel_to_outdir(run_info.final_alignment_path, args)
+    print(f"    Alignment written to:\n        {color_text(final_alignment_path, 'green')}\n")
+
+    genome_summary_path = args.output_dir + "/genomes-summary-info.tsv"
+    print(f"    Input-genomes summary table written to:\n        {color_text(genome_summary_path, 'green')}\n")
+
+
+def get_path_rel_to_outdir(path, args):
+
+    key_dir = args.output_dir
+    idx = path.find(key_dir)
+    if idx != -1:
+        sub_path = path[idx:]
+        return(sub_path)
+    else:
+        raise ValueError(f"Directory {key_dir!r} not found in {path!r}")
