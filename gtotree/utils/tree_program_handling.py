@@ -37,9 +37,9 @@ def run_tree_building(args, run_data):
 
 
 def get_out_tree_file(run_data, suffix="aligned-SCGs"):
-    base = f"{suffix}-mod-names" if run_data.updating_headers else suffix
-    orig_out_tree = os.path.join(run_data.run_files_dir, f"{base}.tre")
-    final_out_tree = os.path.join(run_data.output_dir, f"{base}.tre")
+    output_tree_basename = os.path.basename(run_data.output_dir)
+    orig_out_tree = os.path.join(run_data.run_files_dir, f"{output_tree_basename}.tre")
+    final_out_tree = os.path.join(run_data.output_dir, f"{output_tree_basename}.tre")
     return orig_out_tree, final_out_tree
 
 
