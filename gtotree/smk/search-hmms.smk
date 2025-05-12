@@ -32,6 +32,7 @@ rule all:
                     if int(hmm_search_failed):
                         genome.mark_hmm_search_failed()
                         genome.mark_removed()
+                        genome.reason_removed = "HMM search failed"
                         genome.num_SCG_hits = 0
                     else:
                         add_to_combined_SCG_hit_count_tab(genome.id, run_data)
@@ -39,6 +40,7 @@ rule all:
                             genome.mark_extract_seqs_failed()
                             genome.num_SCG_hits = 0
                             genome.mark_removed()
+                            genome.reason_removed = "extracting sequences after HMM search failed"
                         else:
                             write_out_SCG_hit_seqs(genome.id, run_data)
                             genome.mark_hmm_search_done()

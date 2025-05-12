@@ -29,7 +29,11 @@ rule all:
                     else:
                         acc_gd.mark_removed()
 
-                    acc_gd.was_downloaded = True if int(downloaded) else False
+                    if int(downloaded):
+                        acc_gd.was_downloaded = True
+                    else:
+                        acc_gd.was_downloaded = False
+                        acc_gd.reason_removed = "NCBI download failed"
 
                     acc_gd.prodigal_used = True if int(prodigal_used) else False
 

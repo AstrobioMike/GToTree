@@ -580,6 +580,22 @@ def summarize_results(args, run_info):
     genome_summary_path = args.output_dir + "/genomes-summary-info.tsv"
     print(f"    Input-genomes summary table written to:\n        {color_text(genome_summary_path, 'green')}\n")
 
+    SCG_hits_path = args.output_dir + "/SCG-hit-counts.tsv"
+    print(f"    Summary table with hits per target-gene per genome written to:\n        {color_text(SCG_hits_path, 'green')}\n")
+
+    partitions_file = args.output_dir + "/run-files/partitions.txt"
+    print(f"    Partitions file (for downstream use with mixed-model treeing) written to:\n        {color_text(partitions_file, 'green')}")
+
+    add_border()
+
+    if num_remaining_genomes < num_initial_genomes:
+        print(f"\n  Notes:\n")
+
+        # accs-not-found
+        # accs-not-downloaded
+        # genomes removed for too few hits
+        # if best hit
+            # target genes not found or retained
 
 def get_path_rel_to_outdir(path, args):
 

@@ -46,7 +46,7 @@ def main(args = None):
 
     summarize_results(args, run_data)
 
-    # print(f"\n\n{run_data}\n\n")
+    print(f"\n\n{run_data}\n\n")
     # print(f"\n\n{args}\n\n")
 
     # optional ko searching

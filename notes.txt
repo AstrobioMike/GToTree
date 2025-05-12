@@ -1,6 +1,6 @@
 ## next: 
 
-    # build output summary
+    # build output summary (working mainly in messaging.py)
 
     # build any other remaining output tables at this point (ko and pfam stuff can come later)
 
@@ -13,19 +13,10 @@
 
     # add a GenomeData attribute for reason removed (genome.reason_removed)
         # implemented, but i need to go back and use it for everything before too-few-hit-filtering
+        # add reason removed to "genomes-summary-info.tsv"
 
     # add in checks for the total number of remaining genomes being >= 3
         # at start, and then after genome filtering
-
-    # filter-genomes.smk currently runs whether it's needed or not
-        # this is because i needed to produce the output files whether the step overall is needed or not
-        # it's probably fine this way, but i guess i could check for the expected output files and only run it if
-            # they are not present...
-
-    # align-and-prepare-SCG-sets.smk runs whether it's needed or not
-        # not sure there's any reason to leave this one this way
-            # it isn't actually running all the alignments again if not needed, so it should be relatively quick
-            # but it's probably unnecessarily confusing
 
     # maybe *don't* make --resume be auto (despite my earlier idea), stop and tell the user to specify --resume or -F if the output dir exists
         # and note that resume is only for resuming, all needs to be the same; it's not for modifying and re-running anything

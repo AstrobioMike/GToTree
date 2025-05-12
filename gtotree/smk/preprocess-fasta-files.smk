@@ -34,6 +34,7 @@ rule all:
                         fasta.final_AA_path = final_AA_path
                     else:
                         fasta.mark_removed()
+                        fasta.reason_removed = "fasta-file processing failed"
 
         run_data.tools_used.prodigal_used = True
         write_run_data(run_data)

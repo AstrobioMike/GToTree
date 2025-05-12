@@ -35,6 +35,7 @@ rule all:
                         gb.final_AA_path = final_AA_path
                     else:
                         gb.mark_removed()
+                        gb.reason_removed = "genbank-file processing failed"
 
                     if int(prodigal_used):
                         gb.mark_prodigal_used()

@@ -32,6 +32,7 @@ rule all:
                         AA.final_AA_path = final_AA_path
                     else:
                         AA.mark_removed()
+                        AA.reason_removed = "amino-acid-file processing failed"
 
         write_run_data(run_data)
 
