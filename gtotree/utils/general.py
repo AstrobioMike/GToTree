@@ -54,8 +54,8 @@ class GenomeData:
     final_AA_path: str = ""
     prodigal_used: bool = False
     was_gzipped: bool = False
-    was_found: bool = None
-    was_downloaded: bool = None
+    acc_was_found: bool = None
+    acc_was_downloaded: bool = None
     mapping: str = None
     hmm_search_failed: bool = None
     extract_seqs_failed: bool = None
@@ -173,6 +173,8 @@ class RunData:
     output_dir_rel: str = ""
     run_files_dir: str = ""
     run_files_dir_rel: str = ""
+    individual_gene_alignments_dir: str = ""
+    individual_gene_alignments_dir_rel: str = ""
     run_data_path: str = ""
     hmm_path: str = ""
     mapping_file_path: str = ""
@@ -181,6 +183,7 @@ class RunData:
     ready_genome_AA_files_dir: str = ""
     hmm_results_dir: str = ""
     found_SCG_seqs_dir: str = ""
+    num_SCG_targets_removed: int = 0
     tmp_dir: str = ""
     log_file: str = ""
     logs_dir: str = ""
@@ -214,6 +217,9 @@ class RunData:
     @property
     def num_incomplete_amino_acid_files(self) -> int:
         return len([gd for gd in self.amino_acid_files if not gd.preprocessing_done and not gd.removed])
+
+    def num_accs_not_found(self) -> int:
+        return len([gd for gd in self.ncbi_accs if gd.acc_not_found is True])
 
     def get_all_SCG_targets(self) -> List[SCGset]:
         return [scg for scg in self.SCG_targets]
@@ -274,19 +280,19 @@ class RunData:
         return [gd.id for gd in self.amino_acid_files]
 
     def found_ncbi_accs(self) -> List[GenomeData]:
-        return [gd for gd in self.ncbi_accs if gd.was_found]
+        return [gd for gd in self.ncbi_accs if gd.acc_was_found]
 
     def get_ncbi_accs_for_snakemake_preprocessing(self) -> List[GenomeData]:
-        return [gd for gd in self.ncbi_accs if gd.was_found and not gd.preprocessing_done and not gd.removed]
+        return [gd for gd in self.ncbi_accs if gd.acc_was_found and not gd.preprocessing_done and not gd.removed]
 
     def remaining_ncbi_accs(self) -> List[GenomeData]:
         return [gd.id for gd in self.ncbi_accs if not gd.removed]
 
     def get_ncbi_accs_not_downloaded(self) -> List[str]:
-        return [gd.id for gd in self.ncbi_accs if gd.was_downloaded is False]
+        return [gd.id for gd in self.ncbi_accs if gd.acc_was_downloaded is False]
 
     def get_ncbi_accs_not_found(self) -> List[str]:
-        return [gd.id for gd in self.ncbi_accs if gd.was_found is False]
+        return [gd.id for gd in self.ncbi_accs if gd.acc_was_found is False]
 
     def get_removed_ncbi_accs(self) -> List[str]:
         return [gd.id for gd in self.ncbi_accs if gd.removed]

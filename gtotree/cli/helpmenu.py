@@ -144,7 +144,7 @@ helpmenu += f"""
                   No tree produced. Stop after producing the concatenated
                   alignment.
 
-        - [-k ] keep individual target gene alignments; default: false
+        - [-k ] keep individual target-gene alignments; default: false
                   Keep individual alignment files.
 
         - [-T <str>] tree program to use; default: FastTreeMP

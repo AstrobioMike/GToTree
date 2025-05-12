@@ -7,7 +7,7 @@ run_data = read_run_data(config['run_data_path'])
 if run_data is None:
     raise ValueError("Run data not found")
 
-accession_dict = {gd.id: gd for gd in run_data.ncbi_accs if gd.was_found and not gd.preprocessing_done and not gd.removed}
+accession_dict = {gd.id: gd for gd in run_data.ncbi_accs if gd.acc_was_found and not gd.preprocessing_done and not gd.removed}
 accessions = list(accession_dict.keys())
 
 rule all:
@@ -30,9 +30,9 @@ rule all:
                         acc_gd.mark_removed()
 
                     if int(downloaded):
-                        acc_gd.was_downloaded = True
+                        acc_gd.acc_was_downloaded = True
                     else:
-                        acc_gd.was_downloaded = False
+                        acc_gd.acc_was_downloaded = False
                         acc_gd.reason_removed = "NCBI download failed"
 
                     acc_gd.prodigal_used = True if int(prodigal_used) else False

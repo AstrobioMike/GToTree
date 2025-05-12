@@ -87,7 +87,7 @@ def extract_fasta_from_gb(prefix, input_gb, run_data):
 def check_target_SCGs_have_seqs(run_data, ext):
 
     SCG_targets_present_at_start = run_data.get_all_SCG_targets()
-    new_SCG_targets_missing = []
+    SCG_targets_missing = []
 
     for SCG_obj in SCG_targets_present_at_start:
         SCG = SCG_obj.id
@@ -96,13 +96,19 @@ def check_target_SCGs_have_seqs(run_data, ext):
         if not present:
             SCG_obj.removed = True
             SCG_obj.reason_removed = "no sequences found or remaining after length-filtering"
-            new_SCG_targets_missing.append(SCG)
+            SCG_targets_missing.append(SCG)
 
-    if len(new_SCG_targets_missing) > 0:
-        add_border()
-        message = f"    Some target single-copy genes were not found or were filtered out of the\n"
-        message += f"    analysis.\n\n    These include:\n      {'\n      '.join(new_SCG_targets_missing)}"
-        report_notice(message)
+    # if len(SCG_targets_missing) > run_data.num_SCG_targets_removed:
+    #     add_border()
+    #     message = f"    Some target single-copy genes were not found or were filtered out of the\n"
+    #     message += f"    analysis.\n\n    These include:\n      {'\n      '.join(SCG_targets_missing)}"
+    #     report_notice(message)
+
+    #     with open(run_data.run_files_dir + "/target-SCGs-not-found-or-filtered-out.txt", "w") as out_file:
+    #         for target in SCG_targets_missing:
+    #             out_file.write(target + "\n")
+
+    run_data.num_SCG_targets_removed = len(SCG_targets_missing)
 
     return run_data
 
@@ -280,3 +286,15 @@ def swap_labels_in_alignment(run_data):
     run_data.final_alignment_path = new_alignment_path
 
     return run_data
+
+
+def copy_gene_alignments(run_data):
+
+    all_SCG_targets = run_data.get_all_SCG_targets_remaining()
+
+    for SCG in all_SCG_targets:
+
+        source_path = os.path.join(run_data.found_SCG_seqs_dir, f"{SCG.id}-final.fasta")
+        dest_path = os.path.join(run_data.individual_gene_alignments_dir, f"{SCG.id}-aligned.fasta")
+        if os.path.exists(source_path):
+            shutil.copyfile(source_path, dest_path)

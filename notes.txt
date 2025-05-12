@@ -1,6 +1,10 @@
 ## next: 
 
     # build output summary (working mainly in messaging.py)
+        # still working on this, mirroring the outputs the current GToTree produces (lacking some on the SCGs right now, not sure if i want to add them)
+        # include a message that reports how many SCGs were used in the final alignment, and how many positions it includes
+        # need global timer and to add all timestamp messages
+        # then happy <...>day message at end too
 
     # build any other remaining output tables at this point (ko and pfam stuff can come later)
 
@@ -31,6 +35,8 @@
         # check out what happens if there are multiple matches to key_dir in messaging.get_path_rel_to_outdir()
             # e.g., if we are in a directory called gtotree-output and the output directory is also gtotree-output
             # might need to adjust this (maybe even just searching for the last match, rather than any (or first from reverse order will work
+
+    # go through general.py GenomeData class and see which methods i put in that i'm not using anywhere anymore
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 

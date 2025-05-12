@@ -5,7 +5,8 @@ import time
 import pandas as pd
 import tempfile
 from collections import Counter
-from gtotree.utils.messaging import (report_message,
+from gtotree.utils.messaging import (color_text,
+                                     report_message,
                                      report_early_exit,
                                      report_missing_input_genomes_file,
                                      report_missing_pfam_targets_file,
@@ -62,6 +63,7 @@ def primary_args_validation(args):
     checks_for_nucleotide_mode(args)
     args = check_output_dir(args)
     args, run_data = check_input_files(args)
+    check_for_min_input_genomes(run_data)
     return args, run_data
 
 
@@ -158,6 +160,16 @@ def check_input_files(args):
     run_data.num_hmm_cpus = args.num_hmm_cpus
 
     return args, run_data
+
+
+def check_for_min_input_genomes(run_data):
+    total_input_genomes = len(run_data.get_all_input_genome_ids())
+    if total_input_genomes < 4:
+        word = "was" if total_input_genomes == 1 else "were"
+        message = f"\n  {color_text(f"At least 4 input genomes are required, but only {total_input_genomes} {word} detected.\n\n", "yellow")}"
+        message += "  See `GToTree -h` for more info.\n\nExiting for now :(\n"
+        print(message)
+        exit(1)
 
 
 def check_output_dir(args):
@@ -524,6 +536,11 @@ def final_setups(args, run_data):
         run_data.updating_headers = True
     else:
         run_data.updating_headers = False
+
+    if args.keep_gene_alignments:
+        run_data.individual_gene_alignments_dir_rel = os.path.join(args.run_files_dir_rel, "individual-alignments")
+        run_data.individual_gene_alignments_dir = os.path.abspath(run_data.individual_gene_alignments_dir_rel)
+        os.makedirs(run_data.individual_gene_alignments_dir, exist_ok=True)
 
     return args, run_data
 

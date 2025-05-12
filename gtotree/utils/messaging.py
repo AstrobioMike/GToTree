@@ -355,19 +355,32 @@ def absurd_number_of_genomes_notice(total_input_genomes):
 def report_processing_stage(stage):
 
     stages_dict = {
-        "ncbi":                        "Preprocessing the genomes provided as NCBI accessions",
-        "genbank":                     "Preprocessing the genomes provided as genbank files",
-        "fasta":                       "Preprocessing the genomes provided as fasta files",
-        "amino-acid":                  "Preprocessing the genomes provided as amino-acid files",
-        "preprocessing-update":        "Summary of input-genome preprocessing",
-        "hmm-search":                  "Searching genomes for target single-copy genes",
-        "filter-genes":                "Filtering genes by length",
-        "filter-genomes":              "Filtering genomes with too few hits",
-        "align-and-prepare-SCG-sets":  "Aligning, trimming, and preparing SCG-sets",
-        "concatenate-SCG-sets":        "Concatenating all SCG-set alignments together",
-        "updating-headers":            "Adding more informative headers",
-        "treeing":                     "Making the phylogenomic tree",
-        "done":                        "Done!!",
+        # "ncbi":                        "Preprocessing the genomes provided as NCBI accessions",
+        "ncbi":                        "PREPROCESSING THE GENOMES PROVIDED AS NCBI ACCESSIONS",
+        # "genbank":                     "Preprocessing the genomes provided as genbank files",
+        "genbank":                     "PREPROCESSING THE GENOMES PROVIDED AS GENBANK FILES",
+        # "fasta":                       "Preprocessing the genomes provided as fasta files",
+        "fasta":                       "PREPROCESSING THE GENOMES PROVIDED AS FASTA FILES",
+        # "amino-acid":                  "Preprocessing the genomes provided as amino-acid files",
+        "amino-acid":                  "PREPROCESSING THE GENOMES PROVIDED AS AMINO-ACID FILES",
+        # "preprocessing-update":        "Summary of input-genome preprocessing",
+        "preprocessing-update":        "SUMMARY OF INPUT-GENOME PREPROCESSING",
+#        "hmm-search":                  "Searching genomes for target single-copy genes",
+        "hmm-search":                  "SEARCHING GENOMES FOR TARGET SINGLE-COPY GENES",
+        # "filter-genes":                "Filtering genes by length",
+        "filter-genes":                "FILTERING GENES BY LENGTH",
+        # "filter-genomes":              "Filtering genomes with too few hits",
+        "filter-genomes":              "FILTERING GENOMES WITH TOO FEW HITS",
+        # "align-and-prepare-SCG-sets":  "Aligning, trimming, and preparing SCG-sets",
+        "align-and-prepare-SCG-sets":  "ALIGNING, TRIMMING, AND PREPARING SCG-SETS",
+        # "concatenate-SCG-sets":        "Concatenating all SCG-set alignments together",
+        "concatenate-SCG-sets":        "CONCATENATING ALL SCG-SET ALIGNMENTS TOGETHER",
+        # "updating-headers":            "Adding more informative headers",
+        "updating-headers":            "ADDING MORE INFORMATIVE HEADERS",
+        # "treeing":                     "Making the phylogenomic tree",
+        "treeing":                     "MAKING THE PHYLOGENOMIC TREE",
+        # "done":                        "Done!!",
+        "done":                        "DONE!!",
     }
 
     try:
@@ -498,10 +511,22 @@ def report_genome_preprocessing_update(run_data):
     else:
         message = f"    Of all the input genomes provided:\n\n"
         message += (f"      {color_text(f"{num_removed} failed preprocessing", "yellow")} as described above.\n\n")
-        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully preprocessed.\n\n", "yellow")}")
-        message += "Moving forward with SCG-hunting in those :)".center(82)
+        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully preprocessed.", "yellow")}")
+
+        if num_remaining >= 4:
+            message += "\n\n"
+            message += "Moving forward with SCG-hunting in those :)".center(82)
+
     report_update(message)
 
+    if num_remaining < 4:
+        report_too_few_genomes()
+
+
+def report_too_few_genomes():
+    message = f"\n    {color_text("Unfortunately, there aren't enough genomes remaining to proceed...", 'red')}"
+    print(message)
+    report_early_exit()
 
 def report_hmm_search_update(run_data):
     num_searched = len(run_data.get_all_preprocessed_genomes())
@@ -515,6 +540,8 @@ def report_hmm_search_update(run_data):
 
     report_update(message)
 
+    if num_successful < 4:
+        report_too_few_genomes()
 
 
 def report_genome_filtering_update(run_data):
@@ -539,10 +566,16 @@ def report_genome_filtering_update(run_data):
         else:
             message += (f"    If this is a problem for the genomes you're working with, you could\n")
             message += (f"    consider adjusting the `-G` parameter. See the help menu for more info.\n\n")
-        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} made it through the preprocessing gauntlet.\n\n", "yellow")}")
-        message += "Moving onto alignments with those :)".center(82)
+        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} made it through the preprocessing gauntlet.", "yellow")}")
+
+        if num_remaining >= 4:
+            message += "\n\n"
+            message += "Moving onto alignments with those :)".center(82)
 
     report_update(message)
+
+    if num_remaining < 4:
+        report_too_few_genomes()
 
 
 def report_SCG_set_alignment_update(run_data):
@@ -555,27 +588,41 @@ def report_SCG_set_alignment_update(run_data):
     else:
         message = (f"    Of the initial {total_SCG_targets} SCG-targets:\n\n")
         message += (f"        {color_text(f"{num_SCG_targets_dropped} had no hits or were filtered out", 'yellow')}, reported in:\n")
-        message += (f"          {run_data.run_files_dir_rel}/SCG-targets-dropped-from-analysis.txt\n\n")
-        message += (f"Moving forward with the remaining {num_SCG_targets_remaining} :)".center(82))
+        message += (f"          {run_data.run_files_dir_rel}/target-SCGs-not-found-or-filtered-out.txt")
+
+        if num_SCG_targets_remaining != 0:
+            message += "\n\n"
+            message += (f"Moving forward with the remaining {num_SCG_targets_remaining} :)".center(82))
 
     report_update(message)
 
+    if num_SCG_targets_remaining == 0:
+        report_no_SCGs_remaining()
 
-def summarize_results(args, run_info):
+def report_no_SCGs_remaining():
+    message = f"\n    {color_text("Unfortunately, there are no remaining SCG-targets to proceed with...", 'red')}"
+    print(message)
+    report_early_exit()
+
+def summarize_results(args, run_data):
 
     report_processing_stage("done")
 
-    num_initial_genomes = len(run_info.get_all_input_genome_ids())
-    num_remaining_genomes = len(run_info.get_all_remaining_input_genome_ids())
+    num_initial_genomes = len(run_data.get_all_input_genome_ids())
+    num_remaining_genomes = len(run_data.get_all_remaining_input_genome_ids())
 
     print(f"\n  Overall, {num_remaining_genomes} of the initial {num_initial_genomes} genomes were retained (see notes below).\n")
 
     if not args.no_tree:
-        final_tree_path = get_path_rel_to_outdir(run_info.final_tree_path, args)
+        final_tree_path = get_path_rel_to_outdir(run_data.final_tree_path, args)
         print(f"    Tree written to:\n        {color_text(final_tree_path, "green")}\n")
 
-    final_alignment_path = get_path_rel_to_outdir(run_info.final_alignment_path, args)
+    final_alignment_path = get_path_rel_to_outdir(run_data.final_alignment_path, args)
     print(f"    Alignment written to:\n        {color_text(final_alignment_path, 'green')}\n")
+
+    if args.keep_gene_alignments:
+        gene_alignments_path = run_data.individual_gene_alignments_dir_rel
+        print(f"    Individual target-gene alignments written to:\n        {color_text(gene_alignments_path, 'green')}\n")
 
     genome_summary_path = args.output_dir + "/genomes-summary-info.tsv"
     print(f"    Input-genomes summary table written to:\n        {color_text(genome_summary_path, 'green')}\n")
@@ -591,11 +638,35 @@ def summarize_results(args, run_info):
     if num_remaining_genomes < num_initial_genomes:
         print(f"\n  Notes:\n")
 
-        # accs-not-found
-        # accs-not-downloaded
-        # genomes removed for too few hits
+        num_accs_not_found = len(run_data.get_ncbi_accs_not_found())
+        if num_accs_not_found > 0:
+            print(f"        {num_accs_not_found} accession(s) not successfully found at NCBI")
+
+        num_accs_not_downloaded = len(run_data.get_ncbi_accs_not_downloaded())
+        if num_accs_not_downloaded > 0:
+            print(f"        {num_accs_not_downloaded} accession(s) did not download properly")
+
+        num_genomes_filtered_for_too_few_hits = len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering())
+        if num_genomes_filtered_for_too_few_hits > 0:
+            print(f"        {num_genomes_filtered_for_too_few_hits} genome(s) removed for having too few hits to the targeted SCGs")
+
         # if best hit
             # target genes not found or retained
+
+        print(f"\n    Reported along with additional informative files in:\n        {color_text(f"{run_data.run_files_dir_rel}/", 'green')}")
+
+        add_border()
+
+    run_log_relative_path = run_data.output_dir_rel + "/gtotree-runlog.txt"
+    print(f"\n  Log file written to:\n      {color_text(run_log_relative_path, 'green')}")
+
+    add_border()
+
+    citations_relative_path = args.output_dir + "/gtotree-citations.txt"
+    print(f"\n  {color_text("Programs used and their citations have been written to:", 'yellow')}")
+    print(f"      {color_text(citations_relative_path, 'green')}")
+
+    add_border()
 
 def get_path_rel_to_outdir(path, args):
 

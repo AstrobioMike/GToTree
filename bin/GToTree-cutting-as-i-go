@@ -58,81 +58,6 @@ if [ "$additional_pfam_targets" != 'false' ]; then
 fi
 
 
-#############################################################################
-######################  MAKING SUMMARY TABLE WITH ALL  ######################
-#############################################################################
-if [ -f ${output_dir}/NCBI_genomes_summary_info.tsv ]; then
-    cut -f 1,4,9,10,11,12 ${output_dir}/NCBI_genomes_summary_info.tsv | tail -n +2 >> ${tmp_dir}/building_genomes_tab.tmp
-fi
-
-if [ -f ${output_dir}/Genbank_genomes_summary_info.tsv ]; then
-    cut -f 1,3,6,7,8,9 ${output_dir}/Genbank_genomes_summary_info.tsv | tail -n +2 >> ${tmp_dir}/building_genomes_tab.tmp
-fi
-
-if [ -f ${output_dir}/Fasta_genomes_summary_info.tsv ]; then
-    cut -f 1,3,4,5,6,7 ${output_dir}/Fasta_genomes_summary_info.tsv | tail -n +2 >> ${tmp_dir}/building_genomes_tab.tmp
-fi
-
-if [ -f ${output_dir}/Amino_acid_genomes_summary_info.tsv ]; then
-    cut -f 1,3,4,5,6,7 ${output_dir}/Amino_acid_genomes_summary_info.tsv | tail -n +2 >> ${tmp_dir}/building_genomes_tab.tmp
-fi
-
-## getting current ordered list of all genomes together:
-cut -f 1 ${tmp_dir}/building_genomes_tab.tmp | sort > ${tmp_dir}/sorted_all_output_genome_ids.tmp
-
-## adding columns stating whether genome made it into the final tree, how many SCG-hits they had after length filtering, and how many genes they contributed to final alignment if they weren't removed
-# first getting which were removed from analysis due to too few hits, if any:
-if [ $removed_genomes != "0" ]; then
-    sort <(tail -n +2 ${output_dir}/Genomes_removed_for_too_few_hits.tsv | cut -f1) > ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp
-
-    # getting a list of those that weren't removed to iterate over
-    comm -23 ${tmp_dir}/sorted_all_output_genome_ids.tmp ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp | sort > ${tmp_dir}/sorted_genomes_not_removed.tmp
-
-    ## getting table of those that were removed
-    for genome in $(cat ${tmp_dir}/sorted_genomes_removed_for_too_few_hits.tmp)
-    do
-        grep -m1 -w "^$genome" ${tmp_dir}/building_genomes_tab.tmp >> ${tmp_dir}/building_genomes_tab_for_removed_genomes.tmp
-        grep -m1 -w "^$genome" ${tmp_dir}/counts_tab.tmp | cut -f 2 >> ${tmp_dir}/reporting_SCG_counts_after_len_filt_for_genomes_removed.tmp
-        echo "No" >> ${tmp_dir}/reporting_that_not_in_final_tree_column.tmp
-    done
-
-    # adding columns on:
-    paste ${tmp_dir}/building_genomes_tab_for_removed_genomes.tmp ${tmp_dir}/reporting_SCG_counts_after_len_filt_for_genomes_removed.tmp ${tmp_dir}/reporting_that_not_in_final_tree_column.tmp > ${tmp_dir}/genomes_tab_for_removed_genomes.tmp
-
-    ## getting table of those that weren't removed
-    for genome in $(cat ${tmp_dir}/sorted_genomes_not_removed.tmp)
-    do
-        grep -m1 -w "^$genome" ${tmp_dir}/building_genomes_tab.tmp >> ${tmp_dir}/building_genomes_tab_for_retained_genomes.tmp
-        grep -m1 -w "^$genome" ${tmp_dir}/counts_tab.tmp | cut -f 2 >> ${tmp_dir}/reporting_SCG_counts_after_len_filt_for_genomes_retained.tmp
-        echo "Yes" >> ${tmp_dir}/reporting_that_in_final_tree_column.tmp
-    done
-
-    # adding columns on:
-    paste ${tmp_dir}/building_genomes_tab_for_retained_genomes.tmp ${tmp_dir}/reporting_SCG_counts_after_len_filt_for_genomes_retained.tmp ${tmp_dir}/reporting_that_in_final_tree_column.tmp > ${tmp_dir}/genomes_tab_for_retained_genomes.tmp
-
-
-    ## combining both together
-    cat ${tmp_dir}/genomes_tab_for_retained_genomes.tmp ${tmp_dir}/genomes_tab_for_removed_genomes.tmp > ${tmp_dir}/building_genomes_tab.tmp
-
-else
-    # if there are no genomes to remove, then generating two new columns for all
-    for genome in $(cat ${tmp_dir}/sorted_all_output_genome_ids.tmp)
-    do
-        grep -m1 -w "^$genome" ${tmp_dir}/building_genomes_tab.tmp >> ${tmp_dir}/building_genomes_tab_for_retained_genomes.tmp
-        grep -m1 -w "^$genome" ${tmp_dir}/counts_tab.tmp | cut -f 2 >> ${tmp_dir}/reporting_SCG_counts_after_len_filt_for_genomes_retained.tmp
-        echo "Yes" >> ${tmp_dir}/reporting_that_in_final_tree_column.tmp
-    done
-
-    # adding columns on:
-    paste ${tmp_dir}/building_genomes_tab_for_retained_genomes.tmp ${tmp_dir}/reporting_SCG_counts_after_len_filt_for_genomes_retained.tmp ${tmp_dir}/reporting_that_in_final_tree_column.tmp > ${tmp_dir}/building_genomes_tab.tmp
-
-fi
-
-
-# and adding header and writing to output directory
-cat <(printf "assembly_id\ttaxid\tnum_SCG_hits\tuniq_SCG_hits\tperc_comp\tperc_redund\tnum_SCG_hits_after_len_filt\tin_final_tree\n") ${tmp_dir}/building_genomes_tab.tmp > ${output_dir}/Genomes_summary_info.tsv
-
-
 
 #############################################################################
 ################  COMBINING KO SEARCHING RESULTS IF NEEDED  #################
@@ -216,50 +141,7 @@ printf "\n\n####################################################################
 printf "####                                 ${GREEN}Done!!${NC}                                  ####\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 printf "#################################################################################\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-# genome report
-if [ $genomes_retained == $total_input_genomes ]; then
-    printf "            ${GREEN}All $total_input_genomes input genomes were retained through the workflow!${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-else
-    printf "  Overall, $genomes_retained genomes of the input $total_input_genomes were retained (see notes below).\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-fi
-
-# reporting primary output files
-output_file_prefix=$(basename ${output_dir})
-
-if [ $align_only == 'false' ]; then
-
-    if [ -s ${output_dir}/Aligned_SCGs_mod_names${target_gene_suffix} ]; then
-
-        printf "    Tree written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        printf "        ${GREEN}${output_dir}/${output_file_prefix}.tre${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        mv ${output_dir}/Aligned_SCGs_mod_names.tre ${output_dir}/${output_file_prefix}.tre
-    else
-        printf "    Tree written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        printf "        ${GREEN}${output_dir}/${output_file_prefix}.tre${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        mv ${output_dir}/Aligned_SCGs.tre ${output_dir}/${output_file_prefix}.tre
-    fi
-
-fi
-
-if [ -s ${output_dir}/Aligned_SCGs_mod_names${target_gene_suffix} ]; then
-    printf "    Alignment written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "        ${GREEN}${output_dir}/Aligned_SCGs_mod_names${target_gene_suffix}${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    mv ${output_dir}/Aligned_SCGs${target_gene_suffix} ${output_dir}/run_files/Aligned_SCGs${target_gene_suffix}
-else
-    printf "    Alignment written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "        ${GREEN}${output_dir}/Aligned_SCGs${target_gene_suffix}${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-fi
-
-if [ $keep_individual_alignments == 'true' ]; then
-    printf "    Individual protein alignments stored in:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "        ${GREEN}${output_dir}/run_files/individual_alignments/${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-fi
-
-printf "    Main genomes summary table written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-printf "        ${GREEN}${output_dir}/Genomes_summary_info.tsv${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-printf "    Summary table with hits per target gene per genome written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-printf "        ${GREEN}${output_dir}/SCG_hit_counts.tsv${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+## deleting as i go
 
 
 if [ $ko_targets == 'true' ]; then
@@ -272,38 +154,9 @@ if [ $additional_pfam_targets == 'true' ]; then
     printf "        ${GREEN}${output_dir}/Pfam_search_results/${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 fi
 
-printf "    Partitions file (for downstream use with mixed-model treeing) written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-printf "        ${GREEN}${output_dir}/run_files/Partitions.txt${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-mv ${output_dir}/Partitions.txt ${output_dir}/run_files/Partitions.txt
 
 # reporting any problem files/accessions and mentioning run_files/ directory
 printf " _______________________________________________________________________________\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-if [ -f ${output_dir}/Redundant_input_accessions.txt ] || [ -f ${output_dir}/NCBI_accessions_not_found.txt ] || [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ] || [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ] || [ -f ${output_dir}/Genes_with_no_hits_to_any_genomes.txt ] || [ -f ${output_dir}/Genes_with_no_hits_after_length_filter.txt ] || [ -f ${output_dir}/Genomes_with_questionable_redundancy_estimates.tsv ]; then
-
-    printf "  Notes:\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-    if [ -f ${output_dir}/Redundant_input_accessions.txt ]; then
-        printf "        $num_dupe_report accession(s) redundant.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        mv ${output_dir}/Redundant_input_accessions.txt ${output_dir}/run_files/Redundant_input_accessions.txt
-    fi
-
-    if [ -f ${output_dir}/NCBI_accessions_not_found.txt ]; then
-        num_accs_not_found=$(wc -l ${output_dir}/NCBI_accessions_not_found.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "        $num_accs_not_found accession(s) not successfully found at NCBI.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        mv ${output_dir}/NCBI_accessions_not_found.txt ${output_dir}/run_files/NCBI_accessions_not_found.txt
-    fi
-
-    if [ -f ${output_dir}/NCBI_accessions_not_downloaded.txt ]; then
-        num_accs_not_downloaded=$(wc -l ${output_dir}/NCBI_accessions_not_downloaded.txt | sed "s/^ *//" | cut -d " " -f 1)
-        printf "        $num_accs_not_downloaded did not download properly.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        mv ${output_dir}/NCBI_accessions_not_downloaded.txt ${output_dir}/run_files/NCBI_accessions_not_downloaded.txt
-    fi
-
-    if [ -f ${output_dir}/Genomes_removed_for_too_few_hits.tsv ]; then
-        printf "        $removed_genomes genome(s) removed due to having too few hits to the targeted SCGs.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        mv ${output_dir}/Genomes_removed_for_too_few_hits.tsv ${output_dir}/run_files/Genomes_removed_for_too_few_hits.tsv
-    fi
 
     # reporting of unsucessful targets depends on if run in best-hit mode (-B) or not
     if [ $best_hit_mode != "true" ]; then
