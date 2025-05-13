@@ -14,7 +14,7 @@ from gtotree.utils.seqs import check_target_SCGs_have_seqs
 
 def search_hmms(args, run_data):
 
-    report_processing_stage("hmm-search")
+    report_processing_stage("hmm-search", run_data)
 
     num_genomes_to_search = len(run_data.get_all_input_genomes_for_hmm_search())
 

@@ -7,7 +7,7 @@ from gtotree.utils.seqs import check_target_SCGs_have_seqs
 
 def filter_genes(args, run_data):
 
-    report_processing_stage("filter-genes")
+    report_processing_stage("filter-genes", run_data)
     cutoff = "{:.0f}".format(run_data.seq_length_cutoff * 100)
     print(f"\n      Keeping those with lengths within {cutoff}% of the median for each gene set.")
 

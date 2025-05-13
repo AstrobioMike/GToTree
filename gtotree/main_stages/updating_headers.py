@@ -10,7 +10,7 @@ def update_headers(args, run_data):
         run_data.final_alignment_path = run_data.concatenated_alignment_path
         return run_data
 
-    report_processing_stage("updating-headers")
+    report_processing_stage("updating-headers", run_data)
 
     if not run_data.headers_updated:
 

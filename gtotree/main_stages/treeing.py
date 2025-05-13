@@ -7,7 +7,7 @@ def make_tree(args, run_data):
     if args.no_tree:
         return run_data
 
-    report_processing_stage("treeing")
+    report_processing_stage("treeing", run_data)
 
     if check_file_exists_and_not_empty(run_data.final_tree_path):
         print("")

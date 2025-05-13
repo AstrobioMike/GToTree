@@ -9,7 +9,7 @@ from gtotree.utils.seqs import copy_gene_alignments
 
 def align_and_prepare_SCG_sets(args, run_data):
 
-    report_processing_stage("align-and-prepare-SCG-sets")
+    report_processing_stage("align-and-prepare-SCG-sets", run_data)
 
     if not run_data.all_SCG_sets_aligned:
 

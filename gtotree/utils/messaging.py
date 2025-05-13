@@ -3,6 +3,7 @@ import sys
 import time
 import re
 import contextlib
+from datetime import datetime
 from importlib.metadata import version
 from gtotree.utils.context import log_file_var
 
@@ -77,6 +78,20 @@ def capture_stdout_to_log(log_file):
                     return func(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def format_runtime(start: datetime, now: datetime) -> str:
+    elapsed = now - start
+    hours = elapsed.seconds // 3600
+    minutes = (elapsed.seconds % 3600) // 60
+    return f"{hours} hours and {minutes} minutes"
+
+
+def report_time_status(start: datetime):
+    now = datetime.now()
+    print("")
+    print(f"It is currently {now:%I:%M %p}; the process started at {start:%I:%M %p}.".center(82))
+    print(f"Current process runtime: {format_runtime(start, now)}.".center(82))
 
 
 def report_message(message, color = "yellow", width = 80, ii = "  ", si = "  ", newline = True):
@@ -163,6 +178,10 @@ def display_initial_run_info(args, run_data):
 
     check_and_report_any_changed_default_behavior(args)
     # time.sleep(3)
+
+    run_data.start_time = datetime.now()
+
+    return run_data
 
 
 @capture_stdout_to_log(lambda: log_file_var.get())
@@ -352,34 +371,21 @@ def absurd_number_of_genomes_notice(total_input_genomes):
 
 
 @capture_stdout_to_log(lambda: log_file_var.get())
-def report_processing_stage(stage):
+def report_processing_stage(stage, run_data):
 
     stages_dict = {
-        # "ncbi":                        "Preprocessing the genomes provided as NCBI accessions",
         "ncbi":                        "PREPROCESSING THE GENOMES PROVIDED AS NCBI ACCESSIONS",
-        # "genbank":                     "Preprocessing the genomes provided as genbank files",
         "genbank":                     "PREPROCESSING THE GENOMES PROVIDED AS GENBANK FILES",
-        # "fasta":                       "Preprocessing the genomes provided as fasta files",
         "fasta":                       "PREPROCESSING THE GENOMES PROVIDED AS FASTA FILES",
-        # "amino-acid":                  "Preprocessing the genomes provided as amino-acid files",
         "amino-acid":                  "PREPROCESSING THE GENOMES PROVIDED AS AMINO-ACID FILES",
-        # "preprocessing-update":        "Summary of input-genome preprocessing",
         "preprocessing-update":        "SUMMARY OF INPUT-GENOME PREPROCESSING",
-#        "hmm-search":                  "Searching genomes for target single-copy genes",
         "hmm-search":                  "SEARCHING GENOMES FOR TARGET SINGLE-COPY GENES",
-        # "filter-genes":                "Filtering genes by length",
         "filter-genes":                "FILTERING GENES BY LENGTH",
-        # "filter-genomes":              "Filtering genomes with too few hits",
         "filter-genomes":              "FILTERING GENOMES WITH TOO FEW HITS",
-        # "align-and-prepare-SCG-sets":  "Aligning, trimming, and preparing SCG-sets",
         "align-and-prepare-SCG-sets":  "ALIGNING, TRIMMING, AND PREPARING SCG-SETS",
-        # "concatenate-SCG-sets":        "Concatenating all SCG-set alignments together",
         "concatenate-SCG-sets":        "CONCATENATING ALL SCG-SET ALIGNMENTS TOGETHER",
-        # "updating-headers":            "Adding more informative headers",
         "updating-headers":            "ADDING MORE INFORMATIVE HEADERS",
-        # "treeing":                     "Making the phylogenomic tree",
         "treeing":                     "MAKING THE PHYLOGENOMIC TREE",
-        # "done":                        "Done!!",
         "done":                        "DONE!!",
     }
 
@@ -409,6 +415,7 @@ def report_processing_stage(stage):
         print(f"  {border}")
         print(f"  ####{desc.center(inner_width)}####")
         print(f"  {border}")
+        report_time_status(run_data.start_time)
     # time.sleep(1)
 
 
@@ -606,7 +613,7 @@ def report_no_SCGs_remaining():
 
 def summarize_results(args, run_data):
 
-    report_processing_stage("done")
+    report_processing_stage("done", run_data)
 
     num_initial_genomes = len(run_data.get_all_input_genome_ids())
     num_remaining_genomes = len(run_data.get_all_remaining_input_genome_ids())

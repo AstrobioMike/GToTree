@@ -34,7 +34,7 @@ def preprocess_genomes(args, run_data):
 def preprocess_ncbi_genomes(args, run_data):
     if args.ncbi_accessions:
 
-        report_processing_stage("ncbi")
+        report_processing_stage("ncbi", run_data)
 
         run_data = parse_assembly_summary(NCBI_assembly_summary_tab, run_data)
 
@@ -108,7 +108,7 @@ def capture_ncbi_failed_downloads(run_data):
 def preprocess_genbank_genomes(args, run_data):
     if args.genbank_files:
 
-        report_processing_stage("genbank")
+        report_processing_stage("genbank", run_data)
 
         num_genbank_files_remaining = len([gd for gd in run_data.genbank_files if not gd.preprocessing_done and not gd.removed])
 
@@ -141,7 +141,7 @@ def capture_failed_genbank_files(run_data):
 def preprocess_fasta_genomes(args, run_data):
     if args.fasta_files:
 
-        report_processing_stage("fasta")
+        report_processing_stage("fasta", run_data)
 
         num_fasta_files_remaining = len([fd for fd in run_data.fasta_files if not fd.preprocessing_done and not fd.removed])
 
@@ -174,7 +174,7 @@ def capture_failed_fasta_files(run_data):
 def preprocess_amino_acid_files(args, run_data):
     if args.amino_acid_files:
 
-        report_processing_stage("amino-acid")
+        report_processing_stage("amino-acid", run_data)
 
         num_AA_files_remaining = len([fd for fd in run_data.amino_acid_files if not fd.preprocessing_done and not fd.removed])
 
@@ -205,7 +205,7 @@ def capture_failed_amino_acid_files(run_data):
 
 
 def genome_preprocessing_update(run_data):
-    report_processing_stage("preprocessing-update")
+    report_processing_stage("preprocessing-update", run_data)
     run_data.update_all_input_genomes()
     report_genome_preprocessing_update(run_data)
 

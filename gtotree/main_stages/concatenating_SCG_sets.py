@@ -3,7 +3,7 @@ from gtotree.utils.seqs import concatenate_alignments, gen_partitions_file
 
 def concatenate_SCG_sets(run_data):
 
-    report_processing_stage("concatenate-SCG-sets")
+    report_processing_stage("concatenate-SCG-sets", run_data)
 
     run_data, dict_of_genomes, SCG_IDs = concatenate_alignments(run_data)
 

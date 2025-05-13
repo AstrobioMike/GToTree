@@ -22,7 +22,7 @@ def main(args = None):
 
     args, run_data = preflight_checks(args)
 
-    display_initial_run_info(args, run_data)
+    run_data = display_initial_run_info(args, run_data)
 
     run_data = preprocess_genomes(args, run_data)
 
@@ -46,7 +46,7 @@ def main(args = None):
 
     summarize_results(args, run_data)
 
-    print(f"\n\n{run_data}\n\n")
+    # print(f"\n\n{run_data}\n\n")
     # print(f"\n\n{args}\n\n")
 
     # optional ko searching

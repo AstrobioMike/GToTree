@@ -8,7 +8,7 @@ from gtotree.utils.general import (write_run_data,
 
 def filter_genomes(args, run_data):
 
-    report_processing_stage("filter-genomes")
+    report_processing_stage("filter-genomes", run_data)
     cutoff = "{:.0f}".format(args.genome_hits_cutoff * 100)
     if not args.best_hit_mode:
         print(f"\n    Keeping those with single hits to at least {cutoff}% of the total targeted SCGs.")

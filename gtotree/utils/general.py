@@ -11,6 +11,7 @@ from typing import List
 from tqdm import tqdm # type: ignore
 import subprocess
 import urllib.request
+from datetime import datetime
 from pkg_resources import resource_filename
 from gtotree.utils.messaging import report_early_exit, report_snakemake_failure
 
@@ -163,6 +164,7 @@ class RunData:
     all_input_genomes: List[GenomeData] = field(default_factory=list)
     SCG_targets: List[SCGset] = field(default_factory=list)
 
+    start_time: str = None
     ncbi_sub_table_path: str = ""
     ncbi_downloads_dir: str = ""
     ncbi_downloads_dir_rel: str = ""
@@ -411,8 +413,11 @@ def read_args(args_path):
 
 
 def write_run_data(run_data):
+    run_data_dict = asdict(run_data)
+    if isinstance(run_data.start_time, datetime):
+        run_data_dict['start_time'] = run_data.start_time.isoformat()
     with open(run_data.run_data_path, "w") as f:
-        json.dump(asdict(run_data), f, indent=2)
+        json.dump(run_data_dict, f, indent=2)
 
 
 def read_run_data(path):
@@ -436,10 +441,14 @@ def read_run_data(path):
         else:
             run_data_dict["tools_used"] = ToolsUsed()
 
+        if "start_time" in run_data_dict:
+            run_data_dict["start_time"] = datetime.fromisoformat(run_data_dict["start_time"])
+
         if "SCG_targets" in run_data_dict:
             run_data_dict["SCG_targets"] = [SCGset(**scg) if isinstance(scg, dict) else scg for scg in run_data_dict["SCG_targets"]]
         run_data = RunData(**run_data_dict)
         run_data.update_all_input_genomes()
+
         return run_data
 
     except FileNotFoundError:
