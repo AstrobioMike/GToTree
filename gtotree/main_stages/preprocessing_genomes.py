@@ -133,7 +133,7 @@ def preprocess_genbank_genomes(args, run_data):
 def capture_failed_genbank_files(run_data):
     failed_genbank_files_list = run_data.get_failed_genbank_paths()
     if len(failed_genbank_files_list) > 0:
-        with open(run_data.run_files_dir + "/genbank-files-not-parsed.txt", "w") as not_parsed_file:
+        with open(run_data.run_files_dir + "/failed-genbank-files.txt", "w") as not_parsed_file:
             for entry in failed_genbank_files_list:
                 not_parsed_file.write(entry + "\n")
 

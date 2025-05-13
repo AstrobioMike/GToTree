@@ -1,10 +1,10 @@
 ## next: 
 
     # build output summary (working mainly in messaging.py)
-        # still working on this, mirroring the outputs the current GToTree produces (lacking some on the SCGs right now, not sure if i want to add them)
-        # include a message that reports how many SCGs were used in the final alignment, and how many positions it includes
-        # need global timer and to add all timestamp messages
-        # then happy <...>day message at end too
+        # still working on this, mirroring the outputs the current GToTree produces 
+            # there is an issue right now where i'm reporting an amino acid file as failed when it was removed due to hit-count reasons
+            # right now it's noted at the end for both, it should only be the hit-count reason noted
+            # this is probably going to be a problem for fasta and genbank also, so once fixed for AA, check them too
 
     # build any other remaining output tables at this point (ko and pfam stuff can come later)
 
@@ -37,6 +37,7 @@
             # might need to adjust this (maybe even just searching for the last match, rather than any (or first from reverse order will work
 
     # go through general.py GenomeData class and see which methods i put in that i'm not using anywhere anymore
+
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 

@@ -94,6 +94,16 @@ def report_time_status(start: datetime):
     print(f"Current process runtime: {format_runtime(start, now)}.".center(82))
 
 
+def report_final_time_status(start: datetime):
+    now = datetime.now()
+    run_time = format_runtime(start, now)
+    print("")
+    print(f"Total program runtime: {run_time}".center(82))
+    goodbye_message = f"Happy {now.strftime("%A")} :)".center(82)
+    print(f"{color_text(goodbye_message, 'green')}")
+    print("")
+
+
 def report_message(message, color = "yellow", width = 80, ii = "  ", si = "  ", newline = True):
     if newline:
         print("", flush=True)
@@ -173,7 +183,7 @@ def display_initial_run_info(args, run_data):
         check_input_genomes_amount(len(run_data.all_input_genomes), args)
 
     report_message("  Single-copy gene HMM source to be used:")
-    print(f"      - {args.hmm} ({len(run_data.get_all_SCG_targets_remaining())} targets)", flush=True)
+    print(f"      - {args.hmm} ({len(run_data.get_all_SCG_targets())} targets)", flush=True)
     # time.sleep(1)
 
     check_and_report_any_changed_default_behavior(args)
@@ -324,7 +334,7 @@ def many_genomes_notice(total_input_genomes):
     More info can be found here:
       github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes
 
-    And while we're chatting, you may also want to consider using \"prepresentative\" genomes
+    And while we're chatting, you may also want to consider using \"representative\" genomes
     if you're not already. More info on that can be found here:
       github.com/AstrobioMike/GToTree/wiki/things-to-consider#consider-using-representative-genomes
 
@@ -343,7 +353,7 @@ def few_genomes_notice(total_input_genomes, args):
     More info can be found here:
       github.com/AstrobioMike/GToTree/wiki/Things-to-consider#filtering-hits-by-gene-length
 
-    Moving forward with `-c` set to {args.seq_length_cutoff} this run."""
+                   Moving forward with `-c` set to {args.seq_length_cutoff} this run."""
     )
 
 
@@ -404,7 +414,9 @@ def report_processing_stage(stage, run_data):
         inner_width = width - 2 * len(bumper)
         print()
         print(f"{border}")
+        print(f"{border}")
         print(f"{bumper}{color_text(f"{desc.center(inner_width)}", "green")}{bumper}")
+        print(f"{border}")
         print(f"{border}")
 
     else:
@@ -472,7 +484,7 @@ def report_genbank_update(run_data):
         message += (f"      {color_text(f"{num_prodigal_used} had no CDS entries", "yellow")}, so prodigal was used on the nucleotide sequences.\n\n")
     if num_failed > 0:
         message += (f"      {color_text(f"{num_failed} failed to be successfully parsed", "yellow")}, reported in:\n"
-                    f"        {run_data.run_files_dir_rel}/genbank-files-not-parsed.txt\n\n")
+                    f"        {run_data.run_files_dir_rel}/failed-genbank-files.txt\n\n")
     if num_failed > 0:
         message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} genbank files were successfully parsed and\n    prepared.", "yellow")}")
 
@@ -618,7 +630,11 @@ def summarize_results(args, run_data):
     num_initial_genomes = len(run_data.get_all_input_genome_ids())
     num_remaining_genomes = len(run_data.get_all_remaining_input_genome_ids())
 
-    print(f"\n  Overall, {num_remaining_genomes} of the initial {num_initial_genomes} genomes were retained (see notes below).\n")
+    print(f"\n  Overall, {num_remaining_genomes:,} of the initial {num_initial_genomes:,} genomes were retained (see notes below).\n")
+
+    num_genes = len(run_data.get_all_SCG_targets_remaining())
+    num_sites = run_data.final_alignment_length
+    print(f"  The final alignment utilized {num_genes:,} target genes and contains {num_sites:,} total sites.\n")
 
     if not args.no_tree:
         final_tree_path = get_path_rel_to_outdir(run_data.final_tree_path, args)
@@ -653,12 +669,26 @@ def summarize_results(args, run_data):
         if num_accs_not_downloaded > 0:
             print(f"        {num_accs_not_downloaded} accession(s) did not download properly")
 
+        num_failed_fasta_files = len(run_data.get_failed_fasta_ids())
+        if num_failed_fasta_files > 0:
+            print(f"        {num_failed_fasta_files} fasta file(s) failed to be preprocessed")
+        num_failed_genbank_files = len(run_data.get_failed_genbank_ids())
+        if num_failed_genbank_files > 0:
+            print(f"        {num_failed_genbank_files} genbank file(s) failed to be preprocessed")
+        num_failed_amino_acid_files = len(run_data.get_failed_amino_acid_ids())
+        if num_failed_amino_acid_files > 0:
+            print(f"        {num_failed_amino_acid_files} amino-acid file(s) failed to be preprocessed")
+
         num_genomes_filtered_for_too_few_hits = len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering())
         if num_genomes_filtered_for_too_few_hits > 0:
             print(f"        {num_genomes_filtered_for_too_few_hits} genome(s) removed for having too few hits to the targeted SCGs")
 
-        # if best hit
-            # target genes not found or retained
+        num_genes_removed = len(run_data.get_all_SCG_targets()) - len(run_data.get_all_SCG_targets_remaining())
+        if num_genes_removed > 0:
+            if not args.best_hit_mode:
+                print(f"        {num_genes_removed} gene(s) excluded for having no hits or only multiple hits in each genome")
+            else:
+                print(f"        {num_genes_removed} gene(s) excluded for having no hits in the input genomes")
 
         print(f"\n    Reported along with additional informative files in:\n        {color_text(f"{run_data.run_files_dir_rel}/", 'green')}")
 
@@ -674,6 +704,9 @@ def summarize_results(args, run_data):
     print(f"      {color_text(citations_relative_path, 'green')}")
 
     add_border()
+
+    report_final_time_status(run_data.start_time)
+
 
 def get_path_rel_to_outdir(path, args):
 

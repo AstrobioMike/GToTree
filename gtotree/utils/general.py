@@ -203,6 +203,7 @@ class RunData:
     nucleotide_mode: bool = False
     concatenated_alignment_path: str = ""
     final_alignment_path: str = ""
+    final_alignment_length: int = 0
     original_tree_path: str = ""
     final_tree_path: str = ""
 

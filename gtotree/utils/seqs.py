@@ -300,3 +300,12 @@ def copy_gene_alignments(run_data):
         dest_path = os.path.join(run_data.individual_gene_alignments_dir, f"{SCG.id}-aligned.fasta")
         if os.path.exists(source_path):
             shutil.copyfile(source_path, dest_path)
+
+
+def get_alignment_length(path):
+
+    with open(path, "r") as f:
+        next(f)
+        num_sites = len(next(f).strip())
+
+    return num_sites
