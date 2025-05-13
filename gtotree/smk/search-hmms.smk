@@ -78,7 +78,8 @@ rule search_hmms:
             if not extract_seqs_failed:
                 with open(f"{out_dir}/SCG-hits.fasta", 'w') as f:
                     for gene_id, seq in hit_seqs_dict.items():
-                        f.write(f">{gene_id}\n{seq}\n")
+                        if seq is not None:
+                            f.write(f">{gene_id}\n{seq}\n")
 
         with open(output[0], 'w') as f:
             f.write(f"{wildcards.ID}\t{int(hmm_search_failed)}\t{int(extract_seqs_failed)}\t{int(num_SCG_hits)}\t{int(num_unique_SCG_hits)}\n")

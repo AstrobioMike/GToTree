@@ -95,7 +95,8 @@ def check_target_SCGs_have_seqs(run_data, ext):
         present = check_file_exists_and_not_empty(path)
         if not present:
             SCG_obj.removed = True
-            SCG_obj.reason_removed = "no sequences found or remaining after length-filtering"
+            SCG_obj.remaining = False
+            SCG_obj.reason_removed = "no seqs found or no seqs remaining after length-filtering"
             SCG_targets_missing.append(SCG)
 
     # if len(SCG_targets_missing) > run_data.num_SCG_targets_removed:
@@ -130,7 +131,8 @@ def filter_seqs_by_length(path, cutoff):
             filtered_records.append(record)
             genomes_with_hits_after_filtering.append(record.id)
 
-    out_path = path.rstrip(".fasta") + "-gene-filtered.fasta"
+    root, ext = os.path.splitext(path)
+    out_path = f"{root}-gene-filtered{ext}"
     with open(out_path, "w") as out_handle:
         SeqIO.write(filtered_records, out_handle, "fasta")
 

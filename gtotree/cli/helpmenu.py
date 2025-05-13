@@ -90,10 +90,15 @@ helpmenu += f"""
 
         - [-G <float>] genome hits cutoff; default: 0.5
                   A float between 0-1 specifying the minimum fraction of hits a
-                  genome must have of the SCG-set. For example, if there are 100
-                  target genes in the HMM profile, and Genome X only has hits to
-                  49 of them, it will be removed from analysis with default
-                  value 0.5.
+                  genome must have of the target SCGs that end up in the final
+                  tree. For example, if 100 target genes are going to comprise
+                  the final tree, and Genome X only has hits to 49 of them, that
+                  genome would be removed from the analysis with the default
+                  value of 0.5 for this parameter.
+
+                  Note: This is calculated on the total amount of SCGs that
+                  contribute to the final tree, not necessarily the total
+                  starting number of target SCGs.
 
         - [-B ] best-hit mode; default: false
                   Provide this flag with no arguments if you'd like to run

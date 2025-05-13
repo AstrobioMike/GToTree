@@ -20,6 +20,7 @@ def filter_genomes(args, run_data):
         genomes = run_data.get_all_input_genomes_for_filtering()
         num_remaining_SCG_targets = len([SCG.id for SCG in run_data.get_all_SCG_targets_remaining()])
         min_num_SCG_hits = round(num_remaining_SCG_targets * args.genome_hits_cutoff)
+
         if not args.best_hit_mode:
             genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_unique_SCG_hits < min_num_SCG_hits]
         else:
