@@ -4,6 +4,7 @@
         # or i can make them snakemake wfs and do one search per genome with a counter...
             # i like this idea better for now
         # i started working through pfams
+        # add check if pfam hmms already grabbed, and skip that part if so
 
     # optional pfam search 
         # perform this on all genomes still, after preprocessing before SCG search
