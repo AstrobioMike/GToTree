@@ -151,11 +151,13 @@ def check_input_files(args):
 
     if args.target_pfam_file:
         args.target_pfam_file, total_pfam_targets = check_expected_single_column_input(args.target_pfam_file, "-p", get_count=True)
-        args.total_pfam_targets = total_pfam_targets
+        run_data.target_pfam_file = args.target_pfam_file
+        run_data.total_pfam_targets = total_pfam_targets
 
     if args.target_ko_file:
         args.target_ko_file, total_ko_targets = check_expected_single_column_input(args.target_ko_file, "-K", get_count=True)
-        args.total_ko_targets = total_ko_targets
+        run_data.target_ko_file = args.target_ko_file
+        run_data.total_ko_targets = total_ko_targets
 
     run_data.num_hmm_cpus = args.num_hmm_cpus
 

@@ -209,6 +209,10 @@ class RunData:
     final_alignment_length: int = 0
     original_tree_path: str = ""
     final_tree_path: str = ""
+    target_ko_file: str = None
+    total_ko_targets: int = 0
+    target_pfam_file: str = None
+    total_pfam_targets: int = 0
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 

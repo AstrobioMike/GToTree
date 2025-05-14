@@ -183,7 +183,7 @@ def display_initial_run_info(args, run_data):
     print(f"      - {args.hmm} ({len(run_data.get_all_SCG_targets())} targets)", flush=True)
     # time.sleep(1)
 
-    check_and_report_any_changed_default_behavior(args)
+    check_and_report_any_changed_default_behavior(args, run_data)
     # time.sleep(3)
 
     with contextlib.redirect_stdout(sys.__stdout__):
@@ -225,7 +225,7 @@ def report_update(message, color = "green"):
 
 
 ### specific notices
-def check_and_report_any_changed_default_behavior(args):
+def check_and_report_any_changed_default_behavior(args, run_data):
 
     conditions = [
         args.output_dir != "gtotree-output",
@@ -247,6 +247,8 @@ def check_and_report_any_changed_default_behavior(args):
         args.resume and args.output_already_existed,
         args.force_overwrite and args.output_already_existed,
         args.debug,
+        args.target_pfam_file,
+        args.target_ko_file,
     ]
 
     if any(conditions):
@@ -314,10 +316,10 @@ def check_and_report_any_changed_default_behavior(args):
         print("      - Debug mode is enabled")
 
     if args.target_pfam_file:
-        print(f"      - Genomes will be searched for Pfams listed in: {args.target_pfam_file} ({args.total_pfam_targets} targets)")
+        print(f"      - Genomes will be searched for Pfams listed in: {args.target_pfam_file} ({run_data.total_pfam_targets} targets)")
 
     if args.target_ko_file:
-        print(f"      - Genomes will be searched for KOs listed in: {args.target_ko_file} ({args.total_ko_targets} targets)")
+        print(f"      - Genomes will be searched for KOs listed in: {args.target_ko_file} ({run_data.total_ko_targets} targets)")
 
 
 def many_genomes_notice(total_input_genomes):
@@ -534,7 +536,7 @@ def report_genome_preprocessing_update(run_data):
 
         if num_remaining >= 4:
             message += "\n\n"
-            message += "Moving forward with SCG-hunting in those :)".center(82)
+            message += "Moving forward with those :)".center(82)
 
     report_update(message)
 

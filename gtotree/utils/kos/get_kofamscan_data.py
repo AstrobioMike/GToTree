@@ -91,16 +91,19 @@ def check_if_data_present(location):
             shutil.rmtree(hmms_dir_path)
         return False
     else:
-        if check_stored_data_up_to_date(location):
-            return True
-        else:
-            if os.path.exists(readme_path):
-                os.remove(readme_path)
-            if os.path.exists(ko_list_path):
-                os.remove(ko_list_path)
-            if os.path.isdir(hmms_dir_path):
-                shutil.rmtree(hmms_dir_path)
-            return False
+        return True
+        #### this block would be used if we wanted to check for updates
+        #### but it so rarely (if ever) happens that i'm not sure it's worth it
+        # if check_stored_data_up_to_date(location):
+        #     return True
+        # else:
+        #     if os.path.exists(readme_path):
+        #         os.remove(readme_path)
+        #     if os.path.exists(ko_list_path):
+        #         os.remove(ko_list_path)
+        #     if os.path.isdir(hmms_dir_path):
+        #         shutil.rmtree(hmms_dir_path)
+        #     return False
 
 
 def download_kofamscan_data(location):

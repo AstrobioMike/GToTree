@@ -1,8 +1,11 @@
 ## next: 
 
-    # optional ko search
-        # perform this on all genomes still, after preprocessing before dropping for other reasons
+    # for the pfam/ko searching, maybe i should cat all genome-AA files together into one file, so then i can do the search once on all of them...
+        # or i can make them snakemake wfs and do one search per genome with a counter...
+
     # optional pfam search 
+        # perform this on all genomes still, after preprocessing before dropping for other reasons
+    # optional ko search
         # perform this on all genomes still, after preprocessing before dropping for other reasons
 
     # add a GenomeData attribute for reason removed (genome.reason_removed)
