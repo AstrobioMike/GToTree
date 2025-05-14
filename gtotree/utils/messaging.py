@@ -3,6 +3,7 @@ import sys
 import time
 import re
 import contextlib
+import shutil
 from datetime import datetime
 from importlib.metadata import version
 from gtotree.utils.context import log_file_var
@@ -71,10 +72,12 @@ class Tee:
 def capture_stdout_to_log(log_file):
     def decorator(func):
         def wrapper(*args, **kwargs):
+            if isinstance(sys.stdout, Tee):
+                return func(*args, **kwargs)
             file_path = log_file() if callable(log_file) else log_file
-            with open(file_path, 'a') as f:
+            with open(file_path, 'a', buffering = 1) as f:
                 tee = Tee(sys.stdout, f)
-                with contextlib.redirect_stdout(tee):
+                with contextlib.redirect_stdout(tee), contextlib.redirect_stderr(tee):
                     return func(*args, **kwargs)
         return wrapper
     return decorator
@@ -115,22 +118,22 @@ def report_message(message, color = "yellow", width = 80, ii = "  ", si = "  ", 
 
 def report_missing_input_genomes_file(path, flag):
     report_message(f'You specified "{path}" as a source of input genomes to use (passed to `{flag}`), but that file can\'t be found.')
-    report_early_exit()
+    report_early_exit(None, copy_log = False)
 
 
 def report_missing_pfam_targets_file(path, flag):
     report_message(f'You specified "{path}" as a source of Pfam targets to search each genome for (passed to `{flag}`), but that file can\'t be found.')
-    report_early_exit()
+    report_early_exit(None, copy_log = False)
 
 
 def report_missing_ko_targets_file(path, flag):
     report_message(f'You specified "{path}" as a source of KO targets to search each genome for (passed to `{flag}`), but that file can\'t be found.')
-    report_early_exit()
+    report_early_exit(None, copy_log = False)
 
 
 def report_missing_mapping_file(path, flag):
     report_message(f'You specified "{path}" as a mapping file to use (passed to `{flag}`), but that file can\'t be found.')
-    report_early_exit()
+    report_early_exit(None, copy_log = False)
 
 
 def report_problem_with_mapping_file(mapping_file_problems, path, flag = "-m"):
@@ -138,7 +141,7 @@ def report_problem_with_mapping_file(mapping_file_problems, path, flag = "-m"):
     for problem in mapping_file_problems:
         report_message(problem, width = 100, ii = "    ", si = "    ", newline=False)
     report_message("Please correct these issues and try again!")
-    report_early_exit()
+    report_early_exit(None, copy_log = False)
 
 
 def stdout_and_log(*args, log_file="gtotree-runlog.txt", sep=" ", end="\n\n", flush=False, log_only=False, restart_log=False):
@@ -195,14 +198,24 @@ def display_initial_run_info(args, run_data):
 
 
 @capture_stdout_to_log(lambda: log_file_var.get())
-def report_early_exit(message = None, color = "red", suggest_help = False):
+def report_early_exit(run_data, message = None, color = "red", suggest_help = False, copy_log = True):
     if message:
         print("")
         wprint(color_text(message, color))
     if suggest_help:
         print("\n  See `GToTree -h` for more info.")
     print("\nExiting for now :(\n")
+    if copy_log:
+        copy_log(run_data)
     sys.exit(1)
+
+
+def copy_log(run_data):
+    run_log_path = run_data.output_dir + "/gtotree-runlog.txt"
+    timestamp = run_data.start_time.strftime("%Y-%m-%d_%I-%M-%S")
+    new_log_path = run_data.logs_dir + f"/gtotree-logs/gtotree-runlog-{timestamp}.txt"
+    shutil.copy(run_log_path, new_log_path)
+
 
 @capture_stdout_to_log(lambda: log_file_var.get())
 def add_border():
@@ -247,8 +260,8 @@ def check_and_report_any_changed_default_behavior(args, run_data):
         args.resume and args.output_already_existed,
         args.force_overwrite and args.output_already_existed,
         args.debug,
-        args.target_pfam_file,
-        args.target_ko_file,
+        args.target_pfams_file,
+        args.target_kos_file,
     ]
 
     if any(conditions):
@@ -315,11 +328,11 @@ def check_and_report_any_changed_default_behavior(args, run_data):
     if args.debug:
         print("      - Debug mode is enabled")
 
-    if args.target_pfam_file:
-        print(f"      - Genomes will be searched for Pfams listed in: {args.target_pfam_file} ({run_data.total_pfam_targets} targets)")
+    if args.target_pfams_file:
+        print(f"      - Genomes will be searched for Pfams listed in: {args.target_pfams_file} ({run_data.total_pfam_targets} targets)")
 
-    if args.target_ko_file:
-        print(f"      - Genomes will be searched for KOs listed in: {args.target_ko_file} ({run_data.total_ko_targets} targets)")
+    if args.target_kos_file:
+        print(f"      - Genomes will be searched for KOs listed in: {args.target_kos_file} ({run_data.total_ko_targets} targets)")
 
 
 def many_genomes_notice(total_input_genomes):
@@ -391,6 +404,8 @@ def report_processing_stage(stage, run_data):
         "fasta":                       "PREPROCESSING THE GENOMES PROVIDED AS FASTA FILES",
         "amino-acid":                  "PREPROCESSING THE GENOMES PROVIDED AS AMINO-ACID FILES",
         "preprocessing-update":        "OVERALL SUMMARY OF INPUT-GENOME PREPROCESSING",
+        "additional-pfam-searching":   "SEARCHING GENOMES FOR PROVIDED PFAM TARGETS",
+        "additional-ko-searching":     "SEARCHING GENOMES FOR PROVIDED KO TARGETS",
         "hmm-search":                  "SEARCHING GENOMES FOR TARGET SINGLE-COPY GENES",
         "filter-genes":                "FILTERING GENES BY LENGTH",
         "filter-genomes":              "FILTERING GENOMES WITH TOO FEW HITS",
@@ -433,11 +448,11 @@ def report_processing_stage(stage, run_data):
     # time.sleep(1)
 
 
-def report_snakemake_failure(description, log):
+def report_snakemake_failure(description, log, run_data):
     time.sleep(1)
     report_message(f"\nSnakemake failed while running the \"{description}\" workflow.\n", width = 90, color = "red")
     print(color_text(f"  Check the log at:\n    {log}", "yellow"))
-    report_early_exit()
+    report_early_exit(run_data)
 
 
 def report_ncbi_accs_not_found(num_accs, path):
@@ -541,13 +556,25 @@ def report_genome_preprocessing_update(run_data):
     report_update(message)
 
     if num_remaining < 4:
-        report_too_few_genomes()
+        report_too_few_genomes(run_data)
 
 
-def report_too_few_genomes():
+def report_pfam_searching_update(run_data):
+
+    # if all requested pfams pulled
+        # "All requested pfams were found and genomes searched."
+
+    # if any pfam targets not found
+        # "Some of the input pfams were not found, reported in:"
+        # "Genomes were searched for the remaining ..."
+
+    report_update("Temporary pfam update message.".center(82))
+
+
+def report_too_few_genomes(run_data):
     message = f"\n    {color_text("Unfortunately, there aren't enough genomes remaining to proceed...", 'red')}"
     print(message)
-    report_early_exit()
+    report_early_exit(run_data)
 
 def report_hmm_search_update(run_data):
     num_searched = len(run_data.get_all_preprocessed_genomes())
@@ -562,7 +589,7 @@ def report_hmm_search_update(run_data):
     report_update(message)
 
     if num_successful < 4:
-        report_too_few_genomes()
+        report_too_few_genomes(run_data)
 
 
 def report_genome_filtering_update(run_data):
@@ -596,7 +623,7 @@ def report_genome_filtering_update(run_data):
     report_update(message)
 
     if num_remaining < 4:
-        report_too_few_genomes()
+        report_too_few_genomes(run_data)
 
 
 def report_SCG_set_alignment_update(run_data):
@@ -618,13 +645,16 @@ def report_SCG_set_alignment_update(run_data):
     report_update(message)
 
     if num_SCG_targets_remaining == 0:
-        report_no_SCGs_remaining()
+        report_no_SCGs_remaining(run_data)
 
-def report_no_SCGs_remaining():
+
+def report_no_SCGs_remaining(run_data):
     message = f"\n    {color_text("Unfortunately, there are no remaining SCG-targets to proceed with...", 'red')}"
     print(message)
-    report_early_exit()
+    report_early_exit(run_data)
 
+
+@capture_stdout_to_log(lambda: log_file_var.get())
 def summarize_results(args, run_data):
 
     report_processing_stage("done", run_data)

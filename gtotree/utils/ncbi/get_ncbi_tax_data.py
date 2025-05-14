@@ -61,7 +61,7 @@ def download_ncbi_tax_data(location):
         download_with_tqdm(taxdump_link, "        NCBI Taxonomy data", taxdump_path)
     except Exception as e:
         report_message(f"Downloading the NCBI taxonomy data failed with the following error:\n{e}", "red")
-        report_early_exit()
+        report_early_exit(None, copy_log = False)
 
     with tarfile.open(taxdump_path) as tarball:
         tarball.extractall(location)

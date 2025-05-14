@@ -2,18 +2,13 @@
 
     # for the pfam/ko searching, maybe i should cat all genome-AA files together into one file, so then i can do the search once on all of them...
         # or i can make them snakemake wfs and do one search per genome with a counter...
+            # i like this idea better for now
+        # i started working through pfams
 
     # optional pfam search 
-        # perform this on all genomes still, after preprocessing before dropping for other reasons
+        # perform this on all genomes still, after preprocessing before SCG search
     # optional ko search
-        # perform this on all genomes still, after preprocessing before dropping for other reasons
-
-    # add a GenomeData attribute for reason removed (genome.reason_removed)
-        # implemented, but i need to go back and use it for everything before too-few-hit-filtering
-        # add reason removed to "genomes-summary-info.tsv"
-
-    # add in checks for the total number of remaining genomes being >= 3
-        # at start, and then after genome filtering
+        # perform this on all genomes still, after preprocessing before SCG search
 
     # maybe *don't* make --resume be auto (despite my earlier idea), stop and tell the user to specify --resume or -F if the output dir exists
         # and note that resume is only for resuming, all needs to be the same; it's not for modifying and re-running anything
@@ -27,7 +22,7 @@
         # what happens when the output dir i provide to the gtotree call is a full path?
         # check out what happens if there are multiple matches to key_dir in messaging.get_path_rel_to_outdir()
             # e.g., if we are in a directory called gtotree-output and the output directory is also gtotree-output
-            # might need to adjust this (maybe even just searching for the last match, rather than any (or first from reverse order will work
+            # might need to adjust this (maybe even just searching for the last match, rather than any (or first from reverse order will work)
 
     # go through general.py GenomeData class and see which methods i put in that i'm not using anywhere anymore
 

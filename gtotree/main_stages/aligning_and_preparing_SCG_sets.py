@@ -25,7 +25,7 @@ def align_and_prepare_SCG_sets(args, run_data):
             run_data = read_run_data(run_data.run_data_path)
 
         else:
-            report_no_SCGs_remaining()
+            report_no_SCGs_remaining(run_data)
 
         if args.keep_gene_alignments:
             copy_gene_alignments(run_data)

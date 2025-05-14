@@ -2,8 +2,10 @@ from gtotree.cli.parser import parser
 from gtotree.utils.preflight_checks import preflight_checks
 from gtotree.utils.messaging import (gtotree_header,
                                      display_initial_run_info,
-                                     summarize_results)
+                                     summarize_results,
+                                     copy_log)
 from gtotree.main_stages.preprocessing_genomes import preprocess_genomes
+from gtotree.main_stages.additional_pfam_searching import pfam_target_hunting
 from gtotree.main_stages.hmm_searching import search_hmms
 from gtotree.main_stages.filtering_genes import filter_genes
 from gtotree.main_stages.filtering_genomes import filter_genomes
@@ -26,11 +28,11 @@ def main(args = None):
 
     run_data = preprocess_genomes(args, run_data)
 
-    # if args.target_ko_file:
-    #     run_data = ko_target_hunting(args, run_data)
+    if run_data.target_pfams_file:
+        run_data = pfam_target_hunting(run_data)
 
-    # if args.target_pfam_file:
-    #     run_data = pfam_target_hunting(args, run_data)
+    # if run_data.target_kos_file:
+    #     run_data = ko_target_hunting(run_data)
 
     run_data = search_hmms(args, run_data)
 
@@ -54,6 +56,8 @@ def main(args = None):
         # remove tmp dir unless debug mode (anything else?)
 
     summarize_results(args, run_data)
+
+    copy_log(run_data)
 
     # print(f"\n\n{run_data}\n\n")
     # print(f"\n\n{args}\n\n")

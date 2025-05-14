@@ -50,9 +50,9 @@ def program_check(cmd, essential = False):
     path = shutil.which(cmd)
     if not path:
         if essential:
-            report_early_exit(f"{cmd} is an essential dependency, but it's not in your PATH :(")
+            report_early_exit(None, message = f"{cmd} is an essential dependency, but it's not in your PATH :(", copy_log = False)
         else:
-            report_early_exit(f"You specified to use {cmd}, but it's not in your PATH :(")
+            report_early_exit(None, message = f"You specified to use {cmd}, but it's not in your PATH :(", copy_log = False)
 
 
 def primary_args_validation(args):
@@ -70,11 +70,11 @@ def primary_args_validation(args):
 def check_for_minimum_args(args):
     if not args.ncbi_accessions and not args.genbank_files and not args.fasta_files and not args.amino_acid_files:
         report_message("You need to provide at least one input-genome source!")
-        report_early_exit(suggest_help=True)
+        report_early_exit(None, suggest_help=True, copy_log = False)
     if not args.hmm:
         report_message("You need to specify the HMM file of the target-SCGs you want to tree! "
                        "You can view the available gene-sets packaged with GToTree by running `gtt-hmms`.")
-        report_early_exit(suggest_help=True)
+        report_early_exit(None, suggest_help=True, copy_log = False)
 
 
 def check_optional_deps(args):
@@ -90,17 +90,17 @@ def check_lineage(args):
         if rank.capitalize() not in accepted_ranks:
             report_message(f'You specified "{args.lineage}" to the `-L` argument, but "{rank}" is not an accepted taxonomic rank.')
             print(f"\n  Accepted ranks are any combination of the below entered as a comma-delimited list:\n        {'\n        '.join(accepted_ranks)}")
-            report_early_exit()
+            report_early_exit(None, copy_log = False)
 
     if args.lineage != "Domain,Phylum,Class,Genus,Species" and not args.add_ncbi_tax and not args.add_gtdb_tax:
         report_message("You've specified a custom lineage (`-L`), but neither the "
                        "`-t` nor `-D` flags were provided to indicate which taxonomy to use.")
-        report_early_exit(suggest_help=True)
+        report_early_exit(None, suggest_help=True, copy_log = False)
 
     if args.add_ncbi_tax and args.add_gtdb_tax:
         report_message("You've specified to use both the NCBI and GTDB taxonomies. "
                        "Please choose one or the other.")
-        report_early_exit(suggest_help=True)
+        report_early_exit(None, suggest_help=True, copy_log = False)
 
 
 def check_tree_program(args):
@@ -108,7 +108,7 @@ def check_tree_program(args):
     if args.tree_program not in accepted_programs:
         report_message(f'You specified "{args.tree_program}" to the `-T` argument, but that\'s not an available treeing program.')
         print(f"\n  Available programs are:\n        {'\n        '.join(accepted_programs)}")
-        report_early_exit()
+        report_early_exit(None, copy_log = False)
     program_check(args.tree_program)
 
 
@@ -118,12 +118,12 @@ def checks_for_nucleotide_mode(args):
             report_message("You've specified wanting to work with nucleotide sequences (by passing the `-z` parameter), "
                            "but also provided some input genomes as amino-acid files (passed to `-A`). We can't confidently reverse-translate "
                            "amino-acid seqs to nucleotide seqs, so we can't take both of those options.")
-            report_early_exit()
+            report_early_exit(None, copy_log = False)
         if args.genbank_files:
             report_message("You've specified wanting to work with nucleotide sequences (by passing the `-z` parameter), "
                            "but also provided some input genomes as genbank files (passed to `-g`). Input genbank files are currently "
                            "not supported with nucleotide mode.")
-            report_early_exit()
+            report_early_exit(None, copy_log = False)
 
 
 def check_input_files(args):
@@ -149,14 +149,14 @@ def check_input_files(args):
     if args.mapping_file:
         args, run_data = check_mapping_file(args, run_data)
 
-    if args.target_pfam_file:
-        args.target_pfam_file, total_pfam_targets = check_expected_single_column_input(args.target_pfam_file, "-p", get_count=True)
-        run_data.target_pfam_file = args.target_pfam_file
+    if args.target_pfams_file:
+        args.target_pfams_file, total_pfam_targets = check_expected_single_column_input(args.target_pfams_file, "-p", get_count=True)
+        run_data.target_pfams_file = args.target_pfams_file
         run_data.total_pfam_targets = total_pfam_targets
 
-    if args.target_ko_file:
-        args.target_ko_file, total_ko_targets = check_expected_single_column_input(args.target_ko_file, "-K", get_count=True)
-        run_data.target_ko_file = args.target_ko_file
+    if args.target_kos_file:
+        args.target_kos_file, total_ko_targets = check_expected_single_column_input(args.target_kos_file, "-K", get_count=True)
+        run_data.target_kos_file = args.target_kos_file
         run_data.total_ko_targets = total_ko_targets
 
     run_data.num_hmm_cpus = args.num_hmm_cpus
@@ -228,11 +228,13 @@ def check_for_whitespace(path, flag):
 
     for line in lines:
         if " " in line:
-            report_early_exit(f'The specified input genomes file "{path}" (passed to `{flag}`) contains spaces in one or more entries. '
-                              f'That is not expected and will break things. Please double-check things and remove any whitespace from the file.', suggest_help=True)
+            message = f'The specified input genomes file "{path}" (passed to `{flag}`) contains spaces in one or more entries. '
+            message += f'That is not expected and will break things. Please double-check things and remove any whitespace from the file.'
+            report_early_exit(None, suggest_help = True, copy_log = False)
         if "\t" in line:
-            report_early_exit(f'The specified input genomes file "{path}" (passed to `{flag}`) contains tabs in one or more entries. '
-                              f'That is not expected and will break things. Please double-check things and remove any whitespace from the file.', suggest_help=True)
+            message = f'The specified input genomes file "{path}" (passed to `{flag}`) contains tabs in one or more entries. '
+            message += f'That is not expected and will break things. Please double-check things and remove any whitespace from the file.'
+            report_early_exit(None, suggest_help = True, copy_log = False)
 
 
 def check_line_endings(path, flag):
@@ -285,7 +287,7 @@ def check_inputs_exist(path, flag):
                 line = line.strip()
                 if not os.path.exists(line):
                     report_message(f'The specified input-genome file "{line}" (passed to `{flag}`) does not exist.')
-                    report_early_exit()
+                    report_early_exit(None, copy_log = False)
 
 
 def check_mapping_file(args, run_data, flag = "-m"):
@@ -361,7 +363,7 @@ def make_mapping_dict(path):
             f'The mapping file "{path}" (passed to `-m`) has some duplicate entries in the first column.'
             ' Please address that and try again.'
         )
-        report_early_exit()
+        report_early_exit(None, copy_log = False)
 
     mapping_dict = {}
     for idx, row in df.iterrows():
@@ -392,7 +394,7 @@ def make_mapping_dict(path):
         report_message(
             f'Each input genome must map to a unique label. Please address that and try again.'
         )
-        report_early_exit()
+        report_early_exit(None, copy_log = False)
 
     return mapping_dict
 
@@ -411,7 +413,7 @@ def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
         report_message(
             f"Each input genome in the mapping file (column 1) must be present in one of the input-genome sources. Please address this and try again."
         )
-        report_early_exit()
+        report_early_exit(None, copy_log = False)
 
 
 def check_for_required_dbs(args):
@@ -421,7 +423,7 @@ def check_for_required_dbs(args):
         get_ncbi_tax_data()
     if args.add_gtdb_tax:
         get_gtdb_data()
-    if args.target_ko_file:
+    if args.target_kos_file:
         get_kofamscan_data()
 
 
@@ -444,9 +446,9 @@ def track_tools_used(args, run_data):
         tools_used.iqtree_used = True
     if args.hmm == "Universal" or args.hmm == "Universal-Hug-et-al" or args.hmm == "Universal-Hug-et-al.hmm":
         tools_used.universal_SCGs_used = True
-    if args.target_pfam_file:
+    if args.target_pfams_file:
         tools_used.pfam_db_used = True
-    if args.target_ko_file:
+    if args.target_kos_file:
         tools_used.kofamscan_used = True
 
     run_data.tools_used = tools_used
@@ -490,6 +492,8 @@ def final_setups(args, run_data):
     run_data.logs_dir_rel = logs_dir_rel
     run_data.logs_dir = logs_dir
     run_data.output_dir_rel = args.output_dir
+    run_data.gtotree_logs_dir = os.path.join(logs_dir, "gtotree-logs")
+    os.makedirs(run_data.gtotree_logs_dir, exist_ok=True)
 
     if args.ncbi_accessions:
         ncbi_downloads_dir_rel = os.path.join(args.tmp_dir, "ncbi-downloads")
@@ -544,7 +548,27 @@ def final_setups(args, run_data):
         run_data.individual_gene_alignments_dir = os.path.abspath(run_data.individual_gene_alignments_dir_rel)
         os.makedirs(run_data.individual_gene_alignments_dir, exist_ok=True)
 
+    if args.target_pfams_file:
+        run_data = setup_pfam_dirs(run_data)
+
     return args, run_data
+
+
+def setup_pfam_dirs(run_data):
+    run_data.pfam_results_dir = os.path.join(run_data.output_dir, "pfam-search-results")
+    run_data.pfam_results_dir_rel = os.path.join(run_data.output_dir_rel, "pfam-search-results")
+
+    dirs = [run_data.pfam_results_dir,
+            os.path.join(run_data.pfam_results_dir, "info"),
+            os.path.join(run_data.pfam_results_dir, "individual-genome-results"),
+            os.path.join(run_data.pfam_results_dir, "iToL-files"),
+            os.path.join(run_data.pfam_results_dir, "pfam-hit-seqs"),
+            os.path.join(run_data.pfam_results_dir, "target-pfam-profiles")]
+
+    for d in dirs:
+        os.makedirs(d, exist_ok=True)
+
+    return run_data
 
 
 def setup_tmp_dir(args, run_data):
@@ -568,7 +592,7 @@ def setup_tmp_dir(args, run_data):
         except OSError:
             report_message(f"We could not create a temporary directory in the location you specified: {args.tmp_dir}")
             report_message("Maybe you don't have write permissions there?")
-            report_early_exit()
+            report_early_exit(None, copy_log = False)
     else:
         tmp_dir = tempfile.mkdtemp(prefix = "gtt-tmp-", dir = args.output_dir)
         args.tmp_dir = tmp_dir

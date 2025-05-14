@@ -116,7 +116,7 @@ def get_NCBI_assembly_summary_data(location):
         download_with_tqdm(refseq_link, "        RefSeq assemblies summary", refseq_temp_path)
     except Exception as e:
         report_message(f"Downloading the NCBI assembly summary tables failed with the following error:\n{e}", "red")
-        report_early_exit()
+        report_early_exit(None, copy_log = False)
 
     # combining
     with open (table_path, "a") as final_table:

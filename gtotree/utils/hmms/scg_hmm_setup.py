@@ -60,7 +60,7 @@ def download_prepackaged_hmm(hmm_file, hmm_arg):
         download_with_tqdm(target_hmm_url, f"        {hmm_arg} HMM file", hmm_file)
     except Exception as e:
         report_message(f"Downloading the HMM file failed with the following error:\n{e}", "red")
-        report_early_exit()
+        report_early_exit(None, copy_log = False)
 
 
 def read_in_hmm_summary_table():
@@ -77,7 +77,7 @@ def get_target_hmm_url(hmm_file, hmm_arg):
     except IndexError:
         report_message(f"You specified \"{hmm_arg}\" as the HMM file to use, but that file can't be found.", "red")
         report_message("You can see the available gene-sets packaged with GToTree by running `gtt-hmms`.")
-        report_early_exit()
+        report_early_exit(None, copy_log = False)
     return target_hmm_url
 
 

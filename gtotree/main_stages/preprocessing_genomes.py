@@ -226,7 +226,7 @@ def run_prodigal(id, run_data, full_inpath = None, group = None):
         in_path = full_inpath
         out_path = f"{run_data.fasta_processing_dir}/{id}_protein.faa"
     else:
-        report_early_exit(f"    Prodigal not yet implemented for \"{group}\".")
+        report_early_exit(run_data, message = f"    Prodigal not yet implemented for \"{group}\".")
 
     prodigal_cmd = [
         "prodigal",

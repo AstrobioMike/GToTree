@@ -56,8 +56,8 @@ def parser():
     opt.add_argument("-B", "--best-hit-mode", action="store_true")
 
     # --- Addtional Target Searching ---
-    opt.add_argument("-K", "--target-ko-file", metavar="<file>", type=str)
-    opt.add_argument("-p", "--target-pfam-file", metavar="<file>", type=str)
+    opt.add_argument("-K", "--target-kos-file", metavar="<file>", type=str)
+    opt.add_argument("-p", "--target-pfams-file", metavar="<file>", type=str)
 
     # --- General Run Settings ---
     opt.add_argument("-R", "--resume", action="store_true")

@@ -48,7 +48,6 @@ def filter_genomes(args, run_data):
 
 
 def capture_removed_genomes(run_data):
-    print(len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering()))
     if len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering()) > 0:
         with open(run_data.run_files_dir + "/genomes-removed-for-too-few-SCG-hits.txt", "w") as fail_file:
             for genome in run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering():

@@ -11,7 +11,7 @@ def run_tree_building(args, run_data):
     try:
         builder = command_building_dict[args.tree_program]
     except KeyError:
-        report_early_exit(f"Tree building program {args.tree_program!r} not recognized.", suggest_help=True)
+        report_early_exit(run_data, f"Tree building program {args.tree_program!r} not recognized.", suggest_help=True)
 
     cmd, log_file = builder(args, run_data, orig_out_tree)
 
@@ -23,7 +23,7 @@ def run_tree_building(args, run_data):
 
     result = subprocess.run(cmd, shell=True)
     if result.returncode != 0:
-        report_early_exit("Tree building failed. Please check the log file noted above.")
+        report_early_exit(run_data, "Tree building failed. Please check the log file noted above.")
 
     if args.tree_program == "IQTREE":
         shutil.copyfile(os.path.join(run_data.run_files_dir, "iqtree-out", "iqtree.treefile"),

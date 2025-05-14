@@ -4,7 +4,6 @@ import pandas as pd
 from Bio import SeqIO
 import pyhmmer.easel as easel #type: ignore
 from gtotree.utils.messaging import (report_processing_stage,
-                                     report_early_exit,
                                      report_hmm_search_update)
 from gtotree.utils.general import (write_run_data,
                                    read_run_data,

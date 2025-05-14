@@ -70,7 +70,7 @@ def report_KOFam_dl_failure(e):
     report_message(f"Unfortunately, the KOFam data can only be accessed via ftp, which may be blocked on your system.")
     report_message(f"You can check and see if you can access this URL: ftp://ftp.genome.jp/pub/db/kofam/")
     report_message(f"If accessing that is a problem, you can drop the additional target KOs (being provided to the `-K` flag) and sadly run GToTree without them.")
-    report_early_exit()
+    report_early_exit(None, copy_log = False)
 
 
 def check_if_data_present(location):
@@ -92,8 +92,7 @@ def check_if_data_present(location):
         return False
     else:
         return True
-        #### this block would be used if we wanted to check for updates
-        #### but it so rarely (if ever) happens that i'm not sure it's worth it
+        #### this block would be used if we wanted to check for updates automatically
         # if check_stored_data_up_to_date(location):
         #     return True
         # else:

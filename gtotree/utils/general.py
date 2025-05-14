@@ -3,7 +3,7 @@ import os
 import sys
 import gzip
 import shutil
-import json #type: ignore
+import json
 import argparse
 import pandas as pd
 from dataclasses import dataclass, field, asdict
@@ -14,6 +14,7 @@ import urllib.request
 from datetime import datetime
 from pkg_resources import resource_filename
 from gtotree.utils.messaging import report_early_exit, report_snakemake_failure
+
 
 @dataclass
 class ToolsUsed:
@@ -41,6 +42,17 @@ def download_with_tqdm(url, target, filename=None, urlopen=False):
             dl = urllib.request.urlopen(url, reporthook=reporthook)
             sys.stdout.write("")
             return dl
+
+
+def download_and_gunzip(url, target):
+
+    try:
+        with urllib.request.urlopen(url) as resp, gzip.GzipFile(fileobj=resp) as gzipped, open(target, "wb") as out_f:
+            shutil.copyfileobj(gzipped, out_f)
+        return True
+
+    except:
+        return False
 
 
 @dataclass
@@ -156,8 +168,6 @@ class SCGset:
         self.gene_length_filtered = value
 
 
-
-
 @dataclass
 class RunData:
     ncbi_accs: List[GenomeData] = field(default_factory=list)
@@ -193,6 +203,7 @@ class RunData:
     log_file: str = ""
     logs_dir: str = ""
     logs_dir_rel: str = ""
+    gtotree_logs_dir: str = ""
     num_hmm_cpus: str = ""
     best_hit_mode: bool = False
     seq_length_cutoff: float = None
@@ -209,10 +220,19 @@ class RunData:
     final_alignment_length: int = 0
     original_tree_path: str = ""
     final_tree_path: str = ""
-    target_ko_file: str = None
+    target_kos_file: str = None
     total_ko_targets: int = 0
-    target_pfam_file: str = None
+    target_pfams_file: str = None
     total_pfam_targets: int = 0
+    additional_pfam_searching_done: bool = False
+    additional_ko_searching_done: bool = False
+    pfam_dict: dict = field(default_factory=dict)
+    pfam_results_dir: str = ""
+    pfam_results_dir_rel: str = ""
+    found_pfam_targets: List[str] = field(default_factory=list)
+    failed_pfam_targets: List[str] = field(default_factory=list)
+    kofamscan_results_dir: str = ""
+    kofamscan_results_dir_rel: str = ""
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
@@ -510,8 +530,8 @@ def run_snakemake(snakefile, tqdm_jobs, args, run_data, description, print_lines
         process.wait()
 
         if process.returncode != 0:
-            report_snakemake_failure(description, log_dir_rel)
-            report_early_exit()
+            report_snakemake_failure(description, log_dir_rel, run_data)
+            report_early_exit(run_data)
 
 
 def gunzip_if_needed(path):
@@ -540,3 +560,10 @@ def check_file_exists_and_not_empty(path):
     except FileNotFoundError:
         pass
     return False
+
+
+def concat_files(file_list, output_file):
+    with open(output_file, 'w') as outfile:
+        for fname in file_list:
+            with open(fname, 'r') as infile:
+                shutil.copyfileobj(infile, outfile)
