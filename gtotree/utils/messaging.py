@@ -179,15 +179,15 @@ def display_initial_run_info(args, run_data):
     report_message(f"                           Total input genomes: {len(run_data.all_input_genomes)}", "green")
     # time.sleep(1)
 
-    with contextlib.redirect_stdout(sys.__stdout__):
-        check_input_genomes_amount(len(run_data.all_input_genomes), args)
-
     report_message("  Single-copy gene HMM source to be used:")
     print(f"      - {args.hmm} ({len(run_data.get_all_SCG_targets())} targets)", flush=True)
     # time.sleep(1)
 
     check_and_report_any_changed_default_behavior(args)
     # time.sleep(3)
+
+    with contextlib.redirect_stdout(sys.__stdout__):
+        check_input_genomes_amount(len(run_data.all_input_genomes), args)
 
     run_data.start_time = datetime.now()
 
@@ -388,7 +388,7 @@ def report_processing_stage(stage, run_data):
         "genbank":                     "PREPROCESSING THE GENOMES PROVIDED AS GENBANK FILES",
         "fasta":                       "PREPROCESSING THE GENOMES PROVIDED AS FASTA FILES",
         "amino-acid":                  "PREPROCESSING THE GENOMES PROVIDED AS AMINO-ACID FILES",
-        "preprocessing-update":        "SUMMARY OF INPUT-GENOME PREPROCESSING",
+        "preprocessing-update":        "OVERALL SUMMARY OF INPUT-GENOME PREPROCESSING",
         "hmm-search":                  "SEARCHING GENOMES FOR TARGET SINGLE-COPY GENES",
         "filter-genes":                "FILTERING GENES BY LENGTH",
         "filter-genomes":              "FILTERING GENOMES WITH TOO FEW HITS",
@@ -439,7 +439,7 @@ def report_snakemake_failure(description, log):
 
 
 def report_ncbi_accs_not_found(num_accs, path):
-    report_notice(f"    {num_accs} accession(s) not successfully found at NCBI.\n"
+    report_notice(f"    {num_accs} accession(s) not successfully found at NCBI.\n\n"
                 f"    Reported in {path}/ncbi-accessions-not-found.txt")
     time.sleep(1)
 
@@ -607,7 +607,7 @@ def report_SCG_set_alignment_update(run_data):
     else:
         message = (f"    Of the initial {total_SCG_targets} SCG-targets:\n\n")
         message += (f"        {color_text(f"{num_SCG_targets_dropped} had no hits or were filtered out", 'yellow')}, reported in:\n")
-        message += (f"          {run_data.run_files_dir_rel}/target-SCGs-not-found-or-filtered-out.txt")
+        message += (f"          {run_data.run_files_dir_rel}/target-SCGs-filtered-out-or-not-found.txt")
 
         if num_SCG_targets_remaining != 0:
             message += "\n\n"
@@ -681,7 +681,10 @@ def summarize_results(args, run_data):
 
         num_genomes_filtered_for_too_few_hits = len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering())
         if num_genomes_filtered_for_too_few_hits > 0:
-            print(f"        {num_genomes_filtered_for_too_few_hits} genome(s) removed for having too few hits to the targeted SCGs")
+            if not args.best_hit_mode:
+                print(f"        {num_genomes_filtered_for_too_few_hits} genome(s) removed for having too few unique hits to the targeted SCGs")
+            else:
+                print(f"        {num_genomes_filtered_for_too_few_hits} genome(s) removed for having too few hits to the targeted SCGs")
 
         num_genes_removed = len(run_data.get_all_SCG_targets()) - len(run_data.get_all_SCG_targets_remaining())
         if num_genes_removed > 0:
@@ -699,7 +702,7 @@ def summarize_results(args, run_data):
 
     add_border()
 
-    citations_relative_path = args.output_dir + "/gtotree-citations.txt"
+    citations_relative_path = args.output_dir + "/citations.txt"
     print(f"\n  {color_text("Programs used and their citations have been written to:", 'yellow')}")
     print(f"      {color_text(citations_relative_path, 'green')}")
 

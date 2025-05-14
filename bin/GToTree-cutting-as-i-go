@@ -75,31 +75,6 @@ fi
 
 
 #############################################################################
-#############  CLEARING OUT TMP FILES UNLESS -d FLAG PROVIDED  ##############
-#############################################################################
-# keeping individual alignment files if -k was provided
-if [ $keep_individual_alignments == 'true' ]; then
-    mkdir ${output_dir}/run_files/individual_alignments
-
-    for file in ${tmp_dir}/*_all_aligned${target_gene_suffix}
-    do
-        new_path="${output_dir}/run_files/individual_alignments/$(basename $(echo ${file%%_all_aligned${target_gene_suffix}}))_aln${target_gene_suffix}"
-        mv ${file} ${new_path}
-    done
-
-fi
-
-# saving output dir if -d was provided, removing if not
-if [ ${debug_flag} == 'false' ]; then
-    rm -rf ${tmp_dir}
-else
-    mv ${tmp_dir} ${output_dir}
-fi
-
-
-
-
-#############################################################################
 ##########################  JOB-FINISHED REPORTING  #########################
 #############################################################################
 printf "\n\n#################################################################################\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )

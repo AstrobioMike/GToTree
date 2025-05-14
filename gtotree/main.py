@@ -26,6 +26,12 @@ def main(args = None):
 
     run_data = preprocess_genomes(args, run_data)
 
+    # if args.target_ko_file:
+    #     run_data = ko_target_hunting(args, run_data)
+
+    # if args.target_pfam_file:
+    #     run_data = pfam_target_hunting(args, run_data)
+
     run_data = search_hmms(args, run_data)
 
     run_data = filter_genes(args, run_data)
@@ -44,13 +50,11 @@ def main(args = None):
 
     generate_primary_summary_table(args, run_data)
 
+    # cleanup(args, run_data)
+        # remove tmp dir unless debug mode (anything else?)
+
     summarize_results(args, run_data)
 
     # print(f"\n\n{run_data}\n\n")
     # print(f"\n\n{args}\n\n")
 
-    # optional ko searching
-
-    # optional pfam searching
-
-    # cleanup(args, run_data)

@@ -52,6 +52,7 @@ class GenomeData:
     basename: str
     taxid: str = None
     preprocessing_done: bool = False
+    preprocessing_failed: bool = False
     final_AA_path: str = ""
     prodigal_used: bool = False
     was_gzipped: bool = False
@@ -109,8 +110,9 @@ class GenomeData:
     def mark_preprocessing_done(self, value=True):
         self.preprocessing_done = value
 
-    def mark_removed(self, value=True):
+    def mark_removed(self, reason, value=True):
         self.removed = value
+        self.reason_removed = reason
         self.final_AA_path = None
 
     def mark_prodigal_used(self, value=True):
@@ -145,8 +147,9 @@ class SCGset:
     def from_id(cls, id: str):
         return cls(id, remaining=True, gene_length_filtered=False, removed=False)
 
-    def mark_removed(self, value=True):
+    def mark_removed(self, reason, value=True):
         self.removed = value
+        self.reason_removed = reason
         self.remaining = False
 
     def mark_gene_length_filtered(self, value=True):
@@ -262,7 +265,7 @@ class RunData:
         return [gd for gd in self.all_input_genomes if gd.preprocessing_done and gd.hmm_search_done and not gd.removed]
 
     def get_all_input_genomes_due_for_SCG_min_hit_filtering(self) -> List[GenomeData]:
-        return [gd for gd in self.all_input_genomes if gd.reason_removed == "too few SCG hits"]
+        return [gd for gd in self.all_input_genomes if gd.reason_removed == "too few SCG hits" or gd.reason_removed == "too few unique SCG hits"]
 
     def get_all_input_genome_basenames(self) -> List[str]:
         return [gd.basename for gd in self.all_input_genomes]
@@ -325,10 +328,10 @@ class RunData:
         return [gd.provided_path for gd in self.fasta_files if gd.removed]
 
     def get_failed_amino_acid_ids(self) -> List[str]:
-        return [gd.id for gd in self.amino_acid_files if gd.removed]
+        return [gd.id for gd in self.amino_acid_files if gd.removed and gd.preprocessing_failed]
 
     def get_failed_amino_acid_paths(self) -> List[str]:
-        return [gd.provided_path for gd in self.amino_acid_files if gd.removed]
+        return [gd.provided_path for gd in self.amino_acid_files if gd.removed and gd.preprocessing_failed]
 
     def get_failed_hmm_search_paths(self) -> List[str]:
         return [gd.provided_path for gd in self.all_input_genomes if gd.preprocessing_done and not gd.hmm_search_done]

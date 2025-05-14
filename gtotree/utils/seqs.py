@@ -94,20 +94,8 @@ def check_target_SCGs_have_seqs(run_data, ext):
         path = run_data.found_SCG_seqs_dir + f"/{SCG}{ext}"
         present = check_file_exists_and_not_empty(path)
         if not present:
-            SCG_obj.removed = True
-            SCG_obj.remaining = False
-            SCG_obj.reason_removed = "no seqs found or no seqs remaining after length-filtering"
+            SCG_obj.mark_removed("no seqs found or no seqs remaining after length-filtering")
             SCG_targets_missing.append(SCG)
-
-    # if len(SCG_targets_missing) > run_data.num_SCG_targets_removed:
-    #     add_border()
-    #     message = f"    Some target single-copy genes were not found or were filtered out of the\n"
-    #     message += f"    analysis.\n\n    These include:\n      {'\n      '.join(SCG_targets_missing)}"
-    #     report_notice(message)
-
-    #     with open(run_data.run_files_dir + "/target-SCGs-not-found-or-filtered-out.txt", "w") as out_file:
-    #         for target in SCG_targets_missing:
-    #             out_file.write(target + "\n")
 
     run_data.num_SCG_targets_removed = len(SCG_targets_missing)
 

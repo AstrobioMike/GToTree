@@ -41,6 +41,6 @@ def write_out_removed_SCG_targets(run_data):
 
     removed_SCG_targets = run_data.get_all_removed_SCG_targets()
     if len(removed_SCG_targets) > 0:
-        with open(run_data.run_files_dir + "/target-SCGs-not-found-or-filtered-out.txt", "w") as fail_file:
+        with open(run_data.run_files_dir + "/target-SCGs-filtered-out-or-not-found.txt", "w") as fail_file:
             for target in removed_SCG_targets:
                 fail_file.write(target + "\n")

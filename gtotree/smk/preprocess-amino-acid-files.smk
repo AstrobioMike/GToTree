@@ -31,8 +31,8 @@ rule all:
                         AA.mark_preprocessing_done()
                         AA.final_AA_path = final_AA_path
                     else:
-                        AA.mark_removed()
-                        AA.reason_removed = "amino-acid-file processing failed"
+                        AA.mark_removed("amino-acid-file processing failed")
+                        AA.preprocessing_failed = True
 
         write_run_data(run_data)
 

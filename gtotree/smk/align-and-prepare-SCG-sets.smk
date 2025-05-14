@@ -25,13 +25,11 @@ rule all:
                     ID, align_failed, trimal_failed = line.strip().split('\t')
 
                     if int(align_failed):
-                        SCG_target.mark_removed()
+                        SCG_target.mark_removed("alignment failed")
                         SCG_target.aligned = False
-                        SCG_target.reason_removed = "alignment failed"
                     elif int(trimal_failed):
-                        SCG_target.mark_removed()
+                        SCG_target.mark_removed("trimal failed")
                         SCG_target.trimmed = False
-                        SCG_target.reason_removed = "trimal failed"
                     else:
                         SCG_target.aligned = True
                         SCG_target.trimmed = True

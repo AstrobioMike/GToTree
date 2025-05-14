@@ -34,8 +34,8 @@ rule all:
                         gb.mark_preprocessing_done()
                         gb.final_AA_path = final_AA_path
                     else:
-                        gb.mark_removed()
-                        gb.reason_removed = "genbank-file processing failed"
+                        gb.mark_removed("genbank-file processing failed")
+                        gb.preprocessing_failed = True
 
                     if int(prodigal_used):
                         gb.mark_prodigal_used()

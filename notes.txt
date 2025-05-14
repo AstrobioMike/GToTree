@@ -1,19 +1,9 @@
 ## next: 
 
-    # build output summary (working mainly in messaging.py)
-        # still working on this, mirroring the outputs the current GToTree produces 
-            # there is an issue right now where i'm reporting an amino acid file as failed when it was removed due to hit-count reasons
-            # right now it's noted at the end for both, it should only be the hit-count reason noted
-            # this is probably going to be a problem for fasta and genbank also, so once fixed for AA, check them too
-
-    # build any other remaining output tables at this point (ko and pfam stuff can come later)
-
     # optional ko search
         # perform this on all genomes still, after preprocessing before dropping for other reasons
     # optional pfam search 
         # perform this on all genomes still, after preprocessing before dropping for other reasons
-    # implement nucleotide mode :(
-    # unit tests..... :( :( :(
 
     # add a GenomeData attribute for reason removed (genome.reason_removed)
         # implemented, but i need to go back and use it for everything before too-few-hit-filtering
@@ -37,6 +27,9 @@
             # might need to adjust this (maybe even just searching for the last match, rather than any (or first from reverse order will work
 
     # go through general.py GenomeData class and see which methods i put in that i'm not using anywhere anymore
+
+    # implement nucleotide mode :(
+    # unit tests..... :( :( :(
 
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
@@ -94,6 +87,8 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 # the order of processing changed slightly from v1 to v2, so the output report messages vary a little
     # in v1, each genome was downloaded/parsed and scanned for the target genes in one pass
     # in v2, all input genomes are prepared for each input source, then all are searched together
+# there are no longer separate summary tables for each input-genome source (accessions, fasta files, genbank files, and amino-acid files)
+    # they are all represented in the primary "genomes-summary-info.tsv" table, which includes a "source" column
 
 ### PLACES TO DEF IMPROVE ###
 

@@ -26,14 +26,14 @@ rule all:
                     if int(status):
                         acc_gd.mark_preprocessing_done()
                         acc_gd.final_AA_path = final_AA_path
+                        acc_gd.acc_was_downloaded = True if int(downloaded) else False
                     else:
-                        acc_gd.mark_removed()
-
-                    if int(downloaded):
-                        acc_gd.acc_was_downloaded = True
-                    else:
-                        acc_gd.acc_was_downloaded = False
-                        acc_gd.reason_removed = "NCBI download failed"
+                        if int(downloaded):
+                            acc_gd.acc_was_downloaded = True
+                            acc_gd.mark_removed("acc processing failed after download")
+                        else:
+                            acc_gd.acc_was_downloaded = False
+                            acc_gd.mark_removed("acc download failed")
 
                     acc_gd.prodigal_used = True if int(prodigal_used) else False
 

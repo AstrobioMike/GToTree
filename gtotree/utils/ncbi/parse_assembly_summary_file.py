@@ -91,8 +91,7 @@ def parse_assembly_summary(assembly_summary_file, run_data):
     for acc_gd in run_data.ncbi_accs:
         if acc_gd.id in not_found:
             acc_gd.acc_was_found = False
-            acc_gd.removed = True
-            acc_gd.reason_removed = "accession not found at NCBI"
+            acc_gd.mark_removed("accession not found at NCBI")
         else:
             acc_gd.acc_was_found = True
 

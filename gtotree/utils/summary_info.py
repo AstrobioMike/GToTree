@@ -33,6 +33,7 @@ def generate_primary_summary_table(args, run_data):
             "num_SCG_hits_after_filtering":  g.num_SCG_hits_after_filtering,
             "num_total_genes":               g.num_genes,
             "in_final_tree":                 "Yes" if not g.removed else "No",
+            "reason_removed":                g.reason_removed,
         })
 
     df = (pd.DataFrame(rows).convert_dtypes())

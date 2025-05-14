@@ -28,8 +28,8 @@ def filter_genomes(args, run_data):
 
         for genome in genomes:
             if genome.id in genome_ids_to_filter_out:
-                genome.removed = True
-                genome.reason_removed = "too few SCG hits"
+                reason = "too few SCG hits" if args.best_hit_mode else "too few unique SCG hits"
+                genome.mark_removed(reason)
 
         write_run_data(run_data)
         snakefile = get_snakefile_path("filter-genomes.smk")
@@ -48,6 +48,7 @@ def filter_genomes(args, run_data):
 
 
 def capture_removed_genomes(run_data):
+    print(len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering()))
     if len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering()) > 0:
         with open(run_data.run_files_dir + "/genomes-removed-for-too-few-SCG-hits.txt", "w") as fail_file:
             for genome in run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering():
