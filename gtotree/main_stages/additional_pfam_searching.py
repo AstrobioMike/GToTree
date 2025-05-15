@@ -3,7 +3,7 @@ from gtotree.utils.messaging import (report_processing_stage,
                                      report_pfam_searching_update)
 
 
-def pfam_target_hunting(run_data):
+def search_pfams(run_data):
 
     report_processing_stage("additional-pfam-searching", run_data)
 

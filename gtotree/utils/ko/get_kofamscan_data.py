@@ -75,7 +75,8 @@ def report_KOFam_dl_failure(e):
 
 def check_if_data_present(location):
 
-    readme_path = os.path.join(location, "README")
+    # readme_path = os.path.join(location, "README")
+    readme_path = os.path.join(location, "README.txt") # .txt was needed as of noticed on 15-May-2025
     ko_list_path = os.path.join(location, "ko_list")
     hmms_dir_path = os.path.join(location, "profiles")
 
@@ -93,6 +94,10 @@ def check_if_data_present(location):
     else:
         return True
         #### this block would be used if we wanted to check for updates automatically
+        #### but it was based on the README, which i don't think is the best way
+        #### I also don't know if it's needed, better to add a flag to update with a direct
+        #### program/script call than force a check every normal run
+        #
         # if check_stored_data_up_to_date(location):
         #     return True
         # else:
@@ -107,7 +112,8 @@ def check_if_data_present(location):
 
 def download_kofamscan_data(location):
 
-    readme_url = "ftp://ftp.genome.jp/pub/db/kofam/README"
+    # readme_url = "ftp://ftp.genome.jp/pub/db/kofam/README"
+    readme_url = "ftp://ftp.genome.jp/pub/db/kofam/README.txt" # .txt was needed as of noticed on 15-May-2025
     ko_list_gz_url = "ftp://ftp.genome.jp/pub/db/kofam/ko_list.gz"
     hmms_tar_url = "ftp://ftp.genome.jp/pub/db/kofam/profiles.tar.gz"
 

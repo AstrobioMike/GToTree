@@ -10,7 +10,6 @@ from gtotree.utils.general import (write_run_data,
                                    get_snakefile_path,
                                    run_snakemake)
 from gtotree.utils.seqs import check_target_SCGs_have_seqs
-
 def search_hmms(args, run_data):
 
     report_processing_stage("hmm-search", run_data)

@@ -24,7 +24,7 @@ from gtotree.utils.hmms.scg_hmm_setup import check_hmm_file
 from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_data
 from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
-from gtotree.utils.kos.get_kofamscan_data import get_kofamscan_data
+from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data
 from gtotree.utils.general import (ToolsUsed,
                                    populate_run_data,
                                    read_run_data)
@@ -551,19 +551,43 @@ def final_setups(args, run_data):
     if args.target_pfams_file:
         run_data = setup_pfam_dirs(run_data)
 
+    if args.target_kos_file:
+        run_data = setup_ko_dirs(run_data)
+
     return args, run_data
 
 
 def setup_pfam_dirs(run_data):
     run_data.pfam_results_dir = os.path.join(run_data.output_dir, "pfam-search-results")
     run_data.pfam_results_dir_rel = os.path.join(run_data.output_dir_rel, "pfam-search-results")
+    run_data.tmp_pfam_results_dir = os.path.join(run_data.tmp_dir, "pfam-search-results")
+
 
     dirs = [run_data.pfam_results_dir,
+            run_data.tmp_pfam_results_dir,
             os.path.join(run_data.pfam_results_dir, "info"),
             os.path.join(run_data.pfam_results_dir, "individual-genome-results"),
             os.path.join(run_data.pfam_results_dir, "iToL-files"),
             os.path.join(run_data.pfam_results_dir, "pfam-hit-seqs"),
             os.path.join(run_data.pfam_results_dir, "target-pfam-profiles")]
+
+    for d in dirs:
+        os.makedirs(d, exist_ok=True)
+
+    return run_data
+
+
+def setup_ko_dirs(run_data):
+    run_data.ko_results_dir = os.path.join(run_data.output_dir, "ko-search-results")
+    run_data.ko_results_dir_rel = os.path.join(run_data.output_dir_rel, "ko-search-results")
+    run_data.tmp_ko_results_dir = os.path.join(run_data.tmp_dir, "ko-search-results")
+
+    dirs = [run_data.ko_results_dir,
+            run_data.tmp_ko_results_dir,
+            os.path.join(run_data.ko_results_dir, "individual-genome-results"),
+            os.path.join(run_data.ko_results_dir, "iToL-files"),
+            os.path.join(run_data.ko_results_dir, "ko-hit-seqs"),
+            os.path.join(run_data.ko_results_dir, "target-ko-profiles")]
 
     for d in dirs:
         os.makedirs(d, exist_ok=True)

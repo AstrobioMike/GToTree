@@ -571,6 +571,22 @@ def report_pfam_searching_update(run_data):
     report_update("Temporary pfam update message.".center(82))
 
 
+def report_ko_searching_update(run_data):
+
+    num_ko_targets = run_data.total_ko_targets
+    num_kos_found = len(run_data.found_ko_targets)
+    num_kos_failed = len(run_data.failed_ko_targets)
+
+    if num_kos_found == num_ko_targets:
+        message = (f"{color_text(f"Genomes were searched for all {num_ko_targets} input KO targets!".center(82), 'green')}")
+    else:
+        message = f"    {color_text(f"{num_kos_failed} target KO(s) failed to be found in the KO database", "yellow")}, reported in:\n"
+        message += (f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n")
+        message += (f"    {color_text(f"Genomes were searched for the remaining {num_kos_found} specified KOs.", 'yellow')}")
+
+    report_update(message)
+
+
 def report_too_few_genomes(run_data):
     message = f"\n    {color_text("Unfortunately, there aren't enough genomes remaining to proceed...", 'red')}"
     print(message)

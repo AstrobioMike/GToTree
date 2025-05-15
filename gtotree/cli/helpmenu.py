@@ -213,7 +213,7 @@ helpmenu += f"""
 
         - [-d ] debug mode; default: false
                   Provide this flag with no arguments if you'd like to keep the
-                  temporary directory. (Mostly useful for debugging.)
+                  temporary directory.
 
 
  --------------------------------  {color_text("EXAMPLE USAGE", "yellow")}  --------------------------------

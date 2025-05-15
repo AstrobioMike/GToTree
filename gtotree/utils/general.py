@@ -73,6 +73,8 @@ class GenomeData:
     mapping: str = None
     hmm_search_failed: bool = None
     extract_seqs_failed: bool = None
+    ko_search_done: bool = False
+    pfam_search_done: bool = False
     hmm_search_done: bool = False
     num_genes: int = None
     num_SCG_hits: int = None
@@ -226,13 +228,19 @@ class RunData:
     total_pfam_targets: int = 0
     additional_pfam_searching_done: bool = False
     additional_ko_searching_done: bool = False
+
     pfam_dict: dict = field(default_factory=dict)
     pfam_results_dir: str = ""
     pfam_results_dir_rel: str = ""
+    wanted_pfam_targets: List[str] = field(default_factory=list)
     found_pfam_targets: List[str] = field(default_factory=list)
     failed_pfam_targets: List[str] = field(default_factory=list)
+
     kofamscan_results_dir: str = ""
     kofamscan_results_dir_rel: str = ""
+    wanted_ko_targets: List[str] = field(default_factory=list)
+    found_ko_targets: List[str] = field(default_factory=list)
+    failed_ko_targets: List[str] = field(default_factory=list)
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
@@ -284,6 +292,12 @@ class RunData:
 
     def get_all_input_genomes_for_hmm_search(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.preprocessing_done and not gd.hmm_search_done and not gd.removed]
+
+    def get_all_input_genomes_for_ko_search(self) -> List[GenomeData]:
+        return [gd for gd in self.all_input_genomes if gd.preprocessing_done and not gd.ko_search_done and not gd.removed]
+
+    def get_all_input_genomes_for_pfam_search(self) -> List[GenomeData]:
+        return [gd for gd in self.all_input_genomes if gd.preprocessing_done and not gd.pfam_search_done and not gd.removed]
 
     def get_all_input_genomes_for_filtering(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.preprocessing_done and gd.hmm_search_done and not gd.removed]

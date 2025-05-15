@@ -1,5 +1,8 @@
 ## next: 
 
+    # currently working on ko searching, the "additional_ko_searching.py" module and "search-kos.smk"
+        # loosely following "hmm_searching.py" and "search-hmms.smk" for inspiration
+
     # for the pfam/ko searching, maybe i should cat all genome-AA files together into one file, so then i can do the search once on all of them...
         # or i can make them snakemake wfs and do one search per genome with a counter...
             # i like this idea better for now

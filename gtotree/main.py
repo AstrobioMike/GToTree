@@ -5,7 +5,8 @@ from gtotree.utils.messaging import (gtotree_header,
                                      summarize_results,
                                      copy_log)
 from gtotree.main_stages.preprocessing_genomes import preprocess_genomes
-from gtotree.main_stages.additional_pfam_searching import pfam_target_hunting
+from gtotree.main_stages.additional_pfam_searching import search_pfams
+from gtotree.main_stages.additional_ko_searching import search_kos
 from gtotree.main_stages.hmm_searching import search_hmms
 from gtotree.main_stages.filtering_genes import filter_genes
 from gtotree.main_stages.filtering_genomes import filter_genomes
@@ -29,10 +30,12 @@ def main(args = None):
     run_data = preprocess_genomes(args, run_data)
 
     if run_data.target_pfams_file:
-        run_data = pfam_target_hunting(run_data)
+        run_data = search_pfams(run_data)
 
-    # if run_data.target_kos_file:
-    #     run_data = ko_target_hunting(run_data)
+    if run_data.target_kos_file:
+        run_data = search_kos(args, run_data)
+
+    exit()
 
     run_data = search_hmms(args, run_data)
 
