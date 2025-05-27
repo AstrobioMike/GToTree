@@ -51,8 +51,9 @@ def get_additional_pfam_targets(run_data):
 
     write_out_failed_pfams(run_data)
     write_requested_and_pulled_pfams(run_data, pfam_dict)
-    combined_pfam_hmm_path = f"{run_data.pfam_results_dir}/target-pfam-profiles/all-pfam-targets.hmm"
-    concat_files(pfam_hmm_out_path, combined_pfam_hmm_path)
+    if len(found_pfam_targets) > 0:
+        combined_pfam_hmm_path = f"{run_data.pfam_results_dir}/target-pfam-profiles/all-pfam-targets.hmm"
+        concat_files(pfam_hmm_out_path, combined_pfam_hmm_path)
 
     return run_data
 
