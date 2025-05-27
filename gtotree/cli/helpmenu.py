@@ -28,13 +28,11 @@ helpmenu += f"""
                       available gene-sets
 
 
- -------------------------------  {color_text("OPTIONAL INPUTS", "yellow")}  -------------------------------
-
+ ------------------------------  {color_text("OPTIONAL SETTINGS", "yellow")}  ------------------------------
 
       {color_text("Output directory specification:", "yellow")}
 
         - [-o <str>] default: gtotree-output
-                  Specify the desired output directory.
 
 
       {color_text("User-specified modification of genome labels:", "yellow")}

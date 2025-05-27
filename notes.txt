@@ -1,36 +1,30 @@
 ## next: 
 
-    # currently working on ko searching, the "additional_ko_searching.py" module and "search-kos.smk"
-        # loosely following "hmm_searching.py" and "search-hmms.smk" for inspiration
+    # adding additional pfam searching is next 
+        # ko searching implemented, try following as much of that as possible when implementing additional-pfam-searching
+            # ko searching is mostly the "additional_ko_searching.py" module and "search-kos.smk"
 
-    # for the pfam/ko searching, maybe i should cat all genome-AA files together into one file, so then i can do the search once on all of them...
-        # or i can make them snakemake wfs and do one search per genome with a counter...
-            # i like this idea better for now
-        # i started working through pfams
-        # add check if pfam hmms already grabbed, and skip that part if so
+    # still need to implement iToL-file generation for both pfam and ko searching results
+        # the per-genome rules in the snakefiles (search-kos.smk and searh-pfams.smk) might be the best place to do this
+        # be sure to take into account if we are modifying the genome names so the iToL files match the final alignment/tree files
 
-    # optional pfam search 
-        # perform this on all genomes still, after preprocessing before SCG search
-    # optional ko search
-        # perform this on all genomes still, after preprocessing before SCG search
-
-    # maybe *don't* make --resume be auto (despite my earlier idea), stop and tell the user to specify --resume or -F if the output dir exists
+    # maybe *don't* make --resume be auto (despite my earlier idea), stop and tell the user to specify -R | --resume or -F | --force-overwrite if the output dir exists
         # and note that resume is only for resuming, all needs to be the same; it's not for modifying and re-running anything
         # need to build in something to check nothing changed at a resume start
 
-    # maybe add an ext variable somewhere (could be in run_data) so when working with amino acids we have .faa, and .fa when nucleotides in tmp outputs
-        # right now i just did .fasta so it covers both
-        # final outputs are named appropriately
-
     # test/look into message.get_path_rel_to_outdir()
-        # what happens when the output dir i provide to the gtotree call is a full path?
+        # what happens when the output dir i provide to the initial gtotree call is a full path?
         # check out what happens if there are multiple matches to key_dir in messaging.get_path_rel_to_outdir()
             # e.g., if we are in a directory called gtotree-output and the output directory is also gtotree-output
-            # might need to adjust this (maybe even just searching for the last match, rather than any (or first from reverse order will work)
+            # might need to adjust this (maybe even just searching for the last match, or first from reverse order, rather than any match
 
-    # go through general.py GenomeData class and see which methods i put in that i'm not using anywhere anymore
+    # go through general.py GenomeData and RunData classes and see which methods i put in that i'm not using anywhere anymore
 
     # implement nucleotide mode :(
+        # maybe add an ext variable somewhere (could be in run_data) so when working with amino acids we have .faa, and .fa when nucleotides in tmp outputs
+            # right now i just did .fasta so it covers both
+            # final outputs are named appropriately
+
     # unit tests..... :( :( :(
 
 

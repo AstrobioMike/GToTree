@@ -71,11 +71,13 @@ class GenomeData:
     acc_was_found: bool = None
     acc_was_downloaded: bool = None
     mapping: str = None
+    hmm_search_done: bool = False
     hmm_search_failed: bool = None
     extract_seqs_failed: bool = None
     ko_search_done: bool = False
+    ko_search_failed: bool = False
     pfam_search_done: bool = False
-    hmm_search_done: bool = False
+    pfam_search_failed: bool = False
     num_genes: int = None
     num_SCG_hits: int = None
     num_unique_SCG_hits: int = None
@@ -135,15 +137,29 @@ class GenomeData:
     def mark_was_gzipped(self, value=True):
         self.was_gzipped = value
 
+    def mark_hmm_search_done(self, value=True):
+        self.hmm_search_done = value
+        self.hmm_search_failed = False
+
     def mark_hmm_search_failed(self, value=True):
         self.hmm_search_failed = value
 
     def mark_extract_seqs_failed(self, value=True):
         self.extract_seqs_failed = value
 
-    def mark_hmm_search_done(self, value=True):
-        self.hmm_search_done = value
-        self.hmm_search_failed = False
+    def mark_ko_search_done(self, value=True):
+        self.ko_search_done = value
+
+    def mark_ko_search_failed(self, value=True):
+        self.ko_search_done = True
+        self.ko_search_failed = value
+
+    def mark_pfam_search_done(self, value=True):
+        self.pfam_search_done = value
+
+    def mark_pfam_search_failed(self, value=True):
+        self.pfam_search_done = True
+        self.pfam_search_failed = value
 
 
 @dataclass
@@ -224,6 +240,8 @@ class RunData:
     final_tree_path: str = ""
     target_kos_file: str = None
     total_ko_targets: int = 0
+    target_kos_tsv: str = None
+    target_ko_profiles_dir: str = None
     target_pfams_file: str = None
     total_pfam_targets: int = 0
     additional_pfam_searching_done: bool = False
@@ -236,8 +254,9 @@ class RunData:
     found_pfam_targets: List[str] = field(default_factory=list)
     failed_pfam_targets: List[str] = field(default_factory=list)
 
-    kofamscan_results_dir: str = ""
-    kofamscan_results_dir_rel: str = ""
+    ko_results_dir: str = ""
+    ko_results_dir_rel: str = ""
+    tmp_ko_results_dir: str = ""
     wanted_ko_targets: List[str] = field(default_factory=list)
     found_ko_targets: List[str] = field(default_factory=list)
     failed_ko_targets: List[str] = field(default_factory=list)

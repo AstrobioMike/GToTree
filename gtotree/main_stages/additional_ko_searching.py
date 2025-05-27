@@ -1,4 +1,10 @@
 import subprocess
+import shutil
+from collections import Counter
+import os
+from pathlib import Path
+import pandas as pd
+from Bio import SeqIO
 from gtotree.utils.ko.ko_handling import parse_kofamscan_targets
 from gtotree.utils.messaging import (report_processing_stage,
                                      report_ko_searching_update)
@@ -19,7 +25,7 @@ def search_kos(args, run_data):
     # generating the subset of target KOs
     run_data = parse_kofamscan_targets(run_data)
 
-    num_genomes_to_search = len(run_data.get_all_input_genomes_for_hmm_search())
+    num_genomes_to_search = len(run_data.get_all_input_genomes_for_ko_search())
 
     if num_genomes_to_search > 0:
         # writing run_data to file so it can be accessed by snakemake
@@ -34,15 +40,23 @@ def search_kos(args, run_data):
 
     write_out_failed_ko_targets(run_data)
 
+    run_data.additional_ko_searching_done = True
+
+    print("\n                          Combining KO search results...")
+
+    combine_all_ko_hits(run_data.found_ko_targets,
+                        run_data.tmp_ko_results_dir,
+                        run_data.ko_results_dir + "/ko-hit-seqs")
+
     report_ko_searching_update(run_data)
 
     return run_data
 
 
-def run_ko_search(assembly_id, profiles_dir, ko_file, base_outpath, AA_file):
+def run_ko_search(profiles_dir, ko_file, base_outpath, AA_file):
 
-    outpath = f"{base_outpath}/{assembly_id}.kofamscan.tsv"
-    tmp_path = f"{base_outpath}/{assembly_id}-tmp"
+    outpath = f"{base_outpath}/kofamscan-results.tsv"
+    tmp_path = f"{base_outpath}/kofamscan-tmp"
     cmd = [
         "exec_annotation",
         "-p", profiles_dir,
@@ -61,6 +75,8 @@ def run_ko_search(assembly_id, profiles_dir, ko_file, base_outpath, AA_file):
     except:
         kofamscan_failed = True
 
+    shutil.rmtree(tmp_path, ignore_errors=True)
+
     return kofamscan_failed
 
 
@@ -69,3 +85,53 @@ def write_out_failed_ko_targets(run_data):
         with open(run_data.run_files_dir + "/failed-ko-targets.txt", "w") as fail_file:
             for KO in run_data.failed_ko_targets:
                 fail_file.write(KO + "\n")
+
+
+def get_ko_counts(ko_ids, results_tsv):
+
+    counts = Counter()
+
+    with open(results_tsv, "r") as results_file:
+        for line in results_file:
+            parts = line.strip().split("\t")
+            if len(parts) < 2:
+                continue
+            ko_id = parts[1]
+            if ko_id in ko_ids:
+                counts[ko_id] += 1
+
+    counts_list = [counts[ko_id] for ko_id in ko_ids]
+    return counts_list
+
+
+def write_out_tmp_ko_hits(results_tsv, out_base, AA_path):
+    os.makedirs(out_base, exist_ok=True)
+    df = pd.read_csv(results_tsv, sep="\t", header=None, names=["gene", "ko_id"])
+    seq_index = SeqIO.index(AA_path, "fasta")
+
+    for ko_id, group in df.groupby("ko_id"):
+        # get seqrecords for all gene IDs in this group
+        records = []
+        for gene_id in group["gene"]:
+            if gene_id in seq_index:
+                records.append(seq_index[gene_id])
+
+        # writing those out for the current group
+        out_path = os.path.join(out_base, f"{ko_id}.faa")
+        SeqIO.write(records, out_path, "fasta")
+
+
+def combine_all_ko_hits(ko_ids, tmp_ko_results_area, out_base):
+
+    for ko in ko_ids:
+        pattern = f"*/{ko}.faa"
+        paths = list(Path(tmp_ko_results_area).glob(pattern))
+        if paths:
+            out_path = os.path.join(out_base, f"{ko}.faa")
+
+            with open(out_path, "wb") as out_file:
+                for path in paths:
+                    with open(path, "rb") as in_file:
+                        shutil.copyfileobj(in_file, out_file)
+
+

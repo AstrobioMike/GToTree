@@ -118,22 +118,22 @@ def report_message(message, color = "yellow", width = 80, ii = "  ", si = "  ", 
 
 def report_missing_input_genomes_file(path, flag):
     report_message(f'You specified "{path}" as a source of input genomes to use (passed to `{flag}`), but that file can\'t be found.')
-    report_early_exit(None, copy_log = False)
+    report_early_exit(None, copy_over_log = False)
 
 
 def report_missing_pfam_targets_file(path, flag):
     report_message(f'You specified "{path}" as a source of Pfam targets to search each genome for (passed to `{flag}`), but that file can\'t be found.')
-    report_early_exit(None, copy_log = False)
+    report_early_exit(None, copy_over_log = False)
 
 
 def report_missing_ko_targets_file(path, flag):
     report_message(f'You specified "{path}" as a source of KO targets to search each genome for (passed to `{flag}`), but that file can\'t be found.')
-    report_early_exit(None, copy_log = False)
+    report_early_exit(None, copy_over_log = False)
 
 
 def report_missing_mapping_file(path, flag):
     report_message(f'You specified "{path}" as a mapping file to use (passed to `{flag}`), but that file can\'t be found.')
-    report_early_exit(None, copy_log = False)
+    report_early_exit(None, copy_over_log = False)
 
 
 def report_problem_with_mapping_file(mapping_file_problems, path, flag = "-m"):
@@ -141,7 +141,7 @@ def report_problem_with_mapping_file(mapping_file_problems, path, flag = "-m"):
     for problem in mapping_file_problems:
         report_message(problem, width = 100, ii = "    ", si = "    ", newline=False)
     report_message("Please correct these issues and try again!")
-    report_early_exit(None, copy_log = False)
+    report_early_exit(None, copy_over_log = False)
 
 
 def stdout_and_log(*args, log_file="gtotree-runlog.txt", sep=" ", end="\n\n", flush=False, log_only=False, restart_log=False):
@@ -198,19 +198,19 @@ def display_initial_run_info(args, run_data):
 
 
 @capture_stdout_to_log(lambda: log_file_var.get())
-def report_early_exit(run_data, message = None, color = "red", suggest_help = False, copy_log = True):
+def report_early_exit(run_data, message = None, color = "red", suggest_help = False, copy_over_log = True):
     if message:
         print("")
         wprint(color_text(message, color))
     if suggest_help:
         print("\n  See `GToTree -h` for more info.")
     print("\nExiting for now :(\n")
-    if copy_log:
-        copy_log(run_data)
+    if copy_over_log:
+        copy_log_function(run_data)
     sys.exit(1)
 
 
-def copy_log(run_data):
+def copy_log_function(run_data):
     run_log_path = run_data.output_dir + "/gtotree-runlog.txt"
     timestamp = run_data.start_time.strftime("%Y-%m-%d_%I-%M-%S")
     new_log_path = run_data.logs_dir + f"/gtotree-logs/gtotree-runlog-{timestamp}.txt"
@@ -700,6 +700,9 @@ def summarize_results(args, run_data):
 
     SCG_hits_path = args.output_dir + "/SCG-hit-counts.tsv"
     print(f"    Summary table with hits per target-gene per genome written to:\n        {color_text(SCG_hits_path, 'green')}\n")
+
+    if run_data.target_kos_file:
+        print(f"    Outputs from KO searching written to:\n        {color_text(run_data.ko_results_dir_rel + "/", 'green')}\n")
 
     partitions_file = args.output_dir + "/run-files/partitions.txt"
     print(f"    Partitions file (for downstream use with mixed-model treeing) written to:\n        {color_text(partitions_file, 'green')}")

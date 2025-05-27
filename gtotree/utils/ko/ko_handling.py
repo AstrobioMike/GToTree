@@ -5,7 +5,9 @@ import shutil
 def parse_kofamscan_targets(run_data):
 
     target_KOs_tsv = run_data.ko_results_dir + "/target-kos.tsv"
+    run_data.target_kos_tsv = target_KOs_tsv
     target_KO_profiles_dir = run_data.ko_results_dir + "/target-ko-profiles/"
+    run_data.target_ko_profiles_dir = target_KO_profiles_dir
 
     KO_data_dir = os.environ["KO_data_dir"]
     full_KO_list_tsv = KO_data_dir + "/ko_list"
@@ -18,12 +20,6 @@ def parse_kofamscan_targets(run_data):
     run_data.failed_ko_targets = missing_KOs
 
     copy_over_target_ko_HMMs(found_KOs, full_KO_HMMs_dir, target_KO_profiles_dir)
-    print(target_KOs_tab)
-    print(found_KOs)
-    print(missing_KOs)
-
-
-    print(wanted_KOs)
 
     return(run_data)
 

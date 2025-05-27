@@ -3,7 +3,7 @@ from gtotree.utils.preflight_checks import preflight_checks
 from gtotree.utils.messaging import (gtotree_header,
                                      display_initial_run_info,
                                      summarize_results,
-                                     copy_log)
+                                     copy_log_function)
 from gtotree.main_stages.preprocessing_genomes import preprocess_genomes
 from gtotree.main_stages.additional_pfam_searching import search_pfams
 from gtotree.main_stages.additional_ko_searching import search_kos
@@ -35,7 +35,7 @@ def main(args = None):
     if run_data.target_kos_file:
         run_data = search_kos(args, run_data)
 
-    exit()
+    # exit()
 
     run_data = search_hmms(args, run_data)
 
@@ -60,7 +60,7 @@ def main(args = None):
 
     summarize_results(args, run_data)
 
-    copy_log(run_data)
+    copy_log_function(run_data)
 
     # print(f"\n\n{run_data}\n\n")
     # print(f"\n\n{args}\n\n")

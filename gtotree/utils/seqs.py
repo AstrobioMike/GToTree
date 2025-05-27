@@ -297,3 +297,11 @@ def get_alignment_length(path):
         num_sites = len(next(f).strip())
 
     return num_sites
+
+
+# def pull_out_seqs(seqs_to_pull, in_path, out_path):
+#     records = SeqIO.parse(in_path, "fasta")
+#     filtered_records = [record for record in records if record.id in seqs_to_pull]
+
+#     with open(out_path, "w") as out_handle:
+#         SeqIO.write(filtered_records, out_handle, "fasta")
