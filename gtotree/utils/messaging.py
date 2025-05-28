@@ -561,14 +561,22 @@ def report_genome_preprocessing_update(run_data):
 
 def report_pfam_searching_update(run_data):
 
-    # if all requested pfams pulled
-        # "All requested pfams were found and genomes searched."
+    num_pfam_targets = run_data.total_pfam_targets
+    num_pfams_found = len(run_data.found_pfam_targets)
+    num_pfams_failed = len(run_data.failed_pfam_targets)
 
-    # if any pfam targets not found
-        # "Some of the input pfams were not found, reported in:"
-        # "Genomes were searched for the remaining ..."
+    if num_pfams_found == num_pfam_targets:
+        message = (f"{color_text(f"Genomes were searched for all {num_pfam_targets} input Pfam targets!".center(82), 'green')}")
+    elif num_pfams_found == 0:
+        message = f"    {color_text(f"None of the input Pfam targets were found in the Pfam database", 'yellow')}, reported in:\n"
+        message += (f"      {run_data.run_files_dir_rel}/failed-pfam-targets.txt\n\n")
+        message += (f"{color_text(f"So the input genomes were not searched for any Pfams :(".center(82), 'yellow')}")
+    else:
+        message = f"    {color_text(f"{num_pfams_failed} target Pfam(s) failed to be found in the Pfam database", "yellow")}, reported in:\n"
+        message += (f"      {run_data.run_files_dir_rel}/failed-pfam-targets.txt\n\n")
+        message += (f"{color_text(f"Genomes were searched for the remaining {num_pfams_found} specified Pfams.".center(82), 'yellow')}")
 
-    report_update("Temporary pfam update message.".center(82))
+    report_update(message)
 
 
 def report_ko_searching_update(run_data):

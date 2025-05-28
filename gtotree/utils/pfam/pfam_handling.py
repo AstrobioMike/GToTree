@@ -22,7 +22,8 @@ def get_additional_pfam_targets(run_data):
         target_url = f"{base_link}{target}?annotation=hmm"
         pfam_hmm_out_path = f"{run_data.pfam_results_dir}/target-pfam-profiles/{target}.hmm"
 
-        success = download_and_gunzip(target_url, pfam_hmm_out_path)
+        # success = download_and_gunzip(target_url, pfam_hmm_out_path)
+        success = False
 
         if not success:
             failed_pfam_targets.append(input_id)

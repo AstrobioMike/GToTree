@@ -14,7 +14,7 @@ def parse_kofamscan_targets(run_data):
     full_KO_HMMs_dir = KO_data_dir + "/profiles"
 
     wanted_KOs = get_wanted_KOs(run_data)
-    target_KOs_tab, found_KOs, missing_KOs = get_target_KOs_tab(full_KO_list_tsv, wanted_KOs, target_KOs_tsv)
+    found_KOs, missing_KOs = get_target_KOs_tab(full_KO_list_tsv, wanted_KOs, target_KOs_tsv)
     run_data.wanted_ko_targets = wanted_KOs
     run_data.found_ko_targets = found_KOs
     run_data.failed_ko_targets = missing_KOs
@@ -41,7 +41,7 @@ def get_target_KOs_tab(full_KO_list_tsv, wanted_KOs, target_KOs_tsv):
 
     target_KOs_tab.to_csv(target_KOs_tsv, sep="\t", index=False)
 
-    return target_KOs_tab, found_KOs, missing_KOs
+    return found_KOs, missing_KOs
 
 
 def copy_over_target_ko_HMMs(found_KOs, full_KO_HMMs_dir, target_KO_profiles_dir):
