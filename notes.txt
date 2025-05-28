@@ -4,7 +4,7 @@
         # ko searching implemented, try following as much of that as possible when implementing additional-pfam-searching
             # ko searching is mostly the "additional_ko_searching.py" module and "search-kos.smk"
 
-    # maybe put in checks for both that don't run things if no target KOs or pfams were successfully found
+    # need checks for both to *not* run things if no target KOs or pfams were successfully found
         # e.g., in additional_ko_searching.py, after `run_data = parse_kofamscan_targets(run_data)`, check there len(run_data.found_ko_targets)
         # and something similar for additional_pfam_searching.py after `run_data = get_additional_pfam_targets(run_data)`
 

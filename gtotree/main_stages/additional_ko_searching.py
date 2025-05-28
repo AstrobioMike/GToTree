@@ -25,29 +25,29 @@ def search_kos(args, run_data):
     # generating the subset of target KOs
     run_data = parse_kofamscan_targets(run_data)
 
-    num_genomes_to_search = len(run_data.get_all_input_genomes_for_ko_search())
-
-    if num_genomes_to_search > 0:
-        # writing run_data to file so it can be accessed by snakemake
-        write_run_data(run_data)
-        snakefile = get_snakefile_path("search-kos.smk")
-        description = "Searching KOs"
-
-        run_snakemake(snakefile, num_genomes_to_search, args, run_data, description)
-
-        run_data = read_run_data(run_data.run_data_path)
-
-
     write_out_failed_ko_targets(run_data)
 
+    if len(run_data.found_ko_targets) > 0:
+
+        num_genomes_to_search = len(run_data.get_all_input_genomes_for_ko_search())
+
+        if num_genomes_to_search > 0:
+            # writing run_data to file so it can be accessed by snakemake
+            write_run_data(run_data)
+            snakefile = get_snakefile_path("search-kos.smk")
+            description = "Searching KOs"
+
+            run_snakemake(snakefile, num_genomes_to_search, args, run_data, description)
+
+            run_data = read_run_data(run_data.run_data_path)
+
+        print("") ; print("Combining KO search results...".center(82))
+
+        combine_all_ko_hits(run_data.found_ko_targets,
+                            run_data.tmp_ko_results_dir,
+                            run_data.ko_results_dir + "/ko-hit-seqs")
+
     run_data.additional_ko_searching_done = True
-
-    print("\n                          Combining KO search results...")
-
-    combine_all_ko_hits(run_data.found_ko_targets,
-                        run_data.tmp_ko_results_dir,
-                        run_data.ko_results_dir + "/ko-hit-seqs")
-
     report_ko_searching_update(run_data)
 
     return run_data
@@ -133,5 +133,3 @@ def combine_all_ko_hits(ko_ids, tmp_ko_results_area, out_base):
                 for path in paths:
                     with open(path, "rb") as in_file:
                         shutil.copyfileobj(in_file, out_file)
-
-

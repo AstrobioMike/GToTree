@@ -579,10 +579,14 @@ def report_ko_searching_update(run_data):
 
     if num_kos_found == num_ko_targets:
         message = (f"{color_text(f"Genomes were searched for all {num_ko_targets} input KO targets!".center(82), 'green')}")
+    elif num_kos_found == 0:
+        message = f"    {color_text(f"None of the input KO targets were found in the KO database", 'yellow')}, reported in:\n"
+        message += (f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n")
+        message += (f"{color_text(f"So the input genomes were not searched for any KOs :(".center(82), 'yellow')}")
     else:
         message = f"    {color_text(f"{num_kos_failed} target KO(s) failed to be found in the KO database", "yellow")}, reported in:\n"
         message += (f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n")
-        message += (f"    {color_text(f"Genomes were searched for the remaining {num_kos_found} specified KOs.", 'yellow')}")
+        message += (f"{color_text(f"Genomes were searched for the remaining {num_kos_found} specified KOs.".center(82), 'yellow')}")
 
     report_update(message)
 
