@@ -263,6 +263,8 @@ class RunData:
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
+    args_hash: str = ""
+
     @property
     def num_incomplete_genbank_files(self) -> int:
         return len([gd for gd in self.genbank_files if not gd.preprocessing_done and not gd.removed])

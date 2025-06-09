@@ -5,13 +5,8 @@
             # ko searching is mostly the "additional_ko_searching.py" module and "search-kos.smk"
 
     # still need to implement iToL-file generation for both pfam and ko searching results
-        # the per-genome rules in the snakefiles (search-kos.smk and searh-pfams.smk) might be the best place to start the info needed for this
+        # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
         # be sure to take into account if we are modifying the genome names so the iToL files match the final alignment/tree files
-
-    # *don't* make --resume be auto (despite my earlier idea), stop and tell the user to specify -R | --resume or -F | --force-overwrite if the output dir exists
-        # and note that resume is only for resuming, all needs to be the same; it's not for modifying and re-running anything
-        # need to build in something to check nothing changed in the run_data object at a resume start
-            # if so, tell the user something has changed (report if i can easily), and suggest starting a new run with -F
 
     # test/look into message.get_path_rel_to_outdir()
         # what happens when the output dir i provide to the initial gtotree call is a full path?

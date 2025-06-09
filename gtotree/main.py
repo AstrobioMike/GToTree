@@ -35,8 +35,6 @@ def main(args = None):
     if run_data.target_kos_file:
         run_data = search_kos(args, run_data)
 
-    exit()
-
     run_data = search_hmms(args, run_data)
 
     run_data = filter_genes(args, run_data)

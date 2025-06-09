@@ -121,6 +121,19 @@ def report_missing_input_genomes_file(path, flag):
     report_early_exit(None, copy_log = False)
 
 
+@capture_stdout_to_log(lambda: log_file_var.get())
+def report_early_exit(run_data, message = None, color = "red", suggest_help = False, copy_log = True):
+    if message:
+        print("")
+        wprint(color_text(message, color))
+    if suggest_help:
+        print("\n  See `GToTree -h` for more info.")
+    print("\nExiting for now :(\n")
+    if copy_log:
+        copy_log_function(run_data)
+    sys.exit(1)
+
+
 def report_missing_pfam_targets_file(path, flag):
     report_message(f'You specified "{path}" as a source of Pfam targets to search each genome for (passed to `{flag}`), but that file can\'t be found.')
     report_early_exit(None, copy_log = False)
@@ -195,19 +208,6 @@ def display_initial_run_info(args, run_data):
     run_data.start_time = datetime.now()
 
     return run_data
-
-
-@capture_stdout_to_log(lambda: log_file_var.get())
-def report_early_exit(run_data, message = None, color = "red", suggest_help = False, copy_log = True):
-    if message:
-        print("")
-        wprint(color_text(message, color))
-    if suggest_help:
-        print("\n  See `GToTree -h` for more info.")
-    print("\nExiting for now :(\n")
-    if copy_log:
-        copy_log_function(run_data)
-    sys.exit(1)
 
 
 def copy_log_function(run_data):

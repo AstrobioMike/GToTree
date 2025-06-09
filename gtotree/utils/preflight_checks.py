@@ -5,6 +5,8 @@ import time
 import pandas as pd
 import tempfile
 from collections import Counter
+import json
+import hashlib
 from gtotree.utils.messaging import (color_text,
                                      report_message,
                                      report_early_exit,
@@ -40,6 +42,16 @@ def preflight_checks(args):
 
     return args, run_data
 
+
+def args_hash_function(args):
+    args_dict = vars(args).copy()
+    args_dict.pop("force_overwrite", False)
+    args_dict.pop("resume", False)
+    args_dict.pop("run_files_dir_rel", None)
+    args_dict.pop("run_files_dir", None)
+    args_dict.pop("output_already_existed", None)
+    args_json = json.dumps(args_dict, sort_keys=True)
+    return hashlib.sha256(args_json.encode("utf-8")).hexdigest()
 
 def check_for_essential_deps():
     commands = ["muscle", "hmmsearch", "trimal"]
@@ -138,17 +150,18 @@ def check_input_files(args):
         args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
 
     if args.resume:
-        # maybe move this below where it generates run-data below
-        # then we can read the run-data.json file and check if the core components would
-        # still match
-        try:
+        if os.path.exists(args.run_files_dir + "/run-data.json"):
             run_data = read_run_data(args.run_files_dir + "/run-data.json")
-            print(run_data)
-        except FileNotFoundError:
-            pass
+            if run_data.args_hash != args_hash_function(args):
+                report_message("We are trying to resume a previous run (specified by the `-R` or `--resume` flag), "
+                               "but it looks like the current arguments don't match the intial run's arguments. "
+                               "Your best bet may be to just start a completely fresh run by adding the `-F` flag to "
+                               "force-overwrite the previous outputs.")
+                report_early_exit(None, copy_log = False)
 
     if "run_data" not in locals():
         run_data = populate_run_data(args)
+        run_data.args_hash = args_hash_function(args)
         run_data = check_hmm_file(args, run_data)
 
     if args.mapping_file:
