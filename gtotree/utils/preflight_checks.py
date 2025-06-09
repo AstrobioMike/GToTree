@@ -37,6 +37,7 @@ def preflight_checks(args):
     check_for_required_dbs(args)
     run_data = track_tools_used(args, run_data)
     args, run_data = final_setups(args, run_data)
+
     return args, run_data
 
 
@@ -137,8 +138,12 @@ def check_input_files(args):
         args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
 
     if args.resume:
+        # maybe move this below where it generates run-data below
+        # then we can read the run-data.json file and check if the core components would
+        # still match
         try:
             run_data = read_run_data(args.run_files_dir + "/run-data.json")
+            print(run_data)
         except FileNotFoundError:
             pass
 
@@ -176,12 +181,17 @@ def check_for_min_input_genomes(run_data):
 
 def check_output_dir(args):
     if os.path.exists(args.output_dir):
-        if not args.force_overwrite:
-            args.resume = True
-        else:
+        args.output_already_existed = True
+
+        if not args.force_overwrite and not args.resume:
+            report_message(f'The specified output directory "{args.output_dir}" already exists. '
+                           'Please either remove it, provide the `-F` flag to overwrite it, or '
+                           'provide the `-R` flag to attempt to resume a previous run.')
+            report_early_exit(None, copy_log = False)
+
+        if args.force_overwrite:
             shutil.rmtree(args.output_dir)
             os.makedirs(args.output_dir)
-        args.output_already_existed = True
     else:
         args.output_already_existed = False
 
@@ -555,6 +565,11 @@ def final_setups(args, run_data):
         run_data = setup_ko_dirs(run_data)
 
     return args, run_data
+
+
+# def check_resume_acceptable(run_data):
+#     # this checks the run-data.json that exists has the same core components as the current run-data
+#     pass
 
 
 def setup_pfam_dirs(run_data):
