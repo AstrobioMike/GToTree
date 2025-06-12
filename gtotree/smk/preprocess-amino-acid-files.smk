@@ -21,7 +21,7 @@ rule all:
             status_path = f"{run_data.AA_processing_dir}/{AA_basename}.done"
             with open(status_path, 'r') as f:
                 for line in f:
-                    AA_file, status, was_gzipped, final_AA_path, num_genes = line.strip().split('\t')
+                    AA_file, status, was_gzipped, final_AA_path, num_genes, final_nt_path = line.strip().split('\t')
 
                     AA.num_genes = int(num_genes)
 
@@ -30,6 +30,7 @@ rule all:
                             AA.mark_was_gzipped()
                         AA.mark_preprocessing_done()
                         AA.final_AA_path = final_AA_path
+                        AA.final_nt_path = final_nt_path
                     else:
                         AA.mark_removed("amino-acid-file processing failed")
                         AA.preprocessing_failed = True
@@ -44,9 +45,9 @@ rule process_AA_files:
         AA = AA_dict[wildcards.AA_file]
         path, was_gzipped = gunzip_if_needed(AA.full_path)
 
-        done, final_AA_path, num_genes = filter_and_rename_fasta(AA.id, run_data, path, full_path = True)
+        done, final_AA_path, num_genes, final_nt_path = filter_and_rename_fasta(AA.id, run_data, path, full_path = True)
         if was_gzipped:
             os.remove(path)
 
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.AA_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\t{num_genes}\n')
+            f.write(f'{wildcards.AA_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\t{num_genes}\t{final_nt_path}\n')

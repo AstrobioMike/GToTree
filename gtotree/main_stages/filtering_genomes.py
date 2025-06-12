@@ -40,7 +40,7 @@ def filter_genomes(args, run_data):
         run_data = read_run_data(run_data.run_data_path)
         capture_removed_genomes(run_data)
 
-        run_data = check_target_SCGs_have_seqs(run_data, "-genome-filtered.fasta")
+        run_data = check_target_SCGs_have_seqs(run_data, f"-genome-filtered{run_data.general_ext}")
 
     report_genome_filtering_update(run_data)
 

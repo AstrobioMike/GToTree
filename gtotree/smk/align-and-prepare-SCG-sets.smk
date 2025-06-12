@@ -47,15 +47,16 @@ rule align:
     output:
         f"{run_data.found_SCG_seqs_dir}/{{SCG}}.aligned"
     run:
-        inpath = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-genome-filtered.fasta"
 
-        aligned_path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-aligned.fasta"
+        inpath = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-genome-filtered{run_data.general_ext}"
+
+        aligned_path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-aligned{run_data.general_ext}"
         align_log_path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-align.log"
 
-        trimmed_path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-trimmed.fasta"
+        trimmed_path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-trimmed{run_data.general_ext}"
         trimmal_log_path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-trimmal.log"
 
-        final_path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-final.fasta"
+        final_path = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-final{run_data.general_ext}"
 
         align_failed = run_muscle(f"{wildcards.SCG}", run_data, inpath, aligned_path, align_log_path)
         trimal_failed = run_trimal(aligned_path, trimmed_path, trimmal_log_path)

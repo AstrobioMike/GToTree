@@ -281,7 +281,7 @@ def check_and_report_any_changed_default_behavior(args, run_data):
         print(f"      - Labels of the specified input genomes will be modified based on: \"{args.mapping_file}\"")
 
     if args.nucleotide_mode:
-        print("      - Working towards nucleotie alignments, as the `-z` flag was provided\n"
+        print("      - Working towards nucleotide alignments, as the `-z` flag was provided\n"
               "          (amino-acid seqs are still used for HMM-searching of target genes)")
 
     if args.no_tree:

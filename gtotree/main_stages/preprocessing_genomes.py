@@ -61,6 +61,10 @@ def prepare_accession(acc, run_data):
 
     # first trying amino acids
     try:
+        # going directly to nucleotides if running in nucleotide mode
+        # (so we can call our own genes and CDS and protein match up as expected)
+        if run_data.nucleotide_mode:
+            raise Exception
         amino_acid_link = base_link + acc_assembly_str + "_protein.faa.gz"
         amino_acid_filepath = run_data.ncbi_downloads_dir + "/" + acc + "_protein.faa"
         download_and_unzip_accession(amino_acid_link, amino_acid_filepath)
@@ -217,14 +221,15 @@ def run_prodigal(id, run_data, full_inpath = None, group = None):
 
     if group == "ncbi":
         in_path = f"{run_data.ncbi_downloads_dir}/{id}_genomic.fna"
-        out_path = f"{run_data.ncbi_downloads_dir}/{id}_protein.faa"
+        out_AA_path = f"{run_data.ncbi_downloads_dir}/{id}_protein.faa"
+        out_nt_path = f"{run_data.ncbi_downloads_dir}/{id}_cds.fasta"
     elif group == "genbank":
         in_path = f"{run_data.genbank_processing_dir}/{id}.fasta"
-        out_path = f"{run_data.genbank_processing_dir}/{id}_protein.faa"
-        print(f"\n\n    {out_path}\n\n")
+        out_AA_path = f"{run_data.genbank_processing_dir}/{id}_protein.faa"
     elif group == "fasta":
         in_path = full_inpath
-        out_path = f"{run_data.fasta_processing_dir}/{id}_protein.faa"
+        out_AA_path = f"{run_data.fasta_processing_dir}/{id}_protein.faa"
+        out_nt_path = f"{run_data.fasta_processing_dir}/{id}_cds.fasta"
     else:
         report_early_exit(run_data, message = f"    Prodigal not yet implemented for \"{group}\".")
 
@@ -233,22 +238,26 @@ def run_prodigal(id, run_data, full_inpath = None, group = None):
         "-c",
         "-q",
         "-i", f"{in_path}",
-        "-a", f"{out_path}.tmp",
+        "-a", f"{out_AA_path}.tmp",
+        "-d", f"{out_nt_path}.tmp"
     ]
-    print(f"\n\n    {prodigal_cmd}\n\n")
 
-    remove_ast_cmd = f"tr -d '*' < {out_path}.tmp > {out_path}"
+    remove_AA_ast_cmd = f"tr -d '*' < {out_AA_path}.tmp > {out_AA_path}"
+    remove_nt_ast_cmd = f"tr -d '*' < {out_nt_path}.tmp > {out_nt_path}"
 
     try:
         subprocess.run(prodigal_cmd, stdout=subprocess.DEVNULL)
-        subprocess.run(remove_ast_cmd, shell=True)
-        os.remove(f"{out_path}.tmp")
+        subprocess.run(remove_AA_ast_cmd, shell=True)
+        if run_data.nucleotide_mode:
+            subprocess.run(remove_nt_ast_cmd, shell=True)
+        os.remove(f"{out_AA_path}.tmp")
+        os.remove(f"{out_nt_path}.tmp")
         done = True
     except:
         done = False
 
-    if os.path.getsize(out_path) == 0:
-        os.remove(out_path)
+    if os.path.getsize(out_AA_path) == 0:
+        os.remove(out_AA_path)
         done = False
 
     return done

@@ -66,6 +66,7 @@ class GenomeData:
     preprocessing_done: bool = False
     preprocessing_failed: bool = False
     final_AA_path: str = ""
+    final_nt_path: str = ""
     prodigal_used: bool = False
     was_gzipped: bool = False
     acc_was_found: bool = None
@@ -213,7 +214,7 @@ class RunData:
     mapping_file_path: str = ""
     mapping_dict: dict = field(default_factory=dict)
     initial_mapping_IDs_from_user: List[str] = field(default_factory=list)
-    ready_genome_AA_files_dir: str = ""
+    ready_genome_files_dir: str = ""
     hmm_results_dir: str = ""
     found_SCG_seqs_dir: str = ""
     num_SCG_targets_removed: int = 0
@@ -233,6 +234,7 @@ class RunData:
     use_muscle_super5: bool = False
     num_muscle_threads: int = 5
     nucleotide_mode: bool = False
+    general_ext: str = ""
     concatenated_alignment_path: str = ""
     final_alignment_path: str = ""
     final_alignment_length: int = 0

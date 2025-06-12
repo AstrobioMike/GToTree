@@ -136,12 +136,12 @@ helpmenu += f"""
 
         - [-z ] nucleotide mode; default: false
                   Make alignment and/or tree with nucleotide sequences instead
-                  of amino-acid sequences.
+                  of amino-acid sequences. (GToTree still finds target genes
+                  based on amino-acid HMM searches.)
 
                   Note: This mode can only accept NCBI accessions (passed to
                   `-a`) and genome fasta files (passed to `-f`) as input
-                  sources. (GToTree still finds target genes based on
-                  amino-acid HMM searches.)
+                  sources.
 
         - [-N ] do not make a tree; default: false
                   No tree produced. Stop after producing the concatenated

@@ -22,6 +22,6 @@ def filter_genes(args, run_data):
 
         run_data = read_run_data(run_data.run_data_path)
 
-    run_data = check_target_SCGs_have_seqs(run_data, "-gene-filtered.fasta")
+    run_data = check_target_SCGs_have_seqs(run_data, f"-gene-filtered{run_data.general_ext}")
 
     return run_data

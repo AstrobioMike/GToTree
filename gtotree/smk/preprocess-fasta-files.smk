@@ -23,7 +23,7 @@ rule all:
 
             with open(status_path, 'r') as f:
                 for line in f:
-                    fasta_file, status, was_gzipped, final_AA_path, num_genes = line.strip().split('\t')
+                    fasta_file, status, was_gzipped, final_AA_path, num_genes, final_nt_path = line.strip().split('\t')
 
                     fasta.num_genes = int(num_genes)
 
@@ -32,10 +32,10 @@ rule all:
                             fasta.mark_was_gzipped()
                         fasta.mark_preprocessing_done()
                         fasta.final_AA_path = final_AA_path
+                        fasta.final_nt_path = final_nt_path
                     else:
                         fasta.mark_removed("fasta-file processing failed")
                         fasta.preprocessing_failed = True
-
 
         run_data.tools_used.prodigal_used = True
         write_run_data(run_data)
@@ -54,9 +54,12 @@ rule process_fasta_files:
             os.remove(path)
 
         if done:
-            done, final_AA_path, num_genes = filter_and_rename_fasta(fasta.id, run_data, run_data.fasta_processing_dir)
+            done, final_AA_path, num_genes, final_nt_path = filter_and_rename_fasta(fasta.id, run_data, run_data.fasta_processing_dir)
         else:
+            print(f"\n\nIn ELSE\n\n")
             final_AA_path = None
+            final_nt_path = None
+            num_genes = 0
 
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.fasta_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\t{num_genes}\n')
+            f.write(f'{wildcards.fasta_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\t{num_genes}\t{final_nt_path}\n')

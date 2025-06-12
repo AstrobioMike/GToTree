@@ -5,38 +5,45 @@ from Bio import SeqIO
 import subprocess
 from gtotree.utils.general import (remove_file_if_exists,
                                    check_file_exists_and_not_empty)
-from gtotree.utils.messaging import (add_border,
-                                     report_notice)
 
 def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_length = 99999):
-
-    num = 0
     if full_path:
-        infile = in_path
+        AA_infile = in_path
     else:
-        infile = f"{in_path}/{prefix}_protein.faa"
-    outpath = f"{run_data.ready_genome_AA_files_dir}/{prefix}.faa"
-    with open(outpath, "w") as outfile, open(infile, "r") as infile:
+        AA_infile = f"{in_path}/{prefix}_protein.faa"
+    AA_outpath = f"{run_data.ready_genome_files_dir}/{prefix}.faa"
 
-        for record in SeqIO.parse(infile, "fasta"):
+    num = _filter_and_rename_fasta(AA_outpath, AA_infile, prefix, max_length)
 
+    if num == 0:
+        remove_file_if_exists(AA_outpath)
+        return False, None, num, None
+
+    else:
+        if run_data.nucleotide_mode:
+            nt_infile = f"{in_path}/{prefix}_cds.fasta"
+            nt_outpath = f"{run_data.ready_genome_files_dir}/{prefix}.fasta"
+            nt_max_length = (max_length * 3) + 3  # max length is 3x the AA max length + 3 for the stop codon
+            _filter_and_rename_fasta(nt_outpath, nt_infile, prefix, nt_max_length)
+        else:
+            nt_outpath = None
+        return True, AA_outpath, num, nt_outpath
+
+
+def _filter_and_rename_fasta(outpath, infile, prefix, max_length):
+    num = 0
+    with open(outpath, "w") as outfile, open(infile, "r") as in_file:
+        for record in SeqIO.parse(in_file, "fasta"):
             if len(record.seq) <= max_length:
                 num += 1
                 header = f">{prefix}_{num}"
                 outfile.write(f"{header}\n{record.seq}\n")
-
-    if num == 0:
-        remove_file_if_exists(outpath)
-        return False, None, num
-
-    else:
-        return True, outpath, num
-
+    return num
 
 def extract_filter_and_rename_cds_amino_acids_from_gb(prefix, input_gb, run_data, max_length = 99999):
 
     num = 0
-    output_file = f"{run_data.ready_genome_AA_files_dir}/{prefix}.faa"
+    output_file = f"{run_data.ready_genome_files_dir}/{prefix}.faa"
     note_terms_to_exclude = ["frameshifted", "internal stop", "incomplete"]
     location_terms_to_exclude = ["join", "<", ">"]
 
@@ -199,7 +206,7 @@ def add_needed_gap_seqs(run_data, inpath, outpath):
 def concatenate_alignments(run_data):
     SCGs_ready_for_cat = run_data.get_all_SCG_targets_ready_for_concatenation()
     SCG_IDs_ready_for_cat = [SCG.id for SCG in SCGs_ready_for_cat]
-    SCG_paths_to_cat = [run_data.found_SCG_seqs_dir + f"/{SCG_id}-final.fasta" for SCG_id in SCG_IDs_ready_for_cat]
+    SCG_paths_to_cat = [run_data.found_SCG_seqs_dir + f"/{SCG_id}-final{run_data.general_ext}" for SCG_id in SCG_IDs_ready_for_cat]
 
     # initializing dictionary that will hold headers as keys and a list of all seqs to be cat'd as values
     dict_of_genomes = {genome_id: [] for genome_id in run_data.get_all_remaining_input_genome_ids()}
@@ -220,7 +227,7 @@ def concatenate_alignments(run_data):
         output_path = os.path.join(run_data.output_dir, "aligned-SCGs.faa")
         spacer = "XXXXX"
     else:
-        output_path = os.path.join(run_data.output_dir, "aligned-SCGs.fa")
+        output_path = os.path.join(run_data.output_dir, "aligned-SCGs.fasta")
         spacer = "NNNNNN"
 
     with open(output_path, "w") as out:
@@ -255,14 +262,9 @@ def gen_partitions_file(run_data, SCG_IDs, dict_of_genomes):
 
 
 def swap_labels_in_alignment(run_data):
-    if not run_data.nucleotide_mode:
-        orig_alignment_path = os.path.join(run_data.output_dir, "aligned-SCGs.faa")
-        backup_alignment_path = os.path.join(run_data.run_files_dir, "aligned-SCGs.faa")
-        new_alignment_path = os.path.join(run_data.output_dir, "aligned-SCGs-mod-names.faa")
-    else:
-        orig_alignment_path = os.path.join(run_data.output_dir, "aligned-SCGs.fa")
-        backup_alignment_path = os.path.join(run_data.run_files_dir, "aligned-SCGs.fa")
-        new_alignment_path = os.path.join(run_data.output_dir, "aligned-SCGs-mod-names.fa")
+    orig_alignment_path = os.path.join(run_data.output_dir, f"aligned-SCGs{run_data.general_ext}")
+    backup_alignment_path = os.path.join(run_data.run_files_dir, f"aligned-SCGs{run_data.general_ext}")
+    new_alignment_path = os.path.join(run_data.output_dir, f"aligned-SCGs-mod-names{run_data.general_ext}")
 
     sequences = list(SeqIO.parse(orig_alignment_path, "fasta"))
     with open(new_alignment_path, "w") as fh:
@@ -299,9 +301,13 @@ def get_alignment_length(path):
     return num_sites
 
 
-# def pull_out_seqs(seqs_to_pull, in_path, out_path):
-#     records = SeqIO.parse(in_path, "fasta")
-#     filtered_records = [record for record in records if record.id in seqs_to_pull]
+def pull_out_corresponding_nt_seqs(in_AA_fasta, in_nt_fasta, out_nt_fasta):
 
-#     with open(out_path, "w") as out_handle:
-#         SeqIO.write(filtered_records, out_handle, "fasta")
+    aa_records = SeqIO.index(in_AA_fasta, "fasta")
+    nt_records = SeqIO.index(in_nt_fasta, "fasta")
+
+    with open(out_nt_fasta, "w") as out_handle:
+        for aa_id in aa_records:
+            if aa_id in nt_records:
+                nt_record = nt_records[aa_id]
+                SeqIO.write(nt_record, out_handle, "fasta")

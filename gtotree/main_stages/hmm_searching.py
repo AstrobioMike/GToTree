@@ -29,7 +29,8 @@ def search_hmms(args, run_data):
         capture_hmm_search_failures(run_data)
 
     report_hmm_search_update(run_data)
-    run_data = check_target_SCGs_have_seqs(run_data, ".fasta")
+
+    run_data = check_target_SCGs_have_seqs(run_data, run_data.general_ext)
 
     return run_data
 
@@ -93,19 +94,19 @@ def parse_hmmer_results(inpath, run_data):
     return dict_of_hit_counts, dict_of_hit_gene_ids, num_SCG_hits, num_unique_SCG_hits
 
 
-def get_seqs(dict_of_hit_gene_ids, AA_path):
+def get_seqs(dict_of_hit_gene_ids, path):
 
     try:
         hit_seqs_dict = dict.fromkeys(dict_of_hit_gene_ids.keys(), None)
         reverse_lookup = {seq_id: target for target, seq_id in dict_of_hit_gene_ids.items()}
-        AA_alphabet = easel.Alphabet.amino()
+        easel_alphabet = easel.Alphabet.amino() if path.endswith(".faa") else easel.Alphabet.dna()
 
-        with easel.SequenceFile(AA_path, digital=True, alphabet=AA_alphabet) as seq_file:
+        with easel.SequenceFile(path, digital=True, alphabet=easel_alphabet) as seq_file:
             for seq in seq_file:
                 seq_id = seq.name.decode("utf8")
                 if seq_id in reverse_lookup:
                     target_scg = reverse_lookup[seq_id]
-                    hit_seqs_dict[target_scg] = AA_alphabet.decode(seq)
+                    hit_seqs_dict[target_scg] = easel_alphabet.decode(seq)
         extract_seqs_failed = False
     except:
         extract_seqs_failed = True
@@ -130,14 +131,12 @@ def add_to_combined_SCG_hit_count_tab(genome_id, run_data):
 
 
 def write_out_SCG_hit_seqs(genome_id, run_data):
-    input_fasta = f"{run_data.hmm_results_dir}/{genome_id}/SCG-hits.fasta"
+    input_fasta = f"{run_data.hmm_results_dir}/{genome_id}/SCG-hits{run_data.general_ext}"
     out_dir = f"{run_data.found_SCG_seqs_dir}"
     remaining_SCG_targets = [SCG_target.id for SCG_target in run_data.get_all_SCG_targets_remaining()]
-    output_paths = {target_SCG: f"{out_dir}/{target_SCG}.fasta" for target_SCG in remaining_SCG_targets}
+    output_paths = {target_SCG: f"{out_dir}/{target_SCG}{run_data.general_ext}" for target_SCG in remaining_SCG_targets}
 
     output_handles = {target: open(path, "a") for target, path in output_paths.items()}
-
-    print(output_handles)
 
     with open(input_fasta, "r") as infile:
         for record in SeqIO.parse(infile, "fasta"):

@@ -71,13 +71,19 @@ rule search_hmms:
                     f.write(f"\t{count}")
                 f.write("\n")
 
-            hit_seqs_dict, extract_seqs_failed = get_seqs(dict_of_hit_gene_ids, AA_path)
+            AA_hit_seqs_dict, extract_seqs_failed = get_seqs(dict_of_hit_gene_ids, AA_path)
 
             if not extract_seqs_failed:
-                with open(f"{out_dir}/SCG-hits.fasta", 'w') as f:
-                    for gene_id, seq in hit_seqs_dict.items():
+                with open(f"{out_dir}/SCG-hits.faa", 'w') as f:
+                    for gene_id, seq in AA_hit_seqs_dict.items():
                         if seq is not None:
                             f.write(f">{gene_id}\n{seq}\n")
+                if run_data.nucleotide_mode:
+                    nt_hit_seqs_dict, extract_nt_seqs_failed = get_seqs(dict_of_hit_gene_ids, genome.final_nt_path)
+                    with open(f"{out_dir}/SCG-hits.fasta", 'w') as f:
+                        for gene_id, seq in nt_hit_seqs_dict.items():
+                            if seq is not None:
+                                f.write(f">{gene_id}\n{seq}\n")
 
         with open(output[0], 'w') as f:
             f.write(f"{wildcards.ID}\t{int(hmm_search_failed)}\t{int(extract_seqs_failed)}\t{int(num_SCG_hits)}\t{int(num_unique_SCG_hits)}\n")

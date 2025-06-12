@@ -1,5 +1,7 @@
 ## next: 
 
+    # currently working on adding nucleotide mode, almost all the way through, just testing left
+
     # adding additional pfam searching is next 
         # ko searching implemented, try following as much of that as possible when implementing additional-pfam-searching
             # ko searching is mostly the "additional_ko_searching.py" module and "search-kos.smk"
@@ -15,11 +17,6 @@
             # might need to adjust this (maybe even just searching for the last match, or first from reverse order, rather than any match
 
     # go through general.py GenomeData and RunData classes and see which methods i put in that i'm not using anywhere anymore
-
-    # implement nucleotide mode :(
-        # maybe add an ext variable somewhere (could be in run_data) so when working with amino acids we have .faa, and .fa when nucleotides in tmp outputs
-            # right now i just did .fasta so it covers both
-            # final outputs are named appropriately
 
     # unit tests..... :( :( :(
 

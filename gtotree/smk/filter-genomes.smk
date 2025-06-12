@@ -29,8 +29,8 @@ rule filter_genomes:
     output:
         f"{run_data.found_SCG_seqs_dir}/{{SCG}}.genome-filtered"
     run:
-        inpath = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-gene-filtered.fasta"
-        outpath = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-genome-filtered.fasta"
+        inpath = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-gene-filtered{run_data.general_ext}"
+        outpath = run_data.found_SCG_seqs_dir + f"/{wildcards.SCG}-genome-filtered{run_data.general_ext}"
 
         if len(genome_ids_to_remove) == 0:
             shutil.copy(inpath, outpath)

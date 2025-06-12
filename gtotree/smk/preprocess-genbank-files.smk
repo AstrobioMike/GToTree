@@ -24,7 +24,7 @@ rule all:
             status_path = f"{run_data.genbank_processing_dir}/{gb_basename}.done"
             with open(status_path, 'r') as f:
                 for line in f:
-                    gb_file, status, prodigal_used, was_gzipped, final_AA_path, num_genes = line.strip().split('\t')
+                    gb_file, status, prodigal_used, was_gzipped, final_AA_path, num_genes, final_nt_path = line.strip().split('\t')
 
                     gb.num_genes = int(num_genes)
 
@@ -33,6 +33,7 @@ rule all:
                             gb.mark_was_gzipped()
                         gb.mark_preprocessing_done()
                         gb.final_AA_path = final_AA_path
+                        bg.final_nt_path = final_nt_path
                     else:
                         gb.mark_removed("genbank-file processing failed")
                         gb.preprocessing_failed = True
@@ -59,7 +60,7 @@ rule process_genbank_files:
             done = run_prodigal(gb.id, run_data, path, "genbank")
             prodigal_used = True
             if done:
-                done, final_AA_path, num_genes = filter_and_rename_fasta(gb.id, run_data, run_data.genbank_processing_dir)
+                done, final_AA_path, num_genes, final_nt_path = filter_and_rename_fasta(gb.id, run_data, run_data.genbank_processing_dir)
             else:
                 prodigal_used = False
         else:
@@ -69,4 +70,4 @@ rule process_genbank_files:
             os.remove(path)
 
         with open(output[0], 'w') as f:
-            f.write(f'{wildcards.gb_file}\t{int(done)}\t{int(prodigal_used)}\t{int(was_gzipped)}\t{final_AA_path}\t{num_genes}\n')
+            f.write(f'{wildcards.gb_file}\t{int(done)}\t{int(prodigal_used)}\t{int(was_gzipped)}\t{final_AA_path}\t{num_genes}\t{final_nt_path}\n')

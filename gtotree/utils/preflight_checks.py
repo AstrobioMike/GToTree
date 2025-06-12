@@ -543,8 +543,8 @@ def final_setups(args, run_data):
         os.makedirs(AA_processing_dir, exist_ok=True)
         run_data.AA_processing_dir = AA_processing_dir
 
-    run_data.ready_genome_AA_files_dir = os.path.join(args.tmp_dir, "ready-genome-AA-files")
-    os.makedirs(run_data.ready_genome_AA_files_dir, exist_ok=True)
+    run_data.ready_genome_files_dir = os.path.join(args.tmp_dir, "ready-genome-files")
+    os.makedirs(run_data.ready_genome_files_dir, exist_ok=True)
     run_data.hmm_results_dir = os.path.join(args.tmp_dir, "hmm-results")
     os.makedirs(run_data.hmm_results_dir, exist_ok=True)
     run_data.found_SCG_seqs_dir = os.path.join(args.tmp_dir, "found-SCG-seqs")
@@ -560,6 +560,7 @@ def final_setups(args, run_data):
 
     run_data.num_muscle_threads = args.num_muscle_threads
     run_data.nucleotide_mode = args.nucleotide_mode
+    run_data.general_ext = ".fasta" if run_data.nucleotide_mode else ".faa"
 
     if len(run_data.mapping_dict) > 0 or args.add_ncbi_tax or args.add_gtdb_tax:
         run_data.updating_headers = True
