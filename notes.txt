@@ -8,6 +8,8 @@
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
             # actually it's probably just easier to read in the <output_dir>/ko-search-results/KO-hit-counts.tsv table and make it based on that
         # be sure to take into account if we are modifying the genome names so the iToL files match the final alignment/tree files
+        # make a helper function that does this, and it will take just the path to the table and if it's for KOs or PFams
+            # if they have different formats it'd need a KO or PFam designation. If they are the same format, maybe not
 
     # test/look into message.get_path_rel_to_outdir()
         # what happens when the output dir i provide to the initial gtotree call is a full path?
