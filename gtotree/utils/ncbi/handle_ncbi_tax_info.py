@@ -22,6 +22,7 @@ def update_mapping_dict_with_ncbi_tax_info(args, run_data):
 
     combined_tab = pd.concat([sub_ncbi_tab["input_accession"], sub_ncbi_tax_tab], axis=1)
     combined_tab = combined_tab.rename(columns={"input_accession": "input_acc"})
+    combined_tab = combined_tab.fillna("NA").astype(str)
     combined_tab.to_csv(sub_ncbi_tax_path, sep="\t", index=False)
 
     for index, row in combined_tab.iterrows():
@@ -62,13 +63,16 @@ def reformat_ncbi_tax_tab(df):
     orig_species = df['species'].tolist()
 
     df['species'] = [
-        sp.removeprefix(genus + ' ')
+        sp.removeprefix(str(genus) + ' ')
+        if isinstance(sp, str) else sp
         for genus, sp in zip(df['genus'], df['species'])
     ]
 
     df['strain'] = [
-        st.removeprefix(full_sp + ' ').replace(' ', '-')
+        st.removeprefix(str(full_sp) + ' ').replace(' ', '-')
+        if isinstance(st, str) else st
         for full_sp, st in zip(orig_species, df['strain'])
     ]
 
     return df
+

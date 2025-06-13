@@ -1,6 +1,4 @@
-## next: 
-
-    # currently working on adding nucleotide mode, almost all the way through, just testing left
+## next:
 
     # adding additional pfam searching is next 
         # ko searching implemented, try following as much of that as possible when implementing additional-pfam-searching
@@ -8,6 +6,7 @@
 
     # still need to implement iToL-file generation for both pfam and ko searching results
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
+            # actually it's probably just easier to read in the <output_dir>/ko-search-results/KO-hit-counts.tsv table and make it based on that
         # be sure to take into account if we are modifying the genome names so the iToL files match the final alignment/tree files
 
     # test/look into message.get_path_rel_to_outdir()
@@ -41,17 +40,9 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 ### OVERALL NOTES ###
 # add a stop at "Summary of input-genome preprocessing" to check there are 3 or more as needed to make a tree
-# need a lot of testing on "resume" functionality
-    # if i count on the resume flag for operating, i may need to make sure it makes sense up front (like does the run-data.json exist)
-# need some check and handling if the input files changed when doing a resume
-    # maybe just check and require they haven't changed at all, if so a totally new run is needed
-# when a resume is done, may want to just try snakemake workflows on inputs that failed the prior runs
-# since multiple logs may be created with --resume function, might need to add functionality to back up a log that exists to a sub-dir,
-    # maybe with a time/date stamp of when first run appended to the name
 # eventually look into putting a block for this prodigal failure: "at least 100000 bases for training." (search original files)
     # maybe just make a check that input genomes are greater than 100,000 bases (if that consistently triggers it)
 # eventually add a check that nucleotide fasta inputs are nucleotide and not amino acid, and vice versa
-# eventually do something with gunzipped files we generated (probably delete them, leaving the originals)
 
 ### TO DO ###
 
@@ -59,7 +50,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # affects:
         # get_ncbi_assembly_tables.py (DONE)
         # ncbi assembly downloads (DONE)
-        # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree; it rarely if ever changes)
+        # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree; if it rarely if ever changes)
 
 
 ### CHANGES ###
@@ -84,7 +75,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 ### IMPROVEMENTS to highlight in paper ###
 
-# python packaging and structure (rather than 4,000 lines of bash as main runner with dozens of individual python helper scripts)
+# python packaging and structure (rather than 4,000 lines of bash as main runner with dozens of individual python and bash helper scripts for a total of X lines)
 # instead of just exiting and informing when input files have problems, GToTree2 fixes them
     # e.g., duplicate entries will be unique'd, windows line-endings will be converted, changes written to a new file that is then used
 # snakemake control over the main components for easier restart capabilities
@@ -92,7 +83,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # gtt-gen-SCG-HMMs
     # gtt-get-GTDB-accessions
     # gtt-subset...
-    # new prepackaged HMMs based on GTDB taxonomy
+    # new prepackaged HMMs based on GTDB taxonomy (originals still available)
     # in tandem scanning of target KOs or pfams, files for added vizualization in iToL
     # pre-built HMMs stored remotely and downloaded when used, to slim package size and install time
     # partitions.txt file produced suitable for mixed-model treeing like with iqtree
