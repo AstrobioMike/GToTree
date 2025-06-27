@@ -3,7 +3,7 @@
 ## v1.8.15 (27-Jun-2025)
 
 ### Added
-- added a flag to `bit-get-accessions-from-GTDB` (`--use-ecogenomics`) to allow specifing to download from [data.gtdb.ecogenomic.org/releases](https://data.gtdb.ecogenomic.org/releases/) instead of the default [data.ace.uq.edu.au/public/gtdb/data/releases](https://data.ace.uq.edu.au/public/gtdb/data/releases/) thanks to the suggestion from @Stian-2rz (#107)
+- added a flag to `gtt-get-accessions-from-GTDB` (`--use-ecogenomics`) to allow specifing to download from [data.gtdb.ecogenomic.org/releases](https://data.gtdb.ecogenomic.org/releases/) instead of the default [data.ace.uq.edu.au/public/gtdb/data/releases](https://data.ace.uq.edu.au/public/gtdb/data/releases/) thanks to the suggestion from @Stian-2rz (#107)
 - a partitions file in nexus format (`<outdir>/run_files/Partitions.nex`) is produced in addition to the regular text-formatted one (`<outdir>/run_files/Partitions.txt`), because for some iqtree model settings the txt format has leads to a bug – also thanks to @Stian-2rz! (#108)
 
 ### Changed
