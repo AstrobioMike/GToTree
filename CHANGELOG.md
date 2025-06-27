@@ -1,10 +1,23 @@
 # Change Log
 
+## v1.8.15 (27-Jun-2025)
+
+### Added
+- added a flag to `bit-get-accessions-from-GTDB` (`--use-ecogenomics`) to allow specifing to download from [data.gtdb.ecogenomic.org/releases](https://data.gtdb.ecogenomic.org/releases/) instead of the default [data.ace.uq.edu.au/public/gtdb/data/releases](https://data.ace.uq.edu.au/public/gtdb/data/releases/) thanks to the suggestion from @Stian-2rz (#107)
+- a partitions file in nexus format (`<outdir>/run_files/Partitions.nex`) is produced in addition to the regular text-formatted one (`<outdir>/run_files/Partitions.txt`), because for some iqtree model settings the txt format has leads to a bug – also thanks to @Stian-2rz! (#108)
+
+### Changed
+- currently skipping certificate checking on GTDB downloads (prompted from #107)
+  - this impacts `gtt-get-accessions-from-GTDB` and the internally used `gtt-check-or-setup-GTDB-files`
+
+---
+
 ## v1.8.14 (21-Apr-2025)
 
 ### Changed
 - change to taxonkit call when adding NCBI tax info (now using `reformat2` and a pattern) in order to deal with NCBI tax-structure update
 
+---
 
 ## v1.8.13 (18-Mar-2025)
 
