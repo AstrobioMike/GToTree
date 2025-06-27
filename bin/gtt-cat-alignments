@@ -5,12 +5,12 @@ from glob import glob
 import argparse
 import os.path
 
-parser = argparse.ArgumentParser(description='This script is a helper script to concatenate fasta-formatted multiple sequence alignment files, and generate partitions file.')
+parser = argparse.ArgumentParser(description='This script is a helper to concatenate fasta-formatted multiple sequence alignment files and generate the partitions files.')
 
 required = parser.add_argument_group('required arguments')
 
 required.add_argument("-t", "--tmp-dir", help="The working tmp_dir for the current GToTree run", action="store", dest="tmp_dir", required=True)
-required.add_argument("-o", "--output-dir", help="The output_dir for the current GToTree run", action="store", dest="output_dir", required=True)
+required.add_argument("-o", "--output-dir", help="The wanted output dir", action="store", dest="output_dir", required=True)
 parser.add_argument("--nucleotides", help="Provide this flag if user specified nucleotide mode", action="store_true")
 
 
@@ -83,13 +83,36 @@ alignment_lengths_list = [len(x) for x in list(dict_of_genomes.values())[0]]
 curr_start = 1
 curr_stop = 0
 
-with open(output_dir + "Partitions.txt", "w") as out:
+partitions_txt_file = output_dir + "/run_files/Partitions.txt"
+partitions_nex_file = output_dir + "/run_files/Partitions.nex"
+
+with open(partitions_txt_file, "w") as out:
     for i in range(0,len(gene_list)):
         curr_stop = curr_start + alignment_lengths_list[i] - 1
 
         if not args.nucleotides:
             out.write("AA, " + str(gene_list[i]) + " = " + str(curr_start) + "-" + str(curr_stop) + "\n")
-            curr_start = curr_stop + 6    
+            curr_start = curr_stop + 6
         else:
             out.write("DNA, " + str(gene_list[i]) + " = " + str(curr_start) + "-" + str(curr_stop) + "\n")
             curr_start = curr_stop + 7
+
+# writing out a nex formatted partitions file
+    # thanks to @Stian-2rz on github: https://github.com/AstrobioMike/GToTree/issues/108
+
+with open(partitions_txt_file) as f:
+    lines = [line.strip() for line in f if line.strip()]
+
+with open(partitions_nex_file, "w") as f:
+    f.write("#NEXUS\n")
+    f.write("begin sets;\n")
+    for line in lines:
+        parts = line.split(',')
+        if len(parts) != 2:
+            continue
+        _, rest = parts
+        name, coords = rest.split('=')
+        name = name.strip().replace(" ", "_")
+        coords = coords.strip()
+        f.write(f"  charset {name} = {coords};\n")
+    f.write("end;\n")

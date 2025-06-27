@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.8.14"
+VERSION="v1.8.15"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -2643,11 +2643,11 @@ duration=$SECONDS
 printf "           It is currently $curr_time; the process started at $start_time.\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 printf "               Current process runtime: $(($duration / 60 / 60)) hours and $((($duration / 60) % 60)) minutes.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
-# this concatenates the alignments and generates the partitions file for mixed model alignments
+# this concatenates the alignments and generates the partitions file for mixed-model treeing
 if [ $nucleotide != 'false' ]; then
-    gtt-cat-alignments -t $tmp_dir -o $output_dir --nucleotides
+    gtt-cat-alignments -t $tmp_dir -o ${output_dir} --nucleotides
 else
-    gtt-cat-alignments -t $tmp_dir -o $output_dir
+    gtt-cat-alignments -t $tmp_dir -o ${output_dir}
 fi
 
 # storing genomes that made it through workflow to report at end
@@ -3693,8 +3693,8 @@ if [ $additional_pfam_targets == 'true' ]; then
 fi
 
 printf "    Partitions file (for downstream use with mixed-model treeing) written to:\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-printf "        ${GREEN}${output_dir}/run_files/Partitions.txt${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-mv ${output_dir}/Partitions.txt ${output_dir}/run_files/Partitions.txt
+printf "        ${GREEN}${output_dir}/run_files/Partitions.txt${NC}\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+printf "        ${GREEN}${output_dir}/run_files/Partitions.nex${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
 # reporting any problem files/accessions and mentioning run_files/ directory
 printf " _______________________________________________________________________________\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
