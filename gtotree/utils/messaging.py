@@ -347,11 +347,11 @@ def many_genomes_notice(total_input_genomes):
     command and re-run it.
 
     More info can be found here:
-      github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes
+      github.com/AstrobioMike/GToTree/wiki/things-to-consider
 
     And while we're chatting, you may also want to consider using \"representative\" genomes
     if you're not already. More info on that can be found here:
-      github.com/AstrobioMike/GToTree/wiki/things-to-consider#consider-using-representative-genomes
+      github.com/AstrobioMike/GToTree/wiki/things-to-consider
 
     We will wait 30 seconds before continuing with our regularly scheduled program :)"""
 )
@@ -366,7 +366,7 @@ def few_genomes_notice(total_input_genomes, args):
     to consider increasing it.
 
     More info can be found here:
-      github.com/AstrobioMike/GToTree/wiki/Things-to-consider#filtering-hits-by-gene-length
+      github.com/AstrobioMike/GToTree/wiki/Things-to-consider
 
                    Moving forward with `-c` set to {args.seq_length_cutoff} this run."""
     )
@@ -387,7 +387,7 @@ def absurd_number_of_genomes_notice(total_input_genomes):
     working at a broad level with many genomes.
 
     More info on that can be found here:
-      github.com/AstrobioMike/GToTree/wiki/things-to-consider#consider-using-representative-genomes
+      github.com/AstrobioMike/GToTree/wiki/things-to-consider
 
     You can consider cancelling this run now with `ctrl + c`, otherwise we will
     continue with our regularly scheduled program 60 seconds after this message
@@ -777,7 +777,7 @@ def summarize_results(args, run_data):
 def get_path_rel_to_outdir(path, args):
 
     key_dir = args.output_dir
-    idx = path.find(key_dir)
+    idx = path.rfind(key_dir)
     if idx != -1:
         sub_path = path[idx:]
         return(sub_path)

@@ -1,11 +1,5 @@
 ## next:
 
-    # test/look into message.get_path_rel_to_outdir()
-        # what happens when the output dir i provide to the initial gtotree call is a full path?
-        # check out what happens if there are multiple matches to key_dir in messaging.get_path_rel_to_outdir()
-            # e.g., if we are in a directory called gtotree-output and the output directory is also gtotree-output
-            # might need to adjust this (maybe even just searching for the last match, or first from reverse order, rather than any match
-
 
     # adding additional pfam searching is next 
         # ko searching implemented, try following as much of that as possible when implementing additional-pfam-searching
