@@ -17,6 +17,12 @@ import textwrap
 import argparse
 import shutil
 import filecmp
+import ssl
+###########
+# temp fix for certificate failure: https://github.com/AstrobioMike/GToTree/issues/107
+ssl._create_default_https_context = ssl._create_unverified_context
+###########
+
 
 parser = argparse.ArgumentParser(description="This is a helper program to facilitate using taxonomy \
                                               and genomes from the Genome Taxonomy Database (gtdb.ecogenomic.org) with GToTree.\
@@ -53,7 +59,9 @@ parser.add_argument("--do-not-check-GTDB-version", action="store_true", help="By
 parser.add_argument("--store-GTDB-metadata-in-current-working-dir", action="store_true", help="By default, GToTree uses a system-wide variable \
                                                                         to know where to put and search the GTDB metadata. Provide this flag to \
                                                                         ignore that and store the master table in the current working directory.")
-
+parser.add_argument("--use-ecogenomics", action="store_true", help="By default, we try to pull the data from 'https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/' \
+                                                                        instead of 'https://data.gtdb.ecogenomic.org/releases/latest/'. Add this flag to try to pull from \
+                                                                        the ecogenomics site (might be much slower depending on where you are).")
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -408,15 +416,19 @@ def gen_gtdb_tab(location):
     """ downloads and parses the GTDB info tables """
 
     # getting archaea
-    # arc_tsv_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/ar53_metadata.tsv.gz")
-    arc_tsv_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar53_metadata.tsv.gz")
+    if args.use_ecogenomics:
+        arc_tsv_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/ar53_metadata.tsv.gz")
+    else:
+        arc_tsv_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar53_metadata.tsv.gz")
     arc_tab = pd.read_csv(arc_tsv_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     arc_tab.rename(columns={arc_tab.columns[0]:"accession"}, inplace=True)
     arc_tab.dropna(inplace=True, how="all")
 
     # getting bacteria
-    # bac_tsv_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/bac120_metadata.tsv.gz")
-    bac_tsv_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tsv.gz")
+    if args.use_ecogenomics:
+        bac_tsv_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/bac120_metadata.tsv.gz")
+    else:
+        bac_tsv_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tsv.gz")
     bac_tab = pd.read_csv(bac_tsv_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
     bac_tab.rename(columns={bac_tab.columns[0]:"accession"}, inplace=True)
     bac_tab.dropna(inplace=True, how="all")
@@ -461,10 +473,15 @@ def gen_gtdb_tab(location):
     gtdb_tab.to_csv(location + "GTDB-arc-and-bac-metadata.tsv", index=False, sep="\t")
 
     # gtdb changed from using VERSION to using VERSION.txt at some point, so putting in a try/except to shoot for both in case it's doing a version comparison
+    if args.use_ecogenomics:
+        gtdb_version_link = "https://data.gtdb.ecogenomic.org/releases/latest/VERSION"
+    else:
+        gtdb_version_link = "https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/VERSION"
+
     try:
-        gtdb_version_info = urllib.request.urlretrieve("https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt", location + "GTDB-version-info.txt")
+        gtdb_version_info = urllib.request.urlretrieve(f"{gtdb_version_link}.txt", location + "GTDB-version-info.txt")
     except:
-        gtdb_version_info = urllib.request.urlretrieve("https://data.gtdb.ecogenomic.org/releases/latest/VERSION", location + "GTDB-version-info.txt")
+        gtdb_version_info = urllib.request.urlretrieve(gtdb_version_link, location + "GTDB-version-info.txt")
 
     return(gtdb_tab)
 
@@ -488,10 +505,15 @@ def check_stored_gtdb_up_to_date(location):
 
     # getting latest version info from GTDB
     # gtdb changed from using VERSION to using VERSION.txt at some point, so putting in a try/except to shoot for both in case it's doing a version comparison
+    if args.ecogenomics:
+        gtdb_version_link = "https://data.gtdb.ecogenomic.org/releases/latest/VERSION"
+    else:
+        gtdb_version_link = "https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/VERSION"
+    
     try:
-        gtdb_version_info = urllib.request.urlretrieve("https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt", location + "GTDB-latest-version-info.txt")
+        gtdb_version_info = urllib.request.urlretrieve(f"{gtdb_version_link}.txt", location + "GTDB-latest-version-info.txt")
     except:
-        gtdb_version_info = urllib.request.urlretrieve("https://data.gtdb.ecogenomic.org/releases/latest/VERSION", location + "GTDB-latest-version-info.txt")
+        gtdb_version_info = urllib.request.urlretrieve(gtdb_version_link, location + "GTDB-latest-version-info.txt")
 
     # comparing vs old
     if filecmp.cmp(location + "GTDB-latest-version-info.txt", location + "GTDB-version-info.txt"):
