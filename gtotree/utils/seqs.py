@@ -252,13 +252,24 @@ def gen_partitions_file(run_data, SCG_IDs, dict_of_genomes):
     mol_type = "AA" if not run_data.nucleotide_mode else "DNA"
     spacer_addition = 6 if not run_data.nucleotide_mode else 7
 
-    with open(run_data.run_files_dir + "/partitions.txt", "w") as out:
+    # writing out a partitions.txt and a partitions.nex
+    with open(run_data.run_files_dir + "/partitions.txt", "w") as txt_out:
 
-        for i in range(0,len(SCG_IDs)):
-            curr_stop = curr_start + alignment_lengths_list[i] - 1
+        with open(run_data.run_files_dir + "/partitions.nex", "w") as nex_out:
 
-            out.write(f"{mol_type}, {SCG_IDs[i]} = {curr_start}-{curr_stop}\n")
-            curr_start = curr_stop + spacer_addition
+            nex_out.write("#NEXUS\n")
+            nex_out.write("begin sets;\n")
+
+            for i in range(0,len(SCG_IDs)):
+
+                curr_stop = curr_start + alignment_lengths_list[i] - 1
+
+                txt_out.write(f"{mol_type}, {SCG_IDs[i]} = {curr_start}-{curr_stop}\n")
+                nex_out.write(f"  charset {SCG_IDs[i]} = {curr_start}-{curr_stop};\n")
+
+                curr_start = curr_stop + spacer_addition
+
+            nex_out.write("end;\n")
 
 
 def swap_labels_in_alignment(run_data):

@@ -1,8 +1,16 @@
 ## next:
 
+    # test/look into message.get_path_rel_to_outdir()
+        # what happens when the output dir i provide to the initial gtotree call is a full path?
+        # check out what happens if there are multiple matches to key_dir in messaging.get_path_rel_to_outdir()
+            # e.g., if we are in a directory called gtotree-output and the output directory is also gtotree-output
+            # might need to adjust this (maybe even just searching for the last match, or first from reverse order, rather than any match
+
+
     # adding additional pfam searching is next 
         # ko searching implemented, try following as much of that as possible when implementing additional-pfam-searching
             # ko searching is mostly the "additional_ko_searching.py" module and "search-kos.smk"
+
 
     # still need to implement iToL-file generation for both pfam and ko searching results
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
@@ -11,13 +19,33 @@
         # make a helper function that does this, and it will take just the path to the table and if it's for KOs or PFams
             # if they have different formats it'd need a KO or PFam designation. If they are the same format, maybe not
 
-    # test/look into message.get_path_rel_to_outdir()
-        # what happens when the output dir i provide to the initial gtotree call is a full path?
-        # check out what happens if there are multiple matches to key_dir in messaging.get_path_rel_to_outdir()
-            # e.g., if we are in a directory called gtotree-output and the output directory is also gtotree-output
-            # might need to adjust this (maybe even just searching for the last match, or first from reverse order, rather than any match
 
     # go through general.py GenomeData and RunData classes and see which methods i put in that i'm not using anywhere anymore
+
+
+    # incorporate latest changes from master GToTree
+        # GTDB download needs no-cert-check added and flag for --use-ecogenomics
+        # see GToTree note in my personal cell for others
+
+
+    # package conda recipe with repo like i did for bit
+
+
+    # add a flag to stop auto-update-db checks by date
+        # so like it won't automatically try to grab new ncbi/gtdb/KOFamScan data if older than X weeks like i have set in places
+
+
+    # modularize and reduce code redundancy in my user-side standalone scripts like: 
+        # gtt-get-accessions-from-GTDB
+        # gtt-gen-SCG-set
+        # gtt-pfam-search
+
+
+    # figure out all helper scripts that are no longer needed and remove them
+
+
+    # modularize and reduce code redundancy in any of my helper scripts still remaining
+
 
     # unit tests..... :( :( :(
 
@@ -53,6 +81,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
         # get_ncbi_assembly_tables.py (DONE)
         # ncbi assembly downloads (DONE)
         # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree; if it rarely if ever changes)
+            # looks like it does update regularly, i might just have to catch and report when this download fails and say it might be because it's only available via ftp
 
 
 ### CHANGES ###

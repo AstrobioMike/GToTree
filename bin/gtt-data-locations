@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
-to check and set required environmental variables. 
+This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki)
+to check and set required environmental variables.
 
 For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
 """
@@ -74,7 +74,7 @@ def color_text(text, color='green'):
 
 
 def wprint(text):
-    print(textwrap.fill(text, width=80, initial_indent="  ", 
+    print(textwrap.fill(text, width=80, initial_indent="  ",
           subsequent_indent="  ", break_on_hyphens=False))
 
 
@@ -157,7 +157,7 @@ def get_variable_path(variable):
 
 def set_variable_path(variable, curr_path):
 
-    # if current path exists, making sure user wants to change it 
+    # if current path exists, making sure user wants to change it
     if curr_path:
 
         print("\n  --------------------------------------------------------------------------------")
@@ -218,7 +218,7 @@ def set_variable_path(variable, curr_path):
             print(color_text("\n    That location is not writable for you (press `ctrl + c` if wanting to exit).\n", "red"))
 
         except PathNotAbsolute:
-            print(color_text("\n    Please provide an absolute path (press `ctrl + c` if wanting to exit).\n", "red"))            
+            print(color_text("\n    Please provide an absolute path (press `ctrl + c` if wanting to exit).\n", "red"))
 
     print("\n  --------------------------------------------------------------------------------\n")
 
@@ -244,14 +244,14 @@ def set_env_variables():
 
 
 def modify_conda_activate_startup_script(paths_dict):
-    """ 
+    """
     adjust it so it holds the appropriate environment variables so when opened in the future,
     the variables are loaded properly
     """
 
     # here is the file in the conda env: ls ${CONDA_PREFIX}/etc/conda/activate.d/gtotree.sh
 
-    # some users may not have write permissions to the conda environment area, which holds the launch script 
+    # some users may not have write permissions to the conda environment area, which holds the launch script
         # when the conda env starts up, which sets the variables
         # so, going to create one in their home directory if they don't have write access
         # this also meant adding a code block to the normal conda activate script that checks for this file,
@@ -281,7 +281,7 @@ def modify_conda_activate_startup_script(paths_dict):
 
         new_one = os.path.join(user_config_location, "gtotree.sh")
 
-    
+
     # reading file lines into list
     with open(path_to_startup_script) as initial_file:
 
@@ -293,7 +293,7 @@ def modify_conda_activate_startup_script(paths_dict):
 
     for line in initial_lines:
 
-        ## skipping the lines within the if statement about sourcing the startup script in the user's home 
+        ## skipping the lines within the if statement about sourcing the startup script in the user's home
            # location if we are writing to the user's home location to avoid a singularity
         if not os.access(path_to_startup_script, os.W_OK):
 
@@ -321,7 +321,7 @@ def modify_conda_activate_startup_script(paths_dict):
     # writing to new file
     # in conda area if we have write access
     if os.access(path_to_startup_script, os.W_OK):
-        
+
         with open(new_one_tmp, "w") as outfile:
 
             outfile.write('\n'.join(new_lines))
