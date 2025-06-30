@@ -54,11 +54,12 @@ rule search_kos:
         genome = genome_dict[wildcards.ID]
         AA_path = genome.final_AA_path
 
-        base_out_path = f"{run_data.ko_results_dir}/individual-genome-results/{wildcards.ID}/"
+        base_outpath = f"{run_data.ko_results_dir}/individual-genome-results/{wildcards.ID}/"
         ko_search_failed = run_ko_search(run_data.target_ko_profiles_dir,
                                          run_data.target_kos_tsv,
-                                         base_out_path,
-                                         AA_path)
+                                         base_outpath,
+                                         AA_path,
+                                         run_data.num_hmm_cpus)
 
         if not ko_search_failed:
             # writing out fastas of hits for each KO

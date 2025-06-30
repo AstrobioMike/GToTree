@@ -12,7 +12,7 @@ from tqdm import tqdm # type: ignore
 import subprocess
 import urllib.request
 from datetime import datetime
-from pkg_resources import resource_filename
+import importlib.resources as pkg_resources
 from gtotree.utils.messaging import report_early_exit, report_snakemake_failure
 
 
@@ -246,12 +246,14 @@ class RunData:
     target_ko_profiles_dir: str = None
     target_pfams_file: str = None
     total_pfam_targets: int = 0
+    all_pfam_targets_hmm_path: str = None
     additional_pfam_searching_done: bool = False
     additional_ko_searching_done: bool = False
 
     pfam_dict: dict = field(default_factory=dict)
     pfam_results_dir: str = ""
     pfam_results_dir_rel: str = ""
+    tmp_pfam_results_dir: str = ""
     wanted_pfam_targets: List[str] = field(default_factory=list)
     found_pfam_targets: List[str] = field(default_factory=list)
     failed_pfam_targets: List[str] = field(default_factory=list)
@@ -521,7 +523,7 @@ def read_run_data(path):
 
 
 def get_snakefile_path(basename):
-    return resource_filename("gtotree", f"smk/{basename}")
+    return pkg_resources.files("gtotree") / f"smk/{basename}"
 
 
 def touch(path):

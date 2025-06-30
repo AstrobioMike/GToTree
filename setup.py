@@ -18,12 +18,12 @@ setup(
             "gtt-get-kofamscan-data2=gtotree.utils.kos.get_kofamscan_data:main",
         ],
     },
-    install_requires=[
-        "biopython",
-        "pyarrow",
-        "pyhmmer",
-        "tqdm",
-    ],
+#    install_requires=[
+#        "biopython",
+#        "pyarrow",
+#        "pyhmmer",
+#        "tqdm",
+#    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: GPL3",

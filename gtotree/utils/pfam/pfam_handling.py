@@ -15,6 +15,9 @@ def get_additional_pfam_targets(run_data):
     failed_pfam_targets = []
     found_pfam_paths = []
 
+    combined_pfam_hmm_path = f"{run_data.pfam_results_dir}/target-pfam-profiles/all-pfam-targets.hmm"
+    run_data.all_pfam_targets_hmm_path = combined_pfam_hmm_path
+
     for input_id in pfam_dict.keys():
 
         target = input_id.split(".")[0]
@@ -22,8 +25,7 @@ def get_additional_pfam_targets(run_data):
         target_url = f"{base_link}{target}?annotation=hmm"
         pfam_hmm_out_path = f"{run_data.pfam_results_dir}/target-pfam-profiles/{target}.hmm"
 
-        # success = download_and_gunzip(target_url, pfam_hmm_out_path)
-        success = False
+        success = download_and_gunzip(target_url, pfam_hmm_out_path)
 
         if not success:
             failed_pfam_targets.append(input_id)
@@ -39,22 +41,13 @@ def get_additional_pfam_targets(run_data):
                     pfam_dict[input_id] = pfam_id
                     break
 
-        print(target)
-        print(target_url)
-        print(pfam_hmm_out_path)
-        print(pfam_id)
-
-    print(pfam_dict)
-
     run_data.found_pfam_targets = found_pfam_targets
     run_data.failed_pfam_targets = failed_pfam_targets
     run_data.pfam_dict = pfam_dict
 
     write_out_failed_pfams(run_data)
     write_requested_and_pulled_pfams(run_data, pfam_dict)
-    if len(found_pfam_targets) > 0:
-        combined_pfam_hmm_path = f"{run_data.pfam_results_dir}/target-pfam-profiles/all-pfam-targets.hmm"
-        concat_files(pfam_hmm_out_path, combined_pfam_hmm_path)
+    concat_files(found_pfam_paths, combined_pfam_hmm_path)
 
     return run_data
 
@@ -73,4 +66,3 @@ def write_requested_and_pulled_pfams(run_data, pfam_dict):
             if pulled_id is None:
                 pulled_id = "NA"
             pfam_file.write(f"{input_id}\t{pulled_id}\n")
-

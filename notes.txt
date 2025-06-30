@@ -1,11 +1,6 @@
 ## next:
 
 
-    # adding additional pfam searching is next 
-        # ko searching implemented, try following as much of that as possible when implementing additional-pfam-searching
-            # ko searching is mostly the "additional_ko_searching.py" module and "search-kos.smk"
-
-
     # still need to implement iToL-file generation for both pfam and ko searching results
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
             # actually it's probably just easier to read in the <output_dir>/ko-search-results/KO-hit-counts.tsv table and make it based on that
@@ -19,7 +14,6 @@
 
     # incorporate latest changes from master GToTree
         # GTDB download needs no-cert-check added and flag for --use-ecogenomics
-        # see GToTree note in my personal cell for others
 
 
     # package conda recipe with repo like i did for bit
@@ -41,17 +35,28 @@
     # modularize and reduce code redundancy in any of my helper scripts still remaining
 
 
+    # fix entry points/console scripts as needed in setup.py
+
+
     # unit tests..... :( :( :(
+
+
+    # wherever I have this:
+        # with tarfile.open(taxdump_path) as tarball:
+            # tarball.extractall(location)
+    # do this to get rid of warning message: 
+        # with tarfile.open(tarball_path) as tarball:
+            # tarball.extractall(path=location, filter=lambda ti: ti)
+
+
+    # do i need output message summary noting pfam/ko results location if done? (probably)
 
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
 conda activate gtotree-dev
-conda install tqdm=4.67.1
-conda install pyhmmer=0.11.0
-conda install snakemake=8.30.0
-conda install dendropy=5
-pip install -e gtotree/
+conda install -c conda-forge -c bioconda tqdm=4.67.1 pyhmmer=0.11.0 snakemake=8.30.0 dendropy=5
+pip install -e .
 
 # example test
 rm -rf gtotree-output/ ; gtotree2 -a ncbi-accessions.txt -H Universal -j 4

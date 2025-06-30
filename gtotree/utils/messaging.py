@@ -272,7 +272,7 @@ def check_and_report_any_changed_default_behavior(args, run_data):
 
     if args.force_overwrite:
         if args.output_already_existed:
-            print(f"      - The `-F` flag was provided, so this output directory is being overwritten: \"{args.output_dir}\"")
+            print(f"      - Due to the `-F` flag, this output directory is being overwritten: \"{args.output_dir}\"")
 
     if args.output_dir != "gtotree-output" and not args.resume:
         print(f"      - The output directory has been set to: \"{args.output_dir}\"")
@@ -713,11 +713,14 @@ def summarize_results(args, run_data):
     SCG_hits_path = args.output_dir + "/SCG-hit-counts.tsv"
     print(f"    Summary table with hits per target-gene per genome written to:\n        {color_text(SCG_hits_path, 'green')}\n")
 
+    if run_data.target_pfams_file:
+        print(f"    Outputs from Pfam searching written to:\n        {color_text(run_data.pfam_results_dir_rel + "/", 'green')}\n")
+
     if run_data.target_kos_file:
         print(f"    Outputs from KO searching written to:\n        {color_text(run_data.ko_results_dir_rel + "/", 'green')}\n")
 
-    partitions_file = args.output_dir + "/run-files/partitions.txt"
-    print(f"    Partitions file (for downstream use with mixed-model treeing) written to:\n        {color_text(partitions_file, 'green')}")
+    partitions_files = f"{args.output_dir}/run-files/partitions.txt\n        {args.output_dir}/run-files/partitions.nex"
+    print(f"    Partitions files (for downstream use with mixed-model treeing) written to:\n        {color_text(partitions_files, 'green')}")
 
     add_border()
 

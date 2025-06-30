@@ -30,7 +30,7 @@ def main(args = None):
     run_data = preprocess_genomes(args, run_data)
 
     if run_data.target_pfams_file:
-        run_data = search_pfams(run_data)
+        run_data = search_pfams(args, run_data)
 
     if run_data.target_kos_file:
         run_data = search_kos(args, run_data)
