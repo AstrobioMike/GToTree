@@ -505,11 +505,11 @@ def check_stored_gtdb_up_to_date(location):
 
     # getting latest version info from GTDB
     # gtdb changed from using VERSION to using VERSION.txt at some point, so putting in a try/except to shoot for both in case it's doing a version comparison
-    if args.ecogenomics:
+    if args.use_ecogenomics:
         gtdb_version_link = "https://data.gtdb.ecogenomic.org/releases/latest/VERSION"
     else:
         gtdb_version_link = "https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/VERSION"
-    
+
     try:
         gtdb_version_info = urllib.request.urlretrieve(f"{gtdb_version_link}.txt", location + "GTDB-latest-version-info.txt")
     except:
