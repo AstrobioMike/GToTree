@@ -49,7 +49,7 @@
             # tarball.extractall(path=location, filter=lambda ti: ti)
 
 
-    # do i need output message summary noting pfam/ko results location if done? (probably)
+    # create new SCG-sets for all main phyla (and proteos) of gtdb (and archaea/bacteria)
 
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
@@ -113,7 +113,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
     # gtt-gen-SCG-HMMs
     # gtt-get-GTDB-accessions
     # gtt-subset...
-    # new prepackaged HMMs based on GTDB taxonomy (originals still available)
+    # new prepackaged HMMs based on GTDB taxonomy (originals, based on NCBI, still available)
     # in tandem scanning of target KOs or pfams, files for added vizualization in iToL
     # pre-built HMMs stored remotely and downloaded when used, to slim package size and install time
     # partitions.txt file produced suitable for mixed-model treeing like with iqtree
