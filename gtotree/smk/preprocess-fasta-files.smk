@@ -1,4 +1,5 @@
 import os
+import json
 from gtotree.utils.general import (read_run_data,
                                    write_run_data,
                                    gunzip_if_needed)
@@ -14,36 +15,47 @@ fasta_basenames = list(fasta_dict.keys())
 
 rule all:
     input:
-        expand(f"{run_data.fasta_processing_dir}/{{fasta_file}}.done", fasta_file=fasta_basenames)
+        expand(f"{run_data.fasta_processing_dir}/{{fasta_file}}.json", fasta_file=fasta_basenames)
     run:
         for fasta_basename in fasta_basenames:
             fasta = fasta_dict[fasta_basename]
             path = fasta.full_path
-            status_path = f"{run_data.fasta_processing_dir}/{fasta_basename}.done"
+            status_path = f"{run_data.fasta_processing_dir}/{fasta_basename}.json"
 
-            with open(status_path, 'r') as f:
-                for line in f:
-                    fasta_file, status, was_gzipped, final_AA_path, num_genes, final_nt_path = line.strip().split('\t')
+            if not os.path.exists(status_path):
+                raise FileNotFoundError(f"Expected status file not found: {status_path}")
 
-                    fasta.num_genes = int(num_genes)
+            with open(status_path, 'r') as fh:
+                data = json.load(fh)
 
-                    if int(status):
-                        if int(was_gzipped):
-                            fasta.mark_was_gzipped()
-                        fasta.mark_preprocessing_done()
-                        fasta.final_AA_path = final_AA_path
-                        fasta.final_nt_path = final_nt_path
-                    else:
-                        fasta.mark_removed("fasta-file processing failed")
-                        fasta.preprocessing_failed = True
+            done = bool(data.get('done', False))
+            was_gzipped = bool(data.get('was_gzipped', False))
+            prodigal_used = bool(data.get('prodigal_used', False))
+            final_AA_path = data.get('final_AA_path')
+            final_nt_path = data.get('final_nt_path')
+            num_genes = int(data.get('num_genes', 0) or 0)
 
-        run_data.tools_used.prodigal_used = True
+            fasta.num_genes = num_genes
+
+            if done:
+                if was_gzipped:
+                    fasta.mark_was_gzipped()
+                fasta.mark_preprocessing_done()
+                fasta.final_AA_path = final_AA_path
+                fasta.final_nt_path = final_nt_path
+            else:
+                fasta.mark_removed("fasta-file processing failed")
+                fasta.preprocessing_failed = True
+
+            if prodigal_used:
+                run_data.tools_used.prodigal_used = True
+
         write_run_data(run_data)
 
 
 rule process_fasta_files:
     output:
-        f"{run_data.fasta_processing_dir}/{{fasta_file}}.done"
+        f"{run_data.fasta_processing_dir}/{{fasta_file}}.json"
     run:
         fasta = fasta_dict[wildcards.fasta_file]
         path, was_gzipped = gunzip_if_needed(fasta.full_path)
@@ -56,10 +68,23 @@ rule process_fasta_files:
         if done:
             done, final_AA_path, num_genes, final_nt_path = filter_and_rename_fasta(fasta.id, run_data, run_data.fasta_processing_dir)
         else:
-            print(f"\n\nIn ELSE\n\n")
             final_AA_path = None
             final_nt_path = None
             num_genes = 0
 
-        with open(output[0], 'w') as f:
-            f.write(f'{wildcards.fasta_file}\t{int(done)}\t{int(was_gzipped)}\t{final_AA_path}\t{num_genes}\t{final_nt_path}\n')
+        out_obj = {
+            "input": wildcards.fasta_file,
+            "done": bool(done),
+            "was_gzipped": bool(was_gzipped),
+            "prodigal_used": bool(done),
+            "final_AA_path": final_AA_path,
+            "num_genes": int(num_genes or 0),
+            "final_nt_path": final_nt_path,
+        }
+
+        tmp_path = output[0] + ".tmp"
+        with open(tmp_path, 'w') as fh:
+            json.dump(out_obj, fh, indent=2, sort_keys=True)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, output[0])

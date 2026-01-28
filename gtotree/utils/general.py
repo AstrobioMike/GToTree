@@ -198,8 +198,8 @@ class RunData:
 
     start_time: str = None
     ncbi_sub_table_path: str = ""
-    ncbi_downloads_dir: str = ""
-    ncbi_downloads_dir_rel: str = ""
+    ncbi_processing_dir: str = ""
+    ncbi_processing_dir_rel: str = ""
     genbank_processing_dir: str = ""
     fasta_processing_dir: str = ""
     AA_processing_dir: str = ""

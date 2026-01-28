@@ -23,7 +23,7 @@
         # so like it won't automatically try to grab new ncbi/gtdb/KOFamScan data if older than X weeks like i have set in places
 
 
-    # modularize and reduce code redundancy in my user-side standalone scripts like: 
+    # modularize and reduce code redundancy in my user-side standalone scripts like:
         # gtt-get-accessions-from-GTDB
         # gtt-gen-SCG-set
         # gtt-pfam-search
@@ -44,7 +44,7 @@
     # wherever I have this:
         # with tarfile.open(taxdump_path) as tarball:
             # tarball.extractall(location)
-    # do this to get rid of warning message: 
+    # do this to get rid of warning message:
         # with tarfile.open(tarball_path) as tarball:
             # tarball.extractall(path=location, filter=lambda ti: ti)
 
@@ -82,18 +82,23 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
         # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree; if it rarely if ever changes)
             # looks like it does update regularly, i might just have to catch and report when this download fails and say it might be because it's only available via ftp
 
+# still need to implement nucleotide mode?
+
+# if it's a re-run, and a genome was dropped later due to, e.g., not enough hit targets, the preprocessing summary is misleading as it says the genome was dropped earlier
+
 
 ### CHANGES ###
 
 # default output changed to "gtotree-output"
 # default lineage settings are D,P,C,S (no longer strain)
-# http is used instead of ftp always where available (used to be ftp by default with http option)
+# http is used instead of ftp always where available (used to be ftp by default with an http option)
 # several output files and dirs had underscores changed to dashes (sorry, i now hate underscores when they're not necessary)
 # estimated percent completion and redundancy are no long provided
     # (this was always just "free" info, but checkm2 is a much better way to do this, so i made the decision to stop providing it at all)
-# --resume flag added (will be set automatically if the same output dir but no `-F` flag provided)
+# --resume flag added to attempt to continue interrupted runs
+    # this will be set automatically if the same output dir but no `-F` flag provided
 # taxids are no longer searched for in input genbank files, they will only be found/used for provided input ncbi-accessions
-    # if this is actually a feature that benefitted anyone, i'll add it back in upon request :)
+    # due to the nature of genbank files, this was always a little messy and hacky. If this is actually a feature that benefitted anyone, i'll try adding it back in upon request :)
 # the order of processing changed slightly from v1 to v2, so the output report messages vary a little
     # in v1, each genome was downloaded/parsed and scanned for the target genes in one pass
     # in v2, all input genomes are prepared for each input source, then all are searched together
@@ -121,10 +126,10 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 ### """
 # In its first 6 years, the original GToTree received over 500 citations and has been
-# successfully continually maintained over this time despite its foundation being a main runner 
-# of ~4,000 lines of BASH and dozens of independent python and BASH helper scripts with a lot 
-# of redundancy in its code base. Among several other improvements and feature additions, GToTree 
-# has now been rewritten from the ground up in python with its major stages being powered by 
+# successfully continually maintained over this time despite its foundation being a main runner
+# of ~4,000 lines of BASH and dozens of independent python and BASH helper scripts with a lot
+# of redundancy in its code base. Among several other improvements and feature additions, GToTree
+# has now been rewritten from the ground up in python with its major stages being powered by
 # Snakemake workflows - enabling the resuming of failed or interrupted runs. This paper highlights
 # some of the new additions to GToTree since its initial launch.
 ### """

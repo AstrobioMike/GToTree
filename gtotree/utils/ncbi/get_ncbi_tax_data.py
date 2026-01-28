@@ -39,17 +39,26 @@ def check_tax_location_var_is_set():
 
 def check_if_data_present(location):
 
+    # seeing if present already
+    # if this function returns True, then data is present
+    # if it returns False, then we need to download things
+
     names_path = os.path.join(location, "names.dmp")
     nodes_path = os.path.join(location, "nodes.dmp")
 
-    if not os.path.isfile(names_path) or not os.path.isfile(nodes_path):
-        if os.path.exists(names_path):
-            os.remove(names_path)
-        if os.path.exists(nodes_path):
-            os.remove(nodes_path)
+    def is_nonempty_file(p):
+        return os.path.isfile(p) and os.path.getsize(p) > 0
+
+    # require both files to exist and be non-empty
+    if not (is_nonempty_file(names_path) and is_nonempty_file(nodes_path)):
+
+        # clean up any partial or empty files so the helper can redownload cleanly
+        for p in (names_path, nodes_path):
+            if os.path.exists(p):
+                if os.path.isfile(p):
+                    os.remove(p)
         return False
     return True
-
 
 def download_ncbi_tax_data(location):
 

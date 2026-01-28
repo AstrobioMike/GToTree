@@ -1,4 +1,5 @@
 import os
+import json
 from gtotree.utils.general import (read_run_data,
                                    write_run_data,
                                    gunzip_if_needed)
@@ -16,44 +17,58 @@ genbank_basenames = list(genbank_dict.keys())
 
 rule all:
     input:
-        expand(f"{run_data.genbank_processing_dir}/{{gb_file}}.done", gb_file=genbank_basenames)
+        expand(f"{run_data.genbank_processing_dir}/{{gb_file}}.json", gb_file=genbank_basenames)
     run:
         for gb_basename in genbank_basenames:
             gb = genbank_dict[gb_basename]
             path = gb.full_path
-            status_path = f"{run_data.genbank_processing_dir}/{gb_basename}.done"
-            with open(status_path, 'r') as f:
-                for line in f:
-                    gb_file, status, prodigal_used, was_gzipped, final_AA_path, num_genes, final_nt_path = line.strip().split('\t')
+            status_path = f"{run_data.genbank_processing_dir}/{gb_basename}.json"
 
-                    gb.num_genes = int(num_genes)
+            if not os.path.exists(status_path):
+                raise FileNotFoundError(f"Expected status file not found: {status_path}")
 
-                    if int(status):
-                        if int(was_gzipped):
-                            gb.mark_was_gzipped()
-                        gb.mark_preprocessing_done()
-                        gb.final_AA_path = final_AA_path
-                        bg.final_nt_path = final_nt_path
-                    else:
-                        gb.mark_removed("genbank-file processing failed")
-                        gb.preprocessing_failed = True
+            with open(status_path, 'r') as fh:
+                data = json.load(fh)
 
-                    if int(prodigal_used):
-                        gb.mark_prodigal_used()
-                        run_data.tools_used.prodigal_used = True
+            done = bool(data.get('done', False))
+            prodigal_used = bool(data.get('prodigal_used', False))
+            was_gzipped = bool(data.get('was_gzipped', False))
+            final_AA_path = data.get('final_AA_path')
+            final_nt_path = data.get('final_nt_path')
+            num_genes = int(data.get('num_genes', 0) or 0)
+
+            gb.num_genes = num_genes
+
+            if done:
+                if was_gzipped:
+                    gb.mark_was_gzipped()
+                gb.mark_preprocessing_done()
+                gb.final_AA_path = final_AA_path
+                gb.final_nt_path = final_nt_path
+            else:
+                gb.mark_removed("genbank-file processing failed")
+                gb.preprocessing_failed = True
+
+            if prodigal_used:
+                gb.mark_prodigal_used()
+                run_data.tools_used.prodigal_used = True
 
         write_run_data(run_data)
 
 
 rule process_genbank_files:
     output:
-        f"{run_data.genbank_processing_dir}/{{gb_file}}.done"
+        f"{run_data.genbank_processing_dir}/{{gb_file}}.json"
     run:
         gb = genbank_dict[wildcards.gb_file]
         path, was_gzipped = gunzip_if_needed(gb.full_path)
 
-        done, final_AA_path, num_genes = extract_filter_and_rename_cds_amino_acids_from_gb(gb.id, path, run_data)
+        prodigal_used = False
+        final_nt_path = None
+        final_AA_path = None
+        num_genes = 0
 
+        done, final_AA_path, num_genes = extract_filter_and_rename_cds_amino_acids_from_gb(gb.id, path, run_data)
 
         if not done:
             extract_fasta_from_gb(gb.id, path, run_data)
@@ -69,5 +84,19 @@ rule process_genbank_files:
         if was_gzipped:
             os.remove(path)
 
-        with open(output[0], 'w') as f:
-            f.write(f'{wildcards.gb_file}\t{int(done)}\t{int(prodigal_used)}\t{int(was_gzipped)}\t{final_AA_path}\t{num_genes}\t{final_nt_path}\n')
+        out_obj = {
+            "input": wildcards.gb_file,
+            "done": bool(done),
+            "prodigal_used": prodigal_used,
+            "was_gzipped": bool(was_gzipped),
+            "final_AA_path": final_AA_path,
+            "num_genes": int(num_genes or 0),
+            "final_nt_path": final_nt_path,
+        }
+
+        tmp_path = output[0] + ".tmp"
+        with open(tmp_path, 'w') as fh:
+            json.dump(out_obj, fh, indent=2, sort_keys=True)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, output[0])

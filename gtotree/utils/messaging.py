@@ -218,7 +218,9 @@ def copy_log_function(run_data):
 
 
 @capture_stdout_to_log(lambda: log_file_var.get())
-def add_border():
+def add_border(extra_line=True):
+    if extra_line:
+        print()
     print("\n -------------------------------------------------------------------------------- ")
 
 @capture_stdout_to_log(lambda: log_file_var.get())
@@ -430,7 +432,7 @@ def report_processing_stage(stage, run_data):
         bumper = "#" * 8
         inner_width = width - 2 * len(bumper)
         print()
-        print(f"{border}")
+        print(f"\n{border}")
         print(f"{border}")
         print(f"{bumper}{color_text(f"{desc.center(inner_width)}", "green")}{bumper}")
         print(f"{border}")
@@ -441,7 +443,7 @@ def report_processing_stage(stage, run_data):
         border = "#" * width
         inner_width = width - 2 * len("####")
         print()
-        print(f"  {border}")
+        print(f"\n  {border}")
         print(f"  ####{desc.center(inner_width)}####")
         print(f"  {border}")
         report_time_status(run_data.start_time)
@@ -722,7 +724,7 @@ def summarize_results(args, run_data):
     partitions_files = f"{args.output_dir}/run-files/partitions.txt\n        {args.output_dir}/run-files/partitions.nex"
     print(f"    Partitions files (for downstream use with mixed-model treeing) written to:\n        {color_text(partitions_files, 'green')}")
 
-    add_border()
+    add_border(extra_line=False)
 
     if num_remaining_genomes < num_initial_genomes:
         print(f"\n  Notes:\n")
@@ -761,18 +763,18 @@ def summarize_results(args, run_data):
 
         print(f"\n    Reported along with additional informative files in:\n        {color_text(f"{run_data.run_files_dir_rel}/", 'green')}")
 
-        add_border()
+        add_border(extra_line=False)
 
     run_log_relative_path = run_data.output_dir_rel + "/gtotree-runlog.txt"
     print(f"\n  Log file written to:\n      {color_text(run_log_relative_path, 'green')}")
 
-    add_border()
+    add_border(extra_line=False)
 
     citations_relative_path = args.output_dir + "/citations.txt"
     print(f"\n  {color_text("Programs used and their citations have been written to:", 'yellow')}")
     print(f"      {color_text(citations_relative_path, 'green')}")
 
-    add_border()
+    add_border(extra_line=False)
 
     report_final_time_status(run_data.start_time)
 

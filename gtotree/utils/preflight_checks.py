@@ -519,11 +519,11 @@ def final_setups(args, run_data):
     os.makedirs(run_data.gtotree_logs_dir, exist_ok=True)
 
     if args.ncbi_accessions:
-        ncbi_downloads_dir_rel = os.path.join(args.tmp_dir, "ncbi-downloads")
-        ncbi_downloads_dir = os.path.abspath(ncbi_downloads_dir_rel)
-        os.makedirs(ncbi_downloads_dir, exist_ok=True)
-        run_data.ncbi_downloads_dir_rel = ncbi_downloads_dir_rel
-        run_data.ncbi_downloads_dir = ncbi_downloads_dir
+        ncbi_processing_dir_rel = os.path.join(args.tmp_dir, "ncbi-acc-processing")
+        ncbi_processing_dir = os.path.abspath(ncbi_processing_dir_rel)
+        os.makedirs(ncbi_processing_dir, exist_ok=True)
+        run_data.ncbi_processing_dir_rel = ncbi_processing_dir_rel
+        run_data.ncbi_processing_dir = ncbi_processing_dir
 
     if args.genbank_files:
         genbank_processing_dir = os.path.join(args.tmp_dir, "genbank-processing")

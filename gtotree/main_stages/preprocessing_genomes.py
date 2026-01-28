@@ -66,7 +66,7 @@ def prepare_accession(acc, run_data):
         if run_data.nucleotide_mode:
             raise Exception
         amino_acid_link = base_link + acc_assembly_str + "_protein.faa.gz"
-        amino_acid_filepath = run_data.ncbi_downloads_dir + "/" + acc + "_protein.faa"
+        amino_acid_filepath = run_data.ncbi_processing_dir + "/" + acc + "_protein.faa"
         download_and_unzip_accession(amino_acid_link, amino_acid_filepath)
         done = True
         nt = False
@@ -74,7 +74,7 @@ def prepare_accession(acc, run_data):
         # then trying nucleotides
         try:
             nucleotide_link = base_link + acc_assembly_str + "_genomic.fna.gz"
-            nucleotide_file = run_data.ncbi_downloads_dir + "/" + acc + "_genomic.fna"
+            nucleotide_file = run_data.ncbi_processing_dir + "/" + acc + "_genomic.fna"
             download_and_unzip_accession(nucleotide_link, nucleotide_file)
             done = True
             nt = True
@@ -220,12 +220,13 @@ def run_prodigal(id, run_data, full_inpath = None, group = None):
         raise ValueError(f"Invalid group: {group}. Must be one of {', '.join(allowed_groups)}")
 
     if group == "ncbi":
-        in_path = f"{run_data.ncbi_downloads_dir}/{id}_genomic.fna"
-        out_AA_path = f"{run_data.ncbi_downloads_dir}/{id}_protein.faa"
-        out_nt_path = f"{run_data.ncbi_downloads_dir}/{id}_cds.fasta"
+        in_path = f"{run_data.ncbi_processing_dir}/{id}_genomic.fna"
+        out_AA_path = f"{run_data.ncbi_processing_dir}/{id}_protein.faa"
+        out_nt_path = f"{run_data.ncbi_processing_dir}/{id}_cds.fasta"
     elif group == "genbank":
         in_path = f"{run_data.genbank_processing_dir}/{id}.fasta"
         out_AA_path = f"{run_data.genbank_processing_dir}/{id}_protein.faa"
+        out_nt_path = f"{run_data.genbank_processing_dir}/{id}_cds.fasta"
     elif group == "fasta":
         in_path = full_inpath
         out_AA_path = f"{run_data.fasta_processing_dir}/{id}_protein.faa"
@@ -256,8 +257,12 @@ def run_prodigal(id, run_data, full_inpath = None, group = None):
     except:
         done = False
 
-    if os.path.getsize(out_AA_path) == 0:
-        os.remove(out_AA_path)
+    # be defensive: if the output file doesn't exist or is empty, mark as not done
+    if not os.path.exists(out_AA_path):
         done = False
+    else:
+        if os.path.getsize(out_AA_path) == 0:
+            os.remove(out_AA_path)
+            done = False
 
     return done
