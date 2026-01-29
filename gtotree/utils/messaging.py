@@ -11,29 +11,42 @@ from gtotree.utils.context import log_file_var
 
 tty_colors = {
     'green' : '\033[0;32m%s\033[0m',
-    'yellow' : '\033[0;33m%s\033[0m',
-    'red' : '\033[0;31m%s\033[0m'
+    'orange': '\033[38;5;208m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m',
+    'teal' : '\033[0;36m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m'
 }
+
+color_codes = {
+    'green': '32',
+    'yellow': '33',
+    'red': '31',
+    'teal': '36',
+    'orange': '38;5;208'
+}
+
+
+def color_text(text, color = 'green', bold = False):
+    if not sys.stdout.isatty():
+        return text
+
+    code = color_codes.get(color, color_codes['green'])
+    prefix = f"\033[1;{code}m" if bold else f"\033[0;{code}m"
+
+    return f"{prefix}{text}\033[0m"
 
 
 def gtotree_header():
     header = f"""
 
-                                   GToTree v{version('GToTree')}
-                         (github.com/AstrobioMike/GToTree)
+                                   {color_text(f"GToTree v{version('GToTree')}", "green")}
+                          github.com/AstrobioMike/GToTree
     """
     return header
 
 
 def get_version():
     return version('GToTree')
-
-
-def color_text(text, color = 'green'):
-    if sys.stdout.isatty():
-        return tty_colors[color] % text
-    else:
-        return text
 
 
 def wprint(text, width = 80, ii = "  ", si = "  "):
@@ -121,16 +134,30 @@ def report_missing_input_genomes_file(path, flag):
     report_early_exit(None, copy_log = False)
 
 
+def print_suggest_help():
+    print("\n  See `GToTree -h` for more info.")
+
 @capture_stdout_to_log(lambda: log_file_var.get())
 def report_early_exit(run_data, message = None, color = "red", suggest_help = False, copy_log = True):
     if message:
         print("")
         wprint(color_text(message, color))
     if suggest_help:
-        print("\n  See `GToTree -h` for more info.")
+        print_suggest_help()
     print("\nExiting for now :(\n")
     if copy_log:
         copy_log_function(run_data)
+    sys.exit(1)
+
+
+def report_very_early_exit(message = None, color = "red", suggest_help = False):
+    print("")
+    if message:
+        print("")
+        wprint(color_text(message, color))
+    if suggest_help:
+        print_suggest_help()
+    print("\nExiting for now :(\n")
     sys.exit(1)
 
 
@@ -635,7 +662,7 @@ def report_genome_filtering_update(run_data):
             message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few unique SCG hits", "yellow")}, reported in:\n")
         else:
             message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few SCG hits", "yellow")}, reported in:\n")
-        message += (f"        {run_data.run_files_dir_rel}/genomes-removed-for-too-few-SCG-hits.txt\n\n")
+        message += (f"        {run_data.run_files_dir_rel}/genomes-removed-for-too-few-SCG-hits.tsv\n\n")
 
         if not run_data.best_hit_mode:
             message += (f"    If this is a problem for the genomes you're working with, you could\n")

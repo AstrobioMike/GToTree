@@ -51,6 +51,8 @@ rule all:
                     acc_gd.mark_removed("acc download failed")
 
             acc_gd.prodigal_used = prodigal_used
+            if prodigal_used:
+                run_data.tools_used.prodigal_used = True
 
         write_run_data(run_data)
 

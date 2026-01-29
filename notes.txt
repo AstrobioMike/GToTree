@@ -1,5 +1,25 @@
-## next:
+### TO DO STILL ###
 
+    # currently not dropping genomes after filtering SCG h its by length
+        # meaning a genome may have less than the -G cutoff after removing hits
+        # this needs to be fixed
+
+        # accs to reproduce with Universal HMM targets:
+            # GCA_902755425.1
+            # GCA_902785715.1
+            # GCA_902777105.1
+            # GCA_902765875.1
+            # GCA_016291275.1 (this one causes the above issue currently)
+
+    # update noting at end to better match initial gtotree notes, e.g.:
+            # 2 gene(s) either had no hits or only multiple hits in each genome.
+            # 3 gene(s) had no hits after filtering by length.
+
+        # same test accs above can be used to work on this
+
+
+
+    # implement removing temp dir after run if debug mode isn't set
 
     # still need to implement iToL-file generation for both pfam and ko searching results
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
@@ -8,15 +28,16 @@
         # make a helper function that does this, and it will take just the path to the table and if it's for KOs or PFams
             # if they have different formats it'd need a KO or PFam designation. If they are the same format, maybe not
 
-
     # go through general.py GenomeData and RunData classes and see which methods i put in that i'm not using anywhere anymore
 
 
     # incorporate latest changes from master GToTree
-        # GTDB download needs no-cert-check added and flag for --use-ecogenomics
+        # e.g., GTDB download needs no-cert-check added and flag for --use-ecogenomics
+        # check for others...
 
 
     # package conda recipe with repo like i did for bit
+        # i'm not sure how this will need to impact the bioconda setup/recipe...
 
 
     # add a flag to stop auto-update-db checks by date
@@ -24,7 +45,7 @@
 
 
     # modularize and reduce code redundancy in my user-side standalone scripts like:
-        # gtt-get-accessions-from-GTDB
+        # gtt-get-accessions-from-GTDB (use what we can from utils/gtdb/get_gtdb_data.py)
         # gtt-gen-SCG-set
         # gtt-pfam-search
 
@@ -35,7 +56,7 @@
     # modularize and reduce code redundancy in any of my helper scripts still remaining
 
 
-    # fix entry points/console scripts as needed in setup.py
+    # fix entry points/console scripts as needed in setup.py or pyproject.toml if dumping setup.py
 
 
     # unit tests..... :( :( :(
@@ -50,6 +71,23 @@
 
 
     # create new SCG-sets for all main phyla (and proteos) of gtdb (and archaea/bacteria)
+
+
+    # switch to only using http when available
+        # affects:
+            # get_ncbi_assembly_tables.py (DONE)
+            # ncbi assembly downloads (DONE)
+            # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree; if it rarely if ever changes)
+                # looks like it does update regularly, i might just have to catch and report when this download fails and say it might be because it's only available via ftp
+
+    # still need to implement nucleotide mode?
+
+    # if it's a re-run, and a genome was dropped later due to, e.g., not enough hit targets, the preprocessing summary is misleading as it says the genome was dropped earlier
+
+    # add a flag when all is done, so when resume is tried, it says nothing to do
+
+
+
 
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
@@ -75,28 +113,29 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 ### TO DO ###
 
-# switch to only using http when available
-    # affects:
-        # get_ncbi_assembly_tables.py (DONE)
-        # ncbi assembly downloads (DONE)
-        # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree; if it rarely if ever changes)
-            # looks like it does update regularly, i might just have to catch and report when this download fails and say it might be because it's only available via ftp
 
-# still need to implement nucleotide mode?
+### ADDED ###
 
-# if it's a re-run, and a genome was dropped later due to, e.g., not enough hit targets, the preprocessing summary is misleading as it says the genome was dropped earlier
+# added a gene-represenation cutoff (-g parameter)
+    # this is the minimum proportion of genomes required to have hits to a target gene for that gene to be retained for downstream processing
+    # e.g., with 100 input genomes and a -g of 0.2, any target gene that has hits in less than 20 genomes will be filtered out
 
+### CHANGED ###
 
-### CHANGES ###
-
+# when calculating percent of target genes required to be found (-X parameter)
+    # now it uses the amount remaining after filtering out target genes with too few genomes having hits as the denominator
+    # previously it used the starting total as the denominator
+        # example: if starting with 100 target genes, and 20 are filtered out for having hits in too few genomes, then the percent required is based on 80 target genes now rather than 100
+# default number of jobs set to 4 instead of 1 (-j parameter)
 # default output changed to "gtotree-output"
 # default lineage settings are D,P,C,S (no longer strain)
+# printed output has more progress bars and fewer text printouts
+# better logging of many steps
 # http is used instead of ftp always where available (used to be ftp by default with an http option)
-# several output files and dirs had underscores changed to dashes (sorry, i now hate underscores when they're not necessary)
+# output files and dirs that had underscores have had them replaced with dashes (sorry, i now hate underscores when they're not necessary)
 # estimated percent completion and redundancy are no long provided
     # (this was always just "free" info, but checkm2 is a much better way to do this, so i made the decision to stop providing it at all)
 # --resume flag added to attempt to continue interrupted runs
-    # this will be set automatically if the same output dir but no `-F` flag provided
 # taxids are no longer searched for in input genbank files, they will only be found/used for provided input ncbi-accessions
     # due to the nature of genbank files, this was always a little messy and hacky. If this is actually a feature that benefitted anyone, i'll try adding it back in upon request :)
 # the order of processing changed slightly from v1 to v2, so the output report messages vary a little
@@ -105,6 +144,7 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 # there are no longer separate summary tables for each input-genome source (accessions, fasta files, genbank files, and amino-acid files)
     # they are all represented in the primary "genomes-summary-info.tsv" table, which includes a "source" column
 
+## Fixes
 ### PLACES TO DEF IMPROVE ###
 
 

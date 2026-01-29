@@ -97,6 +97,7 @@ def get_base_link(acc, run_data):
     df = pd.read_csv(run_data.tmp_dir + "/ncbi-accessions-info.tsv", sep="\t",
                      usecols=["input_accession", "http_base_link"])
     base_link = df.loc[df['input_accession'] == acc, 'http_base_link'].values[0]
+    base_link = base_link.replace(" ", "_")
     acc_assembly_str = base_link.split("/")[-2]
     return base_link, acc_assembly_str
 

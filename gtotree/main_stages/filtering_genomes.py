@@ -19,12 +19,15 @@ def filter_genomes(args, run_data):
 
         genomes = run_data.get_all_input_genomes_for_filtering()
         num_remaining_SCG_targets = len([SCG.id for SCG in run_data.get_all_SCG_targets_remaining()])
-        min_num_SCG_hits = round(num_remaining_SCG_targets * args.genome_hits_cutoff)
+        # not using round() to avoid banker's rounding, and already checked up front these will always be positive
+        min_num_SCG_hits = int(num_remaining_SCG_targets * args.genome_hits_cutoff + 0.5)
 
-        if not args.best_hit_mode:
-            genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_unique_SCG_hits < min_num_SCG_hits]
-        else:
-            genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_SCG_hits < min_num_SCG_hits]
+        genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_SCG_hits_after_filtering < min_num_SCG_hits]
+
+        # if not args.best_hit_mode:
+        #     genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_unique_SCG_hits < min_num_SCG_hits]
+        # else:
+        #     genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_SCG_hits < min_num_SCG_hits]
 
         for genome in genomes:
             if genome.id in genome_ids_to_filter_out:
@@ -48,7 +51,18 @@ def filter_genomes(args, run_data):
 
 
 def capture_removed_genomes(run_data):
-    if len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering()) > 0:
-        with open(run_data.run_files_dir + "/genomes-removed-for-too-few-SCG-hits.txt", "w") as fail_file:
-            for genome in run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering():
-                fail_file.write(genome.id + "\n")
+
+    removed = run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering()
+
+    if len(removed) > 0:
+
+        out_path = run_data.run_files_dir + "/genomes-removed-for-too-few-SCG-hits.tsv"
+
+        with open(out_path, "w") as fail_file:
+
+            fail_file.write("assembly_id\ttotal_SCG_hits\tunique_SCG_hits\tnum_SCG_hits_after_filtering\n")
+            for genome in removed:
+                total_hits = getattr(genome, 'num_SCG_hits', 0) or 0
+                unique_hits = getattr(genome, 'num_unique_SCG_hits', 0) or 0
+                hits_after = getattr(genome, 'num_SCG_hits_after_filtering', 0) or 0
+                fail_file.write(f"{genome.id}\t{int(total_hits)}\t{int(unique_hits)}\t{int(hits_after)}\n")

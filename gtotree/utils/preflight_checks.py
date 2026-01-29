@@ -9,7 +9,7 @@ import json
 import hashlib
 from gtotree.utils.messaging import (color_text,
                                      report_message,
-                                     report_early_exit,
+                                     report_very_early_exit,
                                      report_missing_input_genomes_file,
                                      report_missing_pfam_targets_file,
                                      report_missing_ko_targets_file,
@@ -20,8 +20,7 @@ from gtotree.utils.messaging import (color_text,
                                      few_genomes_notice,
                                      absurd_number_of_genomes_notice,
                                      gtotree_header,
-                                     stdout_and_log
-                                     )
+                                     stdout_and_log)
 from gtotree.utils.hmms.scg_hmm_setup import check_hmm_file
 from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_data
 from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
@@ -63,14 +62,17 @@ def program_check(cmd, essential = False):
     path = shutil.which(cmd)
     if not path:
         if essential:
-            report_early_exit(None, message = f"{cmd} is an essential dependency, but it's not in your PATH :(", copy_log = False)
+            report_message(f"{cmd} is an essential dependency, but it's not in your PATH :(")
+            report_very_early_exit(None, color = "yellow")
         else:
-            report_early_exit(None, message = f"You specified to use {cmd}, but it's not in your PATH :(", copy_log = False)
+            report_message(f"You specified to use {cmd}, but it's not in your PATH :(", color = "yellow")
+            report_very_early_exit(None, color = "yellow")
 
 
 def primary_args_validation(args):
     check_for_minimum_args(args)
     check_optional_deps(args)
+    check_set_values(args)
     check_lineage(args)
     check_tree_program(args)
     checks_for_nucleotide_mode(args)
@@ -83,16 +85,39 @@ def primary_args_validation(args):
 def check_for_minimum_args(args):
     if not args.ncbi_accessions and not args.genbank_files and not args.fasta_files and not args.amino_acid_files:
         report_message("You need to provide at least one input-genome source!")
-        report_early_exit(None, suggest_help=True, copy_log = False)
+        report_very_early_exit(suggest_help=True)
     if not args.hmm:
         report_message("You need to specify the HMM file of the target-SCGs you want to tree! "
                        "You can view the available gene-sets packaged with GToTree by running `gtt-hmms`.")
-        report_early_exit(None, suggest_help=True, copy_log = False)
+        report_very_early_exit(suggest_help=True)
 
 
 def check_optional_deps(args):
     if args.add_ncbi_tax:
         program_check("taxonkit")
+
+
+def check_set_values(args):
+
+    if args.seq_length_cutoff < 0 or args.seq_length_cutoff > 1:
+        report_message("The sequence-length-cutoff value (passed to `-c`) must be between 0 and 1 (inclusive).")
+        report_very_early_exit()
+
+    if args.genome_hits_cutoff < 0 or args.genome_hits_cutoff > 1:
+        report_message("The genome-hits-cutoff value (passed to `-G`) must be between 0 and 1 (inclusive).")
+        report_very_early_exit()
+
+    if args.num_jobs < 1:
+        report_message("The number of jobs to run in parallel (passed to `-j`) must be at least 1.")
+        report_very_early_exit()
+
+    if args.num_hmm_cpus < 1:
+        report_message("The number of CPUs to use for HMM searches (passed to `-n`) must be at least 1.")
+        report_very_early_exit()
+
+    if args.num_muscle_threads < 1:
+        report_message("The number of threads to use for MUSCLE (passed to `-M`) must be at least 1.")
+        report_very_early_exit()
 
 
 def check_lineage(args):
@@ -102,26 +127,26 @@ def check_lineage(args):
     for rank in lineage_list:
         if rank.capitalize() not in accepted_ranks:
             report_message(f'You specified "{args.lineage}" to the `-L` argument, but "{rank}" is not an accepted taxonomic rank.')
-            print(f"\n  Accepted ranks are any combination of the below entered as a comma-delimited list:\n        {'\n        '.join(accepted_ranks)}")
-            report_early_exit(None, copy_log = False)
+            print(f"\n  Accepted ranks are any combination of the below entered as a comma-delimited list:\n\n        {'\n        '.join(accepted_ranks)}")
+            report_very_early_exit()
 
     if args.lineage != "Domain,Phylum,Class,Genus,Species" and not args.add_ncbi_tax and not args.add_gtdb_tax:
         report_message("You've specified a custom lineage (`-L`), but neither the "
                        "`-t` nor `-D` flags were provided to indicate which taxonomy to use.")
-        report_early_exit(None, suggest_help=True, copy_log = False)
+        report_very_early_exit(suggest_help=True)
 
     if args.add_ncbi_tax and args.add_gtdb_tax:
-        report_message("You've specified to use both the NCBI and GTDB taxonomies. "
+        report_message("You've specified add taxonomic info based on GTDB and NCBI taxonomies. "
                        "Please choose one or the other.")
-        report_early_exit(None, suggest_help=True, copy_log = False)
+        report_very_early_exit(suggest_help=True)
 
 
 def check_tree_program(args):
     accepted_programs = ["FastTree", "FastTreeMP", "VeryFastTree", "IQTREE"]
     if args.tree_program not in accepted_programs:
         report_message(f'You specified "{args.tree_program}" to the `-T` argument, but that\'s not an available treeing program.')
-        print(f"\n  Available programs are:\n        {'\n        '.join(accepted_programs)}")
-        report_early_exit(None, copy_log = False)
+        print(f"\n  Available treeing programs are:\n\n        {'\n        '.join(accepted_programs)}")
+        report_very_early_exit(suggest_help=True)
     program_check(args.tree_program)
 
 
@@ -131,12 +156,12 @@ def checks_for_nucleotide_mode(args):
             report_message("You've specified wanting to work with nucleotide sequences (by passing the `-z` parameter), "
                            "but also provided some input genomes as amino-acid files (passed to `-A`). We can't confidently reverse-translate "
                            "amino-acid seqs to nucleotide seqs, so we can't take both of those options.")
-            report_early_exit(None, copy_log = False)
+            report_very_early_exit(suggest_help=True)
         if args.genbank_files:
             report_message("You've specified wanting to work with nucleotide sequences (by passing the `-z` parameter), "
                            "but also provided some input genomes as genbank files (passed to `-g`). Input genbank files are currently "
                            "not supported with nucleotide mode.")
-            report_early_exit(None, copy_log = False)
+            report_very_early_exit(suggest_help=True)
 
 
 def check_input_files(args):
@@ -157,7 +182,7 @@ def check_input_files(args):
                                "but it looks like the current arguments don't match the intial run's arguments. "
                                "Your best bet may be to just start a completely fresh run by adding the `-F` flag to "
                                "force-overwrite the previous outputs.")
-                report_early_exit(None, copy_log = False)
+                report_very_early_exit()
 
     if "run_data" not in locals():
         run_data = populate_run_data(args)
@@ -200,7 +225,7 @@ def check_output_dir(args):
             report_message(f'The specified output directory "{args.output_dir}" already exists. '
                            'Please either remove it, provide the `-F` flag to overwrite it, or '
                            'provide the `-R` flag to attempt to resume a previous run.')
-            report_early_exit(None, copy_log = False)
+            report_very_early_exit()
 
         if args.force_overwrite:
             shutil.rmtree(args.output_dir)
@@ -252,12 +277,12 @@ def check_for_whitespace(path, flag):
     for line in lines:
         if " " in line:
             message = f'The specified input genomes file "{path}" (passed to `{flag}`) contains spaces in one or more entries. '
-            message += f'That is not expected and will break things. Please double-check things and remove any whitespace from the file.'
-            report_early_exit(None, suggest_help = True, copy_log = False)
+            message += f'That is not expected and will break stuff. Please double-check things and remove any whitespace from the file.'
+            report_very_early_exit(suggest_help = True)
         if "\t" in line:
             message = f'The specified input genomes file "{path}" (passed to `{flag}`) contains tabs in one or more entries. '
-            message += f'That is not expected and will break things. Please double-check things and remove any whitespace from the file.'
-            report_early_exit(None, suggest_help = True, copy_log = False)
+            message += f'That is not expected and will break stuff. Please double-check things and remove any whitespace from the file.'
+            report_very_early_exit(suggest_help = True)
 
 
 def check_line_endings(path, flag):
@@ -310,7 +335,7 @@ def check_inputs_exist(path, flag):
                 line = line.strip()
                 if not os.path.exists(line):
                     report_message(f'The specified input-genome file "{line}" (passed to `{flag}`) does not exist.')
-                    report_early_exit(None, copy_log = False)
+                    report_very_early_exit()
 
 
 def check_mapping_file(args, run_data, flag = "-m"):
@@ -365,18 +390,17 @@ def check_mapping_file_problem_chars_and_fields(path):
 
 
 def make_mapping_dict(path):
-    """
-    makes a dictionary mapping input genomes to the wanted labels
-    key = original-input-genome-label, value = wanted-label
 
-      1. Checks that every first-column entry is unique
-      2. Uses the first column as the key
-      3. If there are 2 columns, the value is the second column
-      4. If there are 3 columns and the second column is non-empty,
-         the value is "second-column_third-column" (joined with an underscore)
-      5. If there are 3 columns and the second column is empty,
-         the value is "first-column_third-column" (joined with an underscore)
-    """
+    # makes a dictionary mapping input genomes to the wanted labels
+    # key = original-input-genome-label, value = wanted-label
+
+    #   1. Checks that every first-column entry is unique
+    #   2. Uses the first column as the key
+    #   3. If there are 2 columns, the value is the second column
+    #   4. If there are 3 columns and the second column is non-empty,
+    #      the value is "second-column_third-column" (joined with an underscore)
+    #   5. If there are 3 columns and the second column is empty,
+    #      the value is "first-column_third-column" (joined with an underscore)
 
     df = pd.read_csv(path, sep="\t", header=None, dtype=str).fillna("")
 
@@ -386,7 +410,7 @@ def make_mapping_dict(path):
             f'The mapping file "{path}" (passed to `-m`) has some duplicate entries in the first column.'
             ' Please address that and try again.'
         )
-        report_early_exit(None, copy_log = False)
+        report_very_early_exit()
 
     mapping_dict = {}
     for idx, row in df.iterrows():
@@ -417,7 +441,7 @@ def make_mapping_dict(path):
         report_message(
             f'Each input genome must map to a unique label. Please address that and try again.'
         )
-        report_early_exit(None, copy_log = False)
+        report_very_early_exit()
 
     return mapping_dict
 
@@ -436,7 +460,7 @@ def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
         report_message(
             f"Each input genome in the mapping file (column 1) must be present in one of the input-genome sources. Please address this and try again."
         )
-        report_early_exit(None, copy_log = False)
+        report_very_early_exit()
 
 
 def check_for_required_dbs(args):
@@ -645,7 +669,7 @@ def setup_tmp_dir(args, run_data):
         except OSError:
             report_message(f"We could not create a temporary directory in the location you specified: {args.tmp_dir}")
             report_message("Maybe you don't have write permissions there?")
-            report_early_exit(None, copy_log = False)
+            report_very_early_exit()
     else:
         tmp_dir = tempfile.mkdtemp(prefix = "gtt-tmp-", dir = args.output_dir)
         args.tmp_dir = tmp_dir
