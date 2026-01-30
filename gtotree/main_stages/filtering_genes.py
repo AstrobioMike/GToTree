@@ -2,7 +2,8 @@ from gtotree.utils.general import (write_run_data,
                                    read_run_data,
                                    get_snakefile_path,
                                    run_snakemake)
-from gtotree.utils.messaging import report_processing_stage
+from gtotree.utils.messaging import (report_processing_stage,
+                                    report_SCG_set_filtering_update)
 from gtotree.utils.seqs import check_target_SCGs_have_seqs
 
 def filter_genes(args, run_data):
@@ -24,4 +25,35 @@ def filter_genes(args, run_data):
 
     run_data = check_target_SCGs_have_seqs(run_data, f"-gene-filtered{run_data.general_ext}")
 
+    total_genomes_remaining = len(run_data.get_all_input_genomes_for_filtering())
+    # not using round() to avoid banker's rounding, and already checked up front these will always be positive
+    min_genomes_required = int(total_genomes_remaining * args.gene_representation_cutoff + 0.5)
+
+    removed_any = False
+    for scg in run_data.get_all_SCG_targets_remaining():
+        count = getattr(scg, 'num_genomes_with_hits_after_len_filtering', 0)
+        if count < min_genomes_required:
+            scg.mark_removed(f"too few genomes with hits")
+            removed_any = True
+
+    if removed_any:
+        write_run_data(run_data)
+
+    write_out_removed_SCG_targets(run_data)
+
+    report_SCG_set_filtering_update(run_data)
+
     return run_data
+
+
+def write_out_removed_SCG_targets(run_data):
+
+    removed_scg_objs = [scg for scg in run_data.SCG_targets if getattr(scg, 'removed', False)]
+    if len(removed_scg_objs) > 0:
+        out_path = run_data.run_files_dir + "/target-SCGs-dropped-from-analysis.tsv"
+        with open(out_path, "w") as fail_file:
+            # header
+            fail_file.write("target_SCG\treason_removed\n")
+            for scg in removed_scg_objs:
+                reason = scg.reason_removed or ""
+                fail_file.write(f"{scg.id}\t{reason}\n")

@@ -58,8 +58,7 @@ rule search_kos:
         ko_search_failed = run_ko_search(run_data.target_ko_profiles_dir,
                                          run_data.target_kos_tsv,
                                          base_outpath,
-                                         AA_path,
-                                         run_data.num_hmm_cpus)
+                                         AA_path)
 
         if not ko_search_failed:
             # writing out fastas of hits for each KO

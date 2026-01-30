@@ -49,7 +49,7 @@ def search_pfams(args, run_data):
     return run_data
 
 
-def run_pfam_search(all_pfam_targets_hmm, base_outpath, AA_file, num_hmm_cpus):
+def run_pfam_search(all_pfam_targets_hmm, base_outpath, AA_file):
 
     os.makedirs(base_outpath, exist_ok=True)
 
@@ -59,7 +59,7 @@ def run_pfam_search(all_pfam_targets_hmm, base_outpath, AA_file, num_hmm_cpus):
     cmd = [
         "hmmsearch",
         "--cut_ga",
-        "--cpu", str(num_hmm_cpus),
+        "--cpu", str(2),
         "--tblout", outpath,
         all_pfam_targets_hmm,
         AA_file

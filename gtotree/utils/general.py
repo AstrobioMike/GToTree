@@ -168,6 +168,7 @@ class SCGset:
     id: str
     remaining: bool = None
     gene_length_filtered: bool = None
+    num_genomes_with_hits_after_len_filtering: int = 0
     aligned: bool = None
     trimmed: bool = None
     ready_for_cat: bool = None
@@ -223,7 +224,6 @@ class RunData:
     logs_dir: str = ""
     logs_dir_rel: str = ""
     gtotree_logs_dir: str = ""
-    num_hmm_cpus: str = ""
     best_hit_mode: bool = False
     seq_length_cutoff: float = None
     SCG_hits_filtered: bool = False

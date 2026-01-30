@@ -103,16 +103,16 @@ def check_set_values(args):
         report_message("The sequence-length-cutoff value (passed to `-c`) must be between 0 and 1 (inclusive).")
         report_very_early_exit()
 
+    if args.gene_representation_cutoff <0 or args.gene_representation_cutoff > 1:
+        report_message("The gene-representation-cutoff value (passed to `-g`) must be between 0 and 1 (inclusive).")
+        report_very_early_exit()
+
     if args.genome_hits_cutoff < 0 or args.genome_hits_cutoff > 1:
         report_message("The genome-hits-cutoff value (passed to `-G`) must be between 0 and 1 (inclusive).")
         report_very_early_exit()
 
     if args.num_jobs < 1:
         report_message("The number of jobs to run in parallel (passed to `-j`) must be at least 1.")
-        report_very_early_exit()
-
-    if args.num_hmm_cpus < 1:
-        report_message("The number of CPUs to use for HMM searches (passed to `-n`) must be at least 1.")
         report_very_early_exit()
 
     if args.num_muscle_threads < 1:
@@ -201,8 +201,6 @@ def check_input_files(args):
         args.target_kos_file, total_ko_targets = check_expected_single_column_input(args.target_kos_file, "-K", get_count=True)
         run_data.target_kos_file = args.target_kos_file
         run_data.total_ko_targets = total_ko_targets
-
-    run_data.num_hmm_cpus = args.num_hmm_cpus
 
     return args, run_data
 

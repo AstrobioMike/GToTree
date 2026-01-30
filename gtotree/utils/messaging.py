@@ -39,7 +39,7 @@ def color_text(text, color = 'green', bold = False):
 def gtotree_header():
     header = f"""
 
-                                   {color_text(f"GToTree v{version('GToTree')}", "green")}
+                                  {color_text(f"GToTree v{version('GToTree')}", "green")}
                           github.com/AstrobioMike/GToTree
     """
     return header
@@ -260,7 +260,7 @@ def report_notice(message, color = "yellow"):
 
 @capture_stdout_to_log(lambda: log_file_var.get())
 def report_update(message, color = "green"):
-    print("")
+    print("\n")
     print(f"{color_text("  ***********************************", color)} UPDATE {color_text("***********************************  ", color)}")
     print(message)
     print(color_text("  ******************************************************************************  ", color))
@@ -280,9 +280,9 @@ def check_and_report_any_changed_default_behavior(args, run_data):
         args.tree_program != "FastTreeMP",
         args.best_hit_mode,
         args.seq_length_cutoff != 0.2,
+        args.gene_representation_cutoff != 0.2,
         args.genome_hits_cutoff != 0.5,
         args.num_jobs != 1,
-        args.num_hmm_cpus != 2,
         args.num_muscle_threads != 5,
         args.no_super5,
         args.keep_gene_alignments,
@@ -336,14 +336,14 @@ def check_and_report_any_changed_default_behavior(args, run_data):
     if args.seq_length_cutoff != 0.2:
         print(f"      - Gene-length filtering cutoff threshold (`-c`) has been set to: {args.seq_length_cutoff}")
 
+    if args.gene_representation_cutoff != 0.2:
+        print(f"      - Gene-representation cutoff threshold (`-r`) has been set to: {args.gene_representation_cutoff}")
+
     if args.genome_hits_cutoff != 0.5:
         print(f"      - Genome minimum target-gene-copy threshold (`-G`) has been set to: {args.genome_hits_cutoff}")
 
-    if args.num_jobs != 1:
+    if args.num_jobs != 4:
         print(f"      - The number of jobs to run during parallelizable steps has been set to: {args.num_jobs}")
-
-    if args.num_hmm_cpus != 2:
-        print(f"      - The number of CPUs used for `hmmsearch` calls will be: {args.num_hmm_cpus}")
 
     if args.num_muscle_threads != 5:
         print(f"      - The number of threads used for `muscle` calls will be: {args.muscle_threads}")
@@ -436,7 +436,7 @@ def report_processing_stage(stage, run_data):
         "additional-pfam-searching":   "SEARCHING GENOMES FOR SPECIFIED PFAM TARGETS",
         "additional-ko-searching":     "SEARCHING GENOMES FOR SPECIFIED KO TARGETS",
         "hmm-search":                  "SEARCHING GENOMES FOR TARGET SINGLE-COPY GENES",
-        "filter-genes":                "FILTERING GENES BY LENGTH",
+        "filter-genes":                "FILTERING GENES BY LENGTH AND REPRESENTATION",
         "filter-genomes":              "FILTERING GENOMES WITH TOO FEW HITS",
         "align-and-prepare-SCG-sets":  "ALIGNING, TRIMMING, AND PREPARING SCG-SETS",
         "concatenate-SCG-sets":        "CONCATENATING ALL SCG-SET ALIGNMENTS TOGETHER",
@@ -683,7 +683,7 @@ def report_genome_filtering_update(run_data):
         report_too_few_genomes(run_data)
 
 
-def report_SCG_set_alignment_update(run_data):
+def report_SCG_set_filtering_update(run_data):
     total_SCG_targets = len(run_data.get_all_SCG_targets())
     num_SCG_targets_remaining = len(run_data.get_all_SCG_targets_remaining())
     num_SCG_targets_dropped = total_SCG_targets - num_SCG_targets_remaining
@@ -693,7 +693,7 @@ def report_SCG_set_alignment_update(run_data):
     else:
         message = (f"    Of the initial {total_SCG_targets} SCG-targets:\n\n")
         message += (f"        {color_text(f"{num_SCG_targets_dropped} had no hits or were filtered out", 'yellow')}, reported in:\n")
-        message += (f"          {run_data.run_files_dir_rel}/target-SCGs-filtered-out-or-not-found.txt")
+        message += (f"          {run_data.run_files_dir_rel}/target-SCGs-dropped-from-analysis.tsv")
 
         if num_SCG_targets_remaining != 0:
             message += "\n\n"
@@ -753,7 +753,10 @@ def summarize_results(args, run_data):
 
     add_border(extra_line=False)
 
-    if num_remaining_genomes < num_initial_genomes:
+    num_genes_removed = len(run_data.get_all_SCG_targets()) - len(run_data.get_all_SCG_targets_remaining())
+
+    if num_remaining_genomes < num_initial_genomes or num_genes_removed > 0:
+
         print(f"\n  Notes:\n")
 
         num_accs_not_found = len(run_data.get_ncbi_accs_not_found())
@@ -781,12 +784,8 @@ def summarize_results(args, run_data):
             else:
                 print(f"        {num_genomes_filtered_for_too_few_hits} genome(s) removed for having too few hits to the targeted SCGs")
 
-        num_genes_removed = len(run_data.get_all_SCG_targets()) - len(run_data.get_all_SCG_targets_remaining())
         if num_genes_removed > 0:
-            if not args.best_hit_mode:
-                print(f"        {num_genes_removed} gene(s) excluded for having no hits or only multiple hits in each genome")
-            else:
-                print(f"        {num_genes_removed} gene(s) excluded for having no hits in the input genomes")
+            print(f"        {num_genes_removed} target gene(s) not found or filtered out of the analysis")
 
         print(f"\n    Reported along with additional informative files in:\n        {color_text(f"{run_data.run_files_dir_rel}/", 'green')}")
 

@@ -90,6 +90,4 @@ rule process_ncbi_accessions:
         tmp_path = output[0] + ".json.tmp"
         with open(tmp_path, 'w') as fh:
             json.dump(out_obj, fh, indent=2, sort_keys=True)
-            fh.flush()
-            os.fsync(fh.fileno())
         os.replace(tmp_path, output[0])

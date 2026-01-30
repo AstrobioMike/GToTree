@@ -86,7 +86,7 @@ helpmenu += f"""
                   longer than 120 or shorter than 80 will be filtered out before
                   alignment of that gene-set with the default 0.2 setting.
 
-        - [{color_text("-g <float>", "teal", bold = True)}] gene-representation cutoff; default: 0.2
+        - [{color_text("-r <float>", "teal", bold = True)}] gene-representation cutoff; default: 0.2
                   A float between 0-1 (inclusive) specifying the minimum proportion
                   of genomes that must have hits to a target gene for that gene to
                   be retained and used in the final tree. For example, if 100 input
@@ -94,9 +94,10 @@ helpmenu += f"""
                   that target gene would be removed from the analysis with the default
                   value of 0.2 for this parameter.
 
-                  Note: This is calculated based on the total number of genomes that will
-                  contribute to the final tree (after any filtering), not necessarily the
-                  total starting number of genomes.
+                  Note: This is calculated based on the total number of genomes remaining
+                  after preprocessing steps, but before genome filtering based on the '-G'
+                  parameter, and it is not revisited after genome-level filtering. This is
+                  to avoid iterative pruning effects between the '-g' and '-G' parameters.
 
         - [{color_text("-G <float>", "teal", bold = True)}] genome-hits cutoff; default: 0.5
                   A float between 0-1 (inclusive) specifying the minimum proportion
@@ -186,13 +187,6 @@ helpmenu += f"""
                   lot of input accessions were not successfully downloaded,
                   consider trying with a lower `-j` setting.
 
-        - [{color_text("-n <int>", "teal", bold = True)}] num HMM cpus; default: 2
-                  The number of cpus you'd like to use during the HMM search.
-                  Given these are individual small searches on single genomes,
-                  2 is probably always sufficient. (Keep in mind this will be
-                  multiplied by the number of jobs running concurrently if also
-                  modifying the `-j` parameter.)
-
         - [{color_text("-M <int>", "teal", bold = True)}] num muscle threads; default: 5
                   The number of threads muscle will use during alignment. (Keep
                   in mind this will be multiplied by the number of jobs running
@@ -213,7 +207,7 @@ helpmenu += f"""
                   Provide this flag with no arguments if you'd like to force
                   overwriting the output directory if it exists.
 
-        - [{color_text("-tmp-dir <path>", "teal", bold = True)}] temporary directory location; default: <output-dir>/gtt-tmp-*
+        - [{color_text("--tmp-dir <path>", "teal", bold = True)}] temporary directory location; default: <output-dir>/gtt-tmp-*
                   If you want to specify where the temporary working directory will
                   be created, you can provide the path to this parameter.
 

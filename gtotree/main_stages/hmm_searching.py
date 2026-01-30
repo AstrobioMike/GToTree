@@ -39,7 +39,7 @@ def run_hmm_search(id, run_data, inpath, outpath):
     cmd = [
         "hmmsearch",
         "--cut_ga",
-        "--cpu", f"{run_data.num_hmm_cpus}",
+        "--cpu", "2",
         "--tblout", outpath,
         run_data.hmm_path,
         inpath

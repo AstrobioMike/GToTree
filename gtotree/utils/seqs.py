@@ -30,6 +30,15 @@ def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_le
         return True, AA_outpath, num, nt_outpath
 
 
+def fasta_has_single_record(path) -> bool:
+    count = 0
+    for _ in SeqIO.parse(path, "fasta"):
+        count += 1
+        if count > 1:
+            return False
+    return True
+
+
 def _filter_and_rename_fasta(outpath, infile, prefix, max_length):
     num = 0
     with open(outpath, "w") as outfile, open(infile, "r") as in_file:
@@ -97,6 +106,10 @@ def check_target_SCGs_have_seqs(run_data, ext):
     SCG_targets_missing = []
 
     for SCG_obj in SCG_targets_present_at_start:
+
+        if getattr(SCG_obj, 'removed', False):
+            continue
+
         SCG = SCG_obj.id
         path = run_data.found_SCG_seqs_dir + f"/{SCG}{ext}"
         present = check_file_exists_and_not_empty(path)

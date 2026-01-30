@@ -42,7 +42,7 @@ def parser():
     # --- Optional Inputs ---
     opt = parser.add_argument_group("Optional Inputs")
 
-    opt.add_argument("-o", "--output_dir", metavar="<dir>", type=str, default="gtotree-output")
+    opt.add_argument("-o", "--output-dir", metavar="<dir>", type=str, default="gtotree-output")
     opt.add_argument("-m", "--mapping-file", metavar="<file>", type=str)
 
     # --- Taxonomy Options ---
@@ -52,6 +52,7 @@ def parser():
 
     # --- Filtering Settings ---
     opt.add_argument("-c", "--seq-length-cutoff", metavar="<float>", type=float, default=0.2)
+    opt.add_argument("-r", "--gene-representation-cutoff", metavar="<float>", type=float, default=0.2)
     opt.add_argument("-G", "--genome-hits-cutoff", metavar="<float>", type=float, default=0.5)
     opt.add_argument("-B", "--best-hit-mode", action="store_true")
 
@@ -65,8 +66,7 @@ def parser():
     opt.add_argument("-N", "--no-tree", action="store_true")
     opt.add_argument("-k", "--keep-gene-alignments", action="store_true")
     opt.add_argument("-T", "--tree-program", metavar="<str>", type=str, default="FastTreeMP")
-    opt.add_argument("-j", "--num-jobs", metavar="<int>", type=int, default=1)
-    opt.add_argument("-n", "--num-hmm-cpus", metavar="<int>", type=int, default=2)
+    opt.add_argument("-j", "--num-jobs", metavar="<int>", type=int, default=4)
     opt.add_argument("-M", "--num-muscle-threads", metavar="<int>", type=int, default=5)
     opt.add_argument("-X", "--no-super5", action="store_true")
     opt.add_argument("-P", "--use-http", action="store_true")

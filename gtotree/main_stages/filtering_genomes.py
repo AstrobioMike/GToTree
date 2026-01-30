@@ -11,9 +11,9 @@ def filter_genomes(args, run_data):
     report_processing_stage("filter-genomes", run_data)
     cutoff = "{:.0f}".format(args.genome_hits_cutoff * 100)
     if not args.best_hit_mode:
-        print(f"\n    Keeping those with single hits to at least {cutoff}% of the total targeted SCGs.")
+        print(f"\n   Keeping those with single hits to at least {cutoff}% of the remaining target-SCGs.")
     else:
-        print(f"\n       Keeping those with hits to at least {cutoff}% of the total targeted SCGs.")
+        print(f"\n       Keeping those with hits to at least {cutoff}% of the remaining target-SCGs.")
 
     if not run_data.genomes_filtered_for_min_SCG_hits:
 
@@ -23,11 +23,6 @@ def filter_genomes(args, run_data):
         min_num_SCG_hits = int(num_remaining_SCG_targets * args.genome_hits_cutoff + 0.5)
 
         genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_SCG_hits_after_filtering < min_num_SCG_hits]
-
-        # if not args.best_hit_mode:
-        #     genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_unique_SCG_hits < min_num_SCG_hits]
-        # else:
-        #     genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_SCG_hits < min_num_SCG_hits]
 
         for genome in genomes:
             if genome.id in genome_ids_to_filter_out:

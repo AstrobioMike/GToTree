@@ -59,8 +59,7 @@ rule search_pfams:
         base_outpath = f"{run_data.pfam_results_dir}/individual-genome-results/{wildcards.ID}"
         pfam_search_failed = run_pfam_search(run_data.all_pfam_targets_hmm_path,
                                          base_outpath,
-                                         AA_path,
-                                         run_data.num_hmm_cpus)
+                                         AA_path)
 
         if not pfam_search_failed:
             # writing out fastas of hits for each pfam

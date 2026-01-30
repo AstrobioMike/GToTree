@@ -53,7 +53,7 @@ def search_kos(args, run_data):
     return run_data
 
 
-def run_ko_search(profiles_dir, ko_file, base_outpath, AA_file, num_hmm_cpus):
+def run_ko_search(profiles_dir, ko_file, base_outpath, AA_file):
 
     outpath = f"{base_outpath}/kofamscan-results.tsv"
     tmp_path = f"{base_outpath}/kofamscan-tmp"
@@ -61,7 +61,7 @@ def run_ko_search(profiles_dir, ko_file, base_outpath, AA_file, num_hmm_cpus):
         "exec_annotation",
         "-p", profiles_dir,
         "-k", ko_file,
-        "--cpu", str(num_hmm_cpus),
+        "--cpu", str(2),
         "-f", "mapper",
         "--no-report-unannotated",
         "--tmp-dir", tmp_path,

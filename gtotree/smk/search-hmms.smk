@@ -1,4 +1,5 @@
 import os
+import json
 from gtotree.utils.general import (read_run_data,
                                    write_run_data)
 from gtotree.main_stages.hmm_searching import (run_hmm_search,
@@ -17,40 +18,42 @@ genome_ids = list(genome_dict.keys())
 
 rule all:
     input:
-        expand(f"{run_data.hmm_results_dir}/{{ID}}/done", ID=genome_ids)
+        expand(f"{run_data.hmm_results_dir}/{{ID}}/{{ID}}.json", ID=genome_ids)
     run:
         start_combined_SCG_hit_count_tab(run_data)
         for ID in genome_ids:
             genome = genome_dict[ID]
-            status_path = f"{run_data.hmm_results_dir}/{ID}/done"
+            status_path = f"{run_data.hmm_results_dir}/{ID}/{ID}.json"
 
             with open(status_path, 'r') as f:
-                for line in f:
-                    (ID, hmm_search_failed, extract_seqs_failed,
-                    num_SCG_hits, num_unique_SCG_hits) = line.strip().split('\t')
+                obj = json.load(f)
+                hmm_search_failed = bool(obj.get('hmm_search_failed', False))
+                extract_seqs_failed = bool(obj.get('extract_seqs_failed', False))
+                num_SCG_hits = int(obj.get('num_SCG_hits', 0))
+                num_unique_SCG_hits = int(obj.get('num_unique_SCG_hits', 0))
 
-                    if int(hmm_search_failed):
-                        genome.mark_hmm_search_failed()
-                        genome.mark_removed("HMM search failed")
-                        genome.num_SCG_hits = 0
-                    else:
-                        add_to_combined_SCG_hit_count_tab(genome.id, run_data)
-                        if int(extract_seqs_failed):
-                            genome.mark_extract_seqs_failed()
-                            genome.num_SCG_hits = 0
-                            genome.mark_removed("extracting sequences after HMM search failed")
-                        else:
-                            write_out_SCG_hit_seqs(genome.id, run_data)
-                            genome.mark_hmm_search_done()
-                            genome.num_SCG_hits = int(num_SCG_hits)
-                            genome.num_unique_SCG_hits = int(num_unique_SCG_hits)
+            if hmm_search_failed:
+                genome.mark_hmm_search_failed()
+                genome.mark_removed("HMM search failed")
+                genome.num_SCG_hits = 0
+            else:
+                add_to_combined_SCG_hit_count_tab(genome.id, run_data)
+                if extract_seqs_failed:
+                    genome.mark_extract_seqs_failed()
+                    genome.num_SCG_hits = 0
+                    genome.mark_removed("extracting sequences after HMM search failed")
+                else:
+                    write_out_SCG_hit_seqs(genome.id, run_data)
+                    genome.mark_hmm_search_done()
+                    genome.num_SCG_hits = int(num_SCG_hits)
+                    genome.num_unique_SCG_hits = int(num_unique_SCG_hits)
 
         write_run_data(run_data)
 
 
 rule search_hmms:
     output:
-        f"{run_data.hmm_results_dir}/{{ID}}/done"
+        f"{run_data.hmm_results_dir}/{{ID}}/{{ID}}.json"
     run:
         genome = genome_dict[wildcards.ID]
         AA_path = genome.final_AA_path
@@ -63,7 +66,7 @@ rule search_hmms:
 
             (dict_of_hit_counts, dict_of_hit_gene_ids,
             num_SCG_hits, num_unique_SCG_hits) = parse_hmmer_results(f"{out_dir}/SCG-hits-hmm.txt",
-                                                                                         run_data)
+                                                                                      run_data)
 
             with open(f"{out_dir}/SCG-hit-counts.txt", 'w') as f:
                 f.write(f"{genome.id}")
@@ -85,5 +88,18 @@ rule search_hmms:
                             if seq is not None:
                                 f.write(f">{gene_id}\n{seq}\n")
 
-        with open(output[0], 'w') as f:
-            f.write(f"{wildcards.ID}\t{int(hmm_search_failed)}\t{int(extract_seqs_failed)}\t{int(num_SCG_hits)}\t{int(num_unique_SCG_hits)}\n")
+        num_SCG_hits = locals().get('num_SCG_hits', 0)
+        num_unique_SCG_hits = locals().get('num_unique_SCG_hits', 0)
+        extract_seqs_failed = locals().get('extract_seqs_failed', False)
+        status_obj = {
+            'id': wildcards.ID,
+            'hmm_search_failed': bool(hmm_search_failed),
+            'extract_seqs_failed': bool(extract_seqs_failed),
+            'num_SCG_hits': int(num_SCG_hits),
+            'num_unique_SCG_hits': int(num_unique_SCG_hits),
+        }
+
+        tmp_path = output[0] + ".tmp"
+        with open(tmp_path, 'w') as f:
+            json.dump(status_obj, f, indent=2, sort_keys=True)
+        os.replace(tmp_path, output[0])

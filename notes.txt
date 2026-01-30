@@ -15,9 +15,6 @@
             # 2 gene(s) either had no hits or only multiple hits in each genome.
             # 3 gene(s) had no hits after filtering by length.
 
-        # same test accs above can be used to work on this
-
-
 
     # implement removing temp dir after run if debug mode isn't set
 
@@ -70,6 +67,8 @@
             # tarball.extractall(path=location, filter=lambda ti: ti)
 
 
+    # add FAQ page about difference between GToTree v1 and v2
+
     # create new SCG-sets for all main phyla (and proteos) of gtdb (and archaea/bacteria)
 
 
@@ -86,8 +85,11 @@
 
     # add a flag when all is done, so when resume is tried, it says nothing to do
 
+    # if genome filtering drops all genes of a given SCG-set, things might break
+        # is that something worth guarding against?
 
-
+    # do i want to modify 'reason-removed' for SCGs to delineate bewteen 'no/multiple hits found'
+        # and dropped due to length filtering?
 
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
@@ -105,6 +107,7 @@ GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f f
 
 gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -j 4 -t -P
 
+
 ### OVERALL NOTES ###
 # add a stop at "Summary of input-genome preprocessing" to check there are 3 or more as needed to make a tree
 # eventually look into putting a block for this prodigal failure: "at least 100000 bases for training." (search original files)
@@ -113,21 +116,38 @@ gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTre
 
 ### TO DO ###
 
+### Overview of change from v1 to v2 ###
+# The codebase has been virtually entirely rewritten from an 5,000 line bash runner and X disparate
+# python script for a total of XX,XXX lines of code into a (admittedly still poorly engineered and packaged)
+# python package now with XXX modules and snakefiles over XX,XXX lines of code.
+
+# Why did i do this? I don't know. It worked fine and I've successfully maintained it for 6 years and over 600 citations.
+
+# But i felt it might help me grow...
+
 
 ### ADDED ###
 
-# added a gene-represenation cutoff (-g parameter)
-    # this is the minimum proportion of genomes required to have hits to a target gene for that gene to be retained for downstream processing
-    # e.g., with 100 input genomes and a -g of 0.2, any target gene that has hits in less than 20 genomes will be filtered out
+# added a gene-represenation cutoff (-g) parameter
+    # this is the minimum proportion of genomes required to have hits to a target gene for that target gene to be retained for downstream processing
+    # e.g., with 100 input genomes and a -g of the default 0.2, any target gene that has hits in less than 20 genomes will be filtered out
+    # This is calculated based on the total number of genomes remaining
+    #   after preprocessing steps, but before genome filtering based on the '-G'
+    #   parameter, and it is not revisited after genome-level filtering. This
+    #   is to avoid iterative pruning effects between the '-g' and '-G' parameters.
+
+# lots of things since initial v1 release, but were integrated before v2
 
 ### CHANGED ###
 
+# the code-base has been virtually entirely rewritten from
 # when calculating percent of target genes required to be found (-X parameter)
     # now it uses the amount remaining after filtering out target genes with too few genomes having hits as the denominator
     # previously it used the starting total as the denominator
         # example: if starting with 100 target genes, and 20 are filtered out for having hits in too few genomes, then the percent required is based on 80 target genes now rather than 100
 # default number of jobs set to 4 instead of 1 (-j parameter)
 # default output changed to "gtotree-output"
+# dropped '-n' num HMM cpus argument (for scanning individual genomes, the default of 2 is virtually always fine)
 # default lineage settings are D,P,C,S (no longer strain)
 # printed output has more progress bars and fewer text printouts
 # better logging of many steps
