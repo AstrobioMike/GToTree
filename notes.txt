@@ -1,20 +1,5 @@
 ### TO DO STILL ###
 
-    # currently not dropping genomes after filtering SCG h its by length
-        # meaning a genome may have less than the -G cutoff after removing hits
-        # this needs to be fixed
-
-        # accs to reproduce with Universal HMM targets:
-            # GCA_902755425.1
-            # GCA_902785715.1
-            # GCA_902777105.1
-            # GCA_902765875.1
-            # GCA_016291275.1 (this one causes the above issue currently)
-
-    # update noting at end to better match initial gtotree notes, e.g.:
-            # 2 gene(s) either had no hits or only multiple hits in each genome.
-            # 3 gene(s) had no hits after filtering by length.
-
 
     # implement removing temp dir after run if debug mode isn't set
 
@@ -49,14 +34,10 @@
 
     # figure out all helper scripts that are no longer needed and remove them
 
-
     # modularize and reduce code redundancy in any of my helper scripts still remaining
 
 
     # fix entry points/console scripts as needed in setup.py or pyproject.toml if dumping setup.py
-
-
-    # unit tests..... :( :( :(
 
 
     # wherever I have this:
@@ -91,6 +72,9 @@
     # do i want to modify 'reason-removed' for SCGs to delineate bewteen 'no/multiple hits found'
         # and dropped due to length filtering?
 
+    # unit tests..... :( :( :(
+
+
 
 conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
@@ -106,6 +90,15 @@ gtotree2 -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f 
 GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -j 4 -t -P -F
 
 gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -j 4 -t -P
+
+gtotree2 -a problem-accs.txt -o new-problem-accs -H Universal -j 4 -d -G 0.1 -r 0.3 -F
+
+cat problem-accs.txt
+# GCA_902755425.1
+# GCA_902785715.1
+# GCA_902777105.1
+# GCA_902765875.1
+# GCA_016291275.1
 
 
 ### OVERALL NOTES ###
