@@ -1,7 +1,9 @@
 ### TO DO STILL ###
 
 
-    # implement removing temp dir after run if debug mode isn't set
+    # package conda recipe with repo like i did for bit
+        # i'm not sure how this will need to impact the bioconda setup/recipe...
+
 
     # still need to implement iToL-file generation for both pfam and ko searching results
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
@@ -16,10 +18,6 @@
     # incorporate latest changes from master GToTree
         # e.g., GTDB download needs no-cert-check added and flag for --use-ecogenomics
         # check for others...
-
-
-    # package conda recipe with repo like i did for bit
-        # i'm not sure how this will need to impact the bioconda setup/recipe...
 
 
     # add a flag to stop auto-update-db checks by date

@@ -10,7 +10,11 @@ def filter_genes(args, run_data):
 
     report_processing_stage("filter-genes", run_data)
     cutoff = "{:.0f}".format(run_data.seq_length_cutoff * 100)
-    print(f"\n      Keeping those with lengths within {cutoff}% of the median for each gene set.")
+    in_genomes_cutoff_for_report = "{:.0f}".format(args.gene_representation_cutoff * 100)
+
+    print(f"\n      Keeping genes with lengths within {cutoff}% of the median for each gene set,")
+    print(f"      and keeping gene sets with hits in at least {in_genomes_cutoff_for_report}% of the currently")
+    print(f"      retained genomes.")
 
     num_SCGs_to_filter_by_length = len(run_data.get_all_SCG_targets_remaining_but_not_filtered())
 

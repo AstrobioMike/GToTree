@@ -1,3 +1,29 @@
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "gtotree"
+version = "2.0.0"
+description = "A user-friendly workflow for phylogenomics"
+readme = "README.md"
+license = { text = "GPLv3" }
+authors = [{ name = "AstrobioMike", email = "Michael.Lee0517@gmail.com" }]
+urls = { Repository = "https://github.com/astrobiomike/gtotree" }
+# dependencies handled by conda installation
+
+# [tool.setuptools]
+# packages = { find = { where = ["."], include = ["gtotree*"] } }
+# include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["gtotree*"]
+
+[tool.setuptools.package-data]
+gtotree = ["tests/data/*", "smk/*.smk"]
+
+[project.scripts]
+gtotree = "gtotree.main:main"
+GToTree = "gtotree.main:main"
+gtt-midpoint-root-tree = "gtotree.utils.helper_scripts.gtt_midpoint_root_tree:main"
+gtt-get-kofamscan-data = "gtotree.utils.kos.get_kofamscan_data:main"
