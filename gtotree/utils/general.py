@@ -606,3 +606,8 @@ def concat_files(file_list, output_file):
         for fname in file_list:
             with open(fname, 'r') as infile:
                 shutil.copyfileobj(infile, outfile)
+
+
+def cleanup(args, run_data):
+    if not args.debug:
+        shutil.rmtree(run_data.tmp_dir, ignore_errors=True)

@@ -302,8 +302,10 @@ def check_and_report_any_changed_default_behavior(args, run_data):
     if args.force_overwrite:
         if args.output_already_existed:
             print(f"      - Due to the `-F` flag, this output directory is being overwritten: \"{args.output_dir}\"")
+        else:
+            print(f"      - The output directory has been set to: \"{args.output_dir}\"")
 
-    if args.output_dir != "gtotree-output" and not args.resume:
+    if args.output_dir != "gtotree-output" and not args.resume and not args.force_overwrite:
         print(f"      - The output directory has been set to: \"{args.output_dir}\"")
 
     if args.mapping_file:

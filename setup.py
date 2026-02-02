@@ -13,7 +13,8 @@ setup(
     packages=find_packages(),
     entry_points={
         "console_scripts": [
-            "gtotree2=gtotree.main:main",
+            "GToTree=gtotree.main:main",
+            "gtotree=gtotree.main:main",
             "gtt-midpoint-root-tree=gtotree.utils.helper_scripts.gtt_midpoint_root_tree:main",
             "gtt-get-kofamscan-data2=gtotree.utils.kos.get_kofamscan_data:main",
         ],

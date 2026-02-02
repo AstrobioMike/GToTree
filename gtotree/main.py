@@ -16,6 +16,7 @@ from gtotree.main_stages.updating_headers import update_headers
 from gtotree.main_stages.treeing import make_tree
 from gtotree.utils.citations import generate_citations_info
 from gtotree.utils.summary_info import generate_primary_summary_table
+from gtotree.utils.general import cleanup
 
 def main(args = None):
     if args is None:
@@ -53,8 +54,7 @@ def main(args = None):
 
     generate_primary_summary_table(args, run_data)
 
-    # cleanup(args, run_data)
-        # remove tmp dir unless debug mode (anything else?)
+    cleanup(args, run_data)
 
     summarize_results(args, run_data)
 
