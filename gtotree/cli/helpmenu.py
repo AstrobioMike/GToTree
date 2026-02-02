@@ -50,7 +50,7 @@ helpmenu += f"""
 
       {color_text("Options for adding taxonomy information:", "orange")}
 
-        - [{color_text("-D ", "teal", bold = True)}] add GTDB taxonomy; default: false
+        - [{color_text("-D | --add-gtdb-tax", "teal", bold = True)}] add GTDB taxonomy; default: false
                   Provide this flag with no arguments if you'd like to add
                   taxonomy from the Genome Taxonomy Database (GTDB;
                   gtdb.ecogenomic.org) to the sequence headers. This will
@@ -61,7 +61,7 @@ helpmenu += f"""
                   Note: You can use `gtt-get-accessions-from-GTDB` to get
                   input NCBI accessions based on GTDB taxonomy searches.
 
-        - [{color_text("-t ", "teal", bold = True)}] add NCBI taxonomy; default: false
+        - [{color_text("-t | --add-ncbi-tax", "teal", bold = True)}] add NCBI taxonomy; default: false
                   Provide this flag with no arguments if you'd like to add NCBI
                   taxonomy info to the sequence headers. This will only be
                   effective for input genomes provided as NCBI accessions (passed
@@ -111,7 +111,7 @@ helpmenu += f"""
                   contribute to the final tree (after any filtering), not necessarily
                   the total starting number of target SCGs.
 
-        - [{color_text("-B ", "teal", bold = True)}] best-hit mode; default: false
+        - [{color_text("-B | --best-hit-mode", "teal", bold = True)}] best-hit mode; default: false
                   Provide this flag with no arguments if you'd like to run
                   GToTree in "best-hit" mode. By default, if a SCG has more than
                   one hit in a given genome, GToTree won't include a sequence
@@ -143,37 +143,6 @@ helpmenu += f"""
 
       {color_text("General run settings:", "orange")}
 
-        - [{color_text("-R | --resume", "teal", bold = True)}] resume mode; default: false
-                  Provide this flag with no arguments if you'd like to try to resume a
-                  previous run. This cannot be used if any inputs or options have changed.
-
-        - [{color_text("-z ", "teal", bold = True)}] nucleotide mode; default: false
-                  Make alignment and/or tree with nucleotide sequences instead
-                  of amino-acid sequences. (GToTree still finds target genes
-                  based on amino-acid HMM searches.)
-
-                  Note: This mode can only accept NCBI accessions (passed to
-                  `-a`) and genome fasta files (passed to `-f`) as input
-                  sources.
-
-        - [{color_text("-N ", "teal", bold = True)}] do not make a tree; default: false
-                  No tree produced. Stop after producing the concatenated
-                  alignment.
-
-        - [{color_text("-k ", "teal", bold = True)}] keep individual target-gene alignments; default: false
-                  Keep individual alignment files.
-
-        - [{color_text("-T <str>", "teal", bold = True)}] tree program to use; default: FastTreeMP
-                  Which program to use for tree generation. Currently supported
-                  are "FastTree", "FastTreeMP", "VeryFastTree", and "IQTREE".
-                  These run with default settings only (and IQTREE includes
-                  "-m MFP" and "-B 1000"). To run any with more specific options
-                  you can use the output alignment file from GToTree (and the
-                  partitions file if wanted for mixed-model specification) as
-                  input into a dedicated treeing program (the GToTree `-N`
-                  option will generate the alignment only and skip internal
-                  treeing if wanted).
-
         - [{color_text("-j <int>", "teal", bold = True)}] num jobs; default: 4
                   The number of jobs you'd like to run in parallel during steps
                   that are parallelizable. This includes things like downloading
@@ -192,7 +161,7 @@ helpmenu += f"""
                   in mind this will be multiplied by the number of jobs running
                   concurrently if also modifying the `-j` parameter.)
 
-        - [{color_text("-X ", "teal", bold = True)}] override super5 alignment; default: false
+        - [{color_text("-X | --no-super5", "teal", bold = True)}] override super5 alignment; default: false
                   If working with greater than 1,000 target genomes, GToTree
                   will by default use the 'super5' muscle alignment algorithm
                   to increase the speed of the alignments. Provide this flag
@@ -203,7 +172,38 @@ helpmenu += f"""
                   working with many genomes:
                       github.com/AstrobioMike/GToTree/wiki/things-to-consider
 
-        - [{color_text("-F ", "teal", bold = True)}] force overwrite; default: false
+        - [{color_text("-N | --no-tree", "teal", bold = True)}] do not make a tree; default: false
+                  No tree produced. Stop after producing the concatenated
+                  alignment.
+
+        - [{color_text("-T <str>", "teal", bold = True)}] tree program to use; default: FastTreeMP
+                  Which program to use for tree generation. Currently supported
+                  are "{color_text("FastTree", "teal", bold = True)}", "{color_text("FastTreeMP", "teal", bold = True)}", "{color_text("VeryFastTree", "teal", bold = True)}", and "{color_text("IQTREE", "teal", bold = True)}".
+                  These run with default settings only (and IQTREE includes
+                  "-m MFP" and "-B 1000"). To run any with more specific options
+                  you can use the output alignment file from GToTree (and the
+                  partitions file if wanted for mixed-model specification) as
+                  input into a dedicated treeing program (the GToTree `-N`
+                  option will generate the alignment only and skip internal
+                  treeing if wanted).
+
+        - [{color_text("-z | --nucleotide-mode", "teal", bold = True)}] nucleotide mode; default: false
+                  Make alignment and/or tree with nucleotide sequences instead
+                  of amino-acid sequences. (GToTree still finds target genes
+                  based on amino-acid HMM searches.)
+
+                  Note: This mode can only accept NCBI accessions (passed to
+                  `-a`) and genome fasta files (passed to `-f`) as input
+                  sources.
+
+        - [{color_text("-k | --keep-gene-alignments", "teal", bold = True)}] keep individual target-gene alignments; default: false
+                  Keep individual alignment files.
+
+        - [{color_text("-R | --resume", "teal", bold = True)}] resume mode; default: false
+                  Provide this flag with no arguments if you'd like to try to resume a
+                  previous run. This cannot be used if any inputs or options have changed.
+
+        - [{color_text("-F | --force-overwrite", "teal", bold = True)}] force overwrite; default: false
                   Provide this flag with no arguments if you'd like to force
                   overwriting the output directory if it exists.
 
@@ -211,14 +211,14 @@ helpmenu += f"""
                   If you want to specify where the temporary working directory will
                   be created, you can provide the path to this parameter.
 
-        - [{color_text("-d ", "teal", bold = True)}] debug mode; default: false
+        - [{color_text("-d | --debug", "teal", bold = True)}] debug mode; default: false
                   Provide this flag with no arguments if you'd like to keep the
                   temporary directory.
 
 
  --------------------------------  {color_text("EXAMPLE USAGE", "yellow")}  --------------------------------
 
-	GToTree -a ncbi-accessions.txt -f fasta-files.txt -H Bacteria -D -j 4
+	GToTree -a ncbi-accessions.txt -f fasta-files.txt -H Bacteria -D
 
 """
 
