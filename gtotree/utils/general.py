@@ -546,7 +546,13 @@ def run_snakemake(snakefile, tqdm_jobs, args, run_data, description, print_lines
         "--directory", run_data.run_files_dir
     ]
 
-    bar_format = "      {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
+    # bar_format = "      {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
+    bar_format = (
+    "      {percentage:3.0f}%|{bar}| "
+    "{n_fmt}/{total_fmt} "
+    "[time elapsed: {elapsed} | est. remaining: {remaining}]"
+    )
+
     with open(log, "w") as log_file, tqdm(total = tqdm_jobs, bar_format = bar_format, ncols = 76) as pbar:
         process = subprocess.Popen(
             cmd,

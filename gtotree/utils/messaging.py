@@ -301,7 +301,7 @@ def check_and_report_any_changed_default_behavior(args, run_data):
 
     if args.force_overwrite:
         if args.output_already_existed:
-            print(f"      - Due to the `-F` flag, this output directory is being overwritten: \"{args.output_dir}\"")
+            print(f"      - Due to the `-F` flag, this output directory is being overwritten:\n          \"{args.output_dir}\"")
         else:
             print(f"      - The output directory has been set to: \"{args.output_dir}\"")
 
@@ -338,7 +338,7 @@ def check_and_report_any_changed_default_behavior(args, run_data):
     if args.seq_length_cutoff != 0.2:
         print(f"      - Gene-length filtering cutoff threshold (`-c`) has been set to: {args.seq_length_cutoff}")
 
-    if args.gene_representation_cutoff != 0.2:
+    if args.gene_representation_cutoff != 0.1:
         print(f"      - Gene-representation cutoff threshold (`-r`) has been set to: {args.gene_representation_cutoff}")
 
     if args.genome_hits_cutoff != 0.5:
@@ -357,7 +357,7 @@ def check_and_report_any_changed_default_behavior(args, run_data):
         print("      - Individual protein-alignment files will retained, due to the `-k` flag being provided")
 
     if args.debug:
-        print("      - Debug mode is enabled")
+        print("      - Debug mode is enabled, so the temp directory won't be removed at the end of the run")
 
     if args.target_pfams_file:
         print(f"      - Genomes will be searched for Pfams listed in: {args.target_pfams_file} ({run_data.total_pfam_targets} targets)")

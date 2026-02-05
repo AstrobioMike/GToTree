@@ -86,7 +86,7 @@ helpmenu += f"""
                   longer than 120 or shorter than 80 will be filtered out before
                   alignment of that gene-set with the default 0.2 setting.
 
-        - [{color_text("-r <float>", "teal", bold = True)}] gene-representation cutoff; default: 0.2
+        - [{color_text("-r <float>", "teal", bold = True)}] gene-representation cutoff; default: 0.1
                   A float between 0-1 (inclusive) specifying the minimum proportion
                   of genomes that must have hits to a target gene for that gene to
                   be retained and used in the final tree. For example, if 100 input

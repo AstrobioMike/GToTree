@@ -22,6 +22,7 @@
 
     # add a flag to stop auto-update-db checks by date
         # so like it won't automatically try to grab new ncbi/gtdb/KOFamScan data if older than X weeks like i have set in places
+        # seems like at least gtdb download (in regular run) isn't auto-checking right now...
 
 
     # modularize and reduce code redundancy in my user-side standalone scripts like:
@@ -81,15 +82,15 @@ conda install -c conda-forge -c bioconda tqdm=4.67.1 pyhmmer=0.11.0 snakemake=8.
 pip install -e .
 
 # example test
-rm -rf gtotree-output/ ; gtotree2 -a ncbi-accessions.txt -H Universal -j 4
+rm -rf gtotree-output/ ; gtotree -a ncbi-accessions.txt -H Universal
 
-gtotree2 -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -j 4 -t -P
+gtotree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -t -P
 
 GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -j 4 -t -P -F
 
-gtotree2 -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -j 4 -t -P
+gtotree -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -t -P
 
-gtotree2 -a problem-accs.txt -o new-problem-accs -H Universal -j 4 -d -G 0.1 -r 0.3 -F
+gtotree -a problem-accs.txt -o new-problem-accs -H Universal -d -G 0.1 -r 0.3 -F
 
 cat problem-accs.txt
 # GCA_902755425.1
