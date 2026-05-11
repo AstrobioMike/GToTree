@@ -17,6 +17,7 @@
 
     # incorporate latest changes from master GToTree
         # e.g., GTDB download needs no-cert-check added and flag for --use-ecogenomics
+        # gtt-gen-SCG-HMMs has been updated a bit (v1.8.17)
         # check for others...
 
 
