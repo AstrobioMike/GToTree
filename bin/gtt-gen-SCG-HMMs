@@ -361,9 +361,9 @@ def get_amino_acids(ncbi_tab, tmp_dir, output_dir, num_cpus, rerun):
                 out.write("\n")
 
                 if not os.path.exists(output_dir + "Missed-accessions.tsv"):
-                    with open(output_dir + "Missed-accessions.tsv") as out:
+                    with open(output_dir + "Missed-accessions.tsv", "w") as out:
                         out.write("accession\twhy_missing\n")
-                with open(output_dir + "Missed-accessions.tsv") as out:
+                with open(output_dir + "Missed-accessions.tsv", "a") as out:
                     for acc in download_failed:
                         out.write(acc + "\t" + "download failed" + "\n")
 
@@ -376,9 +376,9 @@ def get_amino_acids(ncbi_tab, tmp_dir, output_dir, num_cpus, rerun):
                 out.write("\n")
 
                 if not os.path.exists(output_dir + "Missed-accessions.tsv"):
-                    with open(output_dir + "Missed-accessions.tsv") as out:
+                    with open(output_dir + "Missed-accessions.tsv", "w") as out:
                         out.write("accession\twhy_missing\n")
-                with open(output_dir + "Missed-accessions.tsv") as out:
+                with open(output_dir + "Missed-accessions.tsv", "a") as out:
                     for acc in prodigal_failed:
                         out.write(acc + "\t" + "prodigal failed" + "\n")
 
@@ -412,7 +412,7 @@ def dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir):
 
     for index, row in ncbi_tab.iterrows():
         curr_acc = row["#assembly_accession"]
-        curr_base_url = row["ftp_path"]
+        curr_base_url = row["ftp_path"].rstrip("/")
         base_name = os.path.basename(curr_base_url)
         AA_url = curr_base_url + "/" + base_name + AA_suffix
 
@@ -490,7 +490,8 @@ def dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir):
 def parallelize_get_amino_acids(df, func, num_cpus, tmp_dir):
     """ run dl_genomes_and_get_amino_acids() in parallel """
 
-    df_split = np.array_split(df, num_cpus)
+    df_split = [df.iloc[i::num_cpus] for i in range(num_cpus)]
+
 
     pool = mp.Pool(num_cpus)
     function_call = partial(func, tmp_dir=tmp_dir) # allows providing additional constant argument "tmp_dir" to pool.map next
@@ -510,24 +511,24 @@ def parallelize_get_amino_acids(df, func, num_cpus, tmp_dir):
 
 def get_latest_pfam_version():
 
-    print("")
-    wprint(color_text("NOTICE! Currently the latest PFam version we can work with is 37.0 for reasons described here: https://github.com/AstrobioMike/GToTree/issues/104", "yellow"))
-    print("")
+    # print("")
+    # wprint(color_text("NOTICE! Currently the latest PFam version we can work with is 37.0 for reasons described here: https://github.com/AstrobioMike/GToTree/issues/104", "yellow"))
+    # print("")
 
-    return "37.0"
+    # return "37.0"
 
-    # url = 'https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/'
+    url = 'https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/'
 
-    # with urllib.request.urlopen(url) as response:
-    #     html = response.read().decode('utf-8')
+    with urllib.request.urlopen(url) as response:
+        html = response.read().decode('utf-8')
 
-    # versions = re.findall(r'Pfam(\d+\.\d+)', html)
+    versions = re.findall(r'Pfam(\d+\.\d+)', html)
 
-    # sorted_versions = sorted(versions, key=lambda x: float(x), reverse=True)
+    sorted_versions = sorted(versions, key=lambda x: float(x), reverse=True)
 
-    # latest_version = sorted_versions[0]
+    latest_version = sorted_versions[0]
 
-    # return latest_version
+    return latest_version
 
 
 def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm", filtered_pfam_IDs_file="filtered-pfam-IDs.txt", filtered_pfams_info_file="filtered-pfams-info.tsv", filtered_pfams_hmm_file="filtered-pfams.hmm"):
@@ -561,7 +562,7 @@ def get_and_filter_pfam_hmms(tmp_dir, rerun, full_pfams_hmm_file="all-pfams.hmm"
         print(f"    - the PFam version being used is: {latest_pfam_version}")
 
         pfam_hmm_link = f"{base_url}Pfam{latest_pfam_version}/Pfam-A.hmm.gz"
-        pfam_info_link = f"{base_url}Pfam{latest_pfam_version}/database_files/pfamA.txt.gz"
+        pfam_info_link = f"{base_url}Pfam{latest_pfam_version}/pfamA.txt.gz"
 
         try:
             # pfam_hmms_gz = urllib.request.urlopen("ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz")
