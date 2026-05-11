@@ -3,7 +3,7 @@
 ## v1.8.17 (11-May-2026)
 
 ### Fixed
-- minor updates to `gtt-gen-SCG-HMMs` for things that may have caused it to fail sometimes, and also unlocked the PFam version again since the interpro folks added back in the data we needed (see https://github.com/AstrobioMike/GToTree/issues/104)
+- minor updates to `gtt-gen-SCG-HMMs` for things that may have caused it to fail sometimes, re-uses the main GToTree-stored NCBI assembly data now, and also unlocked the PFam version again since the interpro folks added back in the data we needed (see https://github.com/AstrobioMike/GToTree/issues/104)
 
 
 ## v1.8.16 (09-Jul-2025)

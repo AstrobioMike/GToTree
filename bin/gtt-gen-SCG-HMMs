@@ -9,6 +9,7 @@ For details on the process, please see: https://github.com/AstrobioMike/GToTree/
 """
 
 VERSION="v1.8.16"
+import http
 import os
 import re
 import sys
@@ -234,7 +235,7 @@ def get_target_accs(input_file):
 
 
 def get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, output_dir, rerun):
-    """downloading needed NCBI assembly summary files to construct download links"""
+    """setting up needed NCBI assembly summary files to construct download links"""
 
     # checking if can use from previous run
     if rerun == True and os.path.exists(tmp_dir + "ncbi-assembly-info.tsv"):
@@ -252,23 +253,13 @@ def get_ncbi_tabs(needed_dbs, target_accs, tmp_dir, output_dir, rerun):
     else:
 
         print("")
-        wprint("Downloading needed NCBI assembly summary files...")
+        wprint("Downloading or accessing needed NCBI assembly summary files...")
 
-        if needed_dbs == "GCA":
-            genbank_tab = urllib.request.urlopen("ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt")
-            ncbi_tab = pd.read_csv(genbank_tab, sep="\t", header=1, low_memory=False, usecols=["#assembly_accession", "ftp_path"])
+        NCBI_data_dir = os.environ['NCBI_assembly_data_dir']
 
-        elif needed_dbs == "GCF":
-            refseq_tab = urllib.request.urlopen("ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt")
-            ncbi_tab = pd.read_csv(refseq_tab, sep="\t", header=1, low_memory=False, usecols=["#assembly_accession", "ftp_path"])
+        os.system("gtt-get-ncbi-assembly-tables --use-http")
 
-        else:
-            genbank_tab = urllib.request.urlopen("ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt")
-            genbank_tab = pd.read_csv(genbank_tab, sep="\t", header=1, low_memory=False, usecols=["#assembly_accession", "ftp_path"])
-            refseq_tab = urllib.request.urlopen("ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt")
-            refseq_tab = pd.read_csv(refseq_tab, sep="\t", header=1, low_memory=False, usecols=["#assembly_accession", "ftp_path"])
-
-            ncbi_tab = pd.concat([genbank_tab, refseq_tab])
+        ncbi_tab = pd.read_csv(f"{NCBI_data_dir}/ncbi-assembly-info.tsv", sep="\t", header=1, low_memory=False)
 
         # filtering down to just those needed
         ncbi_tab = ncbi_tab[ncbi_tab["#assembly_accession"].isin(target_accs)]
@@ -361,11 +352,11 @@ def get_amino_acids(ncbi_tab, tmp_dir, output_dir, num_cpus, rerun):
                 out.write("\n")
 
                 if not os.path.exists(output_dir + "Missed-accessions.tsv"):
-                    with open(output_dir + "Missed-accessions.tsv", "w") as out:
-                        out.write("accession\twhy_missing\n")
-                with open(output_dir + "Missed-accessions.tsv", "a") as out:
+                    with open(output_dir + "Missed-accessions.tsv", "w") as missed_out:
+                        missed_out.write("accession\twhy_missing\n")
+                with open(output_dir + "Missed-accessions.tsv", "a") as missed_out:
                     for acc in download_failed:
-                        out.write(acc + "\t" + "download failed" + "\n")
+                        missed_out.write(acc + "\t" + "download failed" + "\n")
 
             else:
                 pass
@@ -376,11 +367,11 @@ def get_amino_acids(ncbi_tab, tmp_dir, output_dir, num_cpus, rerun):
                 out.write("\n")
 
                 if not os.path.exists(output_dir + "Missed-accessions.tsv"):
-                    with open(output_dir + "Missed-accessions.tsv", "w") as out:
-                        out.write("accession\twhy_missing\n")
-                with open(output_dir + "Missed-accessions.tsv", "a") as out:
+                    with open(output_dir + "Missed-accessions.tsv", "w") as missed_out:
+                        missed_out.write("accession\twhy_missing\n")
+                with open(output_dir + "Missed-accessions.tsv", "a") as missed_out:
                     for acc in prodigal_failed:
-                        out.write(acc + "\t" + "prodigal failed" + "\n")
+                        missed_out.write(acc + "\t" + "prodigal failed" + "\n")
 
             else:
                 pass
