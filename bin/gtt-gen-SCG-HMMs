@@ -28,6 +28,7 @@ from Bio import SeqIO # type: ignore
 from functools import partial
 from math import ceil
 from glob import glob
+import time
 
 parser = argparse.ArgumentParser(description="This program takes a list of NCBI accessions and generates a set of single-copy gene HMMs based on PFams.\
                                               Please see the wiki here for details on the process: https://github.com/AstrobioMike/GToTree/wiki/SCG-sets")
@@ -331,7 +332,7 @@ def get_amino_acids(ncbi_tab, tmp_dir, output_dir, num_cpus, rerun):
             # Running this step in parallel with greater than ~15 cpus can often cause it to hang in my testing.
             # After some poking around and a short consult with the wonderful Evan Bolyen, it is likely this is an
             # I/O problem. So setting this to a max of 12 cpus to be on the safer side
-            # (higher amounts of cpus do  work on the parallel hmmsearch step later)
+            # (higher amounts of cpus do work on the parallel hmmsearch step later)
 
             if num_cpus > 12:
                 num_cpus = 12
@@ -410,23 +411,29 @@ def dl_genomes_and_get_amino_acids(ncbi_tab, tmp_dir):
         # attempting to download amino-acid file first
         try:
 
-            curr_AA_gz = urllib.request.urlopen(AA_url)
-            curr_AA = gzip.decompress(curr_AA_gz.read()).decode("UTF-8", "ignore")
+            # curr_AA_gz = urllib.request.urlopen(AA_url)
+            curr_AA_gz_bytes = download_with_retry(AA_url)
+            # curr_AA = gzip.decompress(curr_AA_gz.read()).decode("UTF-8", "ignore")
+            curr_AA = gzip.decompress(curr_AA_gz_bytes).decode("UTF-8", "ignore")
 
             curr_AA = io.StringIO(curr_AA)
 
-        except:
-
+        # except:
+        except Exception as e:
+            # print(f"  Failed to download amino-acid file for {curr_acc} with error: {type(e).__name__}: {e}")
             # now trying to get the nucleotide file and run prodigal on it
             try:
 
                 nt_url = curr_base_url + "/" + base_name + nt_suffix
 
-                curr_nt_gz = urllib.request.urlopen(nt_url)
-                curr_nt = gzip.decompress(curr_nt_gz.read()).decode("UTF-8", "ignore")
+                # curr_nt_gz = urllib.request.urlopen(nt_url)
+                curr_nt_gz_bytes = download_with_retry(nt_url)
+                # curr_nt = gzip.decompress(curr_nt_gz.read()).decode("UTF-8", "ignore")
+                curr_nt = gzip.decompress(curr_nt_gz_bytes).decode("UTF-8", "ignore")
 
-            except:
-
+            # except:
+            except Exception as e:
+                # print(f"  Failed to download nucleotide file for {curr_acc} with error: {type(e).__name__}: {e}")
                 download_failed.append(curr_acc)
                 continue
 
@@ -807,6 +814,16 @@ def note_gtt_store_SCG_HMMs():
     except:
         pass
 
+def download_with_retry(url, max_retries=5):
+    for attempt in range(max_retries):
+        try:
+            return urllib.request.urlopen(url, timeout=30).read()
+        except urllib.error.HTTPError as e:
+            if e.code == 503 and attempt < max_retries - 1:
+                wait = 2 ** attempt
+                time.sleep(wait)
+                continue
+            raise
 
 if __name__ == "__main__":
     main()
