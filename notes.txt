@@ -28,8 +28,8 @@
 
     # modularize and reduce code redundancy in my user-side standalone scripts like:
         # gtt-get-accessions-from-GTDB (use what we can from utils/gtdb/get_gtdb_data.py)
-        # gtt-gen-SCG-set
-        # gtt-pfam-search
+        # gtt-gen-SCG-HMMs (don't forget to include updates made to the v1 GToTree)
+        # gtt-pfam-search (if keeping this, basically dump the v1 standalone script and start re-building from what's available already in v2)
 
 
     # figure out all helper scripts that are no longer needed and remove them
