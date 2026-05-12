@@ -215,13 +215,10 @@ if [ -s ${tmp_dir}/${assembly}_genes3.tmp ]; then
     fi
 
     if [ $debug_flag == "true" ]; then
-        printf "\n\n   Debug mode on, keeping intermediate files.\n\n"
         if [ -s ${tmp_dir}/${assembly}_genes2.tmp ]; then
-            printf "   Keeping ${tmp_dir}/${assembly}_genes2.tmp\n"
             mv ${tmp_dir}/${assembly}_genes2.tmp ${tmp_dir}/ncbi-downloads/${assembly}_protein.faa
         fi
         if [ -s ${tmp_dir}/${assembly}_genome.tmp ]; then
-            printf "   Keeping ${tmp_dir}/${assembly}_genome.tmp\n"
             mv ${tmp_dir}/${assembly}_genome.tmp ${tmp_dir}/ncbi-downloads/${assembly}_genomic.fna
         fi
     fi
