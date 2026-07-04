@@ -33,61 +33,37 @@ do
     printf "\tOn assembly ${GREEN}$assembly${NC}; Number $num of $NCBI_remaining_genomes_total total.\n"
     printf "   --------------------------------------------------------------------------   \n\n"
 
-    # storing and building links
-    if [ "$http_flag" == 'false' ]; then
-        base_link="${curr_line[8]}"
-    else
-        base_link=$(echo ${curr_line[8]} | sed 's/^ftp/https/')
-    fi
+    # base_link (download directory URL) is now fully resolved by
+    # gtt-parse-assembly-summary-file (real ftp_path normalized to https, or
+    # rebuilt from the accession, or "na"); we just consume it here.
+    base_link="${curr_line[8]}"
+    end_path=$(basename "$base_link")
 
-    # checking link was actually present (sometimes, very rarely, it is not there)
-    # if not there, attempting to build ourselves
-    if [ $base_link == "na" ] || [ -z $base_link ]; then
-
-        if [ "$http_flag" == 'false' ]; then
-            p1=$(printf "ftp://ftp.ncbi.nlm.nih.gov/genomes/all")
-        else
-            p1=$(printf "https://ftp.ncbi.nlm.nih.gov/genomes/all")
-        fi
-
-        # checking if GCF or GCA
-        if [[ $assembly == "GCF"* ]]; then
-            p2="GCF"
-        else
-            p2="GCA"
-        fi
-
-        p3=$(echo $assembly | cut -f 2 -d "_" | cut -c 1-3)
-        p4=$(echo $assembly | cut -f 2 -d "_" | cut -c 4-6)
-        p5=$(echo $assembly | cut -f 2 -d "_" | cut -c 7-9)
-
-        ass_name="${curr_line[2]}"
-        end_path=$(paste -d "_" <(echo "$assembly") <(echo "$ass_name"))
-
-        base_link=$(paste -d "/" <(echo "$p1") <(echo "$p2") <(echo "$p3") <(echo "$p4") <(echo "$p5") <(echo "$end_path"))
-
+    # if the link couldn't be resolved at all, skip the download attempts and
+    # let the downstream "not downloaded" handling report it (avoids hammering a
+    # bogus URL through the retry loop)
+    if [ "$(echo "$base_link" | tr "[:upper:]" "[:lower:]")" == "na" ] || [ -z "$base_link" ]; then
+        printf "  ${ORANGE}Could not resolve a download link for $assembly; skipping.${NC}\n\n"
+        echo "$assembly (no resolvable download link)" >> ${output_dir}/run_files/ncbi_download_errors.txt
     else
 
-        end_path=$(basename $base_link)
+    # attempting to download genes for assembly (robust retries; exit 44 == a
+    # definitive 404, meaning no protein file -> fall back to the genome below)
+    gtt-download-ncbi-file "${base_link}/${end_path}_protein.faa.gz" "${tmp_dir}/${assembly}_genes2.tmp.gz" 2>> ${output_dir}/run_files/ncbi_download_errors.txt
+    protein_dl_status=$?
 
-    fi
-
-    # attempting to download genes for assembly
-    curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genes2.tmp.gz "${base_link}/${end_path}_protein.faa.gz"
-
-    # if http, then it pulls down a file still, it just isn't gzipped
-    # if ftp, no file is pulled down
-    # so to cover both cases, just making this need to be present and gzipped
-    if $(file ${tmp_dir}/${assembly}_genes2.tmp.gz | grep -q gzip); then
+    # accept only if we actually got a valid gzip (guards against any partial file)
+    if [ $protein_dl_status -eq 0 ] && $(file ${tmp_dir}/${assembly}_genes2.tmp.gz | grep -q gzip); then
         gunzip -f ${tmp_dir}/${assembly}_genes2.tmp.gz
         # renaming headers to avoid problems with odd characters and how hmmer parses and such
         gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes3.tmp
 
     else # trying to get assembly if there were no gene annotations available
         rm -rf ${tmp_dir}/${assembly}_genes2.tmp.gz
-        curl --silent --retry 10 -o ${tmp_dir}/${assembly}_genome.tmp.gz "${base_link}/${end_path}_genomic.fna.gz"
+        gtt-download-ncbi-file "${base_link}/${end_path}_genomic.fna.gz" "${tmp_dir}/${assembly}_genome.tmp.gz" 2>> ${output_dir}/run_files/ncbi_download_errors.txt
+        genome_dl_status=$?
 
-        if [ -s ${tmp_dir}/${assembly}_genome.tmp.gz ]; then
+        if [ $genome_dl_status -eq 0 ] && [ -s ${tmp_dir}/${assembly}_genome.tmp.gz ]; then
 
             gunzip -f ${tmp_dir}/${assembly}_genome.tmp.gz
 
@@ -104,6 +80,7 @@ do
             ## renaming seqs to have assembly name
             gtt-rename-fasta-headers -i ${tmp_dir}/${assembly}_genes2.tmp -w $assembly -o ${tmp_dir}/${assembly}_genes3.tmp
         fi
+    fi
     fi
 
     if [ -s ${tmp_dir}/${assembly}_genes3.tmp ]; then

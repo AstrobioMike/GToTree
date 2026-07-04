@@ -1,0 +1,119 @@
+#!/usr/bin/env python
+
+"""
+Small helper module vendored from bit's `bit/modules/general.py` so the GToTree
+NCBI assembly-info scripts have the same download/reporting behavior without
+importing from the `bit` package at runtime.
+
+This is imported by:
+  - gtt-get-ncbi-assembly-tables   (slim-tarball acquisition + NCBI rebuild fallback)
+  - gtt-download-ncbi-file         (per-genome robust downloader)
+
+Only the handful of functions those scripts need are carried over; if bit's
+originals change, re-sync the copies here.
+"""
+
+import os
+import sys
+import shutil
+import textwrap
+import urllib.request
+
+try:
+    from tqdm import tqdm  # type: ignore
+except Exception:  # pragma: no cover - tqdm should be a declared dependency
+    tqdm = None
+
+
+# setting some colors to use
+def color_text(text, color='green'):
+    tty_colors = {
+        'green':  '\033[0;32m%s\033[0m',
+        'orange': '\033[38;5;208m%s\033[0m',
+        'red':    '\033[0;31m%s\033[0m',
+        'teal':   '\033[0;36m%s\033[0m',
+        'yellow': '\033[0;33m%s\033[0m',
+    }
+    if sys.stdout.isatty() and color != "none":
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text, width=80, initial_indent="  ", subsequent_indent="  "):
+    print(textwrap.fill(text, width=width, initial_indent=initial_indent,
+          subsequent_indent=subsequent_indent, break_on_hyphens=False))
+
+
+def report_message(message, color="yellow", width=80,
+                   initial_indent="  ", subsequent_indent="  ",
+                   join=True, leading_newline=True, trailing_newline=False):
+
+    if leading_newline:
+        print("")
+
+    if join:
+        message = " ".join(message.split())
+
+    wrapped = textwrap.fill(
+        message,
+        width=width,
+        initial_indent=initial_indent,
+        subsequent_indent=subsequent_indent,
+        break_on_hyphens=False,
+    )
+
+    print(color_text(wrapped, color))
+
+    if trailing_newline:
+        print("")
+
+
+def notify_premature_exit(exit_code=1):
+    print("\n  Exiting for now :(\n", file=sys.stderr)
+    sys.exit(exit_code)
+
+
+def check_files_are_found(paths_list):
+    for path in paths_list:
+        if not os.path.isfile(path):
+            print(f"\n    We were not able to find the input file: {path}")
+            notify_premature_exit()
+
+
+def attempt_to_make_dir(dir_path):
+    try:
+        os.makedirs(dir_path, exist_ok=True)
+    except Exception as e:
+        report_message(f"Failed to create directory '{dir_path}' with the following error:\n{e}", "red")
+        notify_premature_exit()
+
+
+def download_with_tqdm(url, target, filename=None, urlopen=False):
+    """
+    download `url` to `filename` with a tqdm progress bar. Mirrors bit's helper,
+    including the curl User-Agent (some NCBI/GitHub endpoints behave better with
+    it). Falls back to a plain retrieve if tqdm isn't importable.
+    """
+    opener = urllib.request.build_opener()
+    opener.addheaders = [('User-Agent', 'curl/8.0')]
+    urllib.request.install_opener(opener)
+
+    if tqdm is None:
+        downloaded_path, _ = urllib.request.urlretrieve(url, filename)
+        return downloaded_path
+
+    with tqdm(unit='B', unit_scale=True, unit_divisor=1024, miniters=1,
+              desc=target, ncols=90) as t:
+        def reporthook(block_num, block_size, total_size):
+            if total_size > 0:
+                t.total = total_size
+            t.update(block_size)
+        if not urlopen:
+            downloaded_path, _ = urllib.request.urlretrieve(url, filename, reporthook=reporthook)
+            sys.stdout.write("")
+            return downloaded_path
+        else:
+            dl = urllib.request.urlopen(url, reporthook=reporthook)
+            sys.stdout.write("")
+            return dl

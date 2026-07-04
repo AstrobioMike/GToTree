@@ -1,0 +1,169 @@
+#!/usr/bin/env python
+
+"""
+Robust single-file downloader for the per-genome NCBI pulls in GToTree's
+gtt-ncbi-*.sh scripts, replacing a bare `curl --retry`. Ported from bit's
+download_one (bit/modules/ncbi/dl_ncbi_assemblies.py).
+
+Downloads ONE URL to ONE destination per invocation. Retries transient failures
+(429/500/502/503/504, connection errors, error pages, empty bodies) with
+exponential backoff + jitter, honoring a Retry-After header when present.
+Validates gzip integrity for .gz destinations.
+
+Exit codes (so the calling bash can branch correctly):
+  0   success (file downloaded, or already present and valid -> skipped)
+  44  definitive 404 -- the file isn't available in this format at NCBI.
+      For the protein-first scripts this is the normal signal to fall back to
+      the genome + prodigal path; it is NOT an error.
+  1   transient failure after all retries, or any other error. The caller should
+      treat this as "not downloaded" and report the accession.
+
+Usage:
+  gtt-download-ncbi-file <url> <dest_path> [--retries N] [--timeout SECONDS] [--quiet]
+
+A one-line reason is printed to stderr on failure (used for the not-downloaded
+report); nothing is printed to stdout on success unless --verbose is given.
+"""
+
+import sys
+import os
+import time
+import gzip
+import random
+import argparse
+from pathlib import Path
+
+import requests  # type: ignore
+
+
+TRANSIENT_STATUS = {429, 500, 502, 503, 504}
+
+EXIT_OK = 0
+EXIT_FAIL = 1
+EXIT_404 = 44
+
+
+def valid_gzip(path):
+    """integrity check for a gzipped file (used to accept an already-present file)."""
+    if str(path).endswith(".gz"):
+        try:
+            with gzip.open(path, "rb") as fh:
+                while fh.read(1024 * 1024):
+                    pass
+            return True
+        except (OSError, EOFError):
+            return False
+    return True
+
+
+def sleep_backoff(attempt, resp=None):
+    """
+    sleep before a retry. Honors an NCBI-provided Retry-After header when
+    present, otherwise exponential backoff with jitter.
+    """
+    if resp is not None:
+        retry_after = resp.headers.get("Retry-After")
+        if retry_after:
+            try:
+                time.sleep(float(retry_after))
+                return
+            except ValueError:
+                pass
+    time.sleep((2 ** (attempt - 1)) + random.uniform(0, 1))
+
+
+def download_one(target_link, local_dest, retries, timeout):
+    """
+    returns (status, reason) where status is one of:
+      "downloaded", "skipped", "not_found", "failed"
+    """
+    local_path = Path(local_dest)
+
+    if local_path.exists() and local_path.stat().st_size > 0 and valid_gzip(local_path):
+        return ("skipped", None)
+
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.get(target_link, stream=True, timeout=timeout)
+
+            if resp.status_code == 404:
+                return ("not_found", "Not available in requested format (404)")
+
+            if resp.status_code in TRANSIENT_STATUS:
+                if attempt == retries:
+                    return ("failed", f"HTTP {resp.status_code} after {retries} attempts")
+                sleep_backoff(attempt, resp)
+                continue
+
+            resp.raise_for_status()
+
+            content_type = resp.headers.get("Content-Type", "")
+            if "xml" in content_type.lower() or "html" in content_type.lower():
+                if attempt == retries:
+                    return ("failed", f"NCBI returned an error page after {retries} attempts")
+                sleep_backoff(attempt)
+                continue
+
+            with open(local_path, "wb") as fh:
+                for chunk in resp.iter_content(chunk_size=1024 * 64):
+                    fh.write(chunk)
+
+            if local_path.stat().st_size == 0:
+                local_path.unlink(missing_ok=True)
+                if attempt == retries:
+                    return ("failed", "Downloaded file was empty")
+                sleep_backoff(attempt)
+                continue
+
+            # guard against a truncated gzip slipping through
+            if not valid_gzip(local_path):
+                local_path.unlink(missing_ok=True)
+                if attempt == retries:
+                    return ("failed", "Downloaded gzip was truncated/corrupt")
+                sleep_backoff(attempt)
+                continue
+
+            return ("downloaded", None)
+
+        except (requests.RequestException, OSError) as e:
+            if attempt == retries:
+                local_path.unlink(missing_ok=True)
+                return ("failed", str(e))
+            sleep_backoff(attempt)
+
+    # shouldn't be reached, but be explicit
+    return ("failed", "exhausted retries")
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument("url")
+    ap.add_argument("dest")
+    ap.add_argument("--retries", type=int, default=20)
+    ap.add_argument("--timeout", type=float, default=60)
+    ap.add_argument("--verbose", action="store_true",
+                    help="print the outcome to stderr even on success")
+    args = ap.parse_args()
+
+    status, reason = download_one(args.url, args.dest, args.retries, args.timeout)
+
+    if status in ("downloaded", "skipped"):
+        if args.verbose:
+            sys.stderr.write(f"{status}: {args.dest}\n")
+        sys.exit(EXIT_OK)
+
+    if status == "not_found":
+        # definitive 404 -- normal fall-through signal, keep it quiet
+        if args.verbose:
+            sys.stderr.write(f"404: {args.url}\n")
+        sys.exit(EXIT_404)
+
+    # failed (transient-exhausted or other)
+    sys.stderr.write(f"{reason}\n")
+    sys.exit(EXIT_FAIL)
+
+
+if __name__ == "__main__":
+    main()

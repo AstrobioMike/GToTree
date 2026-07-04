@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.8.17"
+VERSION="v1.8.18"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -1692,6 +1692,12 @@ if [ -n "$NCBI_acc_file" ]; then
     fi
 
     printf "     ********************************************************************** \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
+
+    # the per-genome download scripts redirect stderr into this log, which
+    # creates the file even on a clean run with no errors; removing if empty
+    if [ -f ${output_dir}/run_files/ncbi_download_errors.txt ] && [ ! -s ${output_dir}/run_files/ncbi_download_errors.txt ]; then
+        rm -f ${output_dir}/run_files/ncbi_download_errors.txt
+    fi
 
     # adding to genomes from all sources file
     cat ${tmp_dir}/final_included_NCBI_accs.tmp >> ${tmp_dir}/genomes_from_all_sources.tmp

@@ -2,67 +2,142 @@
 
 import sys
 import argparse
+import itertools
+import re
 
-parser = argparse.ArgumentParser(description='This script is for parsing NCBI\'s assembly summary file down to the provided accessions.')
+
+def sanitize_assembly_name(name):
+    """mirror NCBI's directory-name sanitizing (ported from bit)."""
+    sanitized = re.sub(r"[\s/,#()\[\]]", "_", name)
+    sanitized = re.sub(r"_+", "_", sanitized)
+    return sanitized.strip("_")
+
+
+def build_base_link(dl_acc, assembly_name):
+    """
+    fallback directory URL builder, used only when the summary row has no usable
+    ftp_path (ported from bit's parse_ncbi_assembly_summary.build_base_link).
+    Returns the directory URL (with trailing slash) and its basename.
+    """
+    base_url = "https://ftp.ncbi.nlm.nih.gov/genomes/all/"
+    prefix, rest = dl_acc.split("_", 1)
+    number = rest.split(".")[0]
+    p1, p2, p3 = number[0:3], number[3:6], number[6:9]
+    dir_basename = f"{dl_acc}_{sanitize_assembly_name(assembly_name)}"
+    path = f"{prefix}/{p1}/{p2}/{p3}/{dir_basename}/"
+    return base_url + path, dir_basename
+
+
+def resolve_base_link(ftp_path, dl_acc, assembly_name):
+    """
+    resolve the download directory URL for a row: prefer the summary's real
+    ftp_path (normalized to https, no trailing slash); otherwise rebuild it from
+    the accession + assembly name; otherwise NA. Returns the directory URL
+    (no trailing slash, or "NA").
+    """
+    ftp_path = (ftp_path or "").strip()
+    if ftp_path and ftp_path.lower() != "na":
+        return ftp_path.replace("ftp://", "https://").rstrip("/")
+    if dl_acc and dl_acc.lower() != "na" and assembly_name and assembly_name.lower() != "na":
+        built, _ = build_base_link(dl_acc, assembly_name)
+        return built.rstrip("/")
+    return "na"
+
+
+parser = argparse.ArgumentParser(description="This script is for parsing NCBI's assembly summary file down to the provided accessions.")
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-a", "--assembly_summary", help="NCBI's assembly summary file", action="store", dest="all_assemblies", required=True)
+required.add_argument("-a", "--assembly_summary", help="NCBI's (slim) assembly summary file", action="store", dest="all_assemblies", required=True)
 required.add_argument("-w", "--wanted_accessions", help="Single-column file with wanted accessions", action="store", dest="wanted_accs", required=True)
 parser.add_argument("-o", "--output_file", help='Wanted summary info only (default: "Wanted.tsv")', action="store", dest="output_file", default="Wanted.tsv")
 
-if len(sys.argv)==1:
+if len(sys.argv) == 1:
     parser.print_help(sys.stderr)
     sys.exit(0)
 
 args = parser.parse_args()
 
-wanted_dict = {}
 
+# logical field -> column name in the (slim or full) NCBI assembly summary
+NAMES = {
+    "accession":      "assembly_accession",
+    "assembly_name":  "asm_name",
+    "taxid":          "taxid",
+    "org_name":       "organism_name",
+    "infra_name":     "infraspecific_name",
+    "version_status": "version_status",
+    "assembly_level": "assembly_level",
+    "ftp_path":       "ftp_path",
+}
+
+# fixed positions in NCBI's full assembly_summary_*.txt (headerless fallback)
+LEGACY_POS = {
+    "accession": 0, "assembly_name": 15, "taxid": 5, "org_name": 7,
+    "infra_name": 8, "version_status": 10, "assembly_level": 11,
+    "ftp_path": 19,
+}
+
+
+def resolve_positions(header_line):
+    """header line (clean or '#'-prefixed) -> {logical: index}."""
+    names = header_line.lstrip("#").rstrip("\n").split("\t")
+    idx = {name: i for i, name in enumerate(names)}
+    return {logical: idx[col] for logical, col in NAMES.items()}
+
+
+wanted_dict = {}
 with open(args.wanted_accs, "r") as wanted_accs:
     for line in wanted_accs:
         root_acc = line.strip().split(".")[0]
         wanted_dict[str(root_acc)] = line.strip()
 
-out_file = open(args.output_file, "w")
 
-# out_file.write("input_accession\tdownloaded_accession\tassembly_name\ttaxid\torganism_name\tinfraspecific_name\tversion_status\tassembly_level\tftp_path\n")
+def clean(value):
+    value = value.strip()
+    return value if value else "NA"
 
-with open(args.all_assemblies) as assemblies:
-    for line in assemblies:
-        line = line.split("\t")
-        if line[0].split(".")[0] in wanted_dict:
-            
-            dl_acc = str(line[0])
-            if not dl_acc:
-                dl_acc = "NA"
-            
-            ass_name = str(line[15])
-            if not ass_name:
-                ass_name = "NA"
-            
-            taxid = str(line[5])
-            if not taxid:
-                taxid = "NA"
-            
-            org_name = str(line[7])
-            if not org_name:
-                org_name = "NA"
-            
-            infra_name = str(line[8])
-            if not infra_name:
-                infra_name = "NA"
-            
-            version_status = str(line[10])
-            if not version_status:
-                version_status = "NA"
-            
-            ass_level = str(line[11])
-            if not ass_level:
-                ass_level = "NA"
-            
-            ftp_path = str(line[19])
-            if not ftp_path:
-                ftp_path = "NA"
 
-            out_file.write(str(wanted_dict[str(line[0].split(".")[0])]) + "\t" + str(dl_acc) + "\t"  + str(ass_name) + "\t" + str(taxid) + "\t" + str(org_name) + "\t" + str(infra_name) + "\t" + str(version_status) + "\t" + str(ass_level) + "\t" + str(ftp_path) + "\n")
+with open(args.output_file, "w") as out_file, open(args.all_assemblies, "r") as assemblies:
+
+    # peek at the first line to decide header-based vs. legacy-positional
+    first = assemblies.readline()
+    first_stripped = first.lstrip("#").rstrip("\n")
+    if first_stripped.split("\t", 1)[0] == "assembly_accession":
+        pos = resolve_positions(first)          # header present
+        remaining = assemblies                  # data starts on the next line
+    else:
+        pos = dict(LEGACY_POS)                   # headerless -> legacy positions
+        remaining = itertools.chain([first], assemblies)   # first line is data
+
+    p_acc = pos["accession"]; p_name = pos["assembly_name"]
+    p_tax = pos["taxid"]; p_org = pos["org_name"]; p_infra = pos["infra_name"]
+    p_ver = pos["version_status"]; p_lvl = pos["assembly_level"]; p_ftp = pos["ftp_path"]
+    max_pos = max(pos.values())
+
+    for line in remaining:
+        fields = line.rstrip("\n").split("\t")
+        if not fields or len(fields) <= max_pos:
+            continue
+        if fields[p_acc].split(".")[0] in wanted_dict:
+
+            dl_acc = clean(fields[p_acc])
+            ass_name = clean(fields[p_name])
+            taxid = clean(fields[p_tax])
+            org_name = clean(fields[p_org])
+            infra_name = clean(fields[p_infra])
+            version_status = clean(fields[p_ver])
+            ass_level = clean(fields[p_lvl])
+
+            # resolve the download directory URL here (bit's logic): prefer the
+            # real ftp_path (normalized to https), else rebuild it, else NA. The
+            # downstream .sh scripts consume this column directly as base_link
+            # and no longer build paths themselves.
+            base_link = resolve_base_link(fields[p_ftp], dl_acc, ass_name)
+
+            out_file.write(
+                wanted_dict[fields[p_acc].split(".")[0]] + "\t" +
+                dl_acc + "\t" + ass_name + "\t" + taxid + "\t" +
+                org_name + "\t" + infra_name + "\t" + version_status + "\t" +
+                ass_level + "\t" + base_link + "\n"
+            )
