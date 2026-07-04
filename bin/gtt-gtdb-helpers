@@ -1,0 +1,314 @@
+#!/usr/bin/env python
+
+"""
+Shared GTDB data-acquisition helpers for GToTree, ported from bit's
+bit/modules/gtdb/get_gtdb_data.py.
+
+Imported by:
+  - gtt-check-or-setup-GTDB-files   (the main GToTree driver's setup step)
+  - gtt-get-accessions-from-GTDB    (the user-facing GTDB search/accession tool)
+
+Both previously carried their own duplicated download-and-split logic; this
+module is the single source of truth so they can't drift.
+
+Default behavior: download bit's pre-slimmed GTDB tarball (fast, one file). The
+full upstream rebuild (gen_gtdb_tab) runs only as a fallback when the hosted
+tarball can't be retrieved. There is no version/freshness check: the table is
+left alone unless it's absent or the caller forces a re-pull.
+
+The slim table keeps only the columns GToTree/bit use (GTDB_KEPT_COLUMNS), with
+the 7 taxonomic ranks pre-split into their own columns. Readers must look these
+up by name from the header (the on-disk column order is NOT the legacy
+accession-then-ranks order), which is why gtt-parse-gtdb-assembly-summary-file
+is header-aware.
+"""
+
+import sys
+import os
+import socket
+import shutil
+import tarfile
+import time
+import urllib
+import urllib.error
+import urllib.request
+import importlib.util
+from importlib.machinery import SourceFileLoader
+
+import pandas as pd  # type: ignore
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load(module_basename):
+    # sibling modules have no .py extension; give importlib an explicit source
+    # loader rather than relying on extension-based detection.
+    path = os.path.join(_THIS_DIR, module_basename)
+    mod_name = module_basename.replace("-", "_")
+    loader = SourceFileLoader(mod_name, path)
+    spec = importlib.util.spec_from_loader(mod_name, loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+_helpers = _load("gtt-ncbi-helpers")
+wprint = _helpers.wprint
+color_text = _helpers.color_text
+report_message = _helpers.report_message
+notify_premature_exit = _helpers.notify_premature_exit
+download_with_tqdm = _helpers.download_with_tqdm
+
+
+# upstream GTDB release base (used only for the rebuild fallback)
+GTDB_BASE_URL = "https://data.ace.uq.edu.au/public/gtdb/data/releases/latest"
+# alternate upstream, if a caller wants the ecogenomics mirror
+GTDB_ECOGENOMICS_BASE_URL = "https://data.gtdb.ecogenomic.org/releases/latest"
+
+# pre-slimmed table + version-info, packaged as a single .tar.gz and hosted on a
+# bit GitHub release for a fast default download. The archive contains exactly
+# two files at its root:
+#   GTDB-arc-and-bac-metadata.tsv   (already slimmed to GTDB_KEPT_COLUMNS)
+#   GTDB-version-info.txt
+# GToTree depends on the bit-hosted asset (identical layout to what GToTree needs).
+GTDB_SLIM_TARBALL_URL = "https://github.com/AstrobioMike/bit/releases/download/gtdb-metadata-latest/GTDB-arc-and-bac-metadata.tar.gz"
+
+# the columns kept in the slim table (must be a superset of what GToTree reads:
+# accession, ncbi_genbank_assembly_accession, ncbi_refseq_category,
+# gtdb_representative, and the 7 ranks). Order here is on-disk order; readers
+# resolve columns by NAME from the header, not by position.
+GTDB_KEPT_COLUMNS = [
+    "accession", "ncbi_genbank_assembly_accession", "ncbi_taxid",
+    "gtdb_representative", "ncbi_refseq_category",
+    "domain", "phylum", "class", "order", "family", "genus", "species",
+    "checkm2_completeness", "checkm2_contamination",
+    "checkm_completeness", "checkm_contamination",
+    "genome_size", "contig_count", "gc_count", "gc_percentage", "ambiguous_bases",
+    "coding_bases", "coding_density",
+]
+
+GTDB_TABLE_FILENAME = "GTDB-arc-and-bac-metadata.tsv"
+GTDB_VERSION_FILENAME = "GTDB-version-info.txt"
+
+RANKS = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+
+
+def check_if_gtdb_data_present(location):
+    """True if both the slim table and version-info file are present and non-empty."""
+    metadata_path = os.path.join(str(location), GTDB_TABLE_FILENAME)
+    version_info_path = os.path.join(str(location), GTDB_VERSION_FILENAME)
+
+    def is_nonempty_file(p):
+        return os.path.isfile(p) and os.path.getsize(p) > 0
+
+    if not is_nonempty_file(metadata_path) or not is_nonempty_file(version_info_path):
+        for p in (metadata_path, version_info_path):
+            if os.path.exists(p) and os.path.isfile(p):
+                os.remove(p)
+        return False
+    return True
+
+
+def _download_with_retries(url, label, dest, attempts=4, retry_wait=3):
+    """
+    download `url` to `dest`, retrying up to `attempts` times on transient
+    failures, with a short wait between tries. A 404 is raised immediately
+    (not retried). Raises the last error if all attempts fail.
+    """
+    last_err = None
+    for attempt in range(1, attempts + 1):
+        try:
+            download_with_tqdm(url, label, dest)
+            return
+        except urllib.error.HTTPError as err:
+            if err.code == 404:
+                raise
+            last_err = err
+        except (urllib.error.URLError, socket.timeout, TimeoutError,
+                ConnectionError, OSError) as err:
+            last_err = err
+
+        if attempt < attempts:
+            wprint(color_text(
+                f"    download failed (attempt {attempt}/{attempts}); retrying...",
+                "yellow"))
+            time.sleep(retry_wait)
+
+    raise last_err
+
+
+def get_slim_gtdb_tab(location, use_ecogenomics=False):
+    """
+    default path: download bit's pre-slimmed GTDB tarball and extract its two
+    files (the slim metadata table and the version-info file) into `location`.
+    Falls back to rebuilding from the upstream GTDB release (gen_gtdb_tab) if no
+    tarball URL is configured or the download/extract fails.
+    """
+    metadata_path = os.path.join(location, GTDB_TABLE_FILENAME)
+    version_info_path = os.path.join(location, GTDB_VERSION_FILENAME)
+
+    if not GTDB_SLIM_TARBALL_URL:
+        gen_gtdb_tab(location, use_ecogenomics=use_ecogenomics)
+        return
+
+    print(color_text("\n    Downloading the prepared GTDB table (only needs to be done once)...\n", "yellow"))
+
+    tarball_path = os.path.join(location, "GTDB-slim.tar.gz")
+    expected = {GTDB_TABLE_FILENAME, GTDB_VERSION_FILENAME}
+
+    default_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(30)
+    try:
+        _download_with_retries(
+            GTDB_SLIM_TARBALL_URL, "        GTDB prepared data", tarball_path)
+
+        # a truncated/corrupt download fails here (full-stream read via
+        # getmembers), tripping the fallback rather than writing a corrupt table.
+        with tarfile.open(tarball_path, "r:gz") as tar:
+            members = tar.getmembers()
+            wanted = {}
+            for m in members:
+                base = os.path.basename(m.name)
+                if base in expected and m.isfile():
+                    wanted[base] = m
+            missing = expected - set(wanted)
+            if missing:
+                raise ValueError(
+                    f"prepared GTDB archive is missing expected file(s): {', '.join(sorted(missing))}")
+
+            for base, m in wanted.items():
+                src = tar.extractfile(m)
+                if src is None:
+                    raise ValueError(f"could not read '{base}' from prepared GTDB archive")
+                dest = os.path.join(location, base)
+                with src, open(dest, "wb") as out:
+                    shutil.copyfileobj(src, out)
+
+    except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError,
+            tarfile.TarError, ValueError, OSError) as err:
+        for p in (tarball_path, metadata_path, version_info_path):
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+        print("")
+        wprint(color_text("  Couldn't get the prepared GTDB table; "
+                          "rebuilding from the upstream GTDB release instead.", "yellow"))
+        report_message(f"Underlying issue: {err}", initial_indent="    ",
+                       subsequent_indent="    ")
+        print("")
+        gen_gtdb_tab(location, use_ecogenomics=use_ecogenomics)
+        return
+    finally:
+        socket.setdefaulttimeout(default_timeout)
+        if os.path.exists(tarball_path):
+            try:
+                os.remove(tarball_path)
+            except OSError:
+                pass
+    print("")
+
+
+def gen_gtdb_tab(location, use_ecogenomics=False):
+    """
+    rebuild fallback: download the archaeal + bacterial metadata tables directly
+    from the upstream GTDB release, split the taxonomy string into the 7 ranks,
+    slim to GTDB_KEPT_COLUMNS, and write GTDB-arc-and-bac-metadata.tsv +
+    GTDB-version-info.txt. Returns the parsed DataFrame.
+    """
+    base = GTDB_ECOGENOMICS_BASE_URL if use_ecogenomics else GTDB_BASE_URL
+
+    metadata_path = os.path.join(str(location), GTDB_TABLE_FILENAME)
+    version_info_path = os.path.join(str(location), GTDB_VERSION_FILENAME)
+
+    print(color_text("\n    Downloading and parsing metadata tables from GTDB (only needs to be done once)...\n", "yellow"))
+
+    default_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(30)
+    try:
+        arc_link = f"{base}/ar53_metadata.tsv.gz"
+        arc_tsv_gz = urllib.request.urlopen(arc_link)
+        arc_tab = pd.read_csv(arc_tsv_gz, sep="\t", compression="gzip", on_bad_lines='skip', header=0, low_memory=False)
+        arc_tab.rename(columns={arc_tab.columns[0]: "accession"}, inplace=True)
+        arc_tab.dropna(inplace=True, how="all")
+
+        bac_link = f"{base}/bac120_metadata.tsv.gz"
+        bac_tsv_gz = urllib.request.urlopen(bac_link)
+        bac_tab = pd.read_csv(bac_tsv_gz, sep="\t", compression="gzip", on_bad_lines='skip', header=0, low_memory=False)
+        bac_tab.rename(columns={bac_tab.columns[0]: "accession"}, inplace=True)
+        bac_tab.dropna(inplace=True, how="all")
+    except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError) as err:
+        socket.setdefaulttimeout(default_timeout)
+        report_message(f"The GTDB data server could not be reached :(\nUnderlying error: {err}", "red")
+        notify_premature_exit()
+        return
+    finally:
+        socket.setdefaulttimeout(default_timeout)
+
+    gtdb_tab = pd.concat([arc_tab, bac_tab])
+
+    # splitting gtdb taxonomy column into 7 ranks
+    domain, phylum, rclass, order, family, genus, species = [], [], [], [], [], [], []
+    for index, row in gtdb_tab.iterrows():
+        curr_acc = row["accession"]
+        tax_list = row["gtdb_taxonomy"].split(";")
+        if len(tax_list) != 7:
+            wprint(color_text("GTDB entry " + curr_acc + " doesn't seem to have 7-column lineage info. Something is likely wrong :(", "yellow"))
+            print("")
+            wprint("If this continues to happen, please file an issue at github.com/AstrobioMike/GToTree/issues")
+            print("")
+            wprint("Aborting for now.")
+            print("")
+            sys.exit(0)
+        domain.append(tax_list[0][3:])
+        phylum.append(tax_list[1][3:])
+        rclass.append(tax_list[2][3:])
+        order.append(tax_list[3][3:])
+        family.append(tax_list[4][3:])
+        genus.append(tax_list[5][3:])
+        species.append(tax_list[6][3:])
+
+    gtdb_tab.insert(1, "species", species)
+    gtdb_tab.insert(1, "genus", genus)
+    gtdb_tab.insert(1, "family", family)
+    gtdb_tab.insert(1, "order", order)
+    gtdb_tab.insert(1, "class", rclass)
+    gtdb_tab.insert(1, "phylum", phylum)
+    gtdb_tab.insert(1, "domain", domain)
+
+    # slim to only the kept columns (intersect with present columns so a release
+    # missing one of them doesn't error)
+    keep = [c for c in GTDB_KEPT_COLUMNS if c in gtdb_tab.columns]
+    slim_tab = gtdb_tab[keep]
+    slim_tab.to_csv(metadata_path, index=False, sep="\t")
+
+    # version info
+    try:
+        socket.setdefaulttimeout(30)
+        urllib.request.urlretrieve(f"{base}/VERSION.txt", version_info_path)
+    except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError):
+        try:
+            urllib.request.urlretrieve(f"{base}/VERSION", version_info_path)
+        except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError) as err:
+            socket.setdefaulttimeout(default_timeout)
+            report_message(f"Could not retrieve GTDB version info :(\nUnderlying error: {err}", "red")
+            notify_premature_exit()
+            return
+    finally:
+        socket.setdefaulttimeout(default_timeout)
+
+    return slim_tab
+
+
+def report_gtdb_version_info(location):
+    """print the stored GTDB version + release date."""
+    version_info = []
+    with open(os.path.join(location, GTDB_VERSION_FILENAME)) as version_info_file:
+        for line in version_info_file:
+            line = line.strip()
+            if line != "":
+                version_info.append(line)
+    gtdb_version = version_info[0]
+    gtdb_release_date = version_info[1] if len(version_info) > 1 else ""
+    print("    Using GTDB " + gtdb_version + ": " + gtdb_release_date + "\n")

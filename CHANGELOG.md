@@ -2,7 +2,8 @@
 
 ## v1.8.18 (4-Jul-2026)
 
-- Robustness improvements to assembly downloading
+- robustness improvements to assembly downloading
+- downloads pre-packaged, slimmed ncbi assembly summary and gtdb metadata tables now (much faster)
 
 --- 
 

@@ -4,25 +4,48 @@
 This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki)
 for setting up reference files for the glorious Genome Taxonomy Database (gtdb.ecogenomic.org/).
 
+It ensures the (slim) GTDB metadata table is present, downloading bit's
+pre-slimmed tarball if it isn't. There is no version/freshness check: if the
+table is present it is left alone. Rebuilding directly from the upstream GTDB
+release happens only as a fallback if the hosted tarball can't be retrieved.
+
 For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
 """
 
 import sys
 import os
-import urllib.request
-import pandas as pd
-import textwrap
 import argparse
-import ssl
-###########
-# temp fix for certificate failure: https://github.com/AstrobioMike/GToTree/issues/107
-ssl._create_default_https_context = ssl._create_unverified_context
-###########
+import importlib.util
+from importlib.machinery import SourceFileLoader
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-parser = argparse.ArgumentParser(description="This is a helper program to facilitate setting up the reference files for the \
-                                              glorious Genome Taxonomy Database (gtdb.ecogenomic.org). It's really meant for internal \
-                                              use only by the main GToTree program.")
+def _load(module_basename):
+    path = os.path.join(_THIS_DIR, module_basename)
+    mod_name = module_basename.replace("-", "_")
+    loader = SourceFileLoader(mod_name, path)
+    spec = importlib.util.spec_from_loader(mod_name, loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+_gtdb = _load("gtt-gtdb-helpers")
+_helpers = _load("gtt-ncbi-helpers")
+color_text = _helpers.color_text
+wprint = _helpers.wprint
+
+
+parser = argparse.ArgumentParser(
+    description="This is a helper program to facilitate setting up the reference files for the "
+                "glorious Genome Taxonomy Database (gtdb.ecogenomic.org). It's really meant for "
+                "internal use only by the main GToTree program.")
+
+parser.add_argument("-f", "--force-update",
+                    help="Re-download the slim GTDB table even if it is already present "
+                         "(pulls the hosted slim tarball again).",
+                    action="store_true")
 
 args = parser.parse_args()
 
@@ -31,33 +54,15 @@ args = parser.parse_args()
 def main():
 
     ## checking env variable is set and writable
-    check_location_var_is_set_and_writable("GTDB_dir")
+    GTDB_dir = check_location_var_is_set_and_writable("GTDB_dir")
 
-    ## setting up ref GTDB files if needed
-    check_and_or_get_gtdb_files(os.environ["GTDB_dir"])
+    ## setting up ref GTDB files if needed (or if forced)
+    if _gtdb.check_if_gtdb_data_present(GTDB_dir) and not args.force_update:
+        sys.exit(0)
+
+    _gtdb.get_slim_gtdb_tab(GTDB_dir)
 
 ################################################################################
-
-
-# setting some colors
-tty_colors = {
-    'green' : '\033[0;32m%s\033[0m',
-    'yellow' : '\033[0;33m%s\033[0m',
-    'red' : '\033[0;31m%s\033[0m'
-}
-
-
-### functions ###
-def color_text(text, color='green'):
-    if sys.stdout.isatty():
-        return tty_colors[color] % text
-    else:
-        return text
-
-
-def wprint(text):
-    print(textwrap.fill(text, width=80, initial_indent="  ",
-          subsequent_indent="  ", break_on_hyphens=False))
 
 
 def check_location_var_is_set_and_writable(variable):
@@ -65,11 +70,9 @@ def check_location_var_is_set_and_writable(variable):
     # making sure there is an env variable
     try:
         path = os.environ[variable]
-
         if path == "":
-            raise
-
-    except:
+            raise KeyError
+    except KeyError:
         print()
         wprint(color_text("The environment variable '" + str(variable) + "' does not seem to be set, and we need it if wanting to add GTDB taxonomic lineages :(", "red"))
         print()
@@ -78,9 +81,7 @@ def check_location_var_is_set_and_writable(variable):
         sys.exit(1)
 
     # making sure path is writable for the user
-    path_writable = os.access(path, os.W_OK)
-
-    if not path_writable:
+    if not os.access(path, os.W_OK):
         print()
         wprint(color_text("The environment variable '" + str(variable) + "' does not seem to be writable, and we need it to be if wanting to add GTDB taxonomic lineages :(", "red"))
         print()
@@ -88,81 +89,7 @@ def check_location_var_is_set_and_writable(variable):
         print("\nExiting for now.\n")
         sys.exit(1)
 
-    return()
-
-
-def gen_gtdb_tab(location):
-    """ downloads and parses the GTDB info tables """
-
-    # getting archaea
-    # arc_tsv_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/ar53_metadata.tsv.gz")
-    arc_tsv_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/ar53_metadata.tsv.gz")
-    arc_tab = pd.read_csv(arc_tsv_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
-    arc_tab.rename(columns={arc_tab.columns[0]:"accession"}, inplace=True)
-    arc_tab.dropna(inplace=True, how="all")
-
-    # getting bacteria
-    # bac_tsv_gz = urllib.request.urlopen("https://data.gtdb.ecogenomic.org/releases/latest/bac120_metadata.tsv.gz")
-    bac_tsv_gz = urllib.request.urlopen("https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/bac120_metadata.tsv.gz")
-    bac_tab = pd.read_csv(bac_tsv_gz, sep="\t", compression="gzip", on_bad_lines = 'skip', header=0, low_memory=False)
-    bac_tab.rename(columns={bac_tab.columns[0]:"accession"}, inplace=True)
-    bac_tab.dropna(inplace=True, how="all")
-
-    # combining
-    gtdb_tab = pd.concat([arc_tab, bac_tab])
-
-    # splitting gtdb taxonomy column into 7 and dropping the single column
-    domain, phylum, rclass, order, family, genus, species = [], [], [], [], [], [], []
-
-    for index, row in gtdb_tab.iterrows():
-        curr_acc = row["accession"]
-        tax_list = row["gtdb_taxonomy"].split(";")
-
-        if len(tax_list) != 7:
-            wprint(color_text("GTDB entry " + curr_acc + " doesn't seem to have 7-column lineage info. Something is likely wrong :(", "yellow"))
-            print("")
-            wprint("If this continues to happen, please file an issue at github.com/AstrobioMike/GToTree/issues")
-            print("")
-            wprint("Aborting for now.")
-            print("")
-            sys.exit(0)
-
-        else:
-            domain.append(tax_list[0][3:])
-            phylum.append(tax_list[1][3:])
-            rclass.append(tax_list[2][3:])
-            order.append(tax_list[3][3:])
-            family.append(tax_list[4][3:])
-            genus.append(tax_list[5][3:])
-            species.append(tax_list[6][3:])
-
-    gtdb_tab.insert(1, "species", species)
-    gtdb_tab.insert(1, "genus", genus)
-    gtdb_tab.insert(1, "family", family)
-    gtdb_tab.insert(1, "order", order)
-    gtdb_tab.insert(1, "class", rclass)
-    gtdb_tab.insert(1, "phylum", phylum)
-    gtdb_tab.insert(1, "domain", domain)
-
-    # writing out
-    gtdb_tab.to_csv(location + "GTDB-arc-and-bac-metadata.tsv", index=False, sep="\t")
-
-    gtdb_version_info = urllib.request.urlretrieve("https://data.gtdb.ecogenomic.org/releases/latest/VERSION.txt", location + "GTDB-version-info.txt")
-
-
-def check_and_or_get_gtdb_files(GTDB_dir):
-    """ checks for and sets up ref GTDB files if needed """
-
-    if os.path.exists(GTDB_dir + "GTDB-arc-and-bac-metadata.tsv") and os.path.exists(GTDB_dir + "GTDB-version-info.txt"):
-
-        sys.exit(0)
-
-    # generating when table doesn't exist yet
-    else:
-        wprint(color_text("Downloading and parsing archaeal and bacterial metadata tables from GTDB (only needs to be done once)...", "yellow"))
-        print("")
-
-        gen_gtdb_tab(GTDB_dir)
+    return path
 
 
 if __name__ == "__main__":

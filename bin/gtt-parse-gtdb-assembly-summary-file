@@ -1,5 +1,16 @@
 #!/usr/bin/env python
 
+"""
+Parse GTDB's (slim) assembly metadata file down to the target accessions, and
+write out a GTDB taxonomy table for those.
+
+The taxonomy columns (domain, phylum, class, order, family, genus, species) are
+resolved BY NAME from the header row, not by fixed position. This is required
+because the slim table's column order is not the legacy
+"accession-then-7-ranks" order (the ranks sit further along, after some NCBI
+columns). Resolving by name keeps this robust to column order and additions.
+"""
+
 import sys
 import argparse
 
@@ -15,12 +26,13 @@ parser.add_argument("-n", "--not_found_accs_output_file", help='Accessions not f
 parser.add_argument("-t", "--gtdb_tax_output_file", help='Target GTDB taxonomy table (default: "target-gtdb-tax.tsv")', action="store", dest="gtdb_tax_output_file", default="target-gtdb-tax.tsv")
 
 
-
-if len(sys.argv)==1:
+if len(sys.argv) == 1:
     parser.print_help(sys.stderr)
     sys.exit(0)
 
 args = parser.parse_args()
+
+RANKS = ["domain", "phylum", "class", "order", "family", "genus", "species"]
 
 wanted_dict = {}
 
@@ -38,25 +50,40 @@ gtdb_found_accs_out_file = open(args.found_accs_output_file, "w")
 # adding header
 gtdb_found_accs_out_file.write("input_searched\tgtdb_acc_found\tfull_gtdb_acc\n")
 
+# resolving rank column positions from the header, so we don't depend on the
+# slim table's column order
+header_fields = None
+rank_idx = None
 
 with open(args.all_assemblies) as assemblies:
-    # writing out header to keep
-    out_file.write(assemblies.readline())
+    # writing out header to keep, and using it to locate the rank columns
+    header_line = assemblies.readline()
+    out_file.write(header_line)
+
+    header_fields = header_line.rstrip("\n").split("\t")
+    col_index = {name: i for i, name in enumerate(header_fields)}
+    missing = [r for r in RANKS if r not in col_index]
+    if missing:
+        sys.stderr.write(
+            "The GTDB metadata table is missing expected taxonomy column(s): "
+            + ", ".join(missing) + "\n")
+        sys.exit(1)
+    rank_idx = [col_index[r] for r in RANKS]
 
     for line in assemblies:
         split_line = line.strip().split("\t")
-        
+
         acc_with_no_version = split_line[0][7:].split(".")[0]
-        
+
         # i believe refseq typically only has 1 version, so taking even if not the same version as specified (this info, what was searched and what was found, is reported in the output "/run_files/gtdb_to_input_accession_map.tsv" file)
         if acc_with_no_version in wanted_dict:
 
             out_file.write(line)
             gtdb_found_accs_out_file.write(wanted_dict[acc_with_no_version] + "\t" + split_line[0][3:] + "\t" + split_line[0] + "\n")
-            
+
             # adding to found list
             found_accs.append(wanted_dict[acc_with_no_version])
-            
+
 out_file.close()
 gtdb_found_accs_out_file.close()
 
@@ -85,17 +112,18 @@ with open(args.output_file, "r") as assemblies:
 
     # skipping header
     next(assemblies)
-    
+
     for line in assemblies:
-        line = line.strip().split("\t")
+        line = line.rstrip("\n").split("\t")
         full_gtdb_acc = line[0]
         base_gtdb_acc = full_gtdb_acc[3:]
 
-        gtdb_tax_list = [line[1], line[2], line[3], line[4], line[5], line[6], line[7]]
-        
+        # pull the 7 ranks by resolved header position (not fixed 1..7)
+        gtdb_tax_list = [line[i] for i in rank_idx]
+
         if len(gtdb_tax_list) != 7:
             print("GTDB entry " + full_gtdb_acc + " doesn't seem to have full lineage info.")
 
-        out_gtdb_tax_table.write(base_gtdb_acc + "\t" + full_gtdb_acc + "\t" + gtdb_tax_list[0] + "\t" + gtdb_tax_list[1] + "\t" + gtdb_tax_list[2] + "\t" + gtdb_tax_list[3] + "\t" + gtdb_tax_list[4] + "\t" + gtdb_tax_list[5] + "\t" + gtdb_tax_list[6] + "\n")
+        out_gtdb_tax_table.write(base_gtdb_acc + "\t" + full_gtdb_acc + "\t" + "\t".join(gtdb_tax_list) + "\n")
 
 out_gtdb_tax_table.close()
