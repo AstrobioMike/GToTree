@@ -4,6 +4,7 @@
 
 - robustness improvements to assembly downloading
 - downloads pre-packaged, slimmed ncbi assembly summary and gtdb metadata tables now (much faster)
+  - --use-ecogenomics flag dropped from gtt-get-accessions-from-GTDB as it's not longer relevant
 
 --- 
 
