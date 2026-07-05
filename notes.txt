@@ -18,6 +18,8 @@
     # incorporate latest changes from master GToTree
         # e.g., GTDB download needs no-cert-check added and flag for --use-ecogenomics
         # gtt-gen-SCG-HMMs has been updated a bit (v1.8.17)
+        # assembly summary table and gtdb tables pulled from prepackaged ones on bit github
+        # bit's way of downloading assemblies with increased robutness (maybe even drop snakemake for that phase?)
         # check for others...
 
 
