@@ -47,5 +47,9 @@ jobs:
     - name: Set env var so subprocesses get coverage during pytest
       run: echo "COVERAGE_PROCESS_START=.coveragerc" >> $GITHUB_ENV
 
+    - name: Debug coverage config
+      run: |
+        conda run -n gtotree bash -c 'pwd; ls -la .coveragerc; cat .coveragerc'
+
     - name: Run pytest
       run: conda run -n gtotree pytest
