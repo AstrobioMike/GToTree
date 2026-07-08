@@ -83,6 +83,11 @@
         # including needed updates that were done in the v1 branch that were not in the v2 branch :(
 
 
+### things to do prior to final launch ###
+# think about bioconda recipe, that will probably still need to be maintained separately from the conda-recipe in this repo
+
+
+
 # example tests
 rm -rf gtotree-output/ ; gtotree -a ncbi-accessions.txt -H Universal
 

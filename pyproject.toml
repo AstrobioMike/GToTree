@@ -36,5 +36,19 @@ addopts = [
     "--cov-context=test",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-config=.coveragerc",
+]
+
+[tool.coverage.run]
+parallel = true
+concurrency = ["multiprocessing"]
+source = ["gtotree"]
+omit = [
+    "*/__init__.py",
+    "*/tests/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
 ]
