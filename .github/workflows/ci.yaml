@@ -39,6 +39,7 @@ jobs:
     - name: Install package
       run: |
         conda run -n gtotree conda install gtotree -y
+        pip uninstall -y gtotree 2>/dev/null || true # need this due to mac's problem with my dualing entry points of GToTree and gtotree
         conda run -n gtotree pip install -e . # the editable install is so test coverages make sense
 
     - name: Check installed version
