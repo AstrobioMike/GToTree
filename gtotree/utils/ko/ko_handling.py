@@ -1,5 +1,5 @@
 import os
-import pandas as pd
+import pandas as pd # type: ignore
 import shutil
 
 def parse_kofamscan_targets(run_data):

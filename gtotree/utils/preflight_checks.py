@@ -2,7 +2,7 @@ import os
 import sys
 import shutil
 import time
-import pandas as pd
+import pandas as pd # type: ignore
 import tempfile
 from collections import Counter
 import json

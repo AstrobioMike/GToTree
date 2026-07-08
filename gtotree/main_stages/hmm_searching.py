@@ -1,7 +1,7 @@
 import shutil
 import subprocess
-import pandas as pd
-from Bio import SeqIO
+import pandas as pd # type: ignore
+from Bio import SeqIO # type: ignore
 import pyhmmer.easel as easel #type: ignore
 from gtotree.utils.messaging import (report_processing_stage,
                                      report_hmm_search_update)

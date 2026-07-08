@@ -1,0 +1,64 @@
+{% set data = load_file_data("../pyproject.toml", from_recipe_dir=True) %}
+
+package:
+  name: "{{ data.get('project', {}).get('name')|lower }}"
+  version: "{{ data.get('project', {}).get('version') }}"
+
+source:
+  path: ../
+
+build:
+  number: 0
+
+requirements:
+  host:
+    - python
+    - tar
+
+  run:
+    - bc
+    - biopython
+    - coreutils =9.1
+    - curl
+    - dendropy =5
+    - dos2unix
+    - entrez-direct
+    - fasttree =2.1.11
+    - file
+    - gzip
+    - hmmer
+    - iqtree >=2.2.2
+    - kofamscan =1.3.0
+    - muscle =5.1
+    - pandas
+    - parallel
+    - prodigal
+    - pyarrow
+    - pyhmmer =0.11.0
+    - python =3.12.7
+    - requests =2.34
+    - sed
+    - snakemake =8.30.0
+    - taxonkit
+    - trimal
+    - tqdm =4.68
+    - veryfasttree
+
+test:
+  commands:
+    GToTree -h
+
+about:
+  home: https://github.com/AstrobioMike/GToTree/wiki/what-is-gtotree%3F
+  license: GPL3
+  summary: "GToTree: a user-friendly workflow for phylogenomics"
+  dev_url: https://github.com/AstrobioMike/GToTree
+  doc_url: https://github.com/AstrobioMike/GToTree/wiki
+  description: |
+    GToTree is a user-friendly workflow for phylogenomics intended to give more researchers the capability to create phylogenomic trees. The open-access Bioinformatics Journal publication is available here (https://doi.org/10.1093/bioinformatics/btz188), and documentation and examples can be found at the wiki here (https://github.com/AstrobioMike/GToTree/wiki).
+
+    Installation should be performed as:
+
+    ```
+    conda create -n gtotree -c astrobiomike -c conda-forge -c bioconda gtotree
+    ```

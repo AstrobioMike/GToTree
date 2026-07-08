@@ -24,6 +24,6 @@ gtotree = ["tests/data/*", "smk/*.smk"]
 
 [project.scripts]
 gtotree = "gtotree.main:main"
-GToTree = "gtotree.main:main"
+GToTree = "gtotree.main:main" # this doesn't tab-complete on mac, as mac is case-insensitive... but it still works
 gtt-midpoint-root-tree = "gtotree.utils.helper_scripts.gtt_midpoint_root_tree:main"
 gtt-get-kofamscan-data = "gtotree.utils.kos.get_kofamscan_data:main"

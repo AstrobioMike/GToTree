@@ -5,7 +5,7 @@ import gzip
 import shutil
 import json
 import argparse
-import pandas as pd
+import pandas as pd # type: ignore
 from dataclasses import dataclass, field, asdict
 from typing import List
 from tqdm import tqdm # type: ignore

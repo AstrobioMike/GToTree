@@ -1,5 +1,5 @@
 import os
-import pandas as pd
+import pandas as pd # type: ignore
 import subprocess
 
 def update_mapping_dict_with_ncbi_tax_info(args, run_data):

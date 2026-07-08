@@ -3,6 +3,7 @@
 
     # package conda recipe with repo like i did for bit
         # i'm not sure how this will need to impact the bioconda setup/recipe...
+        # that one will probably just need to be maintained differently
 
 
     # still need to implement iToL-file generation for both pfam and ko searching results
@@ -52,7 +53,7 @@
 
     # add FAQ page about difference between GToTree v1 and v2
 
-    # create new SCG-sets for all main phyla (and proteos) of gtdb (and archaea/bacteria)
+    # create new SCG-sets for all main phyla (and proteos/pseudomonadota) of gtdb (and archaea/bacteria)
 
 
     # switch to only using http when available
@@ -77,14 +78,11 @@
     # unit tests..... :( :( :(
 
 
+    # sync the CHANGELOG.md with the latest in the master gtotree v1 branch
+        # including needed updates that were done in the v1 branch that were not in the v2 branch :(
 
-conda create -n gtotree-dev -c astrobiomike -c conda-forge -c bioconda gtotree
 
-conda activate gtotree-dev
-conda install -c conda-forge -c bioconda tqdm=4.67.1 pyhmmer=0.11.0 snakemake=8.30.0 dendropy=5
-pip install -e .
-
-# example test
+# example tests
 rm -rf gtotree-output/ ; gtotree -a ncbi-accessions.txt -H Universal
 
 gtotree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -t -P
@@ -113,7 +111,7 @@ cat problem-accs.txt
 
 ### Overview of change from v1 to v2 ###
 # The codebase has been virtually entirely rewritten from an 5,000 line bash runner and X disparate
-# python script for a total of XX,XXX lines of code into a (admittedly still poorly engineered and packaged)
+# python scripts for a total of XX,XXX lines of code into a (admittedly still poorly engineered and packaged)
 # python package now with XXX modules and snakefiles over XX,XXX lines of code.
 
 # Why did i do this? I don't know. It worked fine and I've successfully maintained it for 6 years and over 600 citations.
@@ -139,7 +137,7 @@ cat problem-accs.txt
 # when calculating percent of target genes required to be found (-X parameter)
     # now it uses the amount remaining after filtering out target genes with too few genomes having hits as the denominator
     # previously it used the starting total as the denominator
-        # example: if starting with 100 target genes, and 20 are filtered out for having hits in too few genomes, then the percent required is based on 80 target genes now rather than 100
+        # example: if starting with 100 target genes, and 20 are filtered out for having hits in too few genomes, then the percent required is based on 80 target-genes now rather than 100
 # default number of jobs set to 4 instead of 1 (-j parameter)
 # default output changed to "gtotree-output"
 # dropped '-n' num HMM cpus argument (for scanning individual genomes, the default of 2 is virtually always fine)
@@ -185,6 +183,6 @@ cat problem-accs.txt
 # of ~4,000 lines of BASH and dozens of independent python and BASH helper scripts with a lot
 # of redundancy in its code base. Among several other improvements and feature additions, GToTree
 # has now been rewritten from the ground up in python with its major stages being powered by
-# Snakemake workflows - enabling the resuming of failed or interrupted runs. This paper highlights
+# Snakemake workflows - enabling the potential for resuming failed or interrupted runs. This paper highlights
 # some of the new additions to GToTree since its initial launch.
 ### """

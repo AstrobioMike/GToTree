@@ -3,8 +3,8 @@ import shutil
 from collections import Counter
 import os
 from pathlib import Path
-import pandas as pd
-from Bio import SeqIO
+import pandas as pd # type: ignore
+from Bio import SeqIO # type: ignore
 from gtotree.utils.pfam.pfam_handling import get_additional_pfam_targets
 from gtotree.utils.messaging import (report_processing_stage,
                                      report_pfam_searching_update)

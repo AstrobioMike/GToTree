@@ -1,7 +1,7 @@
 import os
 import shutil
 import statistics
-from Bio import SeqIO
+from Bio import SeqIO # type: ignore
 import subprocess
 from gtotree.utils.general import (remove_file_if_exists,
                                    check_file_exists_and_not_empty)
