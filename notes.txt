@@ -1,5 +1,7 @@
 ### TO DO STILL ###
 
+    # put gtotree test data on github too
+
     # still need to implement iToL-file generation for both pfam and ko searching results
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
             # actually it's probably just easier to read in the <output_dir>/ko-search-results/KO-hit-counts.tsv table and make it based on that
@@ -46,9 +48,8 @@
     # add FAQ page about differences between GToTree v1 and v2
 
     # create new SCG-sets for all main phyla (and proteos/pseudomonadota) of gtdb (and archaea/bacteria)
+        # continue hosting them as github assets
         # make an organized output for gtt-hmms that breaks done by domain for easier reading and selection
-
-    # move current SCG-sets to github instead of zenodo
 
     # switch to only using http when available
         # affects:
