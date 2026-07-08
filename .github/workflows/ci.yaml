@@ -31,7 +31,7 @@ jobs:
         conda build conda-recipe --output-folder build_artifacts
 
     - name: Create conda env
-      run: conda create -n gtotree -y
+      run: conda create -n gtotree python=3.12 -y
 
     - name: Add local area as channel
       run: conda run -n gtotree conda config --add channels file://${PWD}/build_artifacts

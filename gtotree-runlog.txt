@@ -64,3 +64,9 @@
 
     Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-12/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
   ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-13/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
