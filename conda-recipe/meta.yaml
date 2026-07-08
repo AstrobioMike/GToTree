@@ -49,7 +49,7 @@ requirements:
 
 test:
   commands:
-    GToTree -h
+    GToTree -v
 
 about:
   home: https://github.com/AstrobioMike/GToTree/wiki/what-is-gtotree%3F

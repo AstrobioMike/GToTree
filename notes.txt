@@ -1,11 +1,5 @@
 ### TO DO STILL ###
 
-
-    # package conda recipe with repo like i did for bit
-        # i'm not sure how this will need to impact the bioconda setup/recipe...
-        # that one will probably just need to be maintained differently
-
-
     # still need to implement iToL-file generation for both pfam and ko searching results
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
             # actually it's probably just easier to read in the <output_dir>/ko-search-results/KO-hit-counts.tsv table and make it based on that
@@ -15,12 +9,10 @@
 
     # go through general.py GenomeData and RunData classes and see which methods i put in that i'm not using anywhere anymore
 
-
     # incorporate latest changes from master GToTree
         # e.g., GTDB download needs no-cert-check added and flag for --use-ecogenomics
         # gtt-gen-SCG-HMMs has been updated a bit (v1.8.17)
-        # assembly summary table and gtdb tables pulled from prepackaged ones on bit github
-        # bit's way of downloading assemblies with increased robutness (maybe even drop snakemake for that phase?)
+        # bit's way of downloading assemblies with increased robustness (maybe even drop snakemake for that phase?)
         # check for others...
 
 
@@ -56,13 +48,15 @@
     # create new SCG-sets for all main phyla (and proteos/pseudomonadota) of gtdb (and archaea/bacteria)
         # make an organized output for gtt-hmms that breaks done by domain for easier reading and selection
 
+    # move current SCG-sets to github instead of zenodo
 
     # switch to only using http when available
         # affects:
             # get_ncbi_assembly_tables.py (DONE)
             # ncbi assembly downloads (DONE)
-            # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree; if it rarely if ever changes)
+            # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree; if it rarely changes)
                 # looks like it does update regularly, i might just have to catch and report when this download fails and say it might be because it's only available via ftp
+                # maybe it's small enough i can github asset this too? Then i could have it auto-update in there every so often like ncbi assembly summaries
 
     # still need to implement nucleotide mode?
 
@@ -71,21 +65,21 @@
     # add a flag when all is done, so when resume is tried, it says nothing to do
 
     # if genome filtering drops all genes of a given SCG-set, things might break
-        # is that something worth guarding against?
+        # build some guard for that
 
     # do i want to modify 'reason-removed' for SCGs to delineate bewteen 'no/multiple hits found'
         # and dropped due to length filtering?
 
-    # unit tests..... :( :( :(
-
+    # more unit tests once things are more decided and stable
 
     # sync the CHANGELOG.md with the latest in the master gtotree v1 branch
         # including needed updates that were done in the v1 branch that were not in the v2 branch :(
 
 
-### things to do prior to final launch ###
-# think about bioconda recipe, that will probably still need to be maintained separately from the conda-recipe in this repo
-
+### other things to do prior to final launch ###
+    # think about bioconda recipe, that will probably still need to be maintained separately from the conda-recipe in this repo
+    # revisit all pages on the gtotree wiki and update them as needed
+    # made the CHANGELOG.md (and release notes) really comprehensive about the v1 to v2 changes, and put a link to the initial release notes somewhere on the wiki maybe
 
 
 # example tests
