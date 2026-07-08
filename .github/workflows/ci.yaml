@@ -1,0 +1,51 @@
+name: build-and-test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    if: ${{ !contains(github.event.head_commit.message, '[skip-ci]') }}
+
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-latest"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Set up miniconda
+      uses: conda-incubator/setup-miniconda@v4
+      with:
+        architecture: "x86_64"
+        channels: conda-forge,bioconda
+        channel-priority: strict
+        conda-remove-defaults: true
+        auto-update-conda: true
+
+    - name: Build conda package
+      run: |
+        conda install -n base conda-build -y
+        conda build conda-recipe --output-folder build_artifacts
+
+    - name: Create conda env
+      run: conda create -n gtotree -y
+
+    - name: Add local area as channel
+      run: conda run -n gtotree conda config --add channels file://${PWD}/build_artifacts
+
+    - name: Install package
+      run: |
+        conda run -n gtotree conda install gtotree -y
+        conda run -n gtotree pip install -e . # the editable install is so test coverages make sense
+
+    - name: Check installed version
+      run: conda run -n gtotree gtotree -v
+
+    - name: Set env var so subprocesses get coverage during pytest
+      run: echo "COVERAGE_PROCESS_START=.coveragerc" >> $GITHUB_ENV
+
+    - name: Run pytest
+      run: conda run -n gtotree pytest

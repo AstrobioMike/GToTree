@@ -1,0 +1,66 @@
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-0/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-1/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-2/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-5/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-6/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-7/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-8/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-9/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-10/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-11/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  
+
+  *********************************** NOTICE ***********************************  
+    1 accession(s) not successfully found at NCBI.
+
+    Reported in /private/var/folders/97/_l4jtcs91klbr1jrdv5bc46r0000gr/T/pytest-of-michael.lee/pytest-12/test_parse_marks_found_and_not0/ncbi-accessions-not-found.txt
+  ******************************************************************************  

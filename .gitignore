@@ -1,4 +1,11 @@
 .DS_Store
+*.egg-info/
+dist/
+build/
+build_artifacts/
 GToTree.egg-info/
 *__pycache__*
-build/
+__pycache__/
+htmlcov/
+.coverage*
+.pytest_cache/

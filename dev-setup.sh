@@ -10,6 +10,8 @@ fi
 
 rm -rf build/ gtotree.egg-info/
 
+pip uninstall -y gtotree 2>/dev/null || true
+
 pip install --force-reinstall --no-build-isolation -e .
 
 ## if changing conda versions and wanting to install locally entirely (rather than using a prior official conda install of gtotree)

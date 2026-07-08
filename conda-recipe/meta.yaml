@@ -36,12 +36,14 @@ requirements:
     - pyarrow
     - pyhmmer =0.11.0
     - python =3.12.7
+    - pytest
+    - pytest-cov
     - requests =2.34
     - sed
     - snakemake =8.30.0
     - taxonkit
-    - trimal
     - tqdm =4.68
+    - trimal
     - veryfasttree
 
 test:
