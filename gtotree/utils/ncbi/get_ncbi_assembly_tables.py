@@ -2,26 +2,70 @@
 
 """
 This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki)
-to download the NCBI assembly summary tables if they are not present, or are more than 4 weeks old.
+to download and set up the slim NCBI assembly-info table if it is not present.
+
+Default behavior: download the pre-built, pre-combined slim table (packaged as a
+single .tar.gz and rebuilt weekly by bit's refresh GitHub Action, re-hosted at a
+fixed release asset). This is fast and is what almost everyone gets.
+
+`-f/--force-update` re-pulls that same slim tarball (it does NOT rebuild directly
+from NCBI). A full rebuild from NCBI's GenBank + RefSeq summaries only happens as
+a fallback, if the hosted tarball can't be retrieved or extracted.
+
+There is no longer a 4-week freshness check: if the table is present it is left
+alone unless `-f` is given.
+
+Ex. usage: get_ncbi_assembly_tables.py
 """
 
 import sys
 import os
-import argparse
+import socket
 import shutil
+import tarfile
+import time
+import urllib
+import urllib.error
+import argparse
 from datetime import date
-from gtotree.utils.messaging import wprint, color_text, report_message, report_early_exit
+
+from gtotree.utils.messaging import (wprint, color_text, report_message,
+                                     report_early_exit)
 from gtotree.utils.general import download_with_tqdm
+from gtotree.utils.ncbi.slim_ncbi_assembly_summary import (
+    build_slim_assembly_summary,
+    write_date_retrieved,
+    GENBANK_URL,
+    REFSEQ_URL,
+    TABLE_FILENAME,
+    DATE_FILENAME,
+)
+
+
+# pre-slimmed, pre-combined NCBI assembly-info table + date-retrieved.txt,
+# packaged as a single .tar.gz and rebuilt weekly by bit's
+# refresh-ncbi-assembly-info GitHub Action, then re-hosted at this fixed asset
+# URL. The archive holds exactly two files at its root:
+#   ncbi-assembly-info.tsv   (slim, clean-header; see slim_ncbi_assembly_summary)
+#   date-retrieved.txt       (build date, YYYY,MM,DD)
+# GToTree depends on the bit-hosted asset (identical layout to what GToTree needs).
+NCBI_ASSEMBLY_TARBALL_URL = "https://github.com/AstrobioMike/bit/releases/download/ncbi-assembly-info-latest/ncbi-assembly-info.tar.gz"
+
 
 ################################################################################
 
 def main():
 
-    parser = argparse.ArgumentParser(description="This is a helper program to download and setup the NCBI assembly summary tables if they are \
-                                              not present, or are older than 4 weeks.", \
-                                 epilog="Ex. usage: get_ncbi_assembly_tables.py\n")
+    parser = argparse.ArgumentParser(
+        description="This is a helper program to download and set up the slim "
+                    "NCBI assembly-info table if it is not present.",
+        epilog="Ex. usage: get_ncbi_assembly_tables.py")
 
-    parser.add_argument("-f", "--force-update", help='Force an update regardless of last date retrieved', action = "store_true")
+    parser.add_argument("-f", "--force-update",
+                        help="Re-download the slim assembly-info table even if it "
+                             "is already present (pulls the hosted slim tarball "
+                             "again).",
+                        action="store_true")
 
     args = parser.parse_args()
 
@@ -30,121 +74,205 @@ def main():
 ################################################################################
 
 
-### functions ###
+def get_ncbi_assembly_summary_tab():
+    """
+    lazily resolve the path to the slim assembly-info table. Resolved on demand
+    (not at import time) so importing this module doesn't require the
+    NCBI_assembly_data_dir env variable to be set.
+    """
+    return os.path.join(check_ncbi_assembly_info_location_var_is_set(),
+                        TABLE_FILENAME)
+
+
 def check_ncbi_assembly_info_location_var_is_set():
 
     # making sure there is a NCBI_assembly_data_dir env variable
     try:
-        NCBI_data_dir = os.environ['NCBI_assembly_data_dir']
-    except:
-        wprint(color_text("The environment variable 'NCBI_assembly_data_dir'  does not seem to be set :(", "red"))
+        ncbi_assembly_data_dir = os.environ['NCBI_assembly_data_dir']
+    except KeyError:
+        wprint(color_text("The environment variable 'NCBI_assembly_data_dir' does not seem to be set :(", "yellow"))
         wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
         print("")
         sys.exit(0)
 
-    return(NCBI_data_dir)
+    return ncbi_assembly_data_dir
 
 
-NCBI_assembly_summary_tab = os.path.join(os.environ['NCBI_assembly_data_dir'], "ncbi-assembly-info.tsv")
+def check_if_data_present(location):
+    """
+    True if both the slim table and date-retrieved.txt are present and non-empty.
+    If either is missing/empty, any stray copy is cleaned up and we return False
+    so a fresh copy is pulled.
+    """
+    table_path = os.path.join(str(location), TABLE_FILENAME)
+    date_retrieved_path = os.path.join(str(location), DATE_FILENAME)
+
+    def is_nonempty_file(p):
+        return os.path.isfile(p) and os.path.getsize(p) > 0
+
+    if not is_nonempty_file(table_path) or not is_nonempty_file(date_retrieved_path):
+        for p in (table_path, date_retrieved_path):
+            if os.path.exists(p) and os.path.isfile(p):
+                os.remove(p)
+        return False
+
+    return True
 
 
-def check_if_data_present_and_less_than_4_weeks_old(location):
+def _download_with_retries(url, label, dest, attempts=4, retry_wait=3):
+    """
+    download `url` to `dest`, retrying up to `attempts` times on transient
+    failures (timeouts, connection resets, transient errors), with a short wait
+    between tries. A 404 is raised immediately (not retried). Raises the last
+    error if all attempts fail.
+    """
+    last_err = None
+    for attempt in range(1, attempts + 1):
+        try:
+            download_with_tqdm(url, label, dest)
+            return
+        except urllib.error.HTTPError as err:
+            if err.code == 404:
+                raise
+            last_err = err
+        except (urllib.error.URLError, socket.timeout, TimeoutError,
+                ConnectionError, OSError) as err:
+            last_err = err
 
-    # seeing if present already and if it was downloaded less than 4 weeks ago
-    # if this function returns True, then we don't do anything
-    # if it returns False, then we need to download things
-    table_path = os.path.join(str(location), "ncbi-assembly-info.tsv")
-    date_retrieved_path = os.path.join(str(location), "date-retrieved.txt")
+        if attempt < attempts:
+            wprint(color_text(
+                f"    download failed (attempt {attempt}/{attempts}); retrying...",
+                "yellow"))
+            time.sleep(retry_wait)
 
-    # if either file is missing, we are going to download, we also package the date-retrieved file empty with conda to retain directory, so checking it's not empty as well
-    if not os.path.isfile(table_path) or not os.path.isfile(date_retrieved_path) or not os.path.getsize(date_retrieved_path) > 0:
-
-        if os.path.exists(table_path):
-            os.remove(table_path)
-        if os.path.isdir(date_retrieved_path):
-            shutil.rmtree(date_retrieved_path)
-
-        return(False)
-
-    # if both files are present (and not empty), we are checking if it was downloaded more than 4 weeks ago
-    # and will download if it was
-    if os.path.isfile(table_path) and os.path.isfile(date_retrieved_path):
-
-        # getting current date
-        curr_date = date.today()
-
-        # reading date it was downloaded
-        with open(date_retrieved_path, 'r') as file:
-            stored_date = file.read().strip()
-
-        # setting to date object
-        stored_date_list = stored_date.split(",")
-        stored_date = date(int(stored_date_list[0]), int(stored_date_list[1]), int(stored_date_list[2]))
-
-        # getting difference
-        diff = curr_date - stored_date
-
-        # checking if difference is greater than 28 days
-        if diff.days > 28:
-
-            return(False)
-
-        else:
-
-            return(True)
-
-    else:
-
-        return(True)
+    raise last_err
 
 
-def get_NCBI_assembly_summary_data(location):
+def get_slim_ncbi_assembly_data(location):
+    """
+    default path: download the pre-built slim NCBI assembly-info tarball and
+    extract its two files (the slim table and date-retrieved.txt) into
+    `location`. Falls back to rebuilding directly from NCBI
+    (download_ncbi_assembly_summary_data) if no tarball URL is configured or the
+    download/extract fails, so the user always ends up with a usable table.
+    """
+    table_path = os.path.join(location, TABLE_FILENAME)
+    date_path = os.path.join(location, DATE_FILENAME)
 
-    """ downloads the needed ncbi assembly summary tables and combines them """
+    if not NCBI_ASSEMBLY_TARBALL_URL:
+        download_ncbi_assembly_summary_data(location)
+        return
 
-    # setting links
-    genbank_link = "https://ftp.ncbi.nlm.nih.gov/genomes/genbank/assembly_summary_genbank.txt"
-    refseq_link = "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt"
+    print(color_text("\n    Downloading the prepared NCBI assembly-info table (only needs to be done once)...\n", "yellow"))
 
-    table_path = os.path.join(str(location), "ncbi-assembly-info.tsv")
-    refseq_temp_path = os.path.join(str(location), "refseq-assembly-info.tmp")
+    tarball_path = os.path.join(location, "ncbi-assembly-info.tar.gz")
+    expected = {TABLE_FILENAME, DATE_FILENAME}
 
-    print(color_text("    Downloading NCBI assembly summaries (only done once, or updated after 4 weeks)...\n", "yellow"))
+    default_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(30)
+    try:
+        _download_with_retries(
+            NCBI_ASSEMBLY_TARBALL_URL, "        NCBI prepared data", tarball_path)
+
+        # a truncated/corrupt download trips here (full-stream read via
+        # getmembers), triggering the fallback below rather than writing a
+        # corrupt table.
+        with tarfile.open(tarball_path, "r:gz") as tar:
+            members = tar.getmembers()
+            # take only the two expected files, matched by basename, guarding
+            # against path traversal / nested dirs by extracting to flat names.
+            wanted = {}
+            for m in members:
+                base = os.path.basename(m.name)
+                if base in expected and m.isfile():
+                    wanted[base] = m
+            missing = expected - set(wanted)
+            if missing:
+                raise ValueError(
+                    f"prepared NCBI archive is missing expected file(s): {', '.join(sorted(missing))}")
+
+            for base, m in wanted.items():
+                src = tar.extractfile(m)
+                if src is None:
+                    raise ValueError(f"could not read '{base}' from prepared NCBI archive")
+                dest = os.path.join(location, base)
+                with src, open(dest, "wb") as out:
+                    shutil.copyfileobj(src, out)
+
+    except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError,
+            tarfile.TarError, ValueError, OSError) as err:
+        # clean up partial artifacts, then fall back to rebuilding from NCBI
+        for p in (tarball_path, table_path, date_path):
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+        print("")
+        wprint(color_text("  Couldn't get the prepared NCBI assembly-info table; "
+                          "rebuilding directly from NCBI instead.", "yellow"))
+        report_message(f"Underlying issue: {err}", ii="    ",
+                       si="    ")
+        print("")
+        download_ncbi_assembly_summary_data(location)
+        return
+    finally:
+        socket.setdefaulttimeout(default_timeout)
+        if os.path.exists(tarball_path):
+            try:
+                os.remove(tarball_path)
+            except OSError:
+                pass
+    print("")
+
+
+def download_ncbi_assembly_summary_data(location):
+    """
+    rebuild fallback (used only if the hosted slim tarball can't be retrieved):
+    download the GenBank + RefSeq assembly summaries directly from NCBI, combine
+    and slim them to the columns GToTree uses (identical layout to the hosted
+    asset), and stamp date-retrieved.txt with today's date.
+    """
+    genbank_temp = os.path.join(str(location), "assembly_summary_genbank.txt")
+    refseq_temp = os.path.join(str(location), "assembly_summary_refseq.txt")
+    table_path = os.path.join(str(location), TABLE_FILENAME)
+    date_path = os.path.join(str(location), DATE_FILENAME)
+
+    print(color_text("\n    Downloading NCBI assembly summaries (only needs to be done once)...\n", "yellow"))
 
     try:
-        download_with_tqdm(genbank_link, "        Genbank assemblies summary", table_path)
-        download_with_tqdm(refseq_link, "        RefSeq assemblies summary", refseq_temp_path)
+        download_with_tqdm(GENBANK_URL, "        Genbank assemblies summary", genbank_temp)
+        download_with_tqdm(REFSEQ_URL, "        RefSeq assemblies summary", refseq_temp)
+        print("")
     except Exception as e:
         report_message(f"Downloading the NCBI assembly summary tables failed with the following error:\n{e}", "red")
-        report_early_exit(None, copy_log = False)
+        report_early_exit(None, copy_log=False)
+        return
 
-    # combining
-    with open (table_path, "a") as final_table:
-        with open(refseq_temp_path, "r") as refseq:
-            final_table.write(refseq.read())
+    # combine + slim to the columns GToTree uses (clean-header layout)
+    try:
+        build_slim_assembly_summary(genbank_temp, refseq_temp, table_path)
+    except Exception as e:
+        report_message(f"Combining/slimming the NCBI assembly summary tables failed with the following error:\n{e}", "red")
+        report_early_exit(None, copy_log=False)
+        return
+    finally:
+        for p in (genbank_temp, refseq_temp):
+            if os.path.exists(p):
+                os.remove(p)
 
-    # removing temp
-    if os.path.exists(refseq_temp_path):
-        os.remove(refseq_temp_path)
-
-    # storing date retrieved
-    date_retrieved = str(date.today()).replace("-", ",")
-    date_retrieved.replace("-", ",")
-
-    date_retrieved_path = os.path.join(str(location), "date-retrieved.txt")
-
-    with open(date_retrieved_path, "w") as outfile:
-        outfile.write(date_retrieved + "\n")
+    # storing date retrieved (YYYY,MM,DD), matching the asset's build stamp
+    write_date_retrieved(date_path, when=date.today())
 
 
 def get_ncbi_assembly_data(force_update=False):
     ncbi_dir = check_ncbi_assembly_info_location_var_is_set()
-    data_up_to_date = check_if_data_present_and_less_than_4_weeks_old(ncbi_dir)
+    data_present = check_if_data_present(ncbi_dir)
 
-    if data_up_to_date and not force_update:
+    if data_present and not force_update:
         return
-    else:
-        get_NCBI_assembly_summary_data(ncbi_dir)
+
+    get_slim_ncbi_assembly_data(ncbi_dir)
 
 ################################################################################
 

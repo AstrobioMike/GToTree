@@ -12,7 +12,7 @@ from gtotree.utils.messaging import (report_early_exit,
                                      report_AA_update,
                                      report_genome_preprocessing_update)
 from gtotree.utils.ncbi.parse_assembly_summary_file import parse_assembly_summary
-from gtotree.utils.ncbi.get_ncbi_assembly_tables import NCBI_assembly_summary_tab
+from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_summary_tab
 from gtotree.utils.general import (write_run_data,
                                    read_run_data,
                                    get_snakefile_path,
@@ -36,7 +36,7 @@ def preprocess_ncbi_genomes(args, run_data):
 
         report_processing_stage("ncbi", run_data)
 
-        run_data = parse_assembly_summary(NCBI_assembly_summary_tab, run_data)
+        run_data = parse_assembly_summary(get_ncbi_assembly_summary_tab(), run_data)
 
         num_ncbi_accs_remaining = len(run_data.get_ncbi_accs_for_snakemake_preprocessing())
 
@@ -59,13 +59,19 @@ def preprocess_ncbi_genomes(args, run_data):
 def prepare_accession(acc, run_data):
     base_link, acc_assembly_str = get_base_link(acc, run_data)
 
+    # an unresolvable download directory (no ftp_path and nothing to rebuild
+    # from) comes through as "na" -> there's nothing to download, fail cleanly
+    # rather than building a bogus URL.
+    if not base_link or base_link.lower() == "na":
+        return False, False
+
     # first trying amino acids
     try:
         # going directly to nucleotides if running in nucleotide mode
         # (so we can call our own genes and CDS and protein match up as expected)
         if run_data.nucleotide_mode:
             raise Exception
-        amino_acid_link = base_link + acc_assembly_str + "_protein.faa.gz"
+        amino_acid_link = base_link + "/" + acc_assembly_str + "_protein.faa.gz"
         amino_acid_filepath = run_data.ncbi_processing_dir + "/" + acc + "_protein.faa"
         download_and_unzip_accession(amino_acid_link, amino_acid_filepath)
         done = True
@@ -73,7 +79,7 @@ def prepare_accession(acc, run_data):
     except:
         # then trying nucleotides
         try:
-            nucleotide_link = base_link + acc_assembly_str + "_genomic.fna.gz"
+            nucleotide_link = base_link + "/" + acc_assembly_str + "_genomic.fna.gz"
             nucleotide_file = run_data.ncbi_processing_dir + "/" + acc + "_genomic.fna"
             download_and_unzip_accession(nucleotide_link, nucleotide_file)
             done = True
@@ -97,8 +103,9 @@ def get_base_link(acc, run_data):
     df = pd.read_csv(run_data.tmp_dir + "/ncbi-accessions-info.tsv", sep="\t",
                      usecols=["input_accession", "http_base_link"])
     base_link = df.loc[df['input_accession'] == acc, 'http_base_link'].values[0]
-    base_link = base_link.replace(" ", "_")
-    acc_assembly_str = base_link.split("/")[-2]
+    base_link = str(base_link).replace(" ", "_")
+    base_link = base_link.rstrip("/")
+    acc_assembly_str = base_link.split("/")[-1]
     return base_link, acc_assembly_str
 
 
