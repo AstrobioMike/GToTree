@@ -1,7 +1,7 @@
 import os
 import sys
 from gtotree.utils.messaging import wprint, color_text, report_message, report_early_exit
-import pandas as pd
+import pandas as pd # type: ignore
 from gtotree.utils.general import download_with_tqdm, SCGset
 import pyhmmer #type: ignore
 

@@ -54,6 +54,7 @@
     # add FAQ page about difference between GToTree v1 and v2
 
     # create new SCG-sets for all main phyla (and proteos/pseudomonadota) of gtdb (and archaea/bacteria)
+        # make an organized output for gtt-hmms that breaks done by domain for easier reading and selection
 
 
     # switch to only using http when available

@@ -8,9 +8,9 @@ if [ "${CONDA_DEFAULT_ENV}" != "gtotree-dev" ]; then
     return 1 2>/dev/null || exit 1
 fi
 
-rm -rf build/ bit.egg-info/
+rm -rf build/ gtotree.egg-info/
 
-pip install --no-build-isolation -e .
+pip install --force-reinstall --no-build-isolation -e .
 
 ## if changing conda versions and wanting to install locally entirely (rather than using a prior official conda install of gtotree)
 # conda build -c conda-forge -c bioconda conda-recipe/
