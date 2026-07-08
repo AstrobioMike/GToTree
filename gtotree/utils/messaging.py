@@ -365,6 +365,9 @@ def check_and_report_any_changed_default_behavior(args, run_data):
     if args.target_kos_file:
         print(f"      - Genomes will be searched for KOs listed in: {args.target_kos_file} ({run_data.total_ko_targets} targets)")
 
+    if any(conditions):
+        print("")
+
 
 def many_genomes_notice(total_input_genomes):
     return (

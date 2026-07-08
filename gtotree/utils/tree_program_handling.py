@@ -18,8 +18,7 @@ def run_tree_building(args, run_data):
     print(f"""
     The tree is being built with {args.tree_program}. You can check the log file for
     progress at:
-        {color_text(log_file, "yellow")}
-    """)
+        {color_text(log_file, "yellow")}""")
 
     result = subprocess.run(cmd, shell=True)
     if result.returncode != 0:
