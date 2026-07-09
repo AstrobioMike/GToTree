@@ -1,0 +1,194 @@
+name: refresh-pfam-data
+
+# Resolves the latest Pfam release from EBI and, IF it differs from the version
+# already published, downloads the two files we host (Pfam-A.hmm.gz,
+# pfamA.txt.gz), bundles them with version + date stamps into a single tarball,
+# and force-updates the `pfam-data-latest` release assets that GToTree pulls.
+#
+# Two assets are published to the fixed `pfam-data-latest` tag:
+#   pfam-data.tar.gz    -- the bundle (contents listed below)
+#   pfam-version.txt    -- JUST the version string, published separately so this
+#                          workflow (and the consumer module) can quickly read
+#                          the currently-published version without downloading
+#                          the ~420MB tarball
+#
+# pfam-data.tar.gz holds:
+#   Pfam-A.hmm.gz        (the master HMM file, compressed)
+#   pfamA.txt.gz         (the info table, compressed)
+#   pfam-version.txt     (the resolved version string, e.g. "38.2")
+#   date-retrieved.txt   (build date, YYYY,MM,DD)
+
+on:
+  schedule:
+    - cron: "0 6 3 * *"     # 06:00 UTC on the 3rd of each month
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild and re-publish even if the version is unchanged"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-pfam-data
+  cancel-in-progress: false
+
+env:
+  TAG: pfam-data-latest
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Resolve latest version and compare to published
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          BASE="https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/"
+          echo "Resolving latest Pfam version from ${BASE}"
+          LISTING="$(curl -fSL --retry 6 --retry-delay 5 "${BASE}")"
+          LATEST="$(printf '%s' "${LISTING}" \
+            | grep -oE 'Pfam[0-9]+\.[0-9]+' \
+            | sed 's/^Pfam//' \
+            | sort -t. -k1,1n -k2,2n -u \
+            | tail -1)"
+          if [ -z "${LATEST}" ]; then
+            echo "ERROR: could not parse a Pfam version from the release listing" >&2
+            exit 1
+          fi
+          echo "Latest EBI version: ${LATEST}"
+
+          # Read the currently-published version by fetching JUST the small
+          # pfam-version.txt asset (not the big tarball). Empty if the tag or
+          # asset doesn't exist yet (first-ever run).
+          PUBLISHED=""
+          if gh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+            # download the version asset to stdout if present
+            if gh release download "${TAG}" --repo "${REPO}" \
+                 --pattern pfam-version.txt --output /tmp/published-version.txt 2>/dev/null; then
+              PUBLISHED="$(tr -d '[:space:]' < /tmp/published-version.txt || true)"
+            fi
+          fi
+          echo "Published version: ${PUBLISHED:-<none>}"
+
+          FORCE="${{ github.event.inputs.force }}"
+          echo "Force rebuild: ${FORCE:-false}"
+
+          if [ "${FORCE:-false}" != "true" ] && [ "${LATEST}" = "${PUBLISHED}" ]; then
+            echo "Already publishing Pfam ${LATEST}; nothing to do."
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "latest=${LATEST}" >> "${GITHUB_OUTPUT}"
+
+      - name: Download, validate, and repackage
+        if: steps.check.outputs.changed == 'true'
+        env:
+          LATEST: ${{ steps.check.outputs.latest }}
+        run: |
+          set -euo pipefail
+
+          BASE="https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/"
+          HMM_URL="${BASE}Pfam${LATEST}/Pfam-A.hmm.gz"
+          INFO_URL="${BASE}Pfam${LATEST}/pfamA.txt.gz"
+
+          WORK="$(mktemp -d)"
+          STAGE="${WORK}/pfam-data"
+          mkdir -p "${STAGE}"
+
+          dl() {
+            local url="$1" out="$2"
+            echo "  downloading ${url}"
+            curl -fSL --retry 6 --retry-delay 5 --retry-connrefused \
+                 --connect-timeout 30 --max-time 1800 \
+                 -o "${out}" "${url}"
+          }
+
+          dl "${HMM_URL}"  "${STAGE}/Pfam-A.hmm.gz"
+          dl "${INFO_URL}" "${STAGE}/pfamA.txt.gz"
+
+          echo "  validating gzip integrity"
+          gzip -t "${STAGE}/Pfam-A.hmm.gz"
+          gzip -t "${STAGE}/pfamA.txt.gz"
+
+          hmm_bytes="$(stat -c%s "${STAGE}/Pfam-A.hmm.gz")"
+          echo "  Pfam-A.hmm.gz size: ${hmm_bytes} bytes"
+          if [ "${hmm_bytes}" -lt 100000000 ]; then
+            echo "ERROR: Pfam-A.hmm.gz is suspiciously small (${hmm_bytes} bytes); refusing to publish" >&2
+            exit 1
+          fi
+          [ -s "${STAGE}/pfamA.txt.gz" ] || { echo "ERROR: empty pfamA.txt.gz" >&2; exit 1; }
+
+          if ! gunzip -c "${STAGE}/Pfam-A.hmm.gz" | head -c 200 | grep -q 'HMMER'; then
+            echo "ERROR: Pfam-A.hmm.gz does not look like an HMMER file" >&2
+            exit 1
+          fi
+
+          printf '%s\n' "${LATEST}" > "${STAGE}/pfam-version.txt"
+          date -u +'%Y,%m,%d'       > "${STAGE}/date-retrieved.txt"
+          echo "  version: $(cat "${STAGE}/pfam-version.txt")"
+          echo "  date:    $(cat "${STAGE}/date-retrieved.txt")"
+
+          # the bundle
+          OUT="${GITHUB_WORKSPACE}/pfam-data.tar.gz"
+          tar -c -I 'gzip -1' -f "${OUT}" -C "${STAGE}" .
+          tar -tzf "${OUT}" > /dev/null
+          echo "  wrote ${OUT} ($(du -h "${OUT}" | cut -f1))"
+
+          # the standalone version asset (copied out so the publish step has it)
+          cp "${STAGE}/pfam-version.txt" "${GITHUB_WORKSPACE}/pfam-version.txt"
+
+          echo "PFAM_ASSET=${OUT}" >> "${GITHUB_ENV}"
+          echo "PFAM_VERSION_ASSET=${GITHUB_WORKSPACE}/pfam-version.txt" >> "${GITHUB_ENV}"
+          echo "PFAM_VERSION=${LATEST}" >> "${GITHUB_ENV}"
+
+      - name: Publish to fixed release tag
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # ensure the release exists (idempotent)
+          if ! gh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+            gh release create "${TAG}" --repo "${REPO}" \
+              --title "Pfam data (latest)" \
+              --notes "Auto-refreshed Pfam data, re-hosted over HTTPS for GToTree. Rebuilt when a new Pfam release appears." \
+              --latest=false
+          fi
+
+          # publish the tarball first, then the small version file LAST so that
+          # pfam-version.txt only ever advertises a version whose tarball is
+          # already in place (avoids a window where the version says N.N but the
+          # matching tarball hasn't uploaded yet).
+          n=0
+          until [ "$n" -ge 3 ]; do
+            if timeout 600 gh release upload "${TAG}" "${PFAM_ASSET}" \
+                 --clobber --repo "${REPO}"; then
+              break
+            fi
+            n=$((n+1))
+            echo "tarball upload attempt ${n} failed or timed out; retrying in 30s" >&2
+            sleep 30
+            if [ "$n" -ge 3 ]; then
+              echo "ERROR: tarball upload failed after ${n} attempts" >&2
+              exit 1
+            fi
+          done
+
+          gh release upload "${TAG}" "${PFAM_VERSION_ASSET}" --clobber --repo "${REPO}"
+
+          echo "Published Pfam ${PFAM_VERSION} (tarball + version asset) to release ${TAG}"
+
+      - name: Report no-op
+        if: steps.check.outputs.changed != 'true'
+        run: echo "Pfam ${{ steps.check.outputs.latest }} already published; skipped download and upload."
