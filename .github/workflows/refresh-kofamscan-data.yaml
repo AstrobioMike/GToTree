@@ -87,7 +87,7 @@ jobs:
           # date-retrieved.txt. profiles is already compressed, so gzip the
           # outer tar at level 1 (fast; near-zero further gain on the big blob).
           OUT="${GITHUB_WORKSPACE}/kofamscan-data.tar.gz"
-          GZIP=-1 tar -czf "${OUT}" -C "${STAGE}" .
+          tar -c -I 'gzip -1' -f "${OUT}" -C "${STAGE}" .
           echo "  wrote ${OUT} ($(du -h "${OUT}" | cut -f1))"
  
           # verify the produced archive is itself readable
