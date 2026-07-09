@@ -139,6 +139,9 @@ def download_kofamscan_data(location):
         report_kofam_dl_failure(e)
 
     # extract the OUTER archive into staging
+
+    print(color_text("\n    Extracting...", "yellow"))
+
     try:
         with tarfile.open(tarball_path) as tarball:
             tarball.extractall(staging_dir)
@@ -183,6 +186,7 @@ def download_kofamscan_data(location):
     for entry in os.listdir(staging_dir):
         shutil.move(os.path.join(staging_dir, entry), os.path.join(location, entry))
     shutil.rmtree(staging_dir)
+    print()
 
 
 def _safe_remove(path):
@@ -205,7 +209,7 @@ def get_kofamscan_data(force_update=False):
     ko_data_dir = check_location_var_is_set()
 
     if force_update:
-        print(color_text("    Re-downloading KO data (force-update requested)...\n", "yellow"))
+        print(color_text("\n    Re-downloading KO data (force-update requested)...\n", "yellow"))
         _clear_partial_state(ko_data_dir)
         download_kofamscan_data(ko_data_dir)
         return
@@ -213,8 +217,7 @@ def get_kofamscan_data(force_update=False):
     if check_if_data_present(ko_data_dir):
         return
 
-    print(color_text("    Downloading required KO data (only needs to be done once, "
-                     "unless newer HMMs become available)...\n", "yellow"))
+    print(color_text("\n    Downloading required KO data (only needs to be done once)...\n", "yellow"))
     download_kofamscan_data(ko_data_dir)
 
 

@@ -8,6 +8,8 @@
         # refresh when needed, and when used for individual searches, pull the required ones
         # into the users area, and use them all for gtt-gen-SCG-HMMs
 
+    # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data)
+
     # make gtt an entry point with subcommands for all the gtt scripts (maybe)
 
     # still need to implement iToL-file generation for both pfam and ko searching results

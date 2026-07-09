@@ -29,19 +29,30 @@ class ToolsUsed:
     universal_SCGs_used: bool = False
 
 
-def download_with_tqdm(url, target, filename=None, urlopen=False):
-    with tqdm(unit='B', unit_scale=True, unit_divisor=1024, miniters=1, desc=target, ncols = 90) as t:
+def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True):
+    total = None
+    try:
+        with urllib.request.urlopen(url) as r:
+            cl = r.headers.get("Content-Length")
+            total = int(cl) if cl else None
+    except Exception:
+        total = None
+
+    if urlopen:
+        return urllib.request.urlopen(url)
+
+    with tqdm(unit='B', unit_scale=True, unit_divisor=1024, miniters=1,
+              desc=target, ncols=90, leave=leave, total=total) as t:
         def reporthook(block_num, block_size, total_size):
-            if total_size > 0:
+            if t.total is None and total_size and total_size > 0:
                 t.total = total_size
-            t.update(block_size)
-        if not urlopen:
-            urllib.request.urlretrieve(url, filename, reporthook=reporthook)
-            sys.stdout.write("")
-        else:
-            dl = urllib.request.urlopen(url, reporthook=reporthook)
-            sys.stdout.write("")
-            return dl
+            downloaded = block_num * block_size
+            if t.total is not None:
+                downloaded = min(downloaded, t.total)   # never exceed total
+            t.update(downloaded - t.n)
+        urllib.request.urlretrieve(url, filename, reporthook=reporthook)
+        if t.total is not None and t.n < t.total:
+            t.update(t.total - t.n)
 
 
 def download_and_gunzip(url, target):
