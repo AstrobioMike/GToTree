@@ -3,7 +3,7 @@
 This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki)
 to download and setup the KOFamScan (https://github.com/takaram/kofam_scan) data files for use.
 
-Default behavior: download the pre-built KOFamScan data (README.txt, ko_list,
+Default behavior: download the pre-built KOFamScan data (README, ko_list,
 profiles/, date-retrieved.txt) packaged as a single .tar.gz and rebuilt monthly
 by GToTree's refresh-kofamscan-data GitHub Action, re-hosted at a fixed release
 asset. This is served over HTTPS, so it sidesteps the ftp.genome.jp FTP access
@@ -27,7 +27,7 @@ from gtotree.utils.general import download_with_tqdm
 # pre-built KOFamScan data, packaged as a single .tar.gz and rebuilt monthly by
 # GToTree's refresh-kofamscan-data GitHub Action, then re-hosted at this fixed
 # asset URL. The archive holds exactly this at its root:
-#   README.txt
+#   README
 #   ko_list
 #   profiles/            (the HMM profiles directory)
 #   date-retrieved.txt   (build date, YYYY,MM,DD)
@@ -35,7 +35,7 @@ from gtotree.utils.general import download_with_tqdm
 KOFAMSCAN_TARBALL_URL = "https://github.com/AstrobioMike/GToTree/releases/download/kofamscan-data-latest/kofamscan-data.tar.gz"
 
 # files/dirs expected at the data dir root after a successful setup
-README_FILENAME = "README.txt"   # .txt was needed as of noticed on 15-May-2025
+README_FILENAME = "README"
 KO_LIST_FILENAME = "ko_list"
 PROFILES_DIRNAME = "profiles"
 DATE_FILENAME = "date-retrieved.txt"
