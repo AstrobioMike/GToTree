@@ -2,6 +2,8 @@
 
     # put gtotree test data on github too
 
+    # make gtt an entry point with subcommands for all the gtt scripts (maybe)
+
     # still need to implement iToL-file generation for both pfam and ko searching results
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
             # actually it's probably just easier to read in the <output_dir>/ko-search-results/KO-hit-counts.tsv table and make it based on that

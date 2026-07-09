@@ -3,6 +3,14 @@
 This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki)
 to download and setup the KOFamScan (https://github.com/takaram/kofam_scan) data files for use.
 
+Default behavior: download the pre-built KOFamScan data (README.txt, ko_list,
+profiles/, date-retrieved.txt) packaged as a single .tar.gz and rebuilt monthly
+by GToTree's refresh-kofamscan-data GitHub Action, re-hosted at a fixed release
+asset. This is served over HTTPS, so it sidesteps the ftp.genome.jp FTP access
+problems that block many institutional / cluster networks.
+
+`-f/--force-update` re-pulls that same hosted tarball.
+
 For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
 """
 
@@ -10,12 +18,27 @@ import sys
 import os
 import argparse
 import shutil
-import filecmp
 import tarfile
-import gzip
-from gtotree.utils.messaging import wprint, color_text, report_message, report_early_exit
+from gtotree.utils.messaging import (wprint, color_text, report_message,
+                                     report_early_exit)
 from gtotree.utils.general import download_with_tqdm
 
+
+# pre-built KOFamScan data, packaged as a single .tar.gz and rebuilt monthly by
+# GToTree's refresh-kofamscan-data GitHub Action, then re-hosted at this fixed
+# asset URL. The archive holds exactly this at its root:
+#   README.txt
+#   ko_list
+#   profiles/            (the HMM profiles directory)
+#   date-retrieved.txt   (build date, YYYY,MM,DD)
+# Served over HTTPS to avoid the ftp.genome.jp FTP access problems.
+KOFAMSCAN_TARBALL_URL = "https://github.com/AstrobioMike/GToTree/releases/download/kofamscan-data-latest/kofamscan-data.tar.gz"
+
+# files/dirs expected at the data dir root after a successful setup
+README_FILENAME = "README.txt"   # .txt was needed as of noticed on 15-May-2025
+KO_LIST_FILENAME = "ko_list"
+PROFILES_DIRNAME = "profiles"
+DATE_FILENAME = "date-retrieved.txt"
 
 
 ################################################################################
@@ -26,7 +49,15 @@ def main():
         description="Setup the KOFamScan (https://github.com/takaram/kofam_scan) data files for use.",
         epilog="Example usage: gtt-get-kofamscan-data"
     )
-    get_kofamscan_data()
+
+    parser.add_argument("-f", "--force-update",
+                        help="Re-download the KOFamScan data even if it is already "
+                             "present",
+                        action="store_true")
+
+    args = parser.parse_args()
+
+    get_kofamscan_data(force_update=args.force_update)
 
 ################################################################################
 
@@ -45,110 +76,130 @@ def check_location_var_is_set():
     return ko_data_dir
 
 
-def check_stored_data_up_to_date(location):
-    """ checks if the stored kofamscan data is the latest """
-
-    latest_readme_path = os.path.join(location, "README-latest")
-    remote_url = "ftp://ftp.genome.jp/pub/db/kofam/README"
-    try:
-        download_with_tqdm(remote_url, "        Latest KOFam README", latest_readme_path)
-    except Exception as e:
-        report_KOFam_dl_failure(e)
-
-    local_readme_path = os.path.join(location, "README")
-    if os.path.isfile(local_readme_path) and filecmp.cmp(latest_readme_path, local_readme_path):
-        os.remove(latest_readme_path)
-        return True
-    else:
-        os.remove(latest_readme_path)
-        wprint(color_text("A newer version of the KOFamScan data is available, updating...", "yellow"))
-        return False
-
-
-def report_KOFam_dl_failure(e):
-    report_message(f"Downloading KOFam data failed with the following error:\n{e}", "red")
-    report_message(f"Unfortunately, the KOFam data can only be accessed via ftp, which may be blocked on your system.")
-    report_message(f"You can check and see if you can access this URL: ftp://ftp.genome.jp/pub/db/kofam/")
-    report_message(f"If accessing that is a problem, you can drop the additional target KOs (being provided to the `-K` flag) and sadly run GToTree without them.")
-    report_early_exit(None, copy_log = False)
-
-
 def check_if_data_present(location):
+    """
+    True only if all expected pieces are present. If anything is missing, remove
+    whatever partial state exists so the subsequent download starts clean.
+    """
+    readme_path = os.path.join(location, README_FILENAME)
+    ko_list_path = os.path.join(location, KO_LIST_FILENAME)
+    profiles_dir_path = os.path.join(location, PROFILES_DIRNAME)
 
-    # readme_path = os.path.join(location, "README")
-    readme_path = os.path.join(location, "README.txt") # .txt was needed as of noticed on 15-May-2025
-    ko_list_path = os.path.join(location, "ko_list")
-    hmms_dir_path = os.path.join(location, "profiles")
-
-    # If any file/directory is missing, remove what exists and signal that update is needed.
-    if (not os.path.isfile(readme_path) or
-        not os.path.isfile(ko_list_path) or
-        not os.path.isdir(hmms_dir_path)):
-        if os.path.exists(readme_path):
-            os.remove(readme_path)
-        if os.path.exists(ko_list_path):
-            os.remove(ko_list_path)
-        if os.path.isdir(hmms_dir_path):
-            shutil.rmtree(hmms_dir_path)
-        return False
-    else:
+    if (os.path.isfile(readme_path) and
+            os.path.isfile(ko_list_path) and
+            os.path.isdir(profiles_dir_path)):
         return True
-        #### this block would be used if we wanted to check for updates automatically
-        #### but it was based on the README, which i don't think is the best way
-        #### I also don't know if it's needed, better to add a flag to update with a direct
-        #### program/script call than force a check every normal run
-        #
-        # if check_stored_data_up_to_date(location):
-        #     return True
-        # else:
-        #     if os.path.exists(readme_path):
-        #         os.remove(readme_path)
-        #     if os.path.exists(ko_list_path):
-        #         os.remove(ko_list_path)
-        #     if os.path.isdir(hmms_dir_path):
-        #         shutil.rmtree(hmms_dir_path)
-        #     return False
+
+    # incomplete — clear partial state
+    _clear_partial_state(location)
+    return False
+
+
+def _clear_partial_state(location):
+    """Remove any of the expected files/dirs that happen to exist."""
+    for fname in (README_FILENAME, KO_LIST_FILENAME, DATE_FILENAME):
+        fpath = os.path.join(location, fname)
+        if os.path.exists(fpath):
+            os.remove(fpath)
+    profiles_dir_path = os.path.join(location, PROFILES_DIRNAME)
+    if os.path.isdir(profiles_dir_path):
+        shutil.rmtree(profiles_dir_path)
+
+
+def report_kofam_dl_failure(e):
+    report_message(f"Downloading the KOFamScan data failed with the following error:\n{e}", "red")
+    report_message("GToTree pulls this data from a GitHub-hosted release asset over HTTPS.")
+    report_message("You can check whether you can access this URL:")
+    report_message(f"    {KOFAMSCAN_TARBALL_URL}")
+    report_message("If this keeps failing, it may be a transient network issue — trying again "
+                   "later often resolves it. You can also drop the additional target KOs (being "
+                   "provided to the `-K` flag) and run GToTree without them.")
+    report_early_exit(None, copy_log=False)
 
 
 def download_kofamscan_data(location):
+    """
+    Pull the hosted tarball and extract it atomically into `location`:
+    download to a temp path, extract into a temp staging dir, validate, then
+    move the pieces into place. Avoids leaving a half-populated data dir if the
+    download or extraction is interrupted.
+    """
+    tarball_path = os.path.join(location, "kofamscan-data.tar.gz")
+    staging_dir = os.path.join(location, ".kofamscan-staging")
 
-    # readme_url = "ftp://ftp.genome.jp/pub/db/kofam/README"
-    readme_url = "ftp://ftp.genome.jp/pub/db/kofam/README.txt" # .txt was needed as of noticed on 15-May-2025
-    ko_list_gz_url = "ftp://ftp.genome.jp/pub/db/kofam/ko_list.gz"
-    hmms_tar_url = "ftp://ftp.genome.jp/pub/db/kofam/profiles.tar.gz"
-
-    readme_path = os.path.join(location, "README")
-    ko_list_gz_path = os.path.join(location, "ko_list.gz")
-    ko_list_path = os.path.join(location, "ko_list")
-    hmms_tar_path = os.path.join(location, "profiles.tar.gz")
+    # clean any leftover staging from a prior interrupted run
+    if os.path.isdir(staging_dir):
+        shutil.rmtree(staging_dir)
+    os.makedirs(staging_dir, exist_ok=True)
 
     try:
-        download_with_tqdm(readme_url, "        KOFam README", readme_path)
+        download_with_tqdm(KOFAMSCAN_TARBALL_URL, "        KOFamScan data", tarball_path)
     except Exception as e:
-        report_KOFam_dl_failure(e)
+        _safe_rmtree(staging_dir)
+        _safe_remove(tarball_path)
+        report_kofam_dl_failure(e)
+
+    # extract into staging
     try:
-        download_with_tqdm(ko_list_gz_url, "        KOFam KO list", ko_list_gz_path)
-        download_with_tqdm(hmms_tar_url, "        KOFam HMMs", hmms_tar_path)
+        with tarfile.open(tarball_path) as tarball:
+            tarball.extractall(staging_dir)
     except Exception as e:
-        report_KOFam_dl_failure(e)
+        _safe_rmtree(staging_dir)
+        _safe_remove(tarball_path)
+        report_kofam_dl_failure(e)
 
-    with gzip.open(ko_list_gz_path, 'rb') as f_in:
-        with open(ko_list_path, 'wb') as f_out:
-            shutil.copyfileobj(f_in, f_out)
-    os.remove(ko_list_gz_path)
+    os.remove(tarball_path)
 
-    with tarfile.open(hmms_tar_path) as tarball:
-        tarball.extractall(location)
-    os.remove(hmms_tar_path)
+    # validate expected contents landed in staging
+    staged_readme = os.path.join(staging_dir, README_FILENAME)
+    staged_ko_list = os.path.join(staging_dir, KO_LIST_FILENAME)
+    staged_profiles = os.path.join(staging_dir, PROFILES_DIRNAME)
+    if not (os.path.isfile(staged_readme) and
+            os.path.isfile(staged_ko_list) and
+            os.path.isdir(staged_profiles)):
+        _safe_rmtree(staging_dir)
+        report_kofam_dl_failure(
+            "the downloaded archive did not contain the expected "
+            f"{README_FILENAME}, {KO_LIST_FILENAME}, and {PROFILES_DIRNAME}/")
+
+    # move staged pieces into place (clearing any stale copies first)
+    _clear_partial_state(location)
+    for entry in os.listdir(staging_dir):
+        shutil.move(os.path.join(staging_dir, entry), os.path.join(location, entry))
+    shutil.rmtree(staging_dir)
 
 
-def get_kofamscan_data():
+def _safe_remove(path):
+    if os.path.exists(path):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def _safe_rmtree(path):
+    if os.path.isdir(path):
+        try:
+            shutil.rmtree(path)
+        except OSError:
+            pass
+
+
+def get_kofamscan_data(force_update=False):
     ko_data_dir = check_location_var_is_set()
+
+    if force_update:
+        print(color_text("    Re-downloading KO data (force-update requested)...\n", "yellow"))
+        _clear_partial_state(ko_data_dir)
+        download_kofamscan_data(ko_data_dir)
+        return
+
     if check_if_data_present(ko_data_dir):
         return
-    else:
-        print(color_text("    Downloading required KO data (only needs to be done once, unless newer HMMs become available)...\n", "yellow"))
-        download_kofamscan_data(ko_data_dir)
+
+    print(color_text("    Downloading required KO data (only needs to be done once, "
+                     "unless newer HMMs become available)...\n", "yellow"))
+    download_kofamscan_data(ko_data_dir)
 
 
 if __name__ == "__main__":
