@@ -74,9 +74,10 @@ jobs:
           # pfam-version.txt asset (not the big tarball). Empty if the tag or
           # asset doesn't exist yet (first-ever run).
           PUBLISHED=""
-          gh release download "${TAG}" --repo "${REPO}" --pattern pfam-version.txt --output /tmp/published-version.txt 2>/dev/null
-          PUBLISHED="$(tr -d '[:space:]' < /tmp/published-version.txt || true)"
-
+          if gh release download "${TAG}" --repo "${REPO}" \
+               --pattern pfam-version.txt --output /tmp/published-version.txt 2>/dev/null; then
+            PUBLISHED="$(tr -d '[:space:]' < /tmp/published-version.txt || true)"
+          fi
           echo "Published version: ${PUBLISHED:-<none>}"
 
           FORCE="${{ github.event.inputs.force }}"
