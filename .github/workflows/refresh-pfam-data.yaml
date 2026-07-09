@@ -12,6 +12,11 @@ name: refresh-pfam-data
 #                          the currently-published version without downloading
 #                          the ~420MB tarball
 #
+# Pfam updates infrequently (a new release every year or two), so most monthly
+# runs will find nothing new and exit early without re-downloading or
+# re-uploading. A manual dispatch with force=true rebuilds even at the same
+# version (e.g. to refresh date-retrieved.txt or repair a bad asset).
+#
 # pfam-data.tar.gz holds:
 #   Pfam-A.hmm.gz        (the master HMM file, compressed)
 #   pfamA.txt.gz         (the info table, compressed)
@@ -69,13 +74,9 @@ jobs:
           # pfam-version.txt asset (not the big tarball). Empty if the tag or
           # asset doesn't exist yet (first-ever run).
           PUBLISHED=""
-          if gh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
-            # download the version asset to stdout if present
-            if gh release download "${TAG}" --repo "${REPO}" \
-                 --pattern pfam-version.txt --output /tmp/published-version.txt 2>/dev/null; then
-              PUBLISHED="$(tr -d '[:space:]' < /tmp/published-version.txt || true)"
-            fi
-          fi
+          gh release download "${TAG}" --repo "${REPO}" --pattern pfam-version.txt --output /tmp/published-version.txt 2>/dev/null
+          PUBLISHED="$(tr -d '[:space:]' < /tmp/published-version.txt || true)"
+
           echo "Published version: ${PUBLISHED:-<none>}"
 
           FORCE="${{ github.event.inputs.force }}"
@@ -127,7 +128,12 @@ jobs:
           fi
           [ -s "${STAGE}/pfamA.txt.gz" ] || { echo "ERROR: empty pfamA.txt.gz" >&2; exit 1; }
 
-          if ! gunzip -c "${STAGE}/Pfam-A.hmm.gz" | head -c 200 | grep -q 'HMMER'; then
+          # Sniff the first bytes for the HMMER magic. Capture a bounded slice
+          # into a variable with `|| true` so that closing the pipe early doesn't
+          # send SIGPIPE up to gunzip and trip `set -o pipefail` (which would
+          # otherwise fail this check on a perfectly good 400MB+ file).
+          hmm_head="$(gunzip -c "${STAGE}/Pfam-A.hmm.gz" 2>/dev/null | head -c 200 || true)"
+          if ! printf '%s' "${hmm_head}" | grep -q 'HMMER'; then
             echo "ERROR: Pfam-A.hmm.gz does not look like an HMMER file" >&2
             exit 1
           fi
@@ -158,18 +164,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # ensure the release exists (idempotent)
-          if ! gh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
-            gh release create "${TAG}" --repo "${REPO}" \
-              --title "Pfam data (latest)" \
-              --notes "Auto-refreshed Pfam data, re-hosted over HTTPS for GToTree. Rebuilt when a new Pfam release appears." \
-              --latest=false
-          fi
-
-          # publish the tarball first, then the small version file LAST so that
-          # pfam-version.txt only ever advertises a version whose tarball is
-          # already in place (avoids a window where the version says N.N but the
-          # matching tarball hasn't uploaded yet).
           n=0
           until [ "$n" -ge 3 ]; do
             if timeout 600 gh release upload "${TAG}" "${PFAM_ASSET}" \
