@@ -28,6 +28,7 @@ GToTree = "gtotree.main:main" # this doesn't tab-complete on mac, as mac is case
 gtt-hmms = "gtotree.utils.hmms.gtt_hmms:main"
 gtt-midpoint-root-tree = "gtotree.utils.helper_scripts.gtt_midpoint_root_tree:main"
 gtt-get-kofamscan-data = "gtotree.utils.ko.get_kofamscan_data:main"
+gtt-data-locations = "gtotree.utils.data_locations:main"
 
 [tool.pytest.ini_options]
 testpaths = ["gtotree/tests"]
