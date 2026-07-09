@@ -1,6 +1,6 @@
 name: refresh-kofamscan-data
 
-# Fetches the KOFamScan data files from ftp.genome.jp (README.txt, ko_list.gz,
+# Fetches the KOFamScan data files from ftp.genome.jp (README, ko_list.gz,
 # profiles.tar.gz), repackages them into a single HTTPS-hosted tarball, and
 # force-updates the `kofamscan-data-latest` release asset that GToTree pulls, that
 # is hosted on the gtotree github repo.
@@ -11,7 +11,7 @@ name: refresh-kofamscan-data
 # cluster networks)
 #
 # The produced archive (kofamscan-data.tar.gz) holds:
-#   README.txt
+#   README
 #   ko_list
 #   profiles/            (the extracted HMM profiles directory)
 #   date-retrieved.txt   (pull date, YYYY,MM,DD)
@@ -53,7 +53,7 @@ jobs:
                  -o "${out}" "${url}"
           }
 
-          dl "${FTP_BASE}/README.txt"       "${STAGE}/README.txt"
+          dl "${FTP_BASE}/README"       "${STAGE}/README"
           dl "${FTP_BASE}/ko_list.gz"       "${WORK}/ko_list.gz"
           dl "${FTP_BASE}/profiles.tar.gz"  "${WORK}/profiles.tar.gz"
 
@@ -82,7 +82,7 @@ jobs:
 
           # sanity: ko_list and README must be non-empty
           [ -s "${STAGE}/ko_list" ]   || { echo "ERROR: empty ko_list" >&2; exit 1; }
-          [ -s "${STAGE}/README.txt" ] || { echo "ERROR: empty README.txt" >&2; exit 1; }
+          [ -s "${STAGE}/README" ] || { echo "ERROR: empty README" >&2; exit 1; }
 
           # date-retrieved stamp (YYYY,MM,DD) — mirrors the NCBI asset convention
           date -u +'%Y,%m,%d' > "${STAGE}/date-retrieved.txt"
