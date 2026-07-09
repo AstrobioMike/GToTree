@@ -53,7 +53,7 @@ jobs:
                  -o "${out}" "${url}"
           }
  
-          dl "${FTP_BASE}/README.txt"       "${STAGE}/README.txt"
+          dl "${FTP_BASE}/README"       "${STAGE}/README"
           dl "${FTP_BASE}/ko_list.gz"       "${WORK}/ko_list.gz"
           dl "${FTP_BASE}/profiles.tar.gz"  "${STAGE}/profiles.tar.gz"
  
@@ -77,13 +77,13 @@ jobs:
  
           # sanity: ko_list and README must be non-empty
           [ -s "${STAGE}/ko_list" ]    || { echo "ERROR: empty ko_list" >&2; exit 1; }
-          [ -s "${STAGE}/README.txt" ] || { echo "ERROR: empty README.txt" >&2; exit 1; }
+          [ -s "${STAGE}/README" ] || { echo "ERROR: empty README" >&2; exit 1; }
  
           # date-retrieved stamp (YYYY,MM,DD) -- mirrors the NCBI asset convention
           date -u +'%Y,%m,%d' > "${STAGE}/date-retrieved.txt"
           echo "  date retrieved: $(cat "${STAGE}/date-retrieved.txt")"
  
-          # bundle: archive root == README.txt, ko_list, profiles.tar.gz,
+          # bundle: archive root == README, ko_list, profiles.tar.gz,
           # date-retrieved.txt. profiles is already compressed, so gzip the
           # outer tar at level 1 (fast; near-zero further gain on the big blob).
           OUT="${GITHUB_WORKSPACE}/kofamscan-data.tar.gz"

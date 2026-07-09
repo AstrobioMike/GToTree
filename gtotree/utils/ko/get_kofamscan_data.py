@@ -10,8 +10,6 @@ asset. This is served over HTTPS, so it sidesteps the ftp.genome.jp FTP access
 problems that block many institutional / cluster networks.
 
 `-f/--force-update` re-pulls that same hosted tarball.
-
-For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
 """
 
 import sys
@@ -29,7 +27,7 @@ from gtotree.utils.general import download_with_tqdm
 # asset URL. The archive holds exactly this at its root:
 #   README
 #   ko_list
-#   profiles/            (the HMM profiles directory)
+#   profiles.tar.gz
 #   date-retrieved.txt   (build date, YYYY,MM,DD)
 # Served over HTTPS to avoid the ftp.genome.jp FTP access problems.
 KOFAMSCAN_TARBALL_URL = "https://github.com/AstrobioMike/GToTree/releases/download/kofamscan-data-latest/kofamscan-data.tar.gz"
@@ -38,6 +36,7 @@ KOFAMSCAN_TARBALL_URL = "https://github.com/AstrobioMike/GToTree/releases/downlo
 README_FILENAME = "README"
 KO_LIST_FILENAME = "ko_list"
 PROFILES_DIRNAME = "profiles"
+PROFILES_TARBALL = "profiles.tar.gz"
 DATE_FILENAME = "date-retrieved.txt"
 
 
@@ -90,14 +89,14 @@ def check_if_data_present(location):
             os.path.isdir(profiles_dir_path)):
         return True
 
-    # incomplete — clear partial state
+    # incomplete - clear partial state
     _clear_partial_state(location)
     return False
 
 
 def _clear_partial_state(location):
     """Remove any of the expected files/dirs that happen to exist."""
-    for fname in (README_FILENAME, KO_LIST_FILENAME, DATE_FILENAME):
+    for fname in (README_FILENAME, KO_LIST_FILENAME, DATE_FILENAME, PROFILES_TARBALL):
         fpath = os.path.join(location, fname)
         if os.path.exists(fpath):
             os.remove(fpath)
@@ -111,7 +110,7 @@ def report_kofam_dl_failure(e):
     report_message("GToTree pulls this data from a GitHub-hosted release asset over HTTPS.")
     report_message("You can check whether you can access this URL:")
     report_message(f"    {KOFAMSCAN_TARBALL_URL}")
-    report_message("If this keeps failing, it may be a transient network issue — trying again "
+    report_message("If this keeps failing, it may be a transient network issue - trying again "
                    "later often resolves it. You can also drop the additional target KOs (being "
                    "provided to the `-K` flag) and run GToTree without them.")
     report_early_exit(None, copy_log=False)
@@ -120,9 +119,9 @@ def report_kofam_dl_failure(e):
 def download_kofamscan_data(location):
     """
     Pull the hosted tarball and extract it atomically into `location`:
-    download to a temp path, extract into a temp staging dir, validate, then
-    move the pieces into place. Avoids leaving a half-populated data dir if the
-    download or extraction is interrupted.
+    download to a temp path, extract the outer archive into a temp staging dir,
+    extract the inner profiles.tar.gz, validate, then move the pieces into
+    place. Avoids leaving a half-populated data dir if anything is interrupted.
     """
     tarball_path = os.path.join(location, "kofamscan-data.tar.gz")
     staging_dir = os.path.join(location, ".kofamscan-staging")
@@ -139,7 +138,7 @@ def download_kofamscan_data(location):
         _safe_remove(tarball_path)
         report_kofam_dl_failure(e)
 
-    # extract into staging
+    # extract the OUTER archive into staging
     try:
         with tarfile.open(tarball_path) as tarball:
             tarball.extractall(staging_dir)
@@ -149,6 +148,22 @@ def download_kofamscan_data(location):
         report_kofam_dl_failure(e)
 
     os.remove(tarball_path)
+
+    # extract the INNER profiles.tar.gz (shipped compressed) into staging,
+    # producing profiles/. Remove the inner tarball once extracted so it
+    # doesn't get moved into the final data dir.
+    inner_profiles_tar = os.path.join(staging_dir, PROFILES_TARBALL)
+    if not os.path.isfile(inner_profiles_tar):
+        _safe_rmtree(staging_dir)
+        report_kofam_dl_failure(
+            f"the downloaded archive did not contain {PROFILES_TARBALL}")
+    try:
+        with tarfile.open(inner_profiles_tar) as profiles_tar:
+            profiles_tar.extractall(staging_dir)
+    except Exception as e:
+        _safe_rmtree(staging_dir)
+        report_kofam_dl_failure(f"failed to extract {PROFILES_TARBALL}: {e}")
+    os.remove(inner_profiles_tar)
 
     # validate expected contents landed in staging
     staged_readme = os.path.join(staging_dir, README_FILENAME)
@@ -160,7 +175,8 @@ def download_kofamscan_data(location):
         _safe_rmtree(staging_dir)
         report_kofam_dl_failure(
             "the downloaded archive did not contain the expected "
-            f"{README_FILENAME}, {KO_LIST_FILENAME}, and {PROFILES_DIRNAME}/")
+            f"{README_FILENAME}, {KO_LIST_FILENAME}, and {PROFILES_DIRNAME}/ "
+            "(after extracting profiles)")
 
     # move staged pieces into place (clearing any stale copies first)
     _clear_partial_state(location)
