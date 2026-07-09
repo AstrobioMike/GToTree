@@ -1,0 +1,110 @@
+name: refresh-kofamscan-data
+
+# Fetches the KOFamScan data files from ftp.genome.jp (README.txt, ko_list.gz,
+# profiles.tar.gz), repackages them into a single HTTPS-hosted tarball, and
+# force-updates the `kofamscan-data-latest` release asset that GToTree pulls, that
+# is hosted on the gtotree github repo.
+#
+# KOFam is typically refreshed at the end of each month, so this runs monthly.
+# The whole point of re-hosting: users get the data over HTTPS instead of the
+# flaky ftp.genome.jp FTP (which is frequently blocked on institutional /
+# cluster networks)
+#
+# The produced archive (kofamscan-data.tar.gz) holds:
+#   README.txt
+#   ko_list
+#   profiles/            (the extracted HMM profiles directory)
+#   date-retrieved.txt   (pull date, YYYY,MM,DD)
+
+on:
+  schedule:
+    # 06:00 UTC on the 2nd of every month (kofam data seems to update end of each month)
+    - cron: "0 6 2 * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-kofamscan-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Fetch, validate, and repackage KOFamScan data
+        run: |
+          set -euo pipefail
+
+          FTP_BASE="ftp://ftp.genome.jp/pub/db/kofam"
+          WORK="$(mktemp -d)"
+          STAGE="${WORK}/kofamscan-data"
+          mkdir -p "${STAGE}"
+
+          # curl with retries/backoff; --retry covers transient FTP hiccups,
+          # -f fails loudly on 4xx/5xx-equivalent, -S surfaces the error.
+          dl() {
+            local url="$1" out="$2"
+            echo "  downloading ${url}"
+            curl -fSL --retry 6 --retry-delay 5 --retry-connrefused \
+                 --connect-timeout 30 --max-time 1800 \
+                 -o "${out}" "${url}"
+          }
+
+          dl "${FTP_BASE}/README.txt"       "${STAGE}/README.txt"
+          dl "${FTP_BASE}/ko_list.gz"       "${WORK}/ko_list.gz"
+          dl "${FTP_BASE}/profiles.tar.gz"  "${WORK}/profiles.tar.gz"
+
+          # --- integrity checks: fail loudly rather than shipping a truncated asset ---
+          echo "  validating gzip integrity"
+          gzip -t "${WORK}/ko_list.gz"
+          gzip -t "${WORK}/profiles.tar.gz"
+
+          # decompress ko_list into place
+          gunzip -c "${WORK}/ko_list.gz" > "${STAGE}/ko_list"
+
+          # extract profiles/ into place
+          tar -xzf "${WORK}/profiles.tar.gz" -C "${STAGE}"
+
+          # sanity: the profiles dir must exist and be non-empty
+          if [ ! -d "${STAGE}/profiles" ]; then
+            echo "ERROR: expected ${STAGE}/profiles/ after extraction, not found" >&2
+            exit 1
+          fi
+          n_hmms="$(find "${STAGE}/profiles" -name '*.hmm' | wc -l | tr -d ' ')"
+          echo "  extracted ${n_hmms} HMM profiles"
+          if [ "${n_hmms}" -lt 1000 ]; then
+            echo "ERROR: suspiciously few HMM profiles (${n_hmms}); refusing to publish" >&2
+            exit 1
+          fi
+
+          # sanity: ko_list and README must be non-empty
+          [ -s "${STAGE}/ko_list" ]   || { echo "ERROR: empty ko_list" >&2; exit 1; }
+          [ -s "${STAGE}/README.txt" ] || { echo "ERROR: empty README.txt" >&2; exit 1; }
+
+          # date-retrieved stamp (YYYY,MM,DD) — mirrors the NCBI asset convention
+          date -u +'%Y,%m,%d' > "${STAGE}/date-retrieved.txt"
+          echo "  date retrieved: $(cat "${STAGE}/date-retrieved.txt")"
+
+          # repackage: archive root == the three files + profiles/ (no leading dir)
+          OUT="${GITHUB_WORKSPACE}/kofamscan-data.tar.gz"
+          tar -czf "${OUT}" -C "${STAGE}" .
+          echo "  wrote ${OUT} ($(du -h "${OUT}" | cut -f1))"
+
+          # verify the produced archive is itself readable
+          tar -tzf "${OUT}" > /dev/null
+          echo "KOFAM_ASSET=${OUT}" >> "${GITHUB_ENV}"
+
+      - name: Publish to fixed release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="kofamscan-data-latest"
+
+          # --clobber overwrites the existing asset at this fixed tag
+          gh release upload "${TAG}" "${KOFAM_ASSET}" --clobber
+
+          echo "Published ${KOFAM_ASSET} to release ${TAG}"
