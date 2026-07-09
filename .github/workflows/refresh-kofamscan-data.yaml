@@ -105,7 +105,16 @@ jobs:
           set -euo pipefail
           TAG="kofamscan-data-latest"
 
-          # --clobber overwrites the existing asset at this fixed tag
-          gh release upload "${TAG}" "${KOFAM_ASSET}" --clobber --repo "${REPO}"
-
-          echo "Published ${KOFAM_ASSET} to release ${TAG}"
+          n=0
+          until [ "$n" -ge 3 ]; do
+            if timeout 600 gh release upload "${TAG}" "${KOFAM_ASSET}" \
+                 --clobber --repo "${REPO}"; then
+              echo "Published ${KOFAM_ASSET} to release ${TAG}"
+              exit 0
+            fi
+            n=$((n+1))
+            echo "upload attempt ${n} failed or timed out; retrying in 30s" >&2
+            sleep 30
+          done
+          echo "ERROR: release upload failed after ${n} attempts" >&2
+          exit 1
