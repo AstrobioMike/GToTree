@@ -37,12 +37,12 @@ jobs:
       - name: Fetch, validate, and repackage KOFamScan data
         run: |
           set -euo pipefail
-
+ 
           FTP_BASE="ftp://ftp.genome.jp/pub/db/kofam"
           WORK="$(mktemp -d)"
           STAGE="${WORK}/kofamscan-data"
           mkdir -p "${STAGE}"
-
+ 
           # curl with retries/backoff; --retry covers transient FTP hiccups,
           # -f fails loudly on 4xx/5xx-equivalent, -S surfaces the error.
           dl() {
@@ -52,47 +52,44 @@ jobs:
                  --connect-timeout 30 --max-time 1800 \
                  -o "${out}" "${url}"
           }
-
-          dl "${FTP_BASE}/README"       "${STAGE}/README"
+ 
+          dl "${FTP_BASE}/README.txt"       "${STAGE}/README.txt"
           dl "${FTP_BASE}/ko_list.gz"       "${WORK}/ko_list.gz"
-          dl "${FTP_BASE}/profiles.tar.gz"  "${WORK}/profiles.tar.gz"
-
+          dl "${FTP_BASE}/profiles.tar.gz"  "${STAGE}/profiles.tar.gz"
+ 
           # --- integrity checks: fail loudly rather than shipping a truncated asset ---
           echo "  validating gzip integrity"
           gzip -t "${WORK}/ko_list.gz"
-          gzip -t "${WORK}/profiles.tar.gz"
-
-          # decompress ko_list into place
+          gzip -t "${STAGE}/profiles.tar.gz"
+ 
+          # decompress ko_list into place (small; nice to have ready-to-use)
           gunzip -c "${WORK}/ko_list.gz" > "${STAGE}/ko_list"
-
-          # extract profiles/ into place
-          tar -xzf "${WORK}/profiles.tar.gz" -C "${STAGE}"
-
-          # sanity: the profiles dir must exist and be non-empty
-          if [ ! -d "${STAGE}/profiles" ]; then
-            echo "ERROR: expected ${STAGE}/profiles/ after extraction, not found" >&2
-            exit 1
-          fi
-          n_hmms="$(find "${STAGE}/profiles" -name '*.hmm' | wc -l | tr -d ' ')"
-          echo "  extracted ${n_hmms} HMM profiles"
+ 
+          # verify profiles.tar.gz actually contains a profiles/ tree with a
+          # sane number of HMMs, WITHOUT leaving the extracted tree behind
+          echo "  inspecting profiles.tar.gz contents"
+          n_hmms="$(tar -tzf "${STAGE}/profiles.tar.gz" | grep -c '\.hmm$' || true)"
+          echo "  profiles.tar.gz lists ${n_hmms} HMM profiles"
           if [ "${n_hmms}" -lt 1000 ]; then
             echo "ERROR: suspiciously few HMM profiles (${n_hmms}); refusing to publish" >&2
             exit 1
           fi
-
+ 
           # sanity: ko_list and README must be non-empty
-          [ -s "${STAGE}/ko_list" ]   || { echo "ERROR: empty ko_list" >&2; exit 1; }
-          [ -s "${STAGE}/README" ] || { echo "ERROR: empty README" >&2; exit 1; }
-
-          # date-retrieved stamp (YYYY,MM,DD) — mirrors the NCBI asset convention
+          [ -s "${STAGE}/ko_list" ]    || { echo "ERROR: empty ko_list" >&2; exit 1; }
+          [ -s "${STAGE}/README.txt" ] || { echo "ERROR: empty README.txt" >&2; exit 1; }
+ 
+          # date-retrieved stamp (YYYY,MM,DD) -- mirrors the NCBI asset convention
           date -u +'%Y,%m,%d' > "${STAGE}/date-retrieved.txt"
           echo "  date retrieved: $(cat "${STAGE}/date-retrieved.txt")"
-
-          # repackage: archive root == the three files + profiles/ (no leading dir)
+ 
+          # bundle: archive root == README.txt, ko_list, profiles.tar.gz,
+          # date-retrieved.txt. profiles is already compressed, so gzip the
+          # outer tar at level 1 (fast; near-zero further gain on the big blob).
           OUT="${GITHUB_WORKSPACE}/kofamscan-data.tar.gz"
-          tar -czf "${OUT}" -C "${STAGE}" .
+          GZIP=-1 tar -czf "${OUT}" -C "${STAGE}" .
           echo "  wrote ${OUT} ($(du -h "${OUT}" | cut -f1))"
-
+ 
           # verify the produced archive is itself readable
           tar -tzf "${OUT}" > /dev/null
           echo "KOFAM_ASSET=${OUT}" >> "${GITHUB_ENV}"

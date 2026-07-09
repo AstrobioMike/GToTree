@@ -2,6 +2,12 @@
 
     # put gtotree test data on github too
 
+    # pfams aren't that big either actually, i could host them as github assets too,
+        # (with a similar auto-refresh logic by checking the relnotes.txt version at 
+        # https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/relnotes.txt every month or so)
+        # refresh when needed, and when used for individual searches, pull the required ones
+        # into the users area, and use them all for gtt-gen-SCG-HMMs
+
     # make gtt an entry point with subcommands for all the gtt scripts (maybe)
 
     # still need to implement iToL-file generation for both pfam and ko searching results
@@ -159,6 +165,8 @@ cat problem-accs.txt
     # in v2, all input genomes are prepared for each input source, then all are searched together
 # there are no longer separate summary tables for each input-genome source (accessions, fasta files, genbank files, and amino-acid files)
     # they are all represented in the primary "genomes-summary-info.tsv" table, which includes a "source" column
+# references are slimmed down and hosted on GToTree github as assets now, this will help users who had trouble accessing ftp sites
+
 
 ## Fixes
 ### PLACES TO DEF IMPROVE ###
