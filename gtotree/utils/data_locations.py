@@ -13,6 +13,7 @@ ENV_VARIABLES = [
     "TAXONKIT_DB",
     "GTDB_dir",
     "KO_data_dir",
+    "Pfam_data_dir",
 ]
 
 
