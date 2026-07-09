@@ -100,11 +100,12 @@ jobs:
       - name: Publish to fixed release tag
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           TAG="kofamscan-data-latest"
 
           # --clobber overwrites the existing asset at this fixed tag
-          gh release upload "${TAG}" "${KOFAM_ASSET}" --clobber
+          gh release upload "${TAG}" "${KOFAM_ASSET}" --clobber --repo "${REPO}"
 
           echo "Published ${KOFAM_ASSET} to release ${TAG}"
