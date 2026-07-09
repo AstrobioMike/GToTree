@@ -42,7 +42,7 @@ jobs:
           echo "Latest Pfam version: ${LATEST}"
 
           HMM_URL="${BASE}Pfam${LATEST}/Pfam-A.hmm.gz"
-          INFO_URL="${BASE}Pfam${LATEST}/database_files/pfamA.txt.gz"
+          INFO_URL="${BASE}Pfam${LATEST}/pfamA.txt.gz"
 
           # HEAD-probe a URL, echo the Content-Length in bytes (empty if absent)
           get_size() {
