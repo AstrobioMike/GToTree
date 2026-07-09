@@ -45,7 +45,7 @@ DATE_FILENAME = "date-retrieved.txt"
 def main():
 
     parser = argparse.ArgumentParser(
-        description="Setup the KOFamScan (https://github.com/takaram/kofam_scan) data files for use.",
+        description="Setup the KOFamScan data",
         epilog="Example usage: gtt-get-kofamscan-data"
     )
 
@@ -132,7 +132,7 @@ def download_kofamscan_data(location):
     os.makedirs(staging_dir, exist_ok=True)
 
     try:
-        download_with_tqdm(KOFAMSCAN_TARBALL_URL, "        KOFamScan data", tarball_path)
+        download_with_tqdm(KOFAMSCAN_TARBALL_URL, "        KOFamScan data", tarball_path, speed_gate=True)
     except Exception as e:
         _safe_rmtree(staging_dir)
         _safe_remove(tarball_path)
@@ -140,7 +140,7 @@ def download_kofamscan_data(location):
 
     # extract the OUTER archive into staging
 
-    print(color_text("\n    Extracting...", "yellow"))
+    print(color_text("    Extracting...\n", "yellow"))
 
     try:
         with tarfile.open(tarball_path) as tarball:

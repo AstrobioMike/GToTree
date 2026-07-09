@@ -34,6 +34,9 @@ gtt-midpoint-root-tree = "gtotree.utils.helper_scripts.gtt_midpoint_root_tree:ma
 gtt-data-locations = "gtotree.utils.data_locations:main"
 gtt-get-kofamscan-data = "gtotree.utils.ko.get_kofamscan_data:main"
 gtt-get-pfam-data = "gtotree.utils.pfam.get_pfam_data:main"
+gtt-get-ncbi-assembly-data = "gtotree.utils.ncbi.get_ncbi_assembly_tables:main"
+gtt-get-ncbi-tax-data = "gtotree.utils.ncbi.get_ncbi_tax_data:main"
+gtt-get-gtdb-data = "gtotree.utils.gtdb.get_gtdb_data:main"
 
 
 [tool.pytest.ini_options]

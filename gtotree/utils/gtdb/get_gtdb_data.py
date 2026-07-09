@@ -61,15 +61,11 @@ GTDB_VERSION_FILENAME = "GTDB-version-info.txt"
 def main():
 
     parser = argparse.ArgumentParser(
-        description="This is a helper program to facilitate setting up the "
-                    "reference files for the glorious Genome Taxonomy Database "
-                    "(gtdb.ecogenomic.org). It's really meant for internal use "
-                    "only by the main GToTree program.")
+        description="Setup the GTDB data")
 
     parser.add_argument("-f", "--force-update",
                         help="Re-download the slim GTDB table even if it is "
-                             "already present (pulls the hosted slim tarball "
-                             "again).",
+                             "already present",
                         action="store_true")
 
     args = parser.parse_args()
@@ -142,35 +138,6 @@ def report_gtdb_unreachable(err):
     report_early_exit(None, copy_log=False)
 
 
-def _download_with_retries(url, label, dest, attempts=4, retry_wait=3):
-    """
-    download `url` to `dest`, retrying up to `attempts` times on transient
-    failures (timeouts, connection resets, transient errors), with a short wait
-    between tries. A 404 is raised immediately (not retried). Raises the last
-    error if all attempts fail.
-    """
-    last_err = None
-    for attempt in range(1, attempts + 1):
-        try:
-            download_with_tqdm(url, label, dest)
-            return
-        except urllib.error.HTTPError as err:
-            if err.code == 404:
-                raise
-            last_err = err
-        except (urllib.error.URLError, socket.timeout, TimeoutError,
-                ConnectionError, OSError) as err:
-            last_err = err
-
-        if attempt < attempts:
-            wprint(color_text(
-                f"    download failed (attempt {attempt}/{attempts}); retrying...",
-                "yellow"))
-            time.sleep(retry_wait)
-
-    raise last_err
-
-
 def get_slim_gtdb_tab(location):
     """
     default path: download bit's pre-slimmed GTDB tarball and extract its two
@@ -194,8 +161,7 @@ def get_slim_gtdb_tab(location):
     default_timeout = socket.getdefaulttimeout()
     socket.setdefaulttimeout(30)
     try:
-        _download_with_retries(
-            GTDB_SLIM_TARBALL_URL, "        GTDB prepared data", tarball_path)
+        download_with_tqdm(GTDB_SLIM_TARBALL_URL, "        GTDB prepared data", tarball_path, speed_gate=True)
 
         # a truncated/corrupt download trips here (full-stream read via
         # getmembers), which triggers the fallback below rather than writing a

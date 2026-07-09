@@ -57,14 +57,12 @@ NCBI_ASSEMBLY_TARBALL_URL = "https://github.com/AstrobioMike/bit/releases/downlo
 def main():
 
     parser = argparse.ArgumentParser(
-        description="This is a helper program to download and set up the slim "
-                    "NCBI assembly-info table if it is not present.",
-        epilog="Ex. usage: get_ncbi_assembly_tables.py")
+        description="Setup the NCBI assembly summary table",
+        epilog="Ex. usage: gtt-get-ncbi-assembly-data")
 
     parser.add_argument("-f", "--force-update",
                         help="Re-download the slim assembly-info table even if it "
-                             "is already present (pulls the hosted slim tarball "
-                             "again).",
+                             "is already present",
                         action="store_true")
 
     args = parser.parse_args()
@@ -119,35 +117,6 @@ def check_if_data_present(location):
     return True
 
 
-def _download_with_retries(url, label, dest, attempts=4, retry_wait=3):
-    """
-    download `url` to `dest`, retrying up to `attempts` times on transient
-    failures (timeouts, connection resets, transient errors), with a short wait
-    between tries. A 404 is raised immediately (not retried). Raises the last
-    error if all attempts fail.
-    """
-    last_err = None
-    for attempt in range(1, attempts + 1):
-        try:
-            download_with_tqdm(url, label, dest)
-            return
-        except urllib.error.HTTPError as err:
-            if err.code == 404:
-                raise
-            last_err = err
-        except (urllib.error.URLError, socket.timeout, TimeoutError,
-                ConnectionError, OSError) as err:
-            last_err = err
-
-        if attempt < attempts:
-            wprint(color_text(
-                f"    download failed (attempt {attempt}/{attempts}); retrying...",
-                "yellow"))
-            time.sleep(retry_wait)
-
-    raise last_err
-
-
 def get_slim_ncbi_assembly_data(location):
     """
     default path: download the pre-built slim NCBI assembly-info tarball and
@@ -171,8 +140,7 @@ def get_slim_ncbi_assembly_data(location):
     default_timeout = socket.getdefaulttimeout()
     socket.setdefaulttimeout(30)
     try:
-        _download_with_retries(
-            NCBI_ASSEMBLY_TARBALL_URL, "        NCBI prepared data", tarball_path)
+        download_with_tqdm(NCBI_ASSEMBLY_TARBALL_URL, "        NCBI prepared data", tarball_path, speed_gate=True)
 
         # a truncated/corrupt download trips here (full-stream read via
         # getmembers), triggering the fallback below rather than writing a

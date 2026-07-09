@@ -2,15 +2,10 @@
 
     # put gtotree test data on github too
 
-    # pfams aren't that big either actually, i could host them as github assets too,
-        # (with a similar auto-refresh logic by checking the relnotes.txt version at 
-        # https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/relnotes.txt every month or so)
-        # refresh when needed, and when used for individual searches, pull the required ones
-        # into the users area, and use them all for gtt-gen-SCG-HMMs
-
-    # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data)
+    # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data, "Decompressing" in get-pfam-data, etc.)
 
     # make gtt an entry point with subcommands for all the gtt scripts (maybe)
+        # `gtt data` (at least), mirroring `bit data` would be nice to have i think
 
     # still need to implement iToL-file generation for both pfam and ko searching results
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
@@ -22,19 +17,13 @@
     # go through general.py GenomeData and RunData classes and see which methods i put in that i'm not using anywhere anymore
 
     # incorporate latest changes from master GToTree
-        # e.g., GTDB download needs no-cert-check added and flag for --use-ecogenomics
         # gtt-gen-SCG-HMMs has been updated a bit (v1.8.17)
         # bit's way of downloading assemblies with increased robustness (maybe even drop snakemake for that phase?)
         # check for others...
 
-
-    # add a flag to stop auto-update-db checks by date
-        # so like it won't automatically try to grab new ncbi/gtdb/KOFamScan data if older than X weeks like i have set in places
-        # seems like at least gtdb download (in regular run) isn't auto-checking right now...
-
-
     # modularize and reduce code redundancy in my user-side standalone scripts like:
-        # gtt-get-accessions-from-GTDB (use what we can from utils/gtdb/get_gtdb_data.py)
+        # gtt-get-accessions-from-GTDB (use what we can from utils/gtdb/get_gtdb_data.py; also see what i've done in bit already)
+            # bring over bit-get-accessions-from-ncbi also
         # gtt-gen-SCG-HMMs (don't forget to include updates made to the v1 GToTree)
         # gtt-pfam-search (if keeping this, basically dump the v1 standalone script and start re-building from what's available already in v2)
 
@@ -44,7 +33,7 @@
     # modularize and reduce code redundancy in any of my helper scripts still remaining
 
 
-    # fix entry points/console scripts as needed in setup.py or pyproject.toml if dumping setup.py
+    # fix entry points/console scripts as needed in pyproject.toml
 
 
     # wherever I have this:

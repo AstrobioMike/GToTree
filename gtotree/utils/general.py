@@ -4,6 +4,8 @@ import sys
 import gzip
 import shutil
 import json
+import time
+import socket
 import argparse
 import pandas as pd # type: ignore
 from dataclasses import dataclass, field, asdict
@@ -11,9 +13,11 @@ from typing import List
 from tqdm import tqdm # type: ignore
 import subprocess
 import urllib.request
+import urllib.error
 from datetime import datetime
 import importlib.resources as pkg_resources
-from gtotree.utils.messaging import report_early_exit, report_snakemake_failure
+from gtotree.utils.messaging import (report_early_exit, report_snakemake_failure,
+                                     report_message, color_text, wprint)
 
 
 @dataclass
@@ -29,7 +33,41 @@ class ToolsUsed:
     universal_SCGs_used: bool = False
 
 
-def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True):
+def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True,
+                       retries=True, attempts=6, retry_wait=3,
+                       speed_gate=False, min_mbps=2.0, probe_seconds=5.0):
+    """
+    Download `url` to `filename`, showing a tqdm progress bar, with optional
+    transient-error retries and optional speed-gated route rerolling. Both are
+    handled by a single unified attempt loop sharing one `attempts` budget.
+
+    retries=True (default): transient failures (timeouts, connection resets,
+    transient HTTP/URL errors) are retried up to `attempts` times, waiting
+    `retry_wait` seconds between tries. A 404 is never retried (raised at once).
+    Set retries=False for a single-shot download that raises on any error.
+
+    speed_gate=False (default): don't judge throughput. speed_gate=True: GitHub
+    release assets are served from a CDN whose per-connection throughput varies
+    by edge node; a slow connection tends to stay slow, and reconnecting often
+    lands on a faster edge. With the gate on, non-final attempts measure
+    throughput over an initial `probe_seconds` window and, if it's below
+    `min_mbps`, abort and reconnect to reroll the route. The final attempt
+    accepts whatever speed it gets and runs to completion, so a persistently
+    slow network still succeeds
+
+    `urlopen=True` returns the response
+
+    Raises the last underlying error if every attempt fails.
+    """
+    if urlopen:
+        return urllib.request.urlopen(url)
+
+    # a single attempt if retries are off
+    if not retries:
+        attempts = 1
+
+    # resolve total size up front so the bar is bounded/persistent (a plain GET
+    # carries Content-Length through GitHub's redirect more reliably than HEAD)
     total = None
     try:
         with urllib.request.urlopen(url) as r:
@@ -38,21 +76,99 @@ def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True):
     except Exception:
         total = None
 
-    if urlopen:
-        return urllib.request.urlopen(url)
+    floor_bytes_per_s = (min_mbps * 1024 * 1024) if speed_gate else 0.0
+    last_err = None
 
-    with tqdm(unit='B', unit_scale=True, unit_divisor=1024, miniters=1,
-              desc=target, ncols=90, leave=leave, total=total) as t:
-        def reporthook(block_num, block_size, total_size):
-            if t.total is None and total_size and total_size > 0:
-                t.total = total_size
-            downloaded = block_num * block_size
-            if t.total is not None:
-                downloaded = min(downloaded, t.total)   # never exceed total
-            t.update(downloaded - t.n)
-        urllib.request.urlretrieve(url, filename, reporthook=reporthook)
-        if t.total is not None and t.n < t.total:
-            t.update(t.total - t.n)
+    for attempt in range(2, attempts + 1):
+        is_final = (attempt == attempts)
+        # enforce the speed floor only on non-final attempts (and only if gated)
+        floor = 0.0 if is_final else floor_bytes_per_s
+        # desc = target if attempt == 1 else f"{target} (retry {attempt - 1})"
+        desc = target
+
+        try:
+            _stream_once(url, filename, desc, total, leave, floor, probe_seconds)
+            if leave:
+                sys.stderr.write("\n")
+            return
+
+        except _TooSlow as e:
+            # performance failure: reroll immediately, no wait
+            last_err = e
+            report_message(f"that was a slow route, trying to get a faster one... (try {attempt}/{attempts-1})", "yellow",
+                           ii="          ", si="          ", width=90)
+            print()
+            continue
+
+        except urllib.error.HTTPError as err:
+            # a definitive 404 is never worth retrying
+            if err.code == 404:
+                raise
+            last_err = err
+            if is_final:
+                raise
+            wprint(color_text(
+                f"    download failed (attempt {attempt}/{attempts}); retrying...",
+                "yellow"))
+            time.sleep(retry_wait)
+            continue
+
+        except (urllib.error.URLError, socket.timeout, TimeoutError,
+                ConnectionError, OSError) as err:
+            # transient network failure: wait, then retry
+            last_err = err
+            if is_final:
+                raise
+            wprint(color_text(
+                f"    download failed (attempt {attempt}/{attempts}); retrying...",
+                "yellow"))
+            time.sleep(retry_wait)
+            continue
+
+    if last_err:
+        raise last_err
+
+
+class _TooSlow(Exception):
+    def __init__(self, mbps):
+        self.mbps = mbps
+        super().__init__(f"too slow: {mbps:.2f} MB/s")
+
+
+def _stream_once(url, filename, desc, total, leave, floor_bytes_per_s, probe_seconds):
+    """
+    Stream url->filename with a tqdm bar. If floor_bytes_per_s > 0, measure
+    throughput over the first `probe_seconds` and raise _TooSlow if under floor.
+    Network/HTTP errors propagate to the caller's attempt loop.
+    """
+    chunk = 1024 * 256  # 256 KB reads
+    start = time.monotonic()
+    probed = False
+    req = urllib.request.Request(url)
+    with urllib.request.urlopen(req) as resp, open(filename, "wb") as out, \
+         tqdm(unit='B', unit_scale=True, unit_divisor=1024, miniters=1,
+              desc=desc, ncols=90, leave=leave, total=total) as bar:
+        downloaded = 0
+        while True:
+            buf = resp.read(chunk)
+            if not buf:
+                break
+            out.write(buf)
+            downloaded += len(buf)
+            if total is not None:
+                bar.update(min(downloaded, total) - bar.n)
+            else:
+                bar.update(len(buf))
+            if floor_bytes_per_s > 0 and not probed:
+                elapsed = time.monotonic() - start
+                if elapsed >= probe_seconds:
+                    probed = True
+                    rate = downloaded / elapsed if elapsed > 0 else 0.0
+                    if rate < floor_bytes_per_s:
+                        bar.close()
+                        raise _TooSlow(rate / (1024 * 1024))
+        if total is not None and bar.n < total:
+            bar.update(total - bar.n)
 
 
 def download_and_gunzip(url, target):

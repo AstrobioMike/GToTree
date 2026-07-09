@@ -50,7 +50,7 @@ _DECOMPRESS_PAIRS = ((HMM_GZ_FILENAME, HMM_FILENAME),
 def main():
 
     parser = argparse.ArgumentParser(
-        description="Setup the Pfam data files for use.",
+        description="Setup the Pfam data",
         epilog="Example usage: gtt-get-pfam-data"
     )
 
@@ -117,9 +117,10 @@ def report_pfam_dl_failure(e):
     report_message("GToTree pulls this data from a GitHub-hosted release asset over HTTPS.")
     report_message("You can check whether you can access this URL:")
     report_message(f"    {PFAM_TARBALL_URL}")
-    report_message("If this keeps failing, it may be a transient network issue - trying again "
-                   "later often resolves it. You can also drop the additional target Pfams "
-                   "(being provided to the `-p` flag) and run GToTree without them.")
+    report_message("The problem may be a transient network issue, and trying again "
+                   "later often resolves it. If you're using this in a regular GToTree run, "
+                   "you can also drop the additional target Pfams (being provided "
+                   "to the `-p` flag) and run GToTree without them to get around this.")
     report_early_exit(None, copy_log=False)
 
 
@@ -145,7 +146,7 @@ def download_pfam_data(location):
     os.makedirs(staging_dir, exist_ok=True)
 
     try:
-        download_with_tqdm(PFAM_TARBALL_URL, "        Pfam data", tarball_path)
+        download_with_tqdm(PFAM_TARBALL_URL, "        Pfam data", tarball_path, speed_gate=True)
     except Exception as e:
         _safe_rmtree(staging_dir)
         _safe_remove(tarball_path)
@@ -169,7 +170,7 @@ def download_pfam_data(location):
                 f"the downloaded archive did not contain the expected {fname}")
 
     # decompress the two .gz files in staging, ready for immediate use
-    print(color_text("    Decompressing...", "yellow"))
+    print(color_text("    Decompressing...\n", "yellow"))
     for gz_name, out_name in _DECOMPRESS_PAIRS:
         gz_path = os.path.join(staging_dir, gz_name)
         out_path = os.path.join(staging_dir, out_name)
@@ -196,6 +197,7 @@ def download_pfam_data(location):
             continue
         shutil.move(os.path.join(staging_dir, entry), os.path.join(location, entry))
     shutil.rmtree(staging_dir)
+    print()
 
 
 def _safe_remove(path):
@@ -221,7 +223,7 @@ def get_pfam_data(force_update=False):
         print(color_text("\n    Re-downloading Pfam data (force-update requested)...\n", "yellow"))
         _clear_partial_state(pfam_data_dir)
         download_pfam_data(pfam_data_dir)
-        _report_version(pfam_data_dir)
+        # _report_version(pfam_data_dir)
         return
 
     if check_if_data_present(pfam_data_dir):
@@ -229,13 +231,13 @@ def get_pfam_data(force_update=False):
 
     print(color_text("\n    Downloading required Pfam data (only needs to be done once)...\n", "yellow"))
     download_pfam_data(pfam_data_dir)
-    _report_version(pfam_data_dir)
+    # _report_version(pfam_data_dir)
 
 
 def _report_version(location):
     version = get_stored_pfam_version(location)
     if version:
-        print(color_text(f"    Pfam version: {version}\n", "yellow"))
+        print(color_text(f"\n    Pfam version: {version}\n", "yellow"))
 
 
 if __name__ == "__main__":
