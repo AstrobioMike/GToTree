@@ -1,0 +1,95 @@
+name: probe-pfam-sizes
+
+# DIAGNOSTIC-ONLY workflow. Resolves the latest Pfam release, then does HEAD
+# requests on the two files we'd want to host (Pfam-A.hmm.gz, pfamA.txt.gz) and
+# prints their sizes. It does NOT download the full files, so it finishes in
+# seconds. Purpose: decide whether re-hosting Pfam as a GToTree release asset is
+# practical -- i.e. whether the packaged tarball fits under GitHub's 2 GiB
+# per-file release-asset limit.
+#
+# Run it manually from the Actions tab (workflow_dispatch). Read the sizes in
+# the job log and the run Summary. Delete this workflow once you've decided, or
+# keep it as an occasional size check.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve latest Pfam version and probe file sizes
+        run: |
+          set -euo pipefail
+
+          BASE="https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/"
+
+          echo "Fetching release listing from ${BASE}"
+          LISTING="$(curl -fSL --retry 4 --retry-delay 5 "${BASE}")"
+
+          # extract PfamNN.N version strings, pick the highest numerically
+          LATEST="$(printf '%s' "${LISTING}" \
+            | grep -oE 'Pfam[0-9]+\.[0-9]+' \
+            | sed 's/^Pfam//' \
+            | sort -t. -k1,1n -k2,2n -u \
+            | tail -1)"
+
+          if [ -z "${LATEST}" ]; then
+            echo "ERROR: could not parse any Pfam versions from the listing" >&2
+            exit 1
+          fi
+          echo "Latest Pfam version: ${LATEST}"
+
+          HMM_URL="${BASE}Pfam${LATEST}/Pfam-A.hmm.gz"
+          INFO_URL="${BASE}Pfam${LATEST}/database_files/pfamA.txt.gz"
+
+          # HEAD-probe a URL, echo the Content-Length in bytes (empty if absent)
+          get_size() {
+            curl -sIL --retry 4 --retry-delay 5 "$1" \
+              | tr -d '\r' \
+              | awk 'tolower($1)=="content-length:"{v=$2} END{print v}'
+          }
+
+          HMM_BYTES="$(get_size "${HMM_URL}")"
+          INFO_BYTES="$(get_size "${INFO_URL}")"
+          HMM_BYTES="${HMM_BYTES:-0}"
+          INFO_BYTES="${INFO_BYTES:-0}"
+
+          SUM=$(( HMM_BYTES + INFO_BYTES ))
+          LIMIT=2147483648   # 2 GiB, GitHub per-file release-asset limit
+
+          # pretty-print helper
+          human() { awk -v b="$1" 'BEGIN{printf "%d bytes  =  %.3f GB  =  %.1f MB", b, b/1e9, b/1e6}'; }
+
+          {
+            echo "## Pfam size probe"
+            echo ""
+            echo "Latest Pfam version: **${LATEST}**"
+            echo ""
+            echo "| file | size |"
+            echo "|------|------|"
+            echo "| Pfam-A.hmm.gz | $(human "${HMM_BYTES}") |"
+            echo "| pfamA.txt.gz | $(human "${INFO_BYTES}") |"
+            echo "| **packaged total (approx.)** | $(human "${SUM}") |"
+            echo ""
+            echo "GitHub per-file release-asset limit: $(human "${LIMIT}")"
+            echo ""
+            if [ "${HMM_BYTES}" -eq 0 ] || [ "${INFO_BYTES}" -eq 0 ]; then
+              echo "> WARNING: one or both files returned no Content-Length on HEAD; the"
+              echo "> total may be understated. Re-run, or switch to a ranged GET probe."
+            fi
+            if [ "${SUM}" -gt "${LIMIT}" ]; then
+              echo "**Verdict:** the combined size EXCEEDS the 2 GiB per-file limit."
+              echo "A single bundled tarball won't work -- ship the two files as SEPARATE"
+              echo "release assets instead (each well under the limit on its own)."
+            elif [ "${SUM}" -gt 1900000000 ]; then
+              echo "**Verdict:** hostable as one tarball, but CLOSE to the 2 GiB ceiling."
+              echo "Fine for now; watch it as Pfam grows, and consider separate assets."
+            else
+              echo "**Verdict:** comfortably hostable as a single bundled tarball."
+            fi
+          } | tee -a "${GITHUB_STEP_SUMMARY}"
+
+          echo ""
+          echo "(The same table is in this run's Summary tab.)"

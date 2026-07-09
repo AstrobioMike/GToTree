@@ -3,3 +3,5 @@ notes.txt
 GToTree.egg-info/
 build/
 gtotree/
+.coverage
+__pycache__
