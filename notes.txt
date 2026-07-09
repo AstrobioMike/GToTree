@@ -167,6 +167,7 @@ cat problem-accs.txt
 ### IMPROVEMENTS to highlight in paper ###
 
 # python packaging and structure (rather than 4,000 lines of bash as main runner with dozens of individual python and bash helper scripts for a total of X lines)
+    # unit tests (though it did fine without them for 7 years)
 # instead of just exiting and informing when input files have problems, GToTree2 fixes them
     # e.g., duplicate entries will be unique'd, windows line-endings will be converted, changes written to a new file that is then used
 # snakemake control over the main components for easier restart capabilities
@@ -177,11 +178,11 @@ cat problem-accs.txt
     # new prepackaged HMMs based on GTDB taxonomy (originals, based on NCBI, still available)
     # in tandem scanning of target KOs or pfams, files for added vizualization in iToL
     # pre-built HMMs stored remotely and downloaded when used, to slim package size and install time
-    # partitions.txt file produced suitable for mixed-model treeing like with iqtree
+    # partitions.txt file produced suitable for mixed-model treeing with programs like iqtree
 
 
 ### """
-# In its first 6 years, the original GToTree received over 500 citations and has been
+# In its first 7 years, the original GToTree received over 700 citations and has been
 # successfully continually maintained over this time despite its foundation being a main runner
 # of ~4,000 lines of BASH and dozens of independent python and BASH helper scripts with a lot
 # of redundancy in its code base. Among several other improvements and feature additions, GToTree
