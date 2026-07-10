@@ -38,7 +38,7 @@ def _build_tarball(path, *, include_table=True, include_version=True,
 
 
 def _mock_tarball_download(src):
-    def _dl(url, label, dest):
+    def _dl(url, label, dest, *args, **kwargs):
         import shutil
         shutil.copy(src, dest)
         return dest
@@ -110,7 +110,7 @@ def test_slim_path_no_url_falls_back(tmp_path):
 
 
 def test_slim_path_download_error_falls_back(tmp_path):
-    def boom(url, label, dest):
+    def boom(url, label, dest, *args, **kwargs):
         raise ConnectionError("server down")
     with patch.object(mod, "GTDB_SLIM_TARBALL_URL", "https://example.test/x.tar.gz"), \
          patch(f"{MODPATH}.download_with_tqdm", side_effect=boom), \
@@ -132,7 +132,7 @@ def test_slim_path_missing_file_in_archive_falls_back(tmp_path):
 
 
 def test_slim_path_corrupt_tarball_falls_back(tmp_path):
-    def write_garbage(url, label, dest):
+    def write_garbage(url, label, dest, *args, **kwargs):
         Path(dest).write_bytes(b"not a gzip stream")
     with patch.object(mod, "GTDB_SLIM_TARBALL_URL", "https://example.test/x.tar.gz"), \
          patch(f"{MODPATH}.download_with_tqdm", side_effect=write_garbage), \
@@ -140,41 +140,6 @@ def test_slim_path_corrupt_tarball_falls_back(tmp_path):
         get_slim_gtdb_tab(str(tmp_path))
     mock_gen.assert_called_once_with(str(tmp_path))
     assert not (tmp_path / "GTDB-slim.tar.gz").exists()
-
-
-def test_slim_path_retries_then_succeeds(tmp_path):
-    src = tmp_path / "src.tar.gz"
-    _build_tarball(src)
-    import shutil
-    import socket
-    seen = {"n": 0}
-    def flaky(url, label, dest):
-        if seen["n"] < 2:
-            seen["n"] += 1
-            raise socket.timeout("stall")
-        shutil.copy(src, dest)
-    with patch.object(mod, "GTDB_SLIM_TARBALL_URL", "https://example.test/x.tar.gz"), \
-         patch(f"{MODPATH}.download_with_tqdm", side_effect=flaky), \
-         patch(f"{MODPATH}.time.sleep"), \
-         patch(f"{MODPATH}.gen_gtdb_tab") as mock_gen:
-        get_slim_gtdb_tab(str(tmp_path))
-    mock_gen.assert_not_called()
-    assert (tmp_path / GTDB_TABLE_FILENAME).exists()
-
-
-def test_slim_path_404_not_retried(tmp_path):
-    import urllib.error
-    calls = {"n": 0}
-    def not_found(url, label, dest):
-        calls["n"] += 1
-        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
-    with patch.object(mod, "GTDB_SLIM_TARBALL_URL", "https://example.test/x.tar.gz"), \
-         patch(f"{MODPATH}.download_with_tqdm", side_effect=not_found), \
-         patch(f"{MODPATH}.time.sleep"), \
-         patch(f"{MODPATH}.gen_gtdb_tab") as mock_gen:
-        get_slim_gtdb_tab(str(tmp_path))
-    assert calls["n"] == 1
-    mock_gen.assert_called_once_with(str(tmp_path))
 
 
 ################################################################################

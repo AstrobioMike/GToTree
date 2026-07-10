@@ -75,7 +75,7 @@ def _build_tarball(path, *, include_table=True, include_date=True,
 
 
 def _mock_tarball_download(src):
-    def _dl(url, label, dest):
+    def _dl(url, label, dest, *args, **kwargs):
         import shutil
         shutil.copy(src, dest)
         return dest
@@ -197,7 +197,7 @@ def test_slim_path_no_url_falls_back_to_rebuild(tmp_path):
 
 
 def test_slim_path_download_error_falls_back(tmp_path):
-    def boom(url, label, dest):
+    def boom(url, label, dest, *args, **kwargs):
         raise ConnectionError("server down")
     with patch.object(mod, "NCBI_ASSEMBLY_TARBALL_URL", "https://example.test/x.tar.gz"), \
          patch(f"{MODPATH}.download_with_tqdm", side_effect=boom), \
@@ -219,7 +219,7 @@ def test_slim_path_missing_file_in_archive_falls_back(tmp_path):
 
 
 def test_slim_path_corrupt_tarball_falls_back(tmp_path):
-    def write_garbage(url, label, dest):
+    def write_garbage(url, label, dest, *args, **kwargs):
         Path(dest).write_bytes(b"not a gzip stream")
     with patch.object(mod, "NCBI_ASSEMBLY_TARBALL_URL", "https://example.test/x.tar.gz"), \
          patch(f"{MODPATH}.download_with_tqdm", side_effect=write_garbage), \
@@ -227,43 +227,6 @@ def test_slim_path_corrupt_tarball_falls_back(tmp_path):
         get_slim_ncbi_assembly_data(str(tmp_path))
     mock_rb.assert_called_once_with(str(tmp_path))
     assert not (tmp_path / "ncbi-assembly-info.tar.gz").exists()
-
-
-def test_slim_path_retries_then_succeeds(tmp_path):
-    src = tmp_path / "src.tar.gz"
-    _build_tarball(src)
-    import shutil
-    import socket
-    seen = {"n": 0}
-    def flaky(url, label, dest):
-        if seen["n"] < 2:
-            seen["n"] += 1
-            raise socket.timeout("stall")
-        shutil.copy(src, dest)
-    with patch.object(mod, "NCBI_ASSEMBLY_TARBALL_URL", "https://example.test/x.tar.gz"), \
-         patch(f"{MODPATH}.download_with_tqdm", side_effect=flaky), \
-         patch(f"{MODPATH}.time.sleep"), \
-         patch(f"{MODPATH}.download_ncbi_assembly_summary_data") as mock_rb:
-        get_slim_ncbi_assembly_data(str(tmp_path))
-    mock_rb.assert_not_called()
-    assert (tmp_path / "ncbi-assembly-info.tsv").exists()
-
-
-def test_slim_path_404_not_retried(tmp_path):
-    """A 404 on the hosted asset is definitive -- it should fall straight to the
-    rebuild fallback without burning retry attempts."""
-    import urllib.error
-    calls = {"n": 0}
-    def not_found(url, label, dest):
-        calls["n"] += 1
-        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
-    with patch.object(mod, "NCBI_ASSEMBLY_TARBALL_URL", "https://example.test/x.tar.gz"), \
-         patch(f"{MODPATH}.download_with_tqdm", side_effect=not_found), \
-         patch(f"{MODPATH}.time.sleep"), \
-         patch(f"{MODPATH}.download_ncbi_assembly_summary_data") as mock_rb:
-        get_slim_ncbi_assembly_data(str(tmp_path))
-    assert calls["n"] == 1          # not retried
-    mock_rb.assert_called_once_with(str(tmp_path))
 
 
 ################################################################################

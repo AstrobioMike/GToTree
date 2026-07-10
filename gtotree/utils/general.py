@@ -79,7 +79,7 @@ def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True,
     floor_bytes_per_s = (min_mbps * 1024 * 1024) if speed_gate else 0.0
     last_err = None
 
-    for attempt in range(2, attempts + 1):
+    for attempt in range(1, attempts + 1):
         is_final = (attempt == attempts)
         # enforce the speed floor only on non-final attempts (and only if gated)
         floor = 0.0 if is_final else floor_bytes_per_s
@@ -95,7 +95,7 @@ def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True,
         except _TooSlow as e:
             # performance failure: reroll immediately, no wait
             last_err = e
-            report_message(f"that was a slow route, trying to get a faster one... (try {attempt}/{attempts-1})", "yellow",
+            report_message(f"that was a slow route (try {attempt}/{attempts-1}), trying to get a faster one...", "yellow",
                            ii="          ", si="          ", width=90)
             print()
             continue
@@ -170,7 +170,7 @@ def _stream_once(url, filename, desc, total, leave, floor_bytes_per_s, probe_sec
         if total is not None and bar.n < total:
             bar.update(total - bar.n)
 
-
+##### get rid of this after updating pfam handling to use our locally cached pfams
 def download_and_gunzip(url, target):
 
     try:

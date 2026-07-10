@@ -121,6 +121,9 @@ cat problem-accs.txt
 
 ### ADDED ###
 
+# --taxon parameter added
+    # this allows specifying a taxon at any rank in order to make a tree of genomes from that taxon (will only use species representatives)
+    # this is so the user no longer needs to collect their own accession input lists anymore
 # added a gene-represenation cutoff (-g) parameter
     # this is the minimum proportion of genomes required to have hits to a target gene for that target gene to be retained for downstream processing
     # e.g., with 100 input genomes and a -g of the default 0.2, any target gene that has hits in less than 20 genomes will be filtered out
@@ -128,6 +131,7 @@ cat problem-accs.txt
     #   after preprocessing steps, but before genome filtering based on the '-G'
     #   parameter, and it is not revisited after genome-level filtering. This
     #   is to avoid iterative pruning effects between the '-g' and '-G' parameters.
+# --resume flag added to attempt to continue interrupted runs
 
 # lots of things since initial v1 release, but were integrated before v2
 
@@ -148,7 +152,6 @@ cat problem-accs.txt
 # output files and dirs that had underscores have had them replaced with dashes (sorry, i now hate underscores when they're not necessary)
 # estimated percent completion and redundancy are no long provided
     # (this was always just "free" info, but checkm2 is a much better way to do this, so i made the decision to stop providing it at all)
-# --resume flag added to attempt to continue interrupted runs
 # taxids are no longer searched for in input genbank files, they will only be found/used for provided input ncbi-accessions
     # due to the nature of genbank files, this was always a little messy and hacky. If this is actually a feature that benefitted anyone, i'll try adding it back in upon request :)
 # the order of processing changed slightly from v1 to v2, so the output report messages vary a little
@@ -156,7 +159,7 @@ cat problem-accs.txt
     # in v2, all input genomes are prepared for each input source, then all are searched together
 # there are no longer separate summary tables for each input-genome source (accessions, fasta files, genbank files, and amino-acid files)
     # they are all represented in the primary "genomes-summary-info.tsv" table, which includes a "source" column
-# references are slimmed down and hosted on GToTree github as assets now, this will help users who had trouble accessing ftp sites
+# references are slimmed down and hosted on GToTree github as assets now, this will help users who had trouble accessing ftp or other sites due to firewalls or other restrictions
 
 
 ## Fixes
@@ -165,6 +168,7 @@ cat problem-accs.txt
 
 ### IMPROVEMENTS to highlight in paper ###
 
+# users no longer need to gather their own input accessions, they can just specify a taxon and GToTree will get the accessions for them
 # python packaging and structure (rather than 4,000 lines of bash as main runner with dozens of individual python and bash helper scripts for a total of X lines)
     # unit tests (though it did fine without them for 7 years)
 # instead of just exiting and informing when input files have problems, GToTree2 fixes them
