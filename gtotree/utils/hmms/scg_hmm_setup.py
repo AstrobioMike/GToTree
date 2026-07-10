@@ -21,7 +21,7 @@ def check_hmm_file(args, run_data):
 
     # getting hmm path
     if os.path.isfile(hmm_file): # handles if user-provided full path
-        run_data.hmm_path = hmm_file
+        run_data.hmm_path = os.path.abspath(hmm_file)
     else:
         # getting hmm from prepackaged table
         run_data.hmm_path = get_hmm_path(hmm_file, args.hmm)

@@ -1,3 +1,5 @@
+import sys
+from gtotree.cli.helpmenu import helpmenu
 from gtotree.cli.parser import parser
 from gtotree.utils.preflight_checks import preflight_checks
 from gtotree.utils.messaging import (gtotree_header,
@@ -20,6 +22,10 @@ from gtotree.utils.general import cleanup
 
 def main(args = None):
     if args is None:
+        if len(sys.argv) == 1:
+            sys.stdout.write(helpmenu)
+            sys.exit()
+
         args = parser().parse_args()
 
     print(gtotree_header())

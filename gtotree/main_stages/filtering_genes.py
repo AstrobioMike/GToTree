@@ -2,8 +2,9 @@ from gtotree.utils.general import (write_run_data,
                                    read_run_data,
                                    get_snakefile_path,
                                    run_snakemake)
-from gtotree.utils.messaging import (report_processing_stage,
-                                    report_SCG_set_filtering_update)
+from gtotree.utils.messaging import (report_message,
+                                     report_processing_stage,
+                                     report_SCG_set_filtering_update)
 from gtotree.utils.seqs import check_target_SCGs_have_seqs
 
 def filter_genes(args, run_data):
@@ -12,9 +13,10 @@ def filter_genes(args, run_data):
     cutoff = "{:.0f}".format(run_data.seq_length_cutoff * 100)
     in_genomes_cutoff_for_report = "{:.0f}".format(args.gene_representation_cutoff * 100)
 
-    print(f"\n      Keeping genes with lengths within {cutoff}% of the median for each gene set,")
-    print(f"      and keeping gene sets with hits in at least {in_genomes_cutoff_for_report}% of the currently")
-    print(f"      retained genomes.")
+    message = (f"Keeping genes with lengths within {cutoff}% of the median for each gene set, "
+               f"and keeping gene sets with hits in at least {in_genomes_cutoff_for_report}% of "
+               f"the currently retained genomes.")
+    report_message(message, ii="    ", si="    ", width=80)
 
     num_SCGs_to_filter_by_length = len(run_data.get_all_SCG_targets_remaining_but_not_filtered())
 

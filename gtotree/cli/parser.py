@@ -73,8 +73,4 @@ def parser():
     opt.add_argument("--tmp-dir", default=None)
     opt.add_argument("-d", "--debug", action="store_true")
 
-    if len(sys.argv) == 1:
-        sys.stdout.write(helpmenu)
-        sys.exit()
-
     return parser

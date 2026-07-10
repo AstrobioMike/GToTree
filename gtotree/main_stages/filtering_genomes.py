@@ -1,4 +1,4 @@
-from gtotree.utils.messaging import (report_processing_stage,
+from gtotree.utils.messaging import (report_message, report_processing_stage,
                                      report_genome_filtering_update)
 from gtotree.utils.seqs import check_target_SCGs_have_seqs
 from gtotree.utils.general import (write_run_data,
@@ -11,9 +11,10 @@ def filter_genomes(args, run_data):
     report_processing_stage("filter-genomes", run_data)
     cutoff = "{:.0f}".format(args.genome_hits_cutoff * 100)
     if not args.best_hit_mode:
-        print(f"\n   Keeping those with single hits to at least {cutoff}% of the remaining target-SCGs.")
+        message = f"Keeping those with single hits to at least {cutoff}% of the remaining target-SCGs."
     else:
-        print(f"\n       Keeping those with hits to at least {cutoff}% of the remaining target-SCGs.")
+        message = f"Keeping those with hits to at least {cutoff}% of the remaining target-SCGs."
+    report_message(message, ii="    ", si="    ", width=80)
 
     if not run_data.genomes_filtered_for_min_SCG_hits:
 

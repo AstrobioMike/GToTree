@@ -4,6 +4,9 @@
 
     # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data, "Decompressing" in get-pfam-data, etc.)
 
+    # when 0 accessions are found/make it through, at that stage summary the message is like "0 of total found...", it should probably explicitly check and say None
+        # this is probably the case for all input-processing stages
+
     # make gtt an entry point with subcommands for all the gtt scripts (maybe)
         # `gtt data` (at least), mirroring `bit data` would be nice to have i think
 

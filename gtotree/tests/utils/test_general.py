@@ -242,3 +242,46 @@ def test_speed_gate_fast_completes_first_try(tmp_path, monkeypatch, no_sleep):
 
     assert opens["stream"] == 1     # passed on the first attempt, no reroll
     assert out.read_bytes() == b"x" * (4 * 1024 * 1024)
+
+
+# --------------------------------------------------------------------------- #
+# atomic write: a failed/interrupted download must not leave a file at the
+# destination (which os.path.isfile gates would later mistake for complete),
+# nor leave a stray .part alongside it.
+# --------------------------------------------------------------------------- #
+
+def test_failed_download_leaves_no_file_at_destination(tmp_path, monkeypatch, no_sleep):
+    """Every attempt fails: no partial file at the final path, no .part left."""
+    def failing_urlopen(target, *a, **k):
+        is_stream = isinstance(target, urllib.request.Request)
+        if not is_stream:
+            return _FakeResp(headers={})          # size probe succeeds
+        raise ConnectionResetError("boom")        # every stream attempt fails
+
+    monkeypatch.setattr(general.urllib.request, "urlopen", failing_urlopen)
+
+    out = tmp_path / "out.bin"
+    with pytest.raises(ConnectionResetError):
+        download_with_tqdm("http://x/y", "label", str(out),
+                           attempts=3, retry_wait=0)
+
+    assert not out.exists()                        # no truncated file to be trusted
+    assert not (tmp_path / "out.bin.part").exists()  # temp cleaned up
+
+
+def test_404_leaves_no_partial_file(tmp_path, monkeypatch):
+    """A definitive 404 (never retried) also leaves nothing behind."""
+    def urlopen_404(target, *a, **k):
+        is_stream = isinstance(target, urllib.request.Request)
+        if not is_stream:
+            return _FakeResp(headers={})
+        raise _http_error(code=404)
+
+    monkeypatch.setattr(general.urllib.request, "urlopen", urlopen_404)
+
+    out = tmp_path / "out.bin"
+    with pytest.raises(urllib.error.HTTPError):
+        download_with_tqdm("http://x/y", "label", str(out))
+
+    assert not out.exists()
+    assert not (tmp_path / "out.bin.part").exists()

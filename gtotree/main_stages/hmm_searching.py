@@ -46,9 +46,16 @@ def run_hmm_search(id, run_data, inpath, outpath):
     ]
 
     try:
-        subprocess.run(cmd, stdout=subprocess.DEVNULL)
+        subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
         hmm_search_failed = False
-    except:
+    except subprocess.CalledProcessError as e:
+        stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
+        print(f"[hmmsearch failed for {id}] exit {e.returncode}: {stderr.strip()}")
         hmm_search_failed = True
 
     return hmm_search_failed

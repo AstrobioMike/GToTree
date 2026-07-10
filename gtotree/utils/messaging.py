@@ -646,7 +646,7 @@ def report_hmm_search_update(run_data):
     if num_failed == 0:
         message = (f"{color_text(f"All {num_searched} genomes were successfully searched for target genes!".center(82), "green")}")
     else:
-        message = f"    Of the {num_searched} input genomes, {num_successful} were successfully searched for the target genes.\n\n"
+        message = f"    Of the {num_searched} input genomes, {num_successful} were successfully searched for the target genes."
 
     report_update(message)
 

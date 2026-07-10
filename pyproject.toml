@@ -38,6 +38,8 @@ gtt-get-ncbi-assembly-data = "gtotree.utils.ncbi.get_ncbi_assembly_tables:main"
 gtt-get-ncbi-tax-data = "gtotree.utils.ncbi.get_ncbi_tax_data:main"
 gtt-get-gtdb-data = "gtotree.utils.gtdb.get_gtdb_data:main"
 
+gtt-test = "gtotree.tests.smoke:main"
+
 
 [tool.pytest.ini_options]
 testpaths = ["gtotree/tests"]
