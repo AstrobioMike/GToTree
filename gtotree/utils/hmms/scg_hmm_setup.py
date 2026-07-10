@@ -34,11 +34,11 @@ def check_hmm_file(args, run_data):
 
 def get_hmm_path(hmm_file, hmm_arg):
     hmm_data_dir = check_hmm_location_var_is_set()
-    if os.path.isfile(os.path.join(hmm_data_dir, hmm_file)):
-        return os.path.join(hmm_data_dir, hmm_file)
-    else:
-        download_prepackaged_hmm(hmm_file, hmm_arg)
-        return os.path.join(hmm_data_dir, hmm_file)
+    dest_path = os.path.join(hmm_data_dir, hmm_file)
+    if os.path.isfile(dest_path):
+        return dest_path
+    download_prepackaged_hmm(dest_path, hmm_arg)
+    return dest_path
 
 
 def check_hmm_location_var_is_set():
@@ -51,16 +51,19 @@ def check_hmm_location_var_is_set():
     return hmm_data_dir
 
 
-def download_prepackaged_hmm(hmm_file, hmm_arg):
+def download_prepackaged_hmm(dest_path, hmm_arg):
+    hmm_file = os.path.basename(dest_path)
     target_hmm_url = get_target_hmm_url(hmm_file, hmm_arg)
 
     print(color_text(f"    Downloading the prebuilt \"{hmm_arg}\" HMM set (only needs to be done once)...\n", "yellow"))
 
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)  # guard in case the dir doesn't exist yet
+
     try:
-        download_with_tqdm(target_hmm_url, f"        {hmm_arg} HMM file", hmm_file)
+        download_with_tqdm(target_hmm_url, f"        {hmm_arg} HMM file", dest_path)
     except Exception as e:
         report_message(f"Downloading the HMM file failed with the following error:\n{e}", "red")
-        report_early_exit(None, copy_log = False)
+        report_early_exit(None, copy_log=False)
 
 
 def read_in_hmm_summary_table():
