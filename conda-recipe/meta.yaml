@@ -34,7 +34,7 @@ requirements:
     - pandas
     - parallel
     - prodigal
-    - pyarrow
+    - pyarrow =24
     - pyhmmer =0.11.0
     - python ={{ py }}
     - pytest
