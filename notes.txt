@@ -1,5 +1,7 @@
 ### TO DO STILL ###
 
+    # pursue faster and better handling of reading and writing my run_data object when passing around to/from snakemake calls
+
     # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data, "Decompressing" in get-pfam-data, etc.)
 
     # make gtt an entry point with subcommands for all the gtt scripts (maybe)
