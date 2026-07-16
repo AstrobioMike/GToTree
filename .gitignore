@@ -5,3 +5,4 @@ build/
 gtotree/
 .coverage
 __pycache__
+tmp-testing

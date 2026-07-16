@@ -1,5 +1,12 @@
 # Change Log
 
+## v1.8.19 (16-Jul-2026)
+
+- removed high-genome notice that *required* user interaction to proceed (https://github.com/AstrobioMike/GToTree/issues/83#issuecomment-4989358508)
+
+--- 
+
+
 ## v1.8.18 (4-Jul-2026)
 
 - robustness improvements to assembly downloading
