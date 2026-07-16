@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m'
-VERSION="v1.8.18"
+VERSION="v1.8.19"
 
 if [ "$1" == "--version" ] || [ "$1" == "-v" ]; then
     printf "GToTree ${VERSION}\n"
@@ -1342,49 +1342,6 @@ if [ $total_input_genomes -le 20 ]; then
     printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
 
     sleep 3
-fi
-
-#############################################################################
-########  ADDING NOTICE ABOUT COMPUTATIONAL LOAD WITH MANY GENOMES  #########
-#############################################################################
-if [ $total_input_genomes -ge 12500 ]; then
-    printf "\n  ${YELLOW}********************************** ${NC}NOTICE ${YELLOW}**********************************${NC}  \n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "    The alignment and treeing steps, particularly the alignments, can become\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "    prohibitively memory-intensive with many input genomes. With $total_input_genomes total\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "    input genomes, this job may not be feasible :( \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-    printf "    Often it is useful to slim down how many genomes of closely related\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "    organisms we are including when looking across a broad level of\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "    diversity, as having many closely organisms usually isn't helpful or\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "    informative at broad levels.\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-    printf "    Have you considered using \"representative\" genomes only (either from\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "    NCBI or GTDB)? Those both provide helpful systems for reducing some\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "    redundancy when working at a broad level with many organisms. See\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-    printf "    github.com/AstrobioMike/GToTree/wiki/things-to-consider#consider-using-representative-genomes\n"
-
-    printf "  ${YELLOW}****************************************************************************${NC}  \n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-    printf "      ${YELLOW}Type '${GREEN}yes${YELLOW}' and press return to continue, or type anything else and press return to cancel this run...${NC}\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-
-    # temporarily changing IFS so can tell the difference between input spacebar vs return key
-    orig_IFS=$IFS
-    IFS=""
-
-    read -r -s -n 4 key_var
-
-    if [[ "$key_var" == "yes" ]]; then
-        IFS=${orig_IFS}
-        printf "\n                         You're the boss! Movin' on :)\n\n" | tee >( sed 's/\x1b\[[0-9;]*m//g' >> ${gtotree_log} )
-        sleep 3
-    else
-        IFS=${orig_IFS}
-        printf "\n                Exiting for now, hope to see you again soon :)\n\n"
-        sleep 3
-        rm -rf $gtotree_log uniq_hmm_names.tmp
-        exit
-    fi
-
 fi
 
 
