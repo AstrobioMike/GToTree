@@ -1,27 +1,26 @@
 #!/usr/bin/env python
 
-"""
-This is a helper program of GToTree (https://github.com/AstrobioMike/GToTree/wiki) 
-to download NCBI tax data for using TaxonKit (https://bioinf.shenwei.me/taxonkit/) to add NCBI taxonomy. 
-
-For examples, please visit the GToTree wiki here: https://github.com/AstrobioMike/GToTree/wiki/example-usage
-"""
-
 import sys
 import os
-import urllib.request
 import argparse
 import shutil
 import textwrap
 import filecmp
 import tarfile
 import gzip
+import time
+import random
+
+import requests
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description="This is a helper program to setup NCBI tax data for TaxonKit (bioinf.shenwei.me/taxonkit/) \
                                               to add taxonomy info.", \
                                  epilog="Ex. usage: gtt-get-ncbi-tax-data\n")
 
-parser.add_argument("-P", "--use-http", help='Use http instead of ftp', action = "store_true")
+parser.add_argument("-P", "--use-http", help='Deprecated and ignored: downloads now always use https', action = "store_true")
+
+parser.add_argument("-f", "--force", help='Re-download the NCBI taxonomy data even if it is already present', action = "store_true")
 
 args = parser.parse_args()
 
@@ -34,12 +33,16 @@ def main():
 
     data_present = check_if_data_present(NCBI_data_dir)
 
-    if data_present:
+    if data_present and not args.force:
         exit()
 
     else:
 
-        print(color_text("    Downloading required NCBI taxonomy data (only needs to be done once)...\n", "yellow"))
+        if data_present and args.force:
+            print(color_text("\n    Re-downloading NCBI taxonomy data (--force given)...\n", "yellow"))
+        else:
+            print(color_text("\n    Downloading required NCBI taxonomy data (only needs to be done once)...\n", "yellow"))
+
         get_NCBI_tax_data(NCBI_data_dir)
 
 
@@ -63,7 +66,7 @@ def color_text(text, color='green'):
 
 
 def wprint(text):
-    print(textwrap.fill(text, width=80, initial_indent="  ", 
+    print(textwrap.fill(text, width=80, initial_indent="  ",
           subsequent_indent="  ", break_on_hyphens=False))
 
 
@@ -104,26 +107,133 @@ def check_if_data_present(location):
         return(True)
 
 
+# NCBI throttles aggressively and answers with these transient HTTP statuses
+# when it wants the client to slow down or try again; treat them as retryable.
+TRANSIENT_STATUS = {429, 500, 502, 503, 504}
+MAX_RETRIES = 8
+
+
+def sleep_backoff(attempt, resp=None):
+    """
+    sleep before a retry. Honors an NCBI-provided Retry-After header when present
+    (NCBI sends one with its 503/429 responses), otherwise falls back to
+    exponential backoff with jitter. Mirrors bit's NCBI downloader.
+    """
+    if resp is not None:
+        retry_after = resp.headers.get("Retry-After")
+        if retry_after:
+            try:
+                time.sleep(float(retry_after))
+                return
+            except ValueError:
+                pass
+    time.sleep((2 ** (attempt - 1)) + random.uniform(0, 1))
+
+
+def download_ncbi_taxdump(url, dest, retries=MAX_RETRIES):
+    """
+    Download the NCBI taxdump tarball to `dest` over https, with NCBI-appropriate
+    robustness: Retry-After-aware exponential backoff on transient statuses
+    (429/5xx), a definitive 404 raised at once, HTML/XML error pages treated as
+    transient, and an atomic .part write so an interrupted pull never leaves a
+    truncated tarball that extraction would choke on. Shows a tqdm progress bar.
+
+    Deliberately NOT routed through the shared download_with_tqdm: that helper is
+    tuned for GitHub's CDN (custom curl User-Agent, speed-gated route rerolling)
+    and does not honor Retry-After, which is exactly what NCBI needs. Sending the
+    curl User-Agent to NCBI is also what was triggering 503s here.
+    """
+    tmp = dest + ".part"
+    last_note = None
+
+    for attempt in range(1, retries + 1):
+        try:
+            with requests.get(url, stream=True, timeout=60) as resp:
+
+                if resp.status_code == 404:
+                    raise RuntimeError(f"NCBI returned 404 (not found) for {url}")
+
+                if resp.status_code in TRANSIENT_STATUS:
+                    last_note = f"HTTP {resp.status_code}"
+                    if attempt == retries:
+                        raise RuntimeError(
+                            f"NCBI still returning HTTP {resp.status_code} after {retries} attempts")
+                    wprint(color_text(
+                        f"    download attempt {attempt}/{retries} got {last_note}; backing off and retrying...",
+                        "yellow"))
+                    sleep_backoff(attempt, resp)
+                    continue
+
+                resp.raise_for_status()
+
+                content_type = resp.headers.get("Content-Type", "").lower()
+                if "html" in content_type or "xml" in content_type:
+                    last_note = "an error page instead of the tarball"
+                    if attempt == retries:
+                        raise RuntimeError(
+                            f"NCBI returned {last_note} after {retries} attempts")
+                    wprint(color_text(
+                        f"    download attempt {attempt}/{retries} got {last_note}; backing off and retrying...",
+                        "yellow"))
+                    sleep_backoff(attempt)
+                    continue
+
+                total = resp.headers.get("Content-Length")
+                total = int(total) if total else None
+
+                try:
+                    with open(tmp, "wb") as out, \
+                         tqdm(unit='B', unit_scale=True, unit_divisor=1024,
+                              miniters=1, desc="        NCBI taxdump", ncols=90,
+                              total=total) as bar:
+                        for chunk in resp.iter_content(chunk_size=1024 * 256):
+                            if chunk:
+                                out.write(chunk)
+                                bar.update(len(chunk))
+
+                    if os.path.getsize(tmp) == 0:
+                        raise RuntimeError("downloaded file was empty")
+
+                    os.replace(tmp, dest)
+                    return
+
+                except BaseException:
+                    # clean up the partial on any failure (incl. Ctrl-C) so a
+                    # later "does it exist" check can't trust a truncated file
+                    if os.path.exists(tmp):
+                        try:
+                            os.remove(tmp)
+                        except OSError:
+                            pass
+                    raise
+
+        except (requests.RequestException, OSError) as e:
+            last_note = str(e)
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+            if attempt == retries:
+                raise RuntimeError(
+                    f"downloading the NCBI taxdump failed after {retries} attempts: {last_note}")
+            wprint(color_text(
+                f"    download attempt {attempt}/{retries} failed; backing off and retrying...",
+                "yellow"))
+            sleep_backoff(attempt)
+
+
 def get_NCBI_tax_data(location):
     """ downloads the needed ncbi tax data """
 
-    taxdump_path = os.path.join(str(location) + "taxdump.tar.gz")
+    taxdump_path = os.path.join(str(location), "taxdump.tar.gz")
 
+    taxdump_link = "https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
 
-    # setting links
-    if args.use_http:
+    download_ncbi_taxdump(taxdump_link, taxdump_path)
 
-        taxdump_link = "https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
-
-    else:
-
-        taxdump_link = "ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz"
-
-    urllib.request.urlretrieve(taxdump_link, taxdump_path)
-
-    # unpacking
     with tarfile.open(taxdump_path) as tarball:
-        tarball.extractall(location)
+        tarball.extractall(location, filter="data")
 
     # removing tarball
     os.remove(taxdump_path)
