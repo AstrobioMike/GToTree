@@ -3,6 +3,7 @@
 ## v1.8.19 (16-Jul-2026)
 
 - removed high-genome notice that *required* user interaction to proceed (https://github.com/AstrobioMike/GToTree/issues/83#issuecomment-4989358508)
+  - there is already a for the aligner used if there are a lot of genomes, and if they shut that off explicitly, they already saw my notice and suggestion
 - added support for bailing on slow connections and restarting downloads for the gtdb/ncbi data tables (since they are hosted on github now and this happens from time-to-time)
 
 --- 
