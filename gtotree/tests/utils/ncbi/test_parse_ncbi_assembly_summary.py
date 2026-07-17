@@ -1,4 +1,6 @@
 from pathlib import Path
+import pyarrow as pa # type: ignore
+import pyarrow.parquet as pq # type: ignore
 import pytest # type: ignore
 
 from gtotree.tests.utils.utils import FakeRunData
@@ -10,33 +12,30 @@ from gtotree.utils.ncbi.parse_ncbi_assembly_summary import (
 )
 
 
-SLIM_COLUMNS = [
-    "assembly_accession", "taxid", "organism_name", "infraspecific_name",
-    "version_status", "assembly_level", "asm_name", "ftp_path",
+# columns the parser reads from the hosted NCBI Parquet asset
+_PARQUET_COLUMNS = [
+    "assembly_accession", "asm_name", "taxid", "organism_name",
+    "infraspecific_name", "version_status", "assembly_level", "ftp_path",
 ]
 
-# NCBI full-file positions used to build a headerless legacy fixture row
-LEGACY_N = 38
+
+def _row(acc, taxid="562", org="Escherichia coli", infra="", ver="latest",
+         level="Complete Genome", asm="ASM584v2",
+         ftp="https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/005/845/GCF_000005845.2_ASM584v2"):
+    return {
+        "assembly_accession": acc, "asm_name": asm, "taxid": taxid,
+        "organism_name": org, "infraspecific_name": infra,
+        "version_status": ver, "assembly_level": level, "ftp_path": ftp,
+    }
 
 
-def _slim_row(acc, taxid="562", org="Escherichia coli", infra="", ver="latest",
-              level="Complete Genome", asm="ASM584v2",
-              ftp="https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/005/845/GCF_000005845.2_ASM584v2"):
-    return "\t".join([acc, taxid, org, infra, ver, level, asm, ftp])
+def _write_parquet(path, rows):
+    """Write a schema-faithful slim NCBI Parquet asset with just the read columns."""
+    cols = {c: [r.get(c, "") for r in rows] for c in _PARQUET_COLUMNS}
+    pq.write_table(
+        pa.table({c: pa.array(cols[c], type=pa.string()) for c in _PARQUET_COLUMNS}),
+        str(path))
 
-
-def _write_slim(path, rows):
-    Path(path).write_text("\t".join(SLIM_COLUMNS) + "\n" + "\n".join(rows) + "\n")
-
-
-def _legacy_row(acc, taxid="562", org="Escherichia coli", infra="", ver="latest",
-                level="Complete Genome", asm="ASM584v2",
-                ftp="https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/005/845/GCF_000005845.2_ASM584v2"):
-    """Full 38-col NCBI row with values in the legacy positions, no header."""
-    f = [f"c{i}" for i in range(LEGACY_N)]
-    f[0] = acc; f[5] = taxid; f[7] = org; f[8] = infra
-    f[10] = ver; f[11] = level; f[15] = asm; f[19] = ftp
-    return "\t".join(f)
 
 
 def _read_subtable(rd):
@@ -82,13 +81,13 @@ def test_resolve_base_link_na_when_unrebuildable():
 
 
 ################################################################################
-# parse: header-aware (slim) path
+# parse: reading the Parquet asset
 ################################################################################
 
-def test_parse_slim_header_extracts_correct_columns(tmp_path):
-    summary = tmp_path / "slim.tsv"
-    _write_slim(summary, [_slim_row("GCF_000005845.2", taxid="562",
-                                    org="Escherichia coli", infra="strain=K-12")])
+def test_parse_extracts_correct_columns(tmp_path):
+    summary = tmp_path / "ncbi-data.parquet"
+    _write_parquet(summary, [_row("GCF_000005845.2", taxid="562",
+                                  org="Escherichia coli", infra="strain=K-12")])
     rd = FakeRunData(["GCF_000005845.2"], tmp_path)
 
     parse_assembly_summary(str(summary), rd)
@@ -107,31 +106,9 @@ def test_parse_slim_header_extracts_correct_columns(tmp_path):
     assert not r["http_base_link"].endswith("/")   # canonical: no trailing slash
 
 
-def test_parse_slim_and_legacy_agree(tmp_path):
-    """The header-aware and headerless-legacy paths must produce identical
-    output for the same underlying row (this is the whole point of the dual
-    path -- the slim table and the raw NCBI file are interchangeable)."""
-    slim = tmp_path / "slim.tsv"
-    legacy = tmp_path / "legacy.txt"
-    _write_slim(slim, [_slim_row("GCF_000005845.2")])
-    Path(legacy).write_text(_legacy_row("GCF_000005845.2") + "\n")
-
-    rd_slim = FakeRunData(["GCF_000005845.2"], tmp_path / "a")
-    (tmp_path / "a").mkdir()
-    rd_legacy = FakeRunData(["GCF_000005845.2"], tmp_path / "b")
-    (tmp_path / "b").mkdir()
-
-    parse_assembly_summary(str(slim), rd_slim)
-    parse_assembly_summary(str(legacy), rd_legacy)
-
-    _, rows_slim = _read_subtable(rd_slim)
-    _, rows_legacy = _read_subtable(rd_legacy)
-    assert rows_slim == rows_legacy
-
-
 def test_parse_rebuilds_link_when_ftp_na(tmp_path):
-    summary = tmp_path / "slim.tsv"
-    _write_slim(summary, [_slim_row("GCF_000005845.2", asm="ASM584v2", ftp="na")])
+    summary = tmp_path / "ncbi-data.parquet"
+    _write_parquet(summary, [_row("GCF_000005845.2", asm="ASM584v2", ftp="na")])
     rd = FakeRunData(["GCF_000005845.2"], tmp_path)
 
     parse_assembly_summary(str(summary), rd)
@@ -148,8 +125,8 @@ def test_parse_rebuilds_link_when_ftp_na(tmp_path):
 ################################################################################
 
 def test_parse_marks_found_and_not_found(tmp_path):
-    summary = tmp_path / "slim.tsv"
-    _write_slim(summary, [_slim_row("GCF_000005845.2")])
+    summary = tmp_path / "ncbi-data.parquet"
+    _write_parquet(summary, [_row("GCF_000005845.2")])
     rd = FakeRunData(["GCF_000005845.2", "GCF_999999999.1"], tmp_path)
 
     parse_assembly_summary(str(summary), rd)
@@ -166,8 +143,8 @@ def test_parse_marks_found_and_not_found(tmp_path):
 def test_parse_matches_on_root_accession_ignoring_version(tmp_path):
     """A wanted accession should match the summary row even if the version
     suffix differs (matching is on the pre-dot root)."""
-    summary = tmp_path / "slim.tsv"
-    _write_slim(summary, [_slim_row("GCF_000005845.3")])   # .3 in table
+    summary = tmp_path / "ncbi-data.parquet"
+    _write_parquet(summary, [_row("GCF_000005845.3")])   # .3 in table
     rd = FakeRunData(["GCF_000005845.2"], tmp_path)         # .2 wanted
 
     parse_assembly_summary(str(summary), rd)
@@ -178,8 +155,8 @@ def test_parse_matches_on_root_accession_ignoring_version(tmp_path):
 
 
 def test_parse_idempotent_if_subtable_already_set(tmp_path):
-    summary = tmp_path / "slim.tsv"
-    _write_slim(summary, [_slim_row("GCF_000005845.2")])
+    summary = tmp_path / "ncbi-data.parquet"
+    _write_parquet(summary, [_row("GCF_000005845.2")])
     rd = FakeRunData(["GCF_000005845.2"], tmp_path)
     rd.ncbi_sub_table_path = "already/done.tsv"
 
