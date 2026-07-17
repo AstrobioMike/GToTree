@@ -37,6 +37,7 @@ gtt-get-pfam-data = "gtotree.utils.pfam.get_pfam_data:main"
 gtt-get-ncbi-assembly-data = "gtotree.utils.ncbi.get_ncbi_assembly_tables:main"
 gtt-get-ncbi-tax-data = "gtotree.utils.ncbi.get_ncbi_tax_data:main"
 gtt-get-gtdb-data = "gtotree.utils.gtdb.get_gtdb_data:main"
+gtt-get-accs-from-GTDB = "gtotree.utils.gtdb.get_accessions_from_gtdb:main"
 
 gtt-test = "gtotree.tests.smoke:main"
 

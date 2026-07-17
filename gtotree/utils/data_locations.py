@@ -11,7 +11,7 @@ ENV_VARIABLES = [
     "NCBI_assembly_data_dir",
     "GToTree_HMM_dir",
     "TAXONKIT_DB",
-    "GTDB_dir",
+    "GTDB_DIR",
     "KO_data_dir",
     "Pfam_data_dir",
 ]

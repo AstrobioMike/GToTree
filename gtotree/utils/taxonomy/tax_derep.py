@@ -1,19 +1,19 @@
 """
 Genome/accession DEREPLICATION and quality-picking from the GTDB / NCBI Parquet
-assets.
+assets
 
-The dereplication piece of the taxonomy toolkit. We want "one best genome per
-rank" for tree building, which the filter half (tax_select.py) doesn't do on its own
--- select() just pulls the rows under a taxon; derep() here groups them by a finer
-rank and keeps a single best genome per group.
+The dereplication piece of the taxonomy toolkit. We need "one best genome per
+rank" for tree building, which the filter piece (tax_select.py) doesn't do on its own
 """
 
 from gtotree.utils.taxonomy.tax_ranks import (
     RANKS, NA, REFERENCE_VALUE, accession_core, rank_index, validate_derep_rank)
-from gtotree.utils.taxonomy.tax_select import SOURCES, select, live_accession_cores
+from gtotree.utils.taxonomy.tax_select import (
+    SOURCES, select, resolve_taxon, live_accession_cores)
 
 # Thresholds for the size_advice() nudges at the tails of a selection. A tree far
-# above SANE_HIGH is unwieldy; far below SANE_LOW might be sparser than expected
+# above SANE_HIGH is unwieldy; far below SANE_LOW is probably too sparse to be useful.
+# Advisory only -- they gate warning messages, never the selection itself.
 SANE_LOW = 20
 SANE_HIGH = 5000
 
@@ -29,6 +29,7 @@ ASSEMBLY_LEVEL_ORDER = {
 # but only if it is not actually bad. These gates are deliberately loose, here to
 # catch junk, not to replace all "reference" genomes
 REF_MIN_COMPLETENESS = 85.0
+
 REF_MAX_CONTAMINATION = 10.0
 
 MISSING_CONTAMINATION = float("inf")
@@ -250,8 +251,8 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
         # vs hundreds. So mentioning either way
         finer = RANKS[rank_index(derep_rank) + 1] \
             if rank_index(derep_rank) < len(RANKS) - 1 else None
-        msg = (f"--derep-rank '{derep_rank}' is the same rank as the target taxon, so "
-               f"exactly one genome will be selected (the single best genome for "
+        msg = (f"--derep-rank '{derep_rank}' is the SAME rank as the target taxon, so "
+               f"exactly ONE genome will be selected (the single best genome for "
                f"'{wanted_taxon}', which maybe you want for an outgroup or something.")
         if finer:
             msg += (f" But if you wanted a tree spanning '{wanted_taxon}', use a finer "
@@ -310,3 +311,125 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
 
     accs = [best[g][spec.acc_col] for g in sorted(best)]
     return accs, len(best), warnings
+
+
+class RefGenomeSelection:
+    """
+    Result of select_ref_genomes(): the kept accessions plus the metadata rows they
+    came from, and the resolution details each caller needs to report.
+
+    Attributes:
+        accessions   -- list of ncbi_genbank_assembly_accession strings (order stable)
+        rows         -- list of dict rows (the selected genomes' metadata) for the
+                        accessions above; same order. Suitable for a metadata TSV.
+        canonical    -- the taxon name as it appears in the asset (may differ in case
+                        from what the user typed)
+        resolved_rank-- the rank the taxon was resolved to
+        effective_derep_rank -- the rank dereplication collapsed to, or None if derep
+                        was off (all genomes under the taxon kept)
+        warnings     -- human-facing advisory strings (empty list if none)
+    """
+
+    def __init__(self, accessions, rows, canonical, resolved_rank,
+                 effective_derep_rank, warnings):
+        self.accessions = accessions
+        self.rows = rows
+        self.canonical = canonical
+        self.resolved_rank = resolved_rank
+        self.effective_derep_rank = effective_derep_rank
+        self.warnings = warnings
+
+
+def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
+                       reps_only=None, pick="quality", screen_against=None):
+    """
+    The one selection entry point shared by every surface that adds reference genomes
+    by taxonomy: the standalone get-accessions helpers and the main GToTree driver's
+    --wanted-ref-tax path. It runs the full sequence in one place so the surfaces stay
+    thin and can't drift:
+
+        1. resolve_taxon()      -- taxon (+ optional target_rank) -> (canonical, rank)
+        2. resolve_derep_rank() -- turn "auto"/"off"/<rank> into a concrete rank or None
+        3. derep() OR select()  -- dereplicate to one-best-per-rank, or (derep off) take
+                                   every genome under the taxon
+
+    This is library-layer code: it RAISES on user-correctable problems
+    (TaxonNotFound, AmbiguousTaxon, ValueError for a bad derep rank) and never prints
+    or exits. Each CLI surface catches these and translates them to a friendly message,
+    per the library-vs-CLI contract.
+
+    Returns a RefGenomeSelection.
+    """
+    spec = SOURCES[source]
+
+    # 1. resolve the taxon -> (canonical, rank). Raises TaxonNotFound / AmbiguousTaxon.
+    canonical, resolved_rank = resolve_taxon(path, taxon, target_rank)
+
+    # 2. work out the effective derep rank. Raises ValueError if the rank is coarser
+    #    than the taxon's own rank; may return None (derep off) with a warning.
+    effective_derep_rank, warnings = resolve_derep_rank(resolved_rank, derep_rank)
+
+    if reps_only is None:
+        reps_only = spec.default_reps_only
+
+    if effective_derep_rank is None:
+        # derep off: take every genome under the taxon (optionally NCBI-liveness
+        # screened), preserving full metadata rows for the caller's TSV
+        cols = _selection_columns(spec, extra_rank=None)
+        tab = select(path, source, resolved_rank, canonical,
+                     reps_only=reps_only, columns=cols)
+        rows = tab.to_pylist()
+
+        if screen_against:
+            live = live_accession_cores(screen_against)
+            before = len(rows)
+            rows = [r for r in rows
+                    if r.get(spec.acc_col) and accession_core(r[spec.acc_col]) in live]
+            n_dead = before - len(rows)
+            if n_dead:
+                warnings.append(
+                    f"{n_dead:,} candidate genome(s) are no longer available at NCBI "
+                    f"(suppressed/removed) and were excluded.")
+
+        accessions = [r.get(spec.acc_col) for r in rows if r.get(spec.acc_col)]
+        return RefGenomeSelection(accessions, rows, canonical, resolved_rank,
+                                  None, warnings)
+
+    # 3. dereplicate to one best genome per unique value of effective_derep_rank.
+    #    derep() returns accessions only, so re-slice to recover metadata rows for the
+    #    kept set (keeps a single source of truth for WHICH genomes are picked).
+    accessions, _groups, derep_warnings = derep(
+        path, source, resolved_rank, canonical, effective_derep_rank,
+        reps_only=reps_only, pick=pick, screen_against=screen_against)
+    warnings.extend(derep_warnings)
+
+    rows = _rows_for_accessions(path, source, resolved_rank, canonical,
+                                effective_derep_rank, reps_only, set(accessions))
+
+    return RefGenomeSelection(accessions, rows, canonical, resolved_rank,
+                              effective_derep_rank, warnings)
+
+
+def _selection_columns(spec, extra_rank=None):
+    """The metadata columns worth carrying for a selection's output TSV."""
+    cols = [spec.acc_col, spec.ref_col] + list(spec.quality_cols) + list(RANKS)
+    for extra in (spec.level_col, spec.contig_col, spec.size_col,
+                  spec.size_fallback_col, extra_rank):
+        if extra and extra not in cols:
+            cols.append(extra)
+    return cols
+
+
+def _rows_for_accessions(path, source, wanted_rank, wanted_taxon, derep_rank,
+                         reps_only, wanted_accessions):
+    """
+    Re-read the taxon slice and return only the rows whose accession is in
+    `wanted_accessions` (the derep-kept set), in sorted-accession order.
+    """
+    spec = SOURCES[source]
+    cols = _selection_columns(spec, extra_rank=derep_rank)
+    tab = select(path, source, wanted_rank, wanted_taxon,
+                 reps_only=reps_only, columns=cols)
+    kept = [r for r in tab.to_pylist() if r.get(spec.acc_col) in wanted_accessions]
+    kept.sort(key=lambda r: r.get(spec.acc_col) or "")
+    return kept

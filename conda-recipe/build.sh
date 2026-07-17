@@ -30,7 +30,7 @@ mkdir -p ${PREFIX}/etc/conda/activate.d/
 echo 'export NCBI_assembly_data_dir=${CONDA_PREFIX}/share/gtotree/ncbi_assembly_summaries/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 echo 'export GToTree_HMM_dir=${CONDA_PREFIX}/share/gtotree/hmm_sets/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 echo 'export TAXONKIT_DB=${CONDA_PREFIX}/share/gtotree/ncbi_tax_info/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
-echo 'export GTDB_dir=${CONDA_PREFIX}/share/gtotree/gtdb_tax_info/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
+echo 'export GTDB_DIR=${CONDA_PREFIX}/share/gtotree/gtdb_tax_info/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 echo 'export KO_data_dir=${CONDA_PREFIX}/share/gtotree/kofamscan_data/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 echo 'export Pfam_data_dir=${CONDA_PREFIX}/share/gtotree/pfam_data/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 

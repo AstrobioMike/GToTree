@@ -61,7 +61,7 @@ helpmenu += f"""
                   rank. Pass "none" to disable dereplication and include all genomes under the taxon.
 
                   Note: `--derep-rank` set equal to the `-W` taxon's rank returns a
-                  single best genome (e.g., useful for picking an outgroup).
+                  single best genome (e.g., could be useful for picking an outgroup).
 
 
       {color_text("User-specified modification of genome labels:", "orange")}
