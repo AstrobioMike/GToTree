@@ -17,7 +17,7 @@ touch ${PREFIX}/share/gtotree/ncbi_assembly_summaries/date-retrieved.txt
 touch ${PREFIX}/share/gtotree/ncbi_tax_info/nodes.dmp
 
 # gtdb info added when used, placehoder so location not deleted on creation
-touch ${PREFIX}/share/gtotree/gtdb_tax_info/GTDB-arc-and-bac-metadata.tsv
+touch ${PREFIX}/share/gtotree/gtdb_tax_info/gtdb-data.parquet
 
 # kofamscan data is added when used, placeholder so the dir is not deleted on creation
 touch ${PREFIX}/share/gtotree/kofamscan_data/README
@@ -27,13 +27,12 @@ touch ${PREFIX}/share/gtotree/pfam_data/pfam-version.txt
 
 ## add database paths in variables to activation script
 mkdir -p ${PREFIX}/etc/conda/activate.d/
-echo 'export NCBI_assembly_data_dir=${CONDA_PREFIX}/share/gtotree/ncbi_assembly_summaries/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
+echo 'export NCBI_ASSEMBLY_DATA_DIR=${CONDA_PREFIX}/share/gtotree/ncbi_assembly_summaries/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 echo 'export GToTree_HMM_dir=${CONDA_PREFIX}/share/gtotree/hmm_sets/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 echo 'export TAXONKIT_DB=${CONDA_PREFIX}/share/gtotree/ncbi_tax_info/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 echo 'export GTDB_DIR=${CONDA_PREFIX}/share/gtotree/gtdb_tax_info/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 echo 'export KO_data_dir=${CONDA_PREFIX}/share/gtotree/kofamscan_data/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 echo 'export Pfam_data_dir=${CONDA_PREFIX}/share/gtotree/pfam_data/' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
-
 
 ## adding variables to the conda environment so localization matches what the program expects
 echo 'export LC_ALL="en_US.UTF-8"' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh

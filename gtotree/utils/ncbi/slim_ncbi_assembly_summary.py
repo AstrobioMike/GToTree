@@ -21,7 +21,7 @@ import os
 
 # the columns GToTree actually reads from the assembly summary, in the order
 # they are written to the slim file. Keep in sync with the reader
-# (parse_assembly_summary_file.NAMES), which looks these up by name.
+# (parse_ncbi_assembly_summary.NAMES), which looks these up by name.
 KEPT_COLUMNS = [
     "assembly_accession",
     "taxid",

@@ -24,7 +24,7 @@ class FakeRunData:
     only the container/paths are faked, since building a full RunData requires
     many unrelated fields.
 
-    Keep this in sync with parse_assembly_summary_file / preprocessing_genomes
+    Keep this in sync with parse_ncbi_assembly_summary / preprocessing_genomes
     if their RunData access surface changes.
     """
 

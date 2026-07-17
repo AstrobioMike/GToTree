@@ -11,8 +11,8 @@ from gtotree.utils.messaging import (report_early_exit,
                                      report_fasta_update,
                                      report_AA_update,
                                      report_genome_preprocessing_update)
-from gtotree.utils.ncbi.parse_assembly_summary_file import parse_assembly_summary
-from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_summary_tab
+from gtotree.utils.ncbi.parse_ncbi_assembly_summary import parse_assembly_summary
+from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_summary_tab
 from gtotree.utils.general import (write_run_data,
                                    read_run_data,
                                    get_snakefile_path,

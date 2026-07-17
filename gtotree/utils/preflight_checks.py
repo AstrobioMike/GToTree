@@ -22,7 +22,7 @@ from gtotree.utils.messaging import (color_text,
                                      gtotree_header,
                                      stdout_and_log)
 from gtotree.utils.hmms.scg_hmm_setup import check_hmm_file
-from gtotree.utils.ncbi.get_ncbi_assembly_tables import get_ncbi_assembly_data
+from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
 from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data

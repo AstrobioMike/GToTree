@@ -2,7 +2,7 @@ from pathlib import Path
 import pytest # type: ignore
 
 from gtotree.tests.utils.utils import FakeRunData
-from gtotree.utils.ncbi.parse_assembly_summary_file import (
+from gtotree.utils.ncbi.parse_ncbi_assembly_summary import (
     parse_assembly_summary,
     build_base_link,
     resolve_base_link,

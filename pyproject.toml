@@ -27,18 +27,19 @@ gtotree = "gtotree.main:main"
 GToTree = "gtotree.main:main" # this doesn't tab-complete on mac, as mac is case-insensitive,
                               # but it still works if people type it that way so I'm keeping it here for legacy reasons
 
-gtt-hmms = "gtotree.utils.hmms.gtt_hmms:main"
 
-gtt-midpoint-root-tree = "gtotree.utils.helper_scripts.gtt_midpoint_root_tree:main"
-
+# data-related (`gtt data` subcommands eventually)
 gtt-data-locations = "gtotree.utils.data_locations:main"
 gtt-get-kofamscan-data = "gtotree.utils.ko.get_kofamscan_data:main"
 gtt-get-pfam-data = "gtotree.utils.pfam.get_pfam_data:main"
-gtt-get-ncbi-assembly-data = "gtotree.utils.ncbi.get_ncbi_assembly_tables:main"
+gtt-get-ncbi-assembly-data = "gtotree.utils.ncbi.get_ncbi_assembly_data:main"
 gtt-get-ncbi-tax-data = "gtotree.utils.ncbi.get_ncbi_tax_data:main"
 gtt-get-gtdb-data = "gtotree.utils.gtdb.get_gtdb_data:main"
-gtt-get-accs-from-GTDB = "gtotree.utils.gtdb.get_accessions_from_gtdb:main"
 
+# `gtt` subcommands eventually
+gtt-get-accs-from-gtdb = "gtotree.utils.gtdb.get_accessions_from_gtdb:main"
+gtt-hmms = "gtotree.utils.hmms.gtt_hmms:main"
+gtt-midpoint-root-tree = "gtotree.utils.helper_scripts.gtt_midpoint_root_tree:main"
 gtt-test = "gtotree.tests.smoke:main"
 
 

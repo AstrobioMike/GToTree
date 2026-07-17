@@ -8,7 +8,7 @@ from gtotree.utils.messaging import report_message, color_text, wprint
 
 
 ENV_VARIABLES = [
-    "NCBI_assembly_data_dir",
+    "NCBI_ASSEMBLY_DATA_DIR",
     "GToTree_HMM_dir",
     "TAXONKIT_DB",
     "GTDB_DIR",
