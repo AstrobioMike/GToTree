@@ -1,26 +1,21 @@
 """
-### i started building this in bit, but i only need it in gtotree
-### here as a placeholder until i can integrate it
-
-
 Genome/accession DEREPLICATION and quality-picking from the GTDB / NCBI Parquet
 assets.
 
-Extracted from bit's tax_select.py: bit's own consumers (get-accs-from-*, gen-mg)
-do NOT dereplicate through this code -- get-accs just filters on a column, and
-gen-mg has its own pandas selector. This half exists for GToTree, which needs
-"one best genome per rank" for tree building. Held here unused until the GToTree
-port wires it in.
-
-It depends on the FILTER half that stays in bit (tax_select.py):
-    SOURCES, select, live_accession_cores  -- plus tax_ranks vocabulary.
-When ported into GToTree, repoint these imports at wherever that filter half lands.
+The dereplication piece of the taxonomy toolkit. We want "one best genome per
+rank" for tree building, which the filter half (tax_select.py) doesn't do on its own
+-- select() just pulls the rows under a taxon; derep() here groups them by a finer
+rank and keeps a single best genome per group.
 """
 
-import hashlib
+from gtotree.utils.taxonomy.tax_ranks import (
+    RANKS, NA, REFERENCE_VALUE, accession_core, rank_index, validate_derep_rank)
+from gtotree.utils.taxonomy.tax_select import SOURCES, select, live_accession_cores
 
-from bit.modules.taxonomy.tax_ranks import RANKS, NA, rank_index, validate_derep_rank
-from bit.modules.taxonomy.tax_select import SOURCES, select, live_accession_cores
+# Thresholds for the size_advice() nudges at the tails of a selection. A tree far
+# above SANE_HIGH is unwieldy; far below SANE_LOW might be sparser than expected
+SANE_LOW = 20
+SANE_HIGH = 5000
 
 
 ASSEMBLY_LEVEL_ORDER = {
@@ -34,7 +29,6 @@ ASSEMBLY_LEVEL_ORDER = {
 # but only if it is not actually bad. These gates are deliberately loose, here to
 # catch junk, not to replace all "reference" genomes
 REF_MIN_COMPLETENESS = 85.0
-
 REF_MAX_CONTAMINATION = 10.0
 
 MISSING_CONTAMINATION = float("inf")
@@ -151,25 +145,6 @@ def first_key(row, spec):
     """Cheapest possible picker: first row in lineage-sorted order. Deterministic."""
     return (row.get(spec.acc_col) or "",)
 
-def seeded_random_picker(seed, prefer_references=True):
-    """
-    gen_mg's pick policy, as a picker you can hand to derep(pick=...).
-
-    gen_mg does NOT want the best genome per group, we want an
-    unbiased draw within the group
-    """
-    def pick(row, spec):
-        acc = row.get(spec.acc_col) or ""
-        h = hashlib.blake2b(f"{seed}:{acc}".encode(), digest_size=8).digest()
-        r = int.from_bytes(h, "big")
-
-        if prefer_references:
-            is_ref = str(row.get(spec.ref_col) or "").strip().lower() == REFERENCE_VALUE
-            return (0 if is_ref else 1, r, acc)
-        return (r, acc)
-
-    return pick
-
 #: pickers addressable by name from a CLI flag if i want
 PICKERS = {
     "quality": None,
@@ -186,7 +161,7 @@ def resolve_picker(pick):
         return PICKERS[pick]
     raise ValueError(
         f"unknown pick policy {pick!r}. Pass one of {sorted(PICKERS)}, or a callable "
-        f"(row, spec) -> sort key (see seeded_random_picker).")
+        f"(row, spec) -> sort key (lowest wins; see quality_key).")
 
 def quality_key(row, spec):
     """
@@ -252,10 +227,8 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
 
         "quality" (default) -- best-per-group
         "first"             -- first in lineage-sorted order
-        callable            -- gen_mg uses `seeded_random_picker(seed)`: references first, then
-                               uniformly RANDOM within a tier, because for metagenome
-                               simulation we want an unbiased draw rather than
-                               systematically the most-complete things
+        callable            -- (row, spec) -> sort key (lowest wins), for a custom
+                               selection policy
 
 
     screen_against:
@@ -272,13 +245,13 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
 
     if rank_index(derep_rank) == rank_index(wanted_rank):
         # Sometimes may be wanted, as in "the single best genome for taxon X" is
-        # how you could pick an OUTGROUP. But it is also an easy mis-type for
-        # someone who wanted a tree SPANNING the taxon, and the difference is 1 genome
+        # how you could pick an outgroup. But it is also an easy mis-type for
+        # someone who wanted a tree spanning the taxon, and the difference is 1 genome
         # vs hundreds. So mentioning either way
         finer = RANKS[rank_index(derep_rank) + 1] \
             if rank_index(derep_rank) < len(RANKS) - 1 else None
-        msg = (f"--derep-rank '{derep_rank}' is the SAME rank as the target taxon, so "
-               f"exactly ONE genome will be selected (the single best genome for "
+        msg = (f"--derep-rank '{derep_rank}' is the same rank as the target taxon, so "
+               f"exactly one genome will be selected (the single best genome for "
                f"'{wanted_taxon}', which maybe you want for an outgroup or something.")
         if finer:
             msg += (f" But if you wanted a tree spanning '{wanted_taxon}', use a finer "
