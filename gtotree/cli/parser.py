@@ -45,6 +45,13 @@ def parser():
     opt.add_argument("-o", "--output-dir", metavar="<dir>", type=str, default="gtotree-output")
     opt.add_argument("-m", "--mapping-file", metavar="<file>", type=str)
 
+    # --- Adding Reference Genomes by Taxonomy ---
+    opt.add_argument("-W", "--wanted-ref-tax", metavar="<str>", type=str, default=None)
+    opt.add_argument("--target-rank", metavar="<str>", type=str, default=None)
+    opt.add_argument("--derep-rank", metavar="<str>", type=str, default="auto")
+    opt.add_argument("-S", "--source", metavar="<str>", type=str,
+                     choices=["GTDB", "NCBI"], default="GTDB")
+
     # --- Taxonomy Options ---
     opt.add_argument("-D", "--add-gtdb-tax", action="store_true")
     opt.add_argument("-t", "--add-ncbi-tax", action="store_true")

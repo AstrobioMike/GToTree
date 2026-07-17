@@ -1,5 +1,7 @@
 ### TO DO STILL ###
 
+    # add choices to the --target-rank and --derep-rank parameters in the parser, based on the RANKS list in tax_ranks.py
+
     # bring over the download_with_tqdm updates from bit (stream function gets content length itself)
 
     # pursue faster and better handling of reading and writing my run_data object when passing around to/from snakemake calls

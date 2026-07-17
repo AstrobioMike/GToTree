@@ -35,6 +35,35 @@ helpmenu += f"""
         - [{color_text("-o <dir>", "teal", bold = True)}] default: gtotree-output
 
 
+      {color_text("Adding reference genomes by taxonomy:", "orange")}
+
+        - [{color_text("-W | --wanted-ref-tax <str>", "teal", bold = True)}] taxon to add reference genomes for; default: none
+                  A taxon name (e.g., "Bacteria", "Nitrospirota",
+                  "Escherichia coli") whose reference genomes will be added to
+                  the tree, IN ADDITION TO any genomes provided through the
+                  other input parameters (`-a`, `-g`, `-f`, `-A`). The rank of
+                  the taxon is detected automatically; see `--target-rank` if
+                  needing to specify.
+
+        - [{color_text("-S | --source <str>", "teal", bold = True)}] where to pull reference genomes from; default: GTDB
+                  Which database the `-W` taxon and its genomes are drawn from.
+                  One of "{color_text("GTDB", "teal", bold = True)}" or "{color_text("NCBI", "teal", bold = True)}".
+
+        - [{color_text("--target-rank <str>", "teal", bold = True)}] rank of the `-W` taxon; default: auto-detected
+                  Only needed when the `-W` taxon name occurs at more than one
+                  rank (e.g., if a name is used as both an order and a family).
+
+        - [{color_text("--derep-rank <str>", "teal", bold = True)}] dereplicate to one genome per rank; default: auto
+                  Keeps a single best genome per unique value of this rank within
+                  the `-W` taxon, to control tree size. For example, "-W Bacteria
+                  --derep-rank class" keeps one genome per bacterial class. The
+                  default "auto" uses a rank two levels finer than the taxon's own
+                  rank. Pass "none" to disable dereplication and include all genomes under the taxon.
+
+                  Note: `--derep-rank` set equal to the `-W` taxon's rank returns a
+                  single best genome (e.g., useful for picking an outgroup).
+
+
       {color_text("User-specified modification of genome labels:", "orange")}
 
         - [{color_text("-m <file>", "teal", bold = True)}] mapping file specifying desired genome labels
