@@ -104,7 +104,9 @@ def parse_args(argv=None):
         "--get-taxon-counts",
         action="store_true",
         help=("Provide this flag along with a specified taxon to `-t` to see how many "
-              "genomes match (after any set filters except `--derep-rank`)."),
+              "genomes match. Counts reflect `--source` and "
+              "`--assembly-level` parameters; `--RefSeq-reference-genomes-only` is reported as a "
+              "separate subset if set, and `--derep-rank` does not affect counts."),
     )
 
     parser.add_argument(
@@ -239,8 +241,15 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
     --assembly-level), then if --RefSeq-reference-genomes-only is set a separate
     "In considering only RefSeq reference genomes:" block, like GTDB's reps block.
 
+    The wording is explicit about WHICH filters each block reflects: the primary block
+    reflects --source and --assembly-level (but not the reference-genome filter, which
+    is applied only in the second block), so the two numbers aren't confused.
     """
     prefixes = _source_prefixes(args.source)
+
+    # a short human description of the filters folded into the PRIMARY block, so the
+    # count line says what it actually reflects rather than a vague "any filters"
+    scope_note = _counts_scope_note(args, assembly_levels)
 
     try:
         canonical, ranks_found_in = _resolve_ranks(table_path, taxon)
@@ -258,12 +267,12 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
     for rank in ranks_found_in:
         count = _count_at_rank(table_path, rank, taxon, prefixes=prefixes,
                                assembly_levels=assembly_levels)
-        report_message(f"The rank '{rank}' has {count:,} {taxon} entries (after any specified filters).", color=None,
+        report_message(f"The rank '{rank}' has {count:,} {taxon} entries{scope_note}.", color=None,
                        ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
 
     if args.refseq_reference_genomes_only:
-        wprint(color_text("  In considering only RefSeq reference genomes:", "yellow"))
-        print("")
+        report_message("Of those, in considering only RefSeq reference genomes:", "yellow",
+                       ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
         any_rep = False
         for rank in ranks_found_in:
             count = _count_at_rank(table_path, rank, taxon, prefixes=prefixes,
@@ -276,6 +285,20 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
             report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank as a RefSeq reference genome :(", "yellow",
                            ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
             sys.exit(0)
+
+
+def _counts_scope_note(args, assembly_levels):
+    bits = []
+    if args.source == "refseq":
+        bits.append("in RefSeq")
+    elif args.source == "genbank":
+        bits.append("in GenBank")
+    if assembly_levels:
+        levels = ", ".join(sorted(assembly_levels))
+        bits.append(f"at assembly level {levels}")
+    if not bits:
+        return ""
+    return " (" + ", ".join(bits) + ")"
 
 
 def _source_prefixes(source):
