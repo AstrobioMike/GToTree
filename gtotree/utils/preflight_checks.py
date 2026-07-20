@@ -23,7 +23,6 @@ from gtotree.utils.messaging import (color_text,
                                      stdout_and_log)
 from gtotree.utils.hmms.scg_hmm_setup import check_hmm_file
 from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
-from gtotree.utils.ncbi.get_ncbi_tax_data import get_ncbi_tax_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data
 from gtotree.utils.general import (ToolsUsed,
@@ -93,8 +92,7 @@ def check_for_minimum_args(args):
 
 
 def check_optional_deps(args):
-    if args.add_ncbi_tax:
-        program_check("taxonkit")
+    pass
 
 
 def check_set_values(args):
@@ -464,8 +462,6 @@ def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
 def check_for_required_dbs(args):
     if args.ncbi_accessions or args.add_ncbi_tax:
         get_ncbi_assembly_data()
-    if args.add_ncbi_tax:
-        get_ncbi_tax_data()
     if args.add_gtdb_tax:
         get_gtdb_data()
     if args.target_kos_file:
@@ -478,8 +474,6 @@ def track_tools_used(args, run_data):
 
     if args.fasta_files:
         tools_used.prodigal_used = True
-    if args.add_ncbi_tax:
-        tools_used.taxonkit_used = True
     if args.add_gtdb_tax:
         tools_used.gtdb_used = True
     if args.tree_program == "FastTreeMP" or args.tree_program == "FastTree":

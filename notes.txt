@@ -1,5 +1,13 @@
 ### TO DO STILL ###
 
+    # is there more i can unify between get-accs-from-gtdb and get-accs-from-ncbi? (or at least structure the same even if they need separate functions)
+        # there is some divergence still, e.g., gtdb has _select_and_write() while ncbi has the very similar _select_rows()
+
+    # get-accs-from-ncbi needs more robust handling of filters/reporting counts with --get-taxon-counts
+        # e.g., if refseq, genbank, or both, what assembly levels, if rep genomes
+        # right now it's a little misleading as the first printout is all including, e.g., assembly level,
+        # but that one doesn't include rep genomes only, second printout does
+
     # add choices to the --target-rank and --derep-rank parameters in the parser, based on the RANKS list in tax_ranks.py
 
     # bring over the download_with_tqdm updates from bit (stream function gets content length itself)
@@ -7,9 +15,11 @@
     # pursue faster and better handling of reading and writing my run_data object when passing around to/from snakemake calls
 
     # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data, "Decompressing" in get-pfam-data, etc.)
+        # and reading in and/or parsing the ncbi parquet is noticably slow, maybe add a spinner for that too
 
     # make gtt an entry point with subcommands for all the gtt scripts (maybe)
-        # `gtt data` (at least), mirroring `bit data` would be nice to have i think
+        # make helpers richargparse-based
+        # add tab-complete for subcommands and their args (like i did for bit)
 
     # still need to implement iToL-file generation for both pfam and ko searching results
         # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)

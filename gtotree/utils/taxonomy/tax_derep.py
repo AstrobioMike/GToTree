@@ -210,7 +210,8 @@ def quality_key(row, spec):
 PICKERS["quality"] = quality_key
 
 def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
-          reps_only=None, pick="quality", screen_against=None):
+          reps_only=None, pick="quality", screen_against=None,
+          accession_prefixes=None):
     """
     One genome per unique value of `derep_rank`, within `wanted_taxon`
 
@@ -286,6 +287,9 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
     else:
         rows = tab.to_pylist()
 
+    if accession_prefixes:
+        rows = _restrict_by_prefix(rows, spec.acc_col, accession_prefixes)
+
     if not rows:
         warnings.append(f"No genomes found under {wanted_rank} '{wanted_taxon}'"
                         + (" in the representatives pool." if reps_only else "."))
@@ -341,7 +345,8 @@ class RefGenomeSelection:
 
 
 def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
-                       reps_only=None, pick="quality", screen_against=None):
+                       reps_only=None, pick="quality", screen_against=None,
+                       accession_prefixes=None):
     """
     The one selection entry point shared by every surface that adds reference genomes
     by taxonomy: the standalone get-accessions helpers and the main GToTree driver's
@@ -353,12 +358,13 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
         3. derep() OR select()  -- dereplicate to one-best-per-rank, or (derep off) take
                                    every genome under the taxon
 
-    This is library-layer code: it RAISES on user-correctable problems
-    (TaxonNotFound, AmbiguousTaxon, ValueError for a bad derep rank) and never prints
-    or exits. Each CLI surface catches these and translates them to a friendly message,
-    per the library-vs-CLI contract.
+    accession_prefixes:
+        Optional tuple/list of accession prefixes (e.g. ("GCF_",) for RefSeq, ("GCA_",)
+        for GenBank) restricting the candidate pool BEFORE selection/dereplication. This
+        is applied up front so a best-per-rank pick is made within the requested pool,
+        not dropped after the fact
 
-    Returns a RefGenomeSelection.
+    Returns a RefGenomeSelection
     """
     spec = SOURCES[source]
 
@@ -380,6 +386,9 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                      reps_only=reps_only, columns=cols)
         rows = tab.to_pylist()
 
+        if accession_prefixes:
+            rows = _restrict_by_prefix(rows, spec.acc_col, accession_prefixes)
+
         if screen_against:
             live = live_accession_cores(screen_against)
             before = len(rows)
@@ -400,14 +409,24 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
     #    kept set (keeps a single source of truth for WHICH genomes are picked).
     accessions, _groups, derep_warnings = derep(
         path, source, resolved_rank, canonical, effective_derep_rank,
-        reps_only=reps_only, pick=pick, screen_against=screen_against)
+        reps_only=reps_only, pick=pick, screen_against=screen_against,
+        accession_prefixes=accession_prefixes)
     warnings.extend(derep_warnings)
 
     rows = _rows_for_accessions(path, source, resolved_rank, canonical,
                                 effective_derep_rank, reps_only, set(accessions))
+    if accession_prefixes:
+        rows = _restrict_by_prefix(rows, spec.acc_col, accession_prefixes)
 
     return RefGenomeSelection(accessions, rows, canonical, resolved_rank,
                               effective_derep_rank, warnings)
+
+
+def _restrict_by_prefix(rows, acc_col, prefixes):
+    """Keep only rows whose accession starts with one of `prefixes`."""
+    prefixes = tuple(prefixes)
+    return [r for r in rows
+            if str(r.get(acc_col) or "").startswith(prefixes)]
 
 
 def _selection_columns(spec, extra_rank=None):

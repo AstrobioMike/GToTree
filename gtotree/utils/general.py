@@ -23,7 +23,6 @@ from gtotree.utils.messaging import (report_early_exit, report_snakemake_failure
 @dataclass
 class ToolsUsed:
     prodigal_used: bool = False
-    taxonkit_used: bool = False
     gtdb_used: bool = False
     fasttree_used: bool = False
     veryfasttree_used: bool = False

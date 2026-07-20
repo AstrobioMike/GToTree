@@ -42,7 +42,6 @@ requirements:
     - requests =2.34
     - sed
     - snakemake =8.30.0
-    - taxonkit
     - tqdm =4.68
     - trimal
     - veryfasttree

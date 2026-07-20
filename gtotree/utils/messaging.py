@@ -120,13 +120,15 @@ def report_final_time_status(start: datetime):
     print("")
 
 
-def report_message(message, color = "yellow", width = 80, ii = "  ", si = "  ", newline = True):
+def report_message(message, color = "yellow", width = 80, ii = "  ", si = "  ", newline = True, trailing_newline = False):
     if newline:
         print("", flush=True)
     if color:
         wprint(color_text(message, color), width = width, ii = ii, si = si)
     else:
         wprint(message, width = width, ii = ii, si = si)
+    if trailing_newline:
+        print("", flush=True)
 
 
 def report_missing_input_genomes_file(path, flag):

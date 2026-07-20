@@ -12,7 +12,6 @@ class CitationsInfo:
     muscle = "Edgar RC. MUSCLE v5 enables improved estimates of phylogenetic tree confidence by ensemble bootstrapping. bioRxiv. 2021.06.20.449169. doi.org/10.1101/2021.06.20.449169\n\n"
     trimal = "Gutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972-1973. doi.org/10.1093/bioinformatics/btp348\n\n"
     prodigal = "Hyatt, D. et al. Gene and translation initiation site prediction in metagenomic sequences. Bioinformatics. 2010; 28, 2223-2230. doi.org/10.1186/1471-2105-11-119\n\n"
-    taxonkit = "Shen W and Ren H. TaxonKit: a practical and efficient NCBI Taxonomy toolkit. Journal of Genetics and Genomics. 2021. doi.org/10.1016/j.jgg.2021.03.006\n\n"
     gtdb = "Parks DH et al. A complete domain-to-species taxonomy for Bacteria and Archaea. Nat. Biotech. 2020. doi.org/10.1038/s41587-020-0501-8\n\n"
     fasttree = "Price MN et al. FastTree2 - approximately maximum-likelihood trees for large alignments. PLoS One. 2010; 5. doi.org/10.1371/journal.pone.0009490\n\n"
     veryfasttree = "Pineiro C et al. VeryFastTree: speeding up the estimation of phylogenies for large alignments through parallelization and vectorization strategies. Bioinformatics. 2020. doi.org/10.1093/bioinformatics/btaa582\n\n"
@@ -51,10 +50,6 @@ def generate_citations_info(run_data):
         if run_data.tools_used.prodigal_used:
             outfile.write(f"Prodigal {get_prodigal_version()}\n")
             outfile.write(citations_info.prodigal)
-
-        if run_data.tools_used.taxonkit_used:
-            outfile.write(f"TaxonKit v{get_taxonkit_version()}\n")
-            outfile.write(citations_info.taxonkit)
 
         if run_data.tools_used.gtdb_used:
             outfile.write(f"Genome Taxonomy Database (GTDB)\n")
@@ -109,11 +104,6 @@ def get_prodigal_version():
     prodigal_version = subprocess.run('prodigal -v 2>&1 | grep Prodigal | tr -s " " "\t" | cut -f 2 | tr -d ":" | sed "s/V/v/"',
                                       shell = True, capture_output = True, text = True)
     return prodigal_version.stdout.strip()
-
-def get_taxonkit_version():
-    taxonkit_version = subprocess.run('taxonkit -h | grep Version | tr -s " " "\t" | cut -f 2',
-                                      shell = True, capture_output = True, text = True)
-    return taxonkit_version.stdout.strip()
 
 def get_fasttree_version():
     fasttree_version = subprocess.run('FastTree -expert 2>&1 | head -n 1 | tr -s " " "\t" | cut -f 5',

@@ -15,5 +15,4 @@ pip uninstall -y gtotree 2>/dev/null || true
 pip install --force-reinstall --no-build-isolation -e .
 
 ## if changing conda versions and wanting to install locally entirely (rather than using a prior official conda install of gtotree)
-# conda build -c conda-forge -c bioconda conda-recipe/
-# conda create -n gtotree-dev -c conda-forge -c bioconda --use-local gtotree
+# conda build -c conda-forge -c bioconda conda-recipe/ ; conda create -n gtotree-dev -c conda-forge -c bioconda --use-local gtotree -y
