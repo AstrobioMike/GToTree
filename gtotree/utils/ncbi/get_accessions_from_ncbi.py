@@ -1,9 +1,9 @@
 import sys
 import os
 import argparse
+from collections import namedtuple
 import pyarrow.compute as pc # type: ignore
 import pyarrow.parquet as pq # type: ignore
-
 from gtotree.utils.messaging import report_message, wprint, color_text
 from gtotree.utils.ncbi.get_ncbi_assembly_data import (get_ncbi_assembly_data,
                                                        ncbi_data_table_path,
@@ -27,6 +27,10 @@ _ASSEMBLY_LEVELS = {
     "contig": "Contig",
 }
 
+# result of _select_rows: the metadata rows, a human label for messages, the resolved
+# rank, and the canonical taxon string used to build output filenames
+_NcbiSelection = namedtuple("_NcbiSelection", ["rows", "label", "rank", "taxon"])
+
 
 ################################################################################
 
@@ -41,10 +45,9 @@ def parse_args(argv=None):
         description="This is a helper program to facilitate using taxonomy and genomes "
                     "from NCBI with GToTree. It primarily returns NCBI accessions and "
                     "metadata subsets based on NCBI-taxonomy searches, with optional "
-                    "filtering to RefSeq reference genomes, by source (RefSeq/GenBank), "
-                    "and by assembly level, plus optional dereplication down to one "
-                    "genome per rank.",
-        epilog="Ex. usage: gtt-get-accessions-from-NCBI -t Nitrospirota --source refseq\n")
+                    "filtering, by source (RefSeq/GenBank), assembly level, and/or RefSeq 'reference' genomes "
+                    "only, plus optional dereplication down to one genome per rank.",
+        epilog="Ex. usage: gtt-get-accs-from-ncbi -t Nitrospirota --source refseq\n")
 
     parser.add_argument(
         "-t",
@@ -76,6 +79,7 @@ def parse_args(argv=None):
     )
 
     parser.add_argument(
+        "-s",
         "--source",
         metavar="<STR>",
         default="refseq",
@@ -86,6 +90,7 @@ def parse_args(argv=None):
     )
 
     parser.add_argument(
+        "-a",
         "--assembly-level",
         metavar="<STR>",
         help=("Restrict to one or more assembly levels (comma-separated). Choose from: "
@@ -94,7 +99,8 @@ def parse_args(argv=None):
     )
 
     parser.add_argument(
-        "--RefSeq-reference-genomes-only",
+        "-R",
+        "--refseq-reference-genomes-only",
         dest="refseq_reference_genomes_only",
         action="store_true",
         help=("Pull only genomes designated as RefSeq reference genomes."),
@@ -104,9 +110,7 @@ def parse_args(argv=None):
         "--get-taxon-counts",
         action="store_true",
         help=("Provide this flag along with a specified taxon to `-t` to see how many "
-              "genomes match. Counts reflect `--source` and "
-              "`--assembly-level` parameters; `--RefSeq-reference-genomes-only` is reported as a "
-              "separate subset if set, and `--derep-rank` does not affect counts."),
+              "genomes match the set parameters (excluding --derep-rank)"),
     )
 
     parser.add_argument(
@@ -165,7 +169,8 @@ def get_accessions_from_ncbi(args):
         _report_taxon_counts_or_exit(table_path, target, args, assembly_levels)
         sys.exit(0)
 
-    rows, label = _select_rows(table_path, args)
+    selection = _select_rows(table_path, args)
+    rows, label = selection.rows, selection.label
 
     # assembly-level is the only post-filter left; --source scoping already happened
     # up front inside _select_rows (before any dereplication)
@@ -185,7 +190,7 @@ def get_accessions_from_ncbi(args):
         print("")
         sys.exit(0)
 
-    _write_outputs(rows, args, label)
+    _write_outputs(rows, args, selection)
 
 
 def preflight_checks(args):
@@ -238,7 +243,7 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
     """
     Report how many genomes match `taxon` at each rank it occurs at, matching the GTDB
     helper's format: a primary per-rank block for the base pool (scoped by --source and
-    --assembly-level), then if --RefSeq-reference-genomes-only is set a separate
+    --assembly-level), then if --refseq-reference-genomes-only is set a separate
     "In considering only RefSeq reference genomes:" block, like GTDB's reps block.
 
     The wording is explicit about WHICH filters each block reflects: the primary block
@@ -258,9 +263,10 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
-    if canonical != taxon:
-        report_message(f"Matched input '{taxon}' to NCBI taxon '{canonical}'.", "yellow",
-                       ii="    ", si="    ", width=100)
+    # can use this if i want to notify about case-insensitive matching (thought i wanted it, but don't feel like it's really needed ATM)
+    # if canonical != taxon:
+    #     report_message(f"Matched input '{taxon}' to NCBI taxon '{canonical}'.", "yellow",
+    #                    ii="    ", si="    ", width=100)
     taxon = canonical
 
     print("")
@@ -290,9 +296,9 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
 def _counts_scope_note(args, assembly_levels):
     bits = []
     if args.source == "refseq":
-        bits.append("in RefSeq")
+        bits.append("in refseq")
     elif args.source == "genbank":
-        bits.append("in GenBank")
+        bits.append("in genbank")
     if assembly_levels:
         levels = ", ".join(sorted(assembly_levels))
         bits.append(f"at assembly level {levels}")
@@ -312,7 +318,10 @@ def _source_prefixes(source):
 
 def _select_rows(table_path, args):
     """
-    Resolve the target and return (rows, human-label). Three modes:
+    Resolve the target and return an _NcbiSelection(rows, label, rank, taxon) where
+    `rank` is the resolved rank for a taxon-name search (None for 'all'/taxid, which
+    don't resolve to a single rank) and `taxon` is the canonical name used for output
+    filenames. Three modes:
       - 'all'          -> every genome (optionally reps-only)
       - a numeric taxid-> lineage-taxid lookup
       - a taxon name   -> the shared select_ref_genomes core (honours --derep-rank)
@@ -330,12 +339,12 @@ def _select_rows(table_path, args):
         filters = [("refseq_category", "=", "reference genome")] if reps_only else None
         tab = pq.read_table(table_path, columns=_COLUMNS, filters=filters)
         rows = _apply_source_prefix(tab.to_pylist(), prefixes)
-        return rows, "all genomes"
+        return _NcbiSelection(rows, "all genomes", None, "all")
 
     if target.isdigit():
         rows = _select_by_taxid(table_path, target, reps_only=reps_only)
         rows = _apply_source_prefix(rows, prefixes)
-        return rows, f"taxid {target}"
+        return _NcbiSelection(rows, f"taxid {target}", None, f"taxid-{target}")
 
     # taxon name -> shared core (taxon resolution + optional dereplication).
     # --source scopes the candidate pool BY ACCESSION PREFIX up front (inside the
@@ -362,9 +371,10 @@ def _select_rows(table_path, args):
         report_message(str(err), "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
-    if selection.canonical != target:
-        report_message(f"Matched input '{target}' to NCBI taxon '{selection.canonical}'.",
-                       "yellow", ii="    ", si="    ", width=100)
+    # can use this if i want to notify about case-insensitive matching (thought i wanted it, but don't feel like it's really needed ATM)
+    # if selection.canonical != target:
+    #     report_message(f"Matched input '{target}' to NCBI taxon '{selection.canonical}'.",
+    #                    "yellow", ii="    ", si="    ", width=100)
 
     for warning in selection.warnings:
         report_message(warning, "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
@@ -374,7 +384,9 @@ def _select_rows(table_path, args):
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
-    return selection.rows, f"{selection.resolved_rank} '{selection.canonical}'"
+    return _NcbiSelection(selection.rows,
+                          f"{selection.resolved_rank} '{selection.canonical}'",
+                          selection.resolved_rank, selection.canonical)
 
 
 def _select_by_taxid(table_path, taxid, reps_only=False):
@@ -423,7 +435,7 @@ def report_unique_taxa_counts_of_all_ranks(table_path, source="refseq", reps_onl
     tab = pq.read_table(table_path, columns=ranks + ["assembly_accession"])
     tab = _filter_table_by_source(tab, source)
 
-    label = {"refseq": "RefSeq", "genbank": "GenBank", "both": "all"}.get(source, source)
+    label = {"refseq": "refseq", "genbank": "genbank", "both": "all"}.get(source, source)
     print("\n    {:<10} {:}".format("Rank", f"Num. Unique Taxa ({label})"))
     for rank in ranks:
         n = pc.count_distinct(tab.column(rank)).as_py()
@@ -456,16 +468,18 @@ def _report_ncbi_date(table_path):
 
 
 def copy_ncbi_table(table_path):
-    out_name = "NCBI-assembly-summary-metadata.tsv"
+    out_name = "ncbi-assembly-summary-metadata.tsv"
     pq.read_table(table_path).to_pandas().to_csv(out_name, sep="\t", index=False)
     print("")
     wprint("NCBI table written to:")
     print(color_text("    " + out_name + "\n"))
 
 
-def _write_outputs(rows, args, label):
-    taxon_raw = str(args.target_taxon)
-    taxon_for_filename = taxon_raw.replace(" ", "-").replace("/", "-")
+def _write_outputs(rows, args, selection):
+
+    taxon_for_filename = selection.taxon.replace(" ", "-").replace("/", "-").lower()
+
+    rank_bit = f"-{selection.rank}" if selection.rank else ""
 
     suffix_bits = []
     if args.refseq_reference_genomes_only:
@@ -474,8 +488,8 @@ def _write_outputs(rows, args, label):
         suffix_bits.append(args.source)
     suffix = ("-" + "-".join(suffix_bits)) if suffix_bits else ""
 
-    acc_out = f"NCBI-{taxon_for_filename}{suffix}-accessions.txt"
-    tab_out = f"NCBI-{taxon_for_filename}{suffix}-metadata.tsv"
+    acc_out = f"ncbi-{taxon_for_filename}{rank_bit}{suffix}-accs.txt"
+    tab_out = f"ncbi-{taxon_for_filename}{rank_bit}{suffix}-metadata.tsv"
 
     _write_metadata_tsv(rows, tab_out)
 

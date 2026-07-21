@@ -32,7 +32,7 @@ def parse_args(argv=None):
                     "on GTDB-taxonomy searches, with optional filtering to GTDB "
                     "representative species or RefSeq reference genomes, plus optional "
                     "dereplication down to one genome per rank.",
-        epilog="Ex. usage: gtt-get-accessions-from-GTDB -t Archaea --GTDB-representatives-only\n")
+        epilog="Ex. usage: gtt-get-accs-from-gtdb -t Archaea --gtdb-representatives-only\n")
 
     parser.add_argument(
         "-t",
@@ -65,25 +65,21 @@ def parse_args(argv=None):
         "-G",
         "--gtdb-representatives-only",
         action="store_true",
-        help=("Add this flag to only pull accessions for genomes "
-              "designated as GTDB species representatives (see, e.g., "
-              "https://gtdb.ecogenomic.org/faq#gtdb_species_clusters)."),
+        help=("Pull only genomes designated as GTDB species representatives."),
     )
 
     parser.add_argument(
         "-R",
         "--refseq-reference-genomes-only",
         action="store_true",
-        help=("Add this flag to only pull accessions for genomes designated as "
-              "RefSeq \"reference\" genomes (these used to be called \"representative\" genomes, see, e.g., "
-              "https://www.ncbi.nlm.nih.gov/refseq/about/prokaryotes/#reference_genomes)."),
+        help=("Pull only genomes designated as RefSeq reference genomes."),
     )
 
     parser.add_argument(
         "--get-taxon-counts",
         action="store_true",
-        help=("Provide this flag along with a specified taxon to the `-t` to see how many "
-              "genomes match (after any set filters except `--derep-rank`)."),
+        help=("Provide this flag along with a specified taxon to `-t` to see how many "
+              "genomes match the set parameters (excluding --derep-rank)"),
     )
 
     parser.add_argument(
@@ -138,9 +134,13 @@ def get_accessions_from_gtdb(args):
         _report_taxon_counts_or_exit(gtdb_path, args.target_taxon, representatives_source)
         sys.exit(0)
 
-    _select_and_write(gtdb_path, args, representatives_source)
-    sys.exit(0)
+    if args.target_taxon.lower() == "all":
+        _write_all(gtdb_path, representatives_source)
+        sys.exit(0)
 
+    selection = _select_rows(gtdb_path, args, representatives_source)
+    _write_outputs(selection, representatives_source)
+    sys.exit(0)
 
 
 def preflight_checks(args):
@@ -157,30 +157,29 @@ def preflight_checks(args):
 
     if args.gtdb_representatives_only and args.refseq_reference_genomes_only:
         print("")
-        wprint(color_text("Only one of `--GTDB-representatives-only` or "
-                          "`--RefSeq-reference-genomes-only` can be provided.", "yellow"))
+        wprint(color_text("Only one of `--gtdb-representatives-only` or "
+                          "`--refseq-reference-genomes-only` can be provided.", "yellow"))
         print("")
         sys.exit(1)
 
 
 def _representatives_source(args):
     if args.gtdb_representatives_only:
-        return "GTDB"
+        return "gtdb"
     if args.refseq_reference_genomes_only:
-        return "RefSeq"
+        return "refseq"
     return None
 
 
-def _select_and_write(gtdb_path, args, representatives_source):
+def _select_rows(gtdb_path, args, representatives_source):
     """
-    Pull accessions for the target taxon through the shared taxonomy core, then write
-    the accessions list and a metadata-subset TSV. The 'all' taxon is a bulk dump that
-    the core's taxon-resolution doesn't cover, so it's handled directly.
-    """
-    if args.target_taxon.lower() == "all":
-        _write_all(gtdb_path, representatives_source)
-        return
+    Resolve the target taxon through the shared taxonomy core and return the
+    RefGenomeSelection (accessions + metadata rows + resolved rank/canonical). Writing
+    is done separately by _write_outputs -- this mirrors the NCBI helper's
+    _select_rows / _write_outputs split so the two orchestrators read the same.
 
+    The 'all' taxon is handled by the caller (a bulk dump the core doesn't cover).
+    """
     # reps-only requested -> pass through to the core; RefSeq maps to the NCBI-style
     # reference-genome filter that SOURCES['gtdb'] understands via reps_only, while GTDB
     # representatives are the core's default representative pool.
@@ -205,9 +204,10 @@ def _select_and_write(gtdb_path, args, representatives_source):
         report_message(str(err), "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
-    if selection.canonical != args.target_taxon:
-        report_message(f"Matched input '{args.target_taxon}' to GTDB taxon '{selection.canonical}'.",
-                       "yellow", ii="    ", si="    ", width=100)
+    # can use this if i want to notify about case-insensitive matching (thought i wanted it, but don't feel like it's really needed ATM)
+    # if selection.canonical != args.target_taxon:
+    #     report_message(f"Matched input '{args.target_taxon}' to GTDB taxon '{selection.canonical}'.",
+    #                    "yellow", ii="    ", si="    ", width=100)
 
     for warning in selection.warnings:
         report_message(warning, "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
@@ -217,20 +217,23 @@ def _select_and_write(gtdb_path, args, representatives_source):
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
-    _write_outputs(selection, representatives_source)
+    return selection
 
 
 def _write_outputs(selection, representatives_source):
-    taxon_for_filename = selection.canonical.replace(" ", "-")
+    taxon_for_filename = selection.canonical.replace(" ", "-").lower()
     rank = selection.resolved_rank
 
     if representatives_source:
-        suffix = "-" + representatives_source + "-rep"
+        if representatives_source == "gtdb":
+            suffix = "-" + representatives_source + "-rep"
+        else:
+            suffix = "-" + representatives_source + "-ref"
     else:
         suffix = ""
 
-    acc_out_filename = f"GTDB-{taxon_for_filename}-{rank}{suffix}-accs.txt"
-    tab_out_filename = f"GTDB-{taxon_for_filename}-{rank}{suffix}-metadata.tsv"
+    acc_out_filename = f"gtdb-{taxon_for_filename}-{rank}{suffix}-accs.txt"
+    tab_out_filename = f"gtdb-{taxon_for_filename}-{rank}{suffix}-metadata.tsv"
 
     with open(acc_out_filename, "w") as out:
         for acc in selection.accessions:
@@ -249,7 +252,7 @@ def _write_outputs(selection, representatives_source):
 
 def _write_all(gtdb_path, representatives_source):
     """Bulk dump of every accession (optionally reps-only), plus a metadata TSV."""
-    if representatives_source == "GTDB":
+    if representatives_source == "gtdb":
         filt = [("gtdb_representative", "=", "t")]
     elif representatives_source == "RefSeq":
         filt = [("ncbi_refseq_category", "=", "reference genome")]
@@ -264,11 +267,11 @@ def _write_all(gtdb_path, representatives_source):
     accessions = table.column("ncbi_genbank_assembly_accession").to_pylist()
 
     if representatives_source:
-        acc_out_filename = "GTDB-arc-and-bac-" + representatives_source + "-rep-accessions.txt"
-        tab_out_filename = "GTDB-arc-and-bac-" + representatives_source + "-rep-metadata.tsv"
+        acc_out_filename = "gtdb-arc-and-bac-" + representatives_source + "-rep-accs.txt"
+        tab_out_filename = "gtdb-arc-and-bac-" + representatives_source + "-rep-metadata.tsv"
         table.to_pandas().to_csv(tab_out_filename, sep="\t", index=False)
     else:
-        acc_out_filename = "GTDB-arc-and-bac-accessions.txt"
+        acc_out_filename = "gtdb-arc-and-bac-accs.txt"
         tab_out_filename = None
 
     with open(acc_out_filename, "w") as out:
@@ -306,7 +309,7 @@ def _write_metadata_tsv(rows, out_filename):
 
 def _rep_filter_for(representatives_source):
     """The Parquet predicate for a representatives source (or None for no filter)."""
-    if representatives_source == "GTDB":
+    if representatives_source == "gtdb":
         return ("gtdb_representative", "=", "t")
     if representatives_source == "RefSeq":
         return ("ncbi_refseq_category", "=", "reference genome")
@@ -360,9 +363,10 @@ def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source):
         print("")
         sys.exit(0)
 
-    if canonical != taxon:
-        report_message(f"Matched input '{taxon}' to GTDB taxon '{canonical}'.",
-                       "yellow", ii="    ", si="    ", width=100)
+    # can use this if i want to notify about case-insensitive matching (thought i wanted it, but don't feel like it's really needed ATM)
+    # if canonical != taxon:
+    #     report_message(f"Matched input '{taxon}' to GTDB taxon '{canonical}'.",
+    #                    "yellow", ii="    ", si="    ", width=100)
 
     taxon = canonical
 
@@ -391,7 +395,7 @@ def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source):
 
 
 def _rep_type_label(representatives_source):
-    return "RefSeq reference" if representatives_source == "RefSeq" else "GTDB representative"
+    return "refseq reference" if representatives_source == "refseq" else "gtdb representative"
 
 
 def report_unique_taxa_counts_of_all_ranks(gtdb_path, representatives_source=None):
@@ -409,8 +413,8 @@ def report_unique_taxa_counts_of_all_ranks(gtdb_path, representatives_source=Non
         print("    {:<10} {:}".format(rank, str(n)))
     print("")
 
-    if representatives_source == "GTDB":
-        report_message("(The `--GTDB-representatives-only` flag doesn't change these counts: "
+    if representatives_source == "gtdb":
+        report_message("(The `--gtdb-representatives-only` flag doesn't change these counts: "
                        "every GTDB taxon has a representative genome, so the number of unique "
                        "taxa per rank is the same with or without it.)",
                        "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
@@ -437,7 +441,7 @@ def copy_gtdb_table(gtdb_path):
     directory as a TSV -- the `--get-table` escape hatch.
     """
     _report_gtdb_version(gtdb_path)
-    out_name = "GTDB-arc-and-bac-metadata.tsv"
+    out_name = "gtdb-arc-and-bac-metadata.tsv"
     pq.read_table(gtdb_path).to_pandas().to_csv(out_name, sep="\t", index=False)
     print("")
     wprint("GTDB table written to:")

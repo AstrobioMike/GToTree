@@ -9,6 +9,8 @@
 
     # add choices to the --target-rank and --derep-rank parameters in the parser, based on the RANKS list in tax_ranks.py
 
+    # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can pick based on the --wanted-ref-tax for them
+
     # consider richargparse for the main gtotree parser, instead of my manual one that i've stuck to for legacy reasons...
 
     # bring over the download_with_tqdm updates from bit (stream function gets content length itself)
