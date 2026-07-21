@@ -1,8 +1,5 @@
 ### TO DO STILL ###
 
-    # is there more i can unify between get-accs-from-gtdb and get-accs-from-ncbi? (or at least structure the same even if they need separate functions)
-        # there is some divergence still, e.g., gtdb has _select_and_write() while ncbi has the very similar _select_rows()
-
     # make gtt an entry point with subcommands for all the gtt scripts (maybe)
         # make helpers richargparse-based
         # add tab-complete for subcommands and their args (like i did for bit)

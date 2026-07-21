@@ -25,6 +25,10 @@ from gtotree.utils.hmms.scg_hmm_setup import check_hmm_file
 from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data
+from gtotree.utils.taxonomy.tax_ranks import RANKS
+from gtotree.utils.taxonomy.tax_select import AmbiguousTaxon, TaxonNotFound
+from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
+                                                   WantedRefTaxError)
 from gtotree.utils.general import (ToolsUsed,
                                    populate_run_data,
                                    read_run_data)
@@ -35,6 +39,8 @@ def preflight_checks(args):
     check_for_essential_deps()
     args, run_data = primary_args_validation(args)
     check_for_required_dbs(args)
+    run_data = resolve_wanted_ref_tax(args, run_data)
+    check_for_min_input_genomes(run_data)
     run_data = track_tools_used(args, run_data)
     args, run_data = final_setups(args, run_data)
 
@@ -75,14 +81,15 @@ def primary_args_validation(args):
     check_lineage(args)
     check_tree_program(args)
     checks_for_nucleotide_mode(args)
+    check_wanted_ref_tax_args(args)
     args = check_output_dir(args)
     args, run_data = check_input_files(args)
-    check_for_min_input_genomes(run_data)
     return args, run_data
 
 
 def check_for_minimum_args(args):
-    if not args.ncbi_accessions and not args.genbank_files and not args.fasta_files and not args.amino_acid_files:
+    if (not args.ncbi_accessions and not args.genbank_files and not args.fasta_files
+            and not args.amino_acid_files and not args.wanted_ref_tax):
         report_message("You need to provide at least one input-genome source!")
         report_very_early_exit(suggest_help=True)
     if not args.hmm:
@@ -160,6 +167,83 @@ def checks_for_nucleotide_mode(args):
                            "but also provided some input genomes as genbank files (passed to `-g`). Input genbank files are currently "
                            "not supported with nucleotide mode.")
             report_very_early_exit(suggest_help=True)
+
+
+def check_wanted_ref_tax_args(args):
+    """
+    Cross-argument validation for the --wanted-ref-tax (-W) family, done up front
+    (before any asset is fetched or taxon resolved) so bad combinations fail fast:
+
+      * --target-rank / --derep-rank only mean something alongside -W.
+      * --target-rank, when given, must be one of the 7 taxonomic ranks.
+      * --derep-rank must be 'auto', 'off', or one of the 7 ranks.
+    """
+    ranks = list(RANKS)
+
+    if not args.wanted_ref_tax:
+        dangling = []
+        if args.target_rank is not None:
+            dangling.append("`--target-rank`")
+        # --derep-rank has a non-None default ("auto"); only a user-changed value is dangling
+        if args.derep_rank not in (None, "auto"):
+            dangling.append("`--derep-rank`")
+        if dangling:
+            joined = " and ".join(dangling)
+            report_message(f"You provided {joined}, but that only applies when adding "
+                           "reference genomes by taxonomy with `-W`/`--wanted-ref-tax`.")
+            report_very_early_exit(suggest_help=True)
+        return
+
+    if args.target_rank is not None and args.target_rank.strip().lower() not in ranks:
+        report_message(f'You specified "{args.target_rank}" to `--target-rank`, but that '
+                       "is not an accepted taxonomic rank.")
+        print(f"\n  Accepted ranks are:\n\n        {'\n        '.join(ranks)}\n")
+        report_very_early_exit(suggest_help=True)
+
+    if args.derep_rank is not None:
+        dr = args.derep_rank.strip().lower()
+        if dr not in ("auto", "off") and dr not in ranks:
+            report_message(f'You specified "{args.derep_rank}" to `--derep-rank`, but that '
+                           "is not 'auto', 'off', or an accepted taxonomic rank.")
+            print(f"\n  Accepted ranks are:\n\n        {'\n        '.join(ranks)}\n")
+            report_very_early_exit(suggest_help=True)
+
+
+def resolve_wanted_ref_tax(args, run_data):
+    """
+    CLI layer for --wanted-ref-tax (-W): call the driver-side resolver (which raises),
+    translate any failure into a friendly message + early exit, surface the selection's
+    advisory warnings, and merge the resulting accessions into run_data's NCBI-accession
+    input pool (deduping against user-provided accessions).
+
+    Runs AFTER check_for_required_dbs so the GTDB/NCBI Parquet asset is on disk.
+    """
+    if not args.wanted_ref_tax:
+        return run_data
+
+    try:
+        accessions, selection = resolve_wanted_ref_tax_accessions(
+            args.source, args.wanted_ref_tax,
+            target_rank=args.target_rank, derep_rank=args.derep_rank)
+    except AmbiguousTaxon:
+        report_message(f"Since the `-W` taxon '{args.wanted_ref_tax}' occurs at more than "
+                       "1 rank, you'll need to specify which rank is wanted with "
+                       "`--target-rank`.")
+        report_very_early_exit(suggest_help=True)
+    except TaxonNotFound:
+        report_message(f"The `-W` taxon '{args.wanted_ref_tax}' doesn't seem to exist at any "
+                       f"rank in the {args.source} taxonomy :(")
+        report_very_early_exit(suggest_help=True)
+    except (WantedRefTaxError, ValueError) as err:
+        report_message(str(err))
+        report_very_early_exit(suggest_help=True)
+
+    for warning in selection.warnings:
+        report_message(warning, "yellow")
+
+    run_data.merge_wanted_ref_tax_accessions(accessions)
+
+    return run_data
 
 
 def check_input_files(args):
@@ -460,9 +544,13 @@ def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
 
 
 def check_for_required_dbs(args):
-    if args.ncbi_accessions or args.add_ncbi_tax:
+
+    wanted_ref_tax_source = args.source.strip().lower() if args.wanted_ref_tax else None
+
+    if (args.ncbi_accessions or args.add_ncbi_tax
+            or wanted_ref_tax_source in ("ncbi", "gtdb")):
         get_ncbi_assembly_data()
-    if args.add_gtdb_tax:
+    if args.add_gtdb_tax or wanted_ref_tax_source == "gtdb":
         get_gtdb_data()
     if args.target_kos_file:
         get_kofamscan_data()

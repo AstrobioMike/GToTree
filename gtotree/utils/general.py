@@ -461,6 +461,26 @@ class RunData:
     def get_all_input_genome_ids(self) -> List[str]:
         return [gd.id for gd in self.all_input_genomes]
 
+    def merge_wanted_ref_tax_accessions(self, accessions) -> int:
+        """
+        Fold --wanted-ref-tax (-W) accessions into the NCBI-accession input pool,
+        skipping any already provided by the user by accession id.
+        Order is preserved: existing accs first, then the new -W ones in the order
+        the taxonomy core returned them. Refreshes all_input_genomes and returns the
+        number actually added.
+        """
+        existing = {gd.id for gd in self.ncbi_accs}
+        added = 0
+        for acc in accessions:
+            if acc in existing:
+                continue
+            self.ncbi_accs.append(GenomeData.from_acc(acc))
+            existing.add(acc)
+            added += 1
+        if added:
+            self.update_all_input_genomes()
+        return added
+
     def get_all_preprocessed_genomes(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.preprocessing_done]
 

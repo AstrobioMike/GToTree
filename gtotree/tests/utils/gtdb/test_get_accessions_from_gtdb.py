@@ -107,7 +107,7 @@ def test_gtdb_representatives_only_filters(in_gtdb):
 
 def test_all_taxon_bulk_dump(in_gtdb):
     _run(_args(target_taxon="all"))
-    accs = _read_accs("GTDB-arc-and-bac-accessions.txt")
+    accs = _read_accs("GTDB-arc-and-bac-accs.txt")
     assert len(accs) == 4
 
 
