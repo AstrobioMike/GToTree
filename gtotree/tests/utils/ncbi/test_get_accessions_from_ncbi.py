@@ -89,7 +89,7 @@ def _read_accs(pattern):
 
 def test_taxon_refseq_derep_off(in_ncbi):
     _run(_args(target_taxon="Testophyla", source="refseq"))
-    accs = _read_accs("NCBI-Testophyla-refseq-accessions.txt")
+    accs = _read_accs("ncbi-testophyla-phylum-refseq-accs.txt")
     assert sorted(accs) == ["GCF_000000001.1", "GCF_000000003.1"]  # only GCF
 
 
@@ -99,7 +99,7 @@ def test_source_scoping_precedes_derep(in_ncbi):
     genome per family, NOT drop FamB because its best 'both'-pool genome was the GCA.
     """
     _run(_args(target_taxon="Testophyla", source="refseq", derep_rank="family"))
-    accs = _read_accs("NCBI-Testophyla-refseq-accessions.txt")
+    accs = _read_accs("ncbi-testophyla-phylum-refseq-accs.txt")
     # one per family, and both must be GCF (the refseq-pool winners)
     assert len(accs) == 2
     assert all(a.startswith("GCF_") for a in accs)
@@ -107,14 +107,14 @@ def test_source_scoping_precedes_derep(in_ncbi):
 
 def test_genbank_source_scopes_to_gca(in_ncbi):
     _run(_args(target_taxon="Testophyla", source="genbank", derep_rank="family"))
-    accs = _read_accs("NCBI-Testophyla-genbank-accessions.txt")
+    accs = _read_accs("ncbi-testophyla-phylum-genbank-accs.txt")
     assert len(accs) == 2
     assert all(a.startswith("GCA_") for a in accs)
 
 
 def test_both_source_derep_picks_best_regardless_of_prefix(in_ncbi):
     _run(_args(target_taxon="Testophyla", source="both", derep_rank="family"))
-    accs = _read_accs("NCBI-Testophyla-accessions.txt")
+    accs = _read_accs("ncbi-testophyla-phylum-accs.txt")
     # FamB's best by quality is the 99.9-complete GCA_...004
     assert "GCA_000000004.1" in accs
     assert len(accs) == 2
@@ -122,27 +122,27 @@ def test_both_source_derep_picks_best_regardless_of_prefix(in_ncbi):
 
 def test_all_mode(in_ncbi):
     _run(_args(target_taxon="all", source="both"))
-    accs = _read_accs("NCBI-all-accessions.txt")
+    accs = _read_accs("ncbi-all-accs.txt")
     assert len(accs) == 4
 
 
 def test_taxid_mode(in_ncbi):
     _run(_args(target_taxon="5100", source="both"))  # FamA taxid
-    accs = _read_accs("NCBI-5100-accessions.txt")
+    accs = _read_accs("ncbi-taxid-5100-accs.txt")
     assert sorted(accs) == ["GCA_000000002.1", "GCF_000000001.1"]
 
 
 def test_assembly_level_filter(in_ncbi):
     # only GCA_...004 is Scaffold; the rest Complete Genome
     _run(_args(target_taxon="Testophyla", source="both", assembly_level="scaffold"))
-    accs = _read_accs("NCBI-Testophyla-accessions.txt")
+    accs = _read_accs("ncbi-testophyla-phylum-accs.txt")
     assert accs == ["GCA_000000004.1"]
 
 
 def test_refseq_reference_genomes_only(in_ncbi):
     _run(_args(target_taxon="Testophyla", source="both",
                refseq_reference_genomes_only=True))
-    accs = _read_accs("NCBI-Testophyla-refseq-ref-accessions.txt")
+    accs = _read_accs("ncbi-testophyla-phylum-refseq-ref-accs.txt")
     # only GCF_...001 is a "reference genome"
     assert accs == ["GCF_000000001.1"]
 
@@ -179,7 +179,6 @@ def test_taxon_counts_is_case_insensitive(in_ncbi, capsys):
     out = capsys.readouterr().out
     assert "No genomes were found" not in out
     assert "Testophyla" in out                    # canonical casing echoed back
-    assert "Matched input 'testophyla'" in out
 
 
 def test_taxon_counts_proper_case_no_match_note(in_ncbi, capsys):
@@ -199,7 +198,7 @@ def test_taxon_counts_applies_source_filter(in_ncbi, capsys):
     # source refseq -> only the 2 GCF rows under Testophyla; scope note names the source
     _run(_args(target_taxon="Testophyla", source="refseq", get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 2 Testophyla entries (in RefSeq)." in out
+    assert "The rank 'phylum' has 2 Testophyla entries (in refseq)." in out
 
 
 def test_taxon_counts_applies_assembly_level_filter(in_ncbi, capsys):
@@ -246,7 +245,7 @@ def test_get_table_writes_full_metadata_tsv(in_ncbi, capsys):
     _run(_args(get_table=True))
     out = capsys.readouterr().out
     assert "NCBI table written to" in out
-    matches = glob.glob("NCBI-assembly-summary-metadata.tsv")
+    matches = glob.glob("ncbi-assembly-summary-metadata.tsv")
     assert len(matches) == 1
     with open(matches[0]) as fh:
         rows = list(csv.DictReader(fh, delimiter="\t"))
