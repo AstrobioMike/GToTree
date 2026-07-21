@@ -62,6 +62,7 @@ def parse_args(argv=None):
         "-r",
         "--target-rank",
         metavar="<STR>",
+        # choices=list(RANKS),
         help=("Target rank (if needed to disambiguate a taxon name that exists at multiple ranks"),
         action="store",
     )
