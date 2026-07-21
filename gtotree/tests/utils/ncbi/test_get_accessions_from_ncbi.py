@@ -1,12 +1,3 @@
-"""
-Tests for the standalone gtt-get-accs-from-ncbi helper, driven over the shared taxonomy
-selection core against a small schema-faithful mock NCBI Parquet.
-
-Covers the taxon-name / taxid / 'all' modes, dereplication, source (RefSeq/GenBank)
-scoping applied BEFORE dereplication, assembly-level filtering, counts, and the
-friendly CLI translations of the library-layer exceptions.
-"""
-
 import glob
 import types
 import pyarrow as pa # type: ignore
@@ -201,22 +192,22 @@ def test_taxon_counts_reports_per_rank_breakdown(in_ncbi, capsys):
     # GTDB-style format: "The rank 'X' has N <taxon> entries."
     _run(_args(target_taxon="Testophyla", source="both", get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 4 Testophyla entries (after any specified filters)." in out
+    assert "The rank 'phylum' has 4 Testophyla entries." in out
 
 
 def test_taxon_counts_applies_source_filter(in_ncbi, capsys):
-    # source refseq -> only the 2 GCF rows under Testophyla
+    # source refseq -> only the 2 GCF rows under Testophyla; scope note names the source
     _run(_args(target_taxon="Testophyla", source="refseq", get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 2 Testophyla entries (after any specified filters)." in out
+    assert "The rank 'phylum' has 2 Testophyla entries (in RefSeq)." in out
 
 
 def test_taxon_counts_applies_assembly_level_filter(in_ncbi, capsys):
-    # only GCA_...004 is Scaffold under Testophyla
+    # only GCA_...004 is Scaffold under Testophyla; scope note names the level
     _run(_args(target_taxon="Testophyla", source="both", assembly_level="scaffold",
                get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 1 Testophyla entries (after any specified filters)." in out
+    assert "The rank 'phylum' has 1 Testophyla entries (at assembly level Scaffold)." in out
 
 
 def test_taxon_counts_reps_block(in_ncbi, capsys):
@@ -224,8 +215,8 @@ def test_taxon_counts_reps_block(in_ncbi, capsys):
     _run(_args(target_taxon="Testophyla", source="both",
                refseq_reference_genomes_only=True, get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 4 Testophyla entries (after any specified filters)." in out         # base pool
-    assert "In considering only RefSeq reference genomes:" in out
+    assert "The rank 'phylum' has 4 Testophyla entries." in out         # base pool (source both -> no scope note)
+    assert "Of those, in considering only RefSeq reference genomes:" in out
     assert "has 1 Testophyla RefSeq reference genome entries." in out    # only GCF_...003
 
 
@@ -234,7 +225,7 @@ def test_taxon_counts_ignores_derep(in_ncbi, capsys):
     _run(_args(target_taxon="Testophyla", source="both", derep_rank="family",
                get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 4 Testophyla entries (after any specified filters)." in out   # all 4, not 2 families
+    assert "The rank 'phylum' has 4 Testophyla entries." in out   # all 4, not 2 families
 
 
 def test_taxon_counts_multi_rank_breakdown(in_ncbi, capsys, tmp_path):
@@ -246,8 +237,8 @@ def test_taxon_counts_multi_rank_breakdown(in_ncbi, capsys, tmp_path):
     _write_mock_ncbi(tmp_path / PARQUET_FILENAME, records)
     _run(_args(target_taxon="Dualname", source="both", get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 1 Dualname entries (after any specified filters)." in out
-    assert "The rank 'class' has 1 Dualname entries (after any specified filters)." in out
+    assert "The rank 'phylum' has 1 Dualname entries." in out
+    assert "The rank 'class' has 1 Dualname entries." in out
 
 
 def test_get_table_writes_full_metadata_tsv(in_ncbi, capsys):
