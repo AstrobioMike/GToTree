@@ -92,11 +92,34 @@ def prepare_accession(acc, run_data):
 
 
 def download_and_unzip_accession(link, filepath):
+    # Atomic write: fetch to a temp gzip and unzip into a `.part` temp alongside
+    # the destination, then os.replace() into place only on a fully successful
+    # unzip. An interrupted download or a truncated/corrupt gzip (process kill,
+    # `-R` interrupted mid-run, disk full) therefore never leaves a truncated
+    # file at `filepath` that a later os.path.isfile() / resume check would
+    # mistake for a complete genome. Both temps are cleaned up on any failure.
+    # The function still raises on failure, which prepare_accession relies on to
+    # fall back from amino-acid to nucleotide downloads.
     tmp_gzip = filepath + ".gz"
-    urllib.request.urlretrieve(link, tmp_gzip)
-    with gzip.open(tmp_gzip, 'rb') as f_in, open(filepath, 'wb') as f_out:
-        shutil.copyfileobj(f_in, f_out)
-    os.remove(tmp_gzip)
+    tmp_out = filepath + ".part"
+    try:
+        urllib.request.urlretrieve(link, tmp_gzip)
+        with gzip.open(tmp_gzip, 'rb') as f_in, open(tmp_out, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+        os.replace(tmp_out, filepath)
+    except BaseException:
+        # BaseException so Ctrl-C (KeyboardInterrupt) also cleans up the partials
+        for tmp in (tmp_gzip, tmp_out):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        raise
+    else:
+        try:
+            os.remove(tmp_gzip)
+        except OSError:
+            pass
 
 
 def get_base_link(acc, run_data):

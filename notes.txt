@@ -10,8 +10,6 @@
 
     # consider richargparse for the main gtotree parser, instead of my manual one that i've stuck to for legacy reasons...
 
-    # bring over the download_with_tqdm updates from bit (stream function gets content length itself)
-
     # pursue faster and better handling of reading and writing my run_data object when passing around to/from snakemake calls
 
     # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data, "Decompressing" in get-pfam-data, etc.)
@@ -29,7 +27,7 @@
     # incorporate latest changes from master GToTree
         # gtt-gen-SCG-HMMs has been updated a bit (v1.8.17)
         # bit's way of downloading assemblies with increased robustness (maybe even drop snakemake for that phase?)
-        # check for others...
+        # check for others via all commits since they split... ... ... (yes, that's worth 3 ellipses)
 
     # modularize and reduce code redundancy in my user-side standalone scripts like:
         # gtt-get-accessions-from-GTDB (use what we can from utils/gtdb/get_gtdb_data.py; also see what i've done in bit already)
