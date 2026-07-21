@@ -69,11 +69,11 @@ def test_retries_then_succeeds(tmp_path, monkeypatch, no_sleep):
     calls = {"n": 0}
 
     def flaky_urlopen(target, *a, **k):
-        # size-probe call passes a plain str url; stream call passes a Request.
-        # Only fail on the streaming opens so we count transfer attempts.
+        # Every open is now a streaming Request open (the old up-front size
+        # probe was removed; total is read off the stream response instead).
+        # The non-Request branch is retained only as a defensive no-op.
         is_stream = isinstance(target, urllib.request.Request)
         if not is_stream:
-            # size probe: no Content-Length, succeeds
             return _FakeResp(headers={})
         calls["n"] += 1
         if calls["n"] < 3:
@@ -284,4 +284,51 @@ def test_404_leaves_no_partial_file(tmp_path, monkeypatch):
         download_with_tqdm("http://x/y", "label", str(out))
 
     assert not out.exists()
+    assert not (tmp_path / "out.bin.part").exists()
+
+
+# --------------------------------------------------------------------------- #
+# _stream_once: the bar's total is resolved from the download response's own
+# Content-Length header (no separate probe request). Whether or not the server
+# reports a length, the full payload must land on disk.
+# --------------------------------------------------------------------------- #
+
+def test_stream_once_writes_full_payload_known_length(tmp_path, monkeypatch):
+    """A Content-Length response: total is read off the response, the bar is
+    promoted to bounded, and every byte is streamed to disk."""
+    payload = b"z" * 300_000  # larger than a single 256 KB read
+    dest = str(tmp_path / "out.bin")
+
+    def fake_urlopen(target, *a, **k):
+        return _FakeResp(headers={"Content-Length": str(len(payload))},
+                         chunks=[payload[:256 * 1024], payload[256 * 1024:]])
+
+    monkeypatch.setattr(general.urllib.request, "urlopen", fake_urlopen)
+
+    general._stream_once("http://x/y", dest, "label", leave=False,
+                         floor_bytes_per_s=0.0, probe_seconds=5.0)
+
+    from pathlib import Path
+    assert Path(dest).read_bytes() == payload
+    assert not (tmp_path / "out.bin.part").exists()
+
+
+def test_stream_once_writes_full_payload_unknown_length(tmp_path, monkeypatch):
+    """No Content-Length (total stays None): the whole payload is still written
+    via the len(buf) bar-update branch, and the bar stays indeterminate."""
+    payload = b"q" * 300_000
+    dest = str(tmp_path / "out.bin")
+
+    def fake_urlopen(target, *a, **k):
+        # headers carry NO Content-Length
+        return _FakeResp(headers={},
+                         chunks=[payload[:256 * 1024], payload[256 * 1024:]])
+
+    monkeypatch.setattr(general.urllib.request, "urlopen", fake_urlopen)
+
+    general._stream_once("http://x/y", dest, "label", leave=False,
+                         floor_bytes_per_s=0.0, probe_seconds=5.0)
+
+    from pathlib import Path
+    assert Path(dest).read_bytes() == payload
     assert not (tmp_path / "out.bin.part").exists()

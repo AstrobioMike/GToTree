@@ -60,23 +60,14 @@ def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True,
     Raises the last underlying error if every attempt fails.
     """
     if urlopen:
+        opener = urllib.request.build_opener()
+        opener.addheaders = [('User-Agent', 'curl/8.0')]
+        urllib.request.install_opener(opener)
         return urllib.request.urlopen(url)
 
     # a single attempt if retries are off
     if not retries:
         attempts = 1
-
-    # resolve total size up front so the bar is bounded/persistent (a plain GET
-    # carries Content-Length through GitHub's redirect more reliably than HEAD).
-    # Bounded by probe_timeout so a stalled connection fails fast here rather
-    # than hanging before the retry loop can even begin.
-    total = None
-    try:
-        with urllib.request.urlopen(url, timeout=probe_timeout) as r:
-            cl = r.headers.get("Content-Length")
-            total = int(cl) if cl else None
-    except Exception:
-        total = None
 
     floor_bytes_per_s = (min_mbps * 1024 * 1024) if speed_gate else 0.0
     last_err = None
@@ -89,7 +80,7 @@ def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True,
         desc = target
 
         try:
-            _stream_once(url, filename, desc, total, leave, floor,
+            _stream_once(url, filename, desc, leave, floor,
                          probe_seconds, connect_timeout=probe_timeout)
             if leave:
                 sys.stderr.write("\n")
@@ -138,11 +129,14 @@ class _TooSlow(Exception):
         super().__init__(f"too slow: {mbps:.2f} MB/s")
 
 
-def _stream_once(url, filename, desc, total, leave, floor_bytes_per_s,
+def _stream_once(url, filename, desc, leave, floor_bytes_per_s,
                  probe_seconds, connect_timeout=30):
     """
-    Stream url->filename with a tqdm bar. If floor_bytes_per_s > 0, measure
-    throughput over the first `probe_seconds` and raise _TooSlow if under floor.
+    Stream url->filename with a tqdm bar. The bar's total is resolved from the
+    download response's own Content-Length header (no separate probe request),
+    so a bounded bar shows whenever the server reports a length, and a slow
+    route isn't paid for twice. If floor_bytes_per_s > 0, measure throughput
+    over the first `probe_seconds` and raise _TooSlow if under floor.
     `connect_timeout` bounds the connect/read so a stalled server surfaces as a
     transient error rather than hanging. Network/HTTP errors propagate to the
     caller's attempt loop.
@@ -150,7 +144,7 @@ def _stream_once(url, filename, desc, total, leave, floor_bytes_per_s,
     chunk = 1024 * 256  # 256 KB reads
     start = time.monotonic()
     probed = False
-    req = urllib.request.Request(url)
+    req = urllib.request.Request(url, headers={'User-Agent': 'curl/8.0'})
     # Write to a temp file alongside the destination and atomically rename into
     # place only on a fully successful read. This way an interrupted download
     # (network drop, Ctrl-C, _TooSlow on the final attempt, process kill) never
@@ -160,7 +154,12 @@ def _stream_once(url, filename, desc, total, leave, floor_bytes_per_s,
     try:
         with urllib.request.urlopen(req, timeout=connect_timeout) as resp, open(tmp, "wb") as out, \
              tqdm(unit='B', unit_scale=True, unit_divisor=1024, miniters=1,
-                  desc=desc, ncols=90, leave=leave, total=total) as bar:
+                  desc=desc, ncols=90, leave=leave, total=None) as bar:
+            cl = resp.headers.get("Content-Length")
+            total = int(cl) if cl else None
+            if total is not None:
+                bar.total = total
+                bar.refresh()
             downloaded = 0
             while True:
                 buf = resp.read(chunk)
