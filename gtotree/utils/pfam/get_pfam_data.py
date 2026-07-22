@@ -16,7 +16,7 @@ import shutil
 import gzip
 import tarfile
 from gtotree.utils.messaging import (wprint, color_text, report_message,
-                                     report_early_exit)
+                                     report_early_exit, spinner)
 from gtotree.utils.general import download_with_tqdm
 
 
@@ -132,8 +132,9 @@ def download_pfam_data(location):
         report_pfam_dl_failure(e)
 
     try:
-        with tarfile.open(tarball_path) as tarball:
-            tarball.extractall(staging_dir)
+        with spinner("Extracting archive...", "Extracted archive"):
+            with tarfile.open(tarball_path) as tarball:
+                tarball.extractall(staging_dir)
     except Exception as e:
         _safe_rmtree(staging_dir)
         _safe_remove(tarball_path)
@@ -149,15 +150,15 @@ def download_pfam_data(location):
                 f"the downloaded archive did not contain the expected {fname}")
 
     # decompress the two .gz files in staging, ready for immediate use
-    print(color_text("    Decompressing...\n", "yellow"))
-    for gz_name, out_name in _DECOMPRESS_PAIRS:
-        gz_path = os.path.join(staging_dir, gz_name)
-        out_path = os.path.join(staging_dir, out_name)
-        try:
-            _gunzip(gz_path, out_path)
-        except Exception as e:
-            _safe_rmtree(staging_dir)
-            report_pfam_dl_failure(f"failed to decompress {gz_name}: {e}")
+    with spinner("Decompressing...", "Decompressed"):
+        for gz_name, out_name in _DECOMPRESS_PAIRS:
+            gz_path = os.path.join(staging_dir, gz_name)
+            out_path = os.path.join(staging_dir, out_name)
+            try:
+                _gunzip(gz_path, out_path)
+            except Exception as e:
+                _safe_rmtree(staging_dir)
+                report_pfam_dl_failure(f"failed to decompress {gz_name}: {e}")
 
     # validate the decompressed files are present and non-empty
     for out_name in (HMM_FILENAME, INFO_FILENAME):

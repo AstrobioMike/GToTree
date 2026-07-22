@@ -1,9 +1,9 @@
 ### TO DO STILL ###
 
-    # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data, "Decompressing" in get-pfam-data, etc.)
-        # maybe add spinners to writing out the gtdb and ncbi tables (--get-table) from the get-accs helpers
-        # spinner when getting/organizing pfams and kos for additional target searching
+    # add my with_spinner() from bit for things like
+        # Gathering genomes needs to be moved inside -- RUN INFO --
         # probably the treeing step, putting it after where it says the log file can be monitored
+            # need to remove one empty line before the bottom border after adding this
 
 
     # build in/port over these from v1 (or make new) as subcommands under gtt
@@ -11,10 +11,6 @@
         # gtt-pfam-search -> gtt search-pfams (should take all input types that gtotree can take, including --wanted-ref-tax)
         # gtt-ko-search -> gtt search-kos (totally new one; should take all input types that gtotree can take, including --wanted-ref-tax))
 
-
-
-    # maybe add a notice and spinner when selecting ref genomes to include (as it happens before the run outputs any info)
-        # probably have this after the -- RUN INFO -- header
 
     # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can auto-pick based on the --wanted-ref-tax for them
         # find lowest rank in the associated taxonomy that has a pre-built SCG-set and use that one
@@ -41,11 +37,6 @@
     # incorporate latest changes from master GToTree
         # gtt-gen-SCG-HMMs has been updated a bit (v1.8.17)
         # check for others via all commits since they split... ... ... (yes, that's worth 3 ellipses)
-
-    # modularize and reduce code redundancy in my user-side standalone scripts like:
-        # gtt-gen-SCG-HMMs (don't forget to include updates made to the v1 GToTree)
-        # gtt-pfam-search (if keeping this, basically dump the v1 standalone script and start re-building from what's available already in v2)
-        # gtt-ko-search (might as well have these, they are convenient if you just want to search for functions using gtotree's input flexibility)
 
 
     # figure out all helper scripts that are no longer needed and remove them

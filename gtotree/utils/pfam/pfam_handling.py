@@ -1,7 +1,7 @@
 import os
 import sys
 from gtotree.utils.general import concat_files
-from gtotree.utils.messaging import wprint, color_text
+from gtotree.utils.messaging import wprint, color_text, spinner
 from gtotree.utils.pfam.get_pfam_data import HMM_FILENAME, INFO_FILENAME
 import pyhmmer  # type: ignore
 
@@ -19,8 +19,8 @@ def _load_pfam_info(info_path):
     """
     Build a lookup from the local pfamA.txt info table.
 
-    Returns a dict keyed by version-less accession (e.g. 'PF00001') mapping to
-    the profile NAME (e.g. '7tm_1'). pfamA.txt is tab-delimited with accession
+    Returns a dict keyed by version-less accession (e.g., 'PF00001') mapping to
+    the profile NAME (e.g., '7tm_1'). pfamA.txt is tab-delimited with accession
     in column 1 and name in column 2.
     """
     acc_to_name = {}
@@ -68,45 +68,47 @@ def get_additional_pfam_targets(run_data):
     found_pfam_targets = []
     found_pfam_paths = []
 
-    # single streaming pass over the master HMM, pulling only wanted profiles
-    with pyhmmer.plan7.HMMFile(master_hmm_path) as hmm_file:
-        for hmm in hmm_file:
-            acc = hmm.accession.decode() if hmm.accession else ""
-            core = acc.split(".")[0]
+    print()
+    with spinner("Collecting Pfam targets...", "", clear_on_done=True):
+        # single streaming pass over the master HMM, pulling only wanted profiles
+        with pyhmmer.plan7.HMMFile(master_hmm_path) as hmm_file:
+            for hmm in hmm_file:
+                acc = hmm.accession.decode() if hmm.accession else ""
+                core = acc.split(".")[0]
 
-            # fall back to matching on NAME if accession isn't set on the profile
-            if core not in wanted_by_core:
-                name = hmm.name.decode() if hmm.name else ""
-                # map a requested name-less acc via the info table's name, if needed
-                core = next((c for c, iid in wanted_by_core.items()
-                             if acc_to_name.get(c) == name), core)
+                # fall back to matching on NAME if accession isn't set on the profile
+                if core not in wanted_by_core:
+                    name = hmm.name.decode() if hmm.name else ""
+                    # map a requested name-less acc via the info table's name, if needed
+                    core = next((c for c, iid in wanted_by_core.items()
+                                 if acc_to_name.get(c) == name), core)
 
-            if core not in wanted_by_core:
-                continue
+                if core not in wanted_by_core:
+                    continue
 
-            input_id = wanted_by_core[core]
-            if pfam_dict[input_id] is not None:
-                continue  # already pulled (guards against dup accessions)
+                input_id = wanted_by_core[core]
+                if pfam_dict[input_id] is not None:
+                    continue  # already pulled (guards against dup accessions)
 
-            out_path = f"{profiles_dir}/{core}.hmm"
-            with open(out_path, "wb") as out_fh:
-                hmm.write(out_fh)
+                out_path = f"{profiles_dir}/{core}.hmm"
+                with open(out_path, "wb") as out_fh:
+                    hmm.write(out_fh)
 
-            pfam_dict[input_id] = acc if acc else core
-            found_pfam_targets.append(core)
-            found_pfam_paths.append(out_path)
+                pfam_dict[input_id] = acc if acc else core
+                found_pfam_targets.append(core)
+                found_pfam_paths.append(out_path)
 
-    failed_pfam_targets = [iid for iid, pulled in pfam_dict.items() if pulled is None]
+        failed_pfam_targets = [iid for iid, pulled in pfam_dict.items() if pulled is None]
 
-    run_data.found_pfam_targets = found_pfam_targets
-    run_data.failed_pfam_targets = failed_pfam_targets
-    run_data.pfam_dict = pfam_dict
+        run_data.found_pfam_targets = found_pfam_targets
+        run_data.failed_pfam_targets = failed_pfam_targets
+        run_data.pfam_dict = pfam_dict
 
-    write_out_failed_pfams(run_data)
-    write_requested_and_pulled_pfams(run_data, pfam_dict)
+        write_out_failed_pfams(run_data)
+        write_requested_and_pulled_pfams(run_data, pfam_dict)
 
-    if found_pfam_paths:
-        concat_files(found_pfam_paths, combined_pfam_hmm_path)
+        if found_pfam_paths:
+            concat_files(found_pfam_paths, combined_pfam_hmm_path)
 
     return run_data
 

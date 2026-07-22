@@ -1,7 +1,7 @@
 import os
 import shutil
 import subprocess
-from gtotree.utils.messaging import report_early_exit, report_notice, color_text
+from gtotree.utils.messaging import report_early_exit, report_notice, color_text, spinner
 from gtotree.utils.helper_scripts.gtt_midpoint_root_tree import midpoint_root_tree
 
 
@@ -20,8 +20,13 @@ def run_tree_building(args, run_data):
     progress at:
         {color_text(log_file, "yellow")}""")
 
-    result = subprocess.run(cmd, shell=True)
-    if result.returncode != 0:
+    try:
+        print()
+        with spinner("Building tree...", "", clear_on_done=True):
+            result = subprocess.run(cmd, shell=True)
+            if result.returncode != 0:
+                raise RuntimeError("tree build failed")
+    except RuntimeError:
         report_early_exit(run_data, "Tree building failed. Please check the log file noted above.")
 
     if args.tree_program == "IQTREE":

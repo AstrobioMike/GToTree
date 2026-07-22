@@ -20,7 +20,8 @@ from gtotree.utils.messaging import (color_text,
                                      few_genomes_notice,
                                      absurd_number_of_genomes_notice,
                                      gtotree_header,
-                                     stdout_and_log)
+                                     stdout_and_log,
+                                     spinner)
 from gtotree.utils.hmms.scg_hmm_setup import check_hmm_file
 from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
@@ -223,9 +224,10 @@ def resolve_wanted_ref_tax(args, run_data):
         return run_data
 
     try:
-        accessions, selection = resolve_wanted_ref_tax_accessions(
-            args.source, args.wanted_ref_tax,
-            target_rank=args.target_rank, derep_rank=args.derep_rank)
+        with spinner("Gathering references...", "", clear_on_done=True):
+            accessions, selection = resolve_wanted_ref_tax_accessions(
+                args.source, args.wanted_ref_tax,
+                target_rank=args.target_rank, derep_rank=args.derep_rank)
     except AmbiguousTaxon:
         report_message(f"Since the `-W` taxon '{args.wanted_ref_tax}' occurs at more than "
                        "1 rank, you'll need to specify which rank is wanted with "

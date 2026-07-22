@@ -4,6 +4,8 @@ import time
 import re
 import contextlib
 import shutil
+import itertools
+import threading
 from datetime import datetime
 from importlib.metadata import version
 from gtotree.utils.context import log_file_var
@@ -80,6 +82,86 @@ class Tee:
         if self.files and hasattr(self.files[0], "isatty"):
             return self.files[0].isatty()
         return False
+
+
+def _real_terminal_stream():
+    """
+    Return the underlying real terminal stream to animate the spinner on, or
+    None if there isn't one.
+
+    During a GToTree run stdout/stderr are `Tee`s that mirror everything into
+    `gtotree-runlog.txt`. We do not want the per-frame carriage-return redraws
+    written to that log file, so the animation is sent to the real terminal
+    directly (unwrapping the Tee to find it). If nothing in the chain is an
+    interactive tty, we animate nowhere -- the final line still prints normally.
+    """
+    stream = sys.stderr
+    if isinstance(stream, Tee):
+        for f in stream.files:
+            if hasattr(f, "isatty") and f.isatty():
+                return f
+        return None
+    if hasattr(stream, "isatty") and stream.isatty():
+        return stream
+    return None
+
+
+@contextlib.contextmanager
+def spinner(in_progress_msg, complete_msg, indent="    ", clear_on_done=False):  # pragma: no cover
+    """
+    Show a spinner while a block runs, then print a single completion line.
+
+    Ported from bit's `spinner`, adapted for GToTree's logging: the animated
+    frames are written straight to the real terminal (never the run log), while
+    the final `✔ complete_msg` line goes through the normal stream so it lands
+    in the log too. Elapsed time is appended only if the block took >= 60 s.
+
+    Usage:
+        with spinner("Gathering references...", "References gathered"):
+            ...work...
+    """
+    done = threading.Event()
+    term = _real_terminal_stream()
+
+    def spin():
+        if term is None:
+            done.wait()
+            return
+        for char in itertools.cycle("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"):
+            if done.is_set():
+                break
+            term.write(f"\r{indent}{char} {in_progress_msg}")
+            term.flush()
+            time.sleep(0.1)
+        # clear the animated line so the completion line (or an error) starts clean
+        term.write("\r" + " " * (len(indent) + len(in_progress_msg) + 4) + "\r")
+        term.flush()
+
+    t = threading.Thread(target=spin)
+    t.start()
+    start_time = time.monotonic()
+    failed = False
+    try:
+        yield
+    except BaseException:
+        failed = True
+        raise
+    finally:
+        done.set()
+        t.join()
+        # only announce completion on success; on failure the caller's own
+        # error/exit message takes over on a freshly-cleared line. When
+        # clear_on_done is set, the line has already been wiped and we print
+        # nothing further, leaving the cursor on a clean line.
+        if not failed and not clear_on_done:
+            elapsed = time.monotonic() - start_time
+            if elapsed >= 60:
+                mins, secs = divmod(int(elapsed), 60)
+                time_str = f" (took ~{mins} min and {secs} sec)"
+            else:
+                time_str = ""
+            # final line goes through the normal stream so the run log records it
+            print(f"{indent}✔ {complete_msg}{time_str}", flush=True)
 
 
 def capture_stdout_to_log(log_file):

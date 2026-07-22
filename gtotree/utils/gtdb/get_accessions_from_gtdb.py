@@ -5,7 +5,7 @@ import pyarrow.compute as pc # type: ignore
 import pyarrow.parquet as pq # type: ignore
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
-from gtotree.utils.messaging import wprint, color_text, report_message
+from gtotree.utils.messaging import wprint, color_text, report_message, spinner
 from gtotree.utils.gtdb.get_gtdb_data import (get_gtdb_data, gtdb_data_table_path,
                                               report_gtdb_version_info as _read_gtdb_version_info)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
@@ -457,15 +457,16 @@ def _report_gtdb_version(gtdb_path):
 
 def copy_gtdb_table(gtdb_path):
     """
-    Materialize the full GTDB metadata table (all columns in the asset) to the current
-    directory as a TSV -- the `--get-table` escape hatch.
+    Write the full GTDB metadata table (all columns in the asset) to the current
+    directory as a tsv
     """
     _report_gtdb_version(gtdb_path)
     out_name = "gtdb-arc-and-bac-metadata.tsv"
-    pq.read_table(gtdb_path).to_pandas().to_csv(out_name, sep="\t", index=False)
     print("")
-    wprint("GTDB table written to:")
-    print(color_text("    " + out_name + "\n"))
+    with spinner("Writing GTDB table...", "", clear_on_done=True):
+        pq.read_table(gtdb_path).to_pandas().to_csv(out_name, sep="\t", index=False)
+    wprint("  GTDB table written to:")
+    print(color_text("      " + out_name + "\n"))
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ import os
 import shutil
 import tarfile
 from gtotree.utils.messaging import (wprint, color_text, report_message,
-                                     report_early_exit)
+                                     report_early_exit, spinner)
 from gtotree.utils.general import download_with_tqdm
 
 
@@ -116,13 +116,10 @@ def download_kofamscan_data(location):
         _safe_remove(tarball_path)
         report_kofam_dl_failure(e)
 
-    # extract the OUTER archive into staging
-
-    print(color_text("    Extracting...\n", "yellow"))
-
     try:
-        with tarfile.open(tarball_path) as tarball:
-            tarball.extractall(staging_dir)
+        with spinner("Extracting archive...", "Extracted archive"):
+            with tarfile.open(tarball_path) as tarball:
+                tarball.extractall(staging_dir)
     except Exception as e:
         _safe_rmtree(staging_dir)
         _safe_remove(tarball_path)
@@ -130,17 +127,15 @@ def download_kofamscan_data(location):
 
     os.remove(tarball_path)
 
-    # extract the INNER profiles.tar.gz (shipped compressed) into staging,
-    # producing profiles/. Remove the inner tarball once extracted so it
-    # doesn't get moved into the final data dir.
     inner_profiles_tar = os.path.join(staging_dir, PROFILES_TARBALL)
     if not os.path.isfile(inner_profiles_tar):
         _safe_rmtree(staging_dir)
         report_kofam_dl_failure(
             f"the downloaded archive did not contain {PROFILES_TARBALL}")
     try:
-        with tarfile.open(inner_profiles_tar) as profiles_tar:
-            profiles_tar.extractall(staging_dir)
+        with spinner("Decompressing profiles...", "Decompressed profiles"):
+            with tarfile.open(inner_profiles_tar) as profiles_tar:
+                profiles_tar.extractall(staging_dir)
     except Exception as e:
         _safe_rmtree(staging_dir)
         report_kofam_dl_failure(f"failed to extract {PROFILES_TARBALL}: {e}")

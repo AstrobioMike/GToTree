@@ -5,7 +5,7 @@ from collections import namedtuple
 import pyarrow.compute as pc # type: ignore
 import pyarrow.parquet as pq # type: ignore
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
-from gtotree.utils.messaging import report_message, wprint, color_text
+from gtotree.utils.messaging import report_message, wprint, color_text, spinner
 from gtotree.utils.ncbi.get_ncbi_assembly_data import (get_ncbi_assembly_data,
                                                        ncbi_data_table_path,
                                                        read_date_retrieved)
@@ -490,10 +490,11 @@ def _report_ncbi_date(table_path):
 
 def copy_ncbi_table(table_path):
     out_name = "ncbi-assembly-summary-metadata.tsv"
-    pq.read_table(table_path).to_pandas().to_csv(out_name, sep="\t", index=False)
     print("")
-    wprint("NCBI table written to:")
-    print(color_text("    " + out_name + "\n"))
+    with spinner("Writing NCBI table...", "", clear_on_done=True):
+        pq.read_table(table_path).to_pandas().to_csv(out_name, sep="\t", index=False)
+    wprint("  NCBI table written to:")
+    print(color_text("      " + out_name + "\n"))
 
 
 def _write_outputs(rows, args, selection):
