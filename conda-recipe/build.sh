@@ -47,3 +47,7 @@ fi
 
 # running pip install of gtotree
 "${PYTHON}" -m pip install . --no-deps --ignore-installed -vv
+
+# copying over the gtt tab-completion script (registers argcomplete for `gtt`)
+mkdir -p ${PREFIX}/etc/conda/activate.d/
+cp ${RECIPE_DIR}/gtotree-tab-completion.sh ${PREFIX}/etc/conda/activate.d/

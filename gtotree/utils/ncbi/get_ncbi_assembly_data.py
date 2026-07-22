@@ -13,7 +13,6 @@ import os
 import socket
 import urllib
 import urllib.error
-import argparse
 
 from gtotree.utils.messaging import (wprint, color_text, report_message,
                                      report_early_exit)
@@ -27,26 +26,6 @@ DATE_FILENAME = "date-retrieved.txt"
 
 NCBI_DATA_URL = f"{_RELEASE_BASE}/{PARQUET_FILENAME}"
 NCBI_DATE_URL = f"{_RELEASE_BASE}/{DATE_FILENAME}"
-
-
-################################################################################
-
-def main():
-
-    parser = argparse.ArgumentParser(
-        description="Setup the NCBI assembly summary table",
-        epilog="Ex. usage: gtt-get-ncbi-assembly-data")
-
-    parser.add_argument("-f", "--force-update",
-                        help="Re-download the prepared assembly-info table even if it "
-                             "is already present",
-                        action="store_true")
-
-    args = parser.parse_args()
-
-    get_ncbi_assembly_data(force_update=args.force_update)
-
-################################################################################
 
 
 def get_ncbi_assembly_data(force_update=False):
@@ -66,7 +45,7 @@ def check_ncbi_assembly_info_location_var_is_set():
         ncbi_assembly_data_dir = os.environ['NCBI_ASSEMBLY_DATA_DIR']
     except KeyError:
         wprint(color_text("The environment variable 'NCBI_ASSEMBLY_DATA_DIR' does not seem to be set :(", "yellow"))
-        wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
+        wprint("This shouldn't happen, check on things with `gtt data locations check`.")
         print("")
         sys.exit(0)
 
@@ -122,7 +101,7 @@ def report_ncbi_unavailable(err):
     print(f"        {color_text(NCBI_DATA_URL)}")
     print(f"        {color_text(NCBI_DATE_URL)}")
     report_message(f"and placed (as '{PARQUET_FILENAME}' and '{DATE_FILENAME}') in the "
-                   "directory shown by `gtt-data-locations check`.", color=None,
+                   "directory shown by `gtt data locations check`.", color=None,
                    ii="    ", si="    ")
     print("")
     report_early_exit(None, copy_log=False)
@@ -212,6 +191,3 @@ def read_date_retrieved(location):
     except (ValueError, TypeError):
         return stamp
 
-
-if __name__ == "__main__":
-    main()

@@ -2,12 +2,45 @@
 
 import os
 import sys
+import argparse
+from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.messaging import color_text, report_message
 from gtotree.utils.hmms.scg_hmm_setup import (check_hmm_location_var_is_set,
                                               read_in_hmm_summary_table)
 
 
+def build_parser(parent_subparsers=None):
+
+    desc = ("This program lists the pre-packaged HMM SCG-sets available in GToTree. "
+            "See github.com/AstrobioMike/GToTree/wiki/SCG-sets for more info.")
+
+    if parent_subparsers is not None:
+        parser = parent_subparsers.add_parser(
+            "hmms",
+            description=desc,
+            formatter_class=CustomRichHelpFormatter,
+            add_help=False,
+        )
+    else:
+        parser = argparse.ArgumentParser(
+            description=desc,
+            epilog="Ex. usage: `gtt hmms`",
+            formatter_class=CustomRichHelpFormatter,
+            add_help=False,
+        )
+
+    optional = parser.add_argument_group("Optional Parameters")
+    add_help(optional)
+    add_version_arg(optional)
+
+    return parser
+
+
 def main():
+
+    parser = build_parser()
+    parser.parse_args()
+
     print(color_text("\n                   GToTree pre-packaged HMM SCG-sets", "yellow"))
     print("   See github.com/AstrobioMike/GToTree/wiki/SCG-sets for more info\n")
 
@@ -26,7 +59,7 @@ def get_writable_hmm_dir():
         except OSError:
             report_message(
                 "The 'GToTree_HMM_dir' location does not exist and can't be "
-                "created :( Use `gtt-data-locations check` to check and configure.",
+                "created :( Use `gtt data locations check` and `gtt data locations set` to check and configure.",
                 "yellow",
             )
             sys.exit(1)
@@ -34,7 +67,7 @@ def get_writable_hmm_dir():
     if not os.access(hmm_data_dir, os.W_OK):
         report_message(
             "The 'GToTree_HMM_dir' location is not writable for you :( "
-            "Use `gtt-data-locations check` to check and configure.",
+            "Use `gtt data locations check` and `gtt data locations set` to check and configure.",
             "yellow",
         )
         sys.exit(1)

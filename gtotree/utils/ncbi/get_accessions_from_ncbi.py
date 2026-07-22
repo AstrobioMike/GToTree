@@ -4,6 +4,7 @@ import argparse
 from collections import namedtuple
 import pyarrow.compute as pc # type: ignore
 import pyarrow.parquet as pq # type: ignore
+from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.messaging import report_message, wprint, color_text
 from gtotree.utils.ncbi.get_ncbi_assembly_data import (get_ncbi_assembly_data,
                                                        ncbi_data_table_path,
@@ -34,22 +35,32 @@ _NcbiSelection = namedtuple("_NcbiSelection", ["rows", "label", "rank", "taxon"]
 
 ################################################################################
 
-def main():
-    args = parse_args()
-    get_accessions_from_ncbi(args)
+def build_parser(parent_subparsers=None):
 
+    desc = ("This is a helper program to facilitate using taxonomy and genomes "
+            "from NCBI with GToTree. It primarily returns NCBI accessions and "
+            "metadata subsets based on NCBI-taxonomy searches, with optional "
+            "filtering by source (RefSeq/GenBank), assembly level, and/or RefSeq 'reference' genomes "
+            "only, plus optional dereplication down to one genome per specified rank.")
 
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(
+    if parent_subparsers is not None:
+        parser = parent_subparsers.add_parser(
+            "get-accs-from-ncbi",
+            description=desc,
+            formatter_class=CustomRichHelpFormatter,
+            add_help=False,
+        )
+    else:
+        parser = argparse.ArgumentParser(
+            description=desc,
+            epilog="Ex. usage: `gtt get-accs-from-ncbi -t Nitrospirota --source refseq`",
+            formatter_class=CustomRichHelpFormatter,
+            add_help=False,
+        )
 
-        description="This is a helper program to facilitate using taxonomy and genomes "
-                    "from NCBI with GToTree. It primarily returns NCBI accessions and "
-                    "metadata subsets based on NCBI-taxonomy searches, with optional "
-                    "filtering, by source (RefSeq/GenBank), assembly level, and/or RefSeq 'reference' genomes "
-                    "only, plus optional dereplication down to one genome per rank.",
-        epilog="Ex. usage: gtt-get-accs-from-ncbi -t Nitrospirota --source refseq\n")
+    optional = parser.add_argument_group("Optional Parameters")
 
-    parser.add_argument(
+    optional.add_argument(
         "-t",
         "--target-taxon",
         metavar="<STR>",
@@ -58,7 +69,7 @@ def parse_args(argv=None):
         action="store",
     )
 
-    parser.add_argument(
+    optional.add_argument(
         "-r",
         "--target-rank",
         metavar="<STR>",
@@ -67,7 +78,7 @@ def parse_args(argv=None):
         action="store",
     )
 
-    parser.add_argument(
+    optional.add_argument(
         "--derep-rank",
         metavar="<STR>",
         default="off",
@@ -79,7 +90,7 @@ def parse_args(argv=None):
         action="store",
     )
 
-    parser.add_argument(
+    optional.add_argument(
         "-s",
         "--source",
         metavar="<STR>",
@@ -90,7 +101,7 @@ def parse_args(argv=None):
         action="store",
     )
 
-    parser.add_argument(
+    optional.add_argument(
         "-a",
         "--assembly-level",
         metavar="<STR>",
@@ -99,7 +110,7 @@ def parse_args(argv=None):
         action="store",
     )
 
-    parser.add_argument(
+    optional.add_argument(
         "-R",
         "--refseq-reference-genomes-only",
         dest="refseq_reference_genomes_only",
@@ -107,33 +118,43 @@ def parse_args(argv=None):
         help=("Pull only genomes designated as RefSeq reference genomes."),
     )
 
-    parser.add_argument(
+    optional.add_argument(
         "--get-taxon-counts",
         action="store_true",
         help=("Provide this flag along with a specified taxon to `-t` to see how many "
               "genomes match the set parameters (excluding --derep-rank)"),
     )
 
-    parser.add_argument(
+    optional.add_argument(
         "--get-rank-counts",
         action="store_true",
         help=("Provide just this flag alone to see counts of how many unique taxa there "
               "are for each rank."),
     )
 
-    parser.add_argument(
+    optional.add_argument(
         "--get-table",
         action="store_true",
         help=("Provide just this flag alone to write out a tsv of GToTree's "
               "NCBI assembly-summary metadata table."),
     )
 
-    argv = sys.argv[1:] if argv is None else argv
-    if not argv:
+    add_help(optional)
+    add_version_arg(optional)
+
+    return parser
+
+
+def main():
+
+    parser = build_parser()
+
+    if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(0)
 
-    return parser.parse_args(argv)
+    args = parser.parse_args()
+    get_accessions_from_ncbi(args)
 
 ################################################################################
 

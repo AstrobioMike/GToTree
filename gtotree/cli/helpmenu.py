@@ -24,7 +24,7 @@ helpmenu += f"""
       2)  [{color_text("-H <file>", "teal", bold = True)}] location of the uncompressed target SCGs HMM file being
                       used, or just the HMM name if the 'GToTree_HMM_dir'
                       environment variable is set (which is typically handled
-                      by the conda installation), run 'gtt-hmms' to view
+                      by the conda installation), run 'gtt hmms' to view
                       available gene-sets
 
 
@@ -87,7 +87,7 @@ helpmenu += f"""
                   (passed to the `-a` parameter) that are in the GTDB. See the
                   `-L` argument for specifying desired ranks.
 
-                  Note: You can use `gtt-get-accessions-from-GTDB` to get
+                  Note: You can use `gtt get-accs-from-gtdb` to get
                   input NCBI accessions based on GTDB taxonomy searches.
 
         - [{color_text("-t | --add-ncbi-tax", "teal", bold = True)}] add NCBI taxonomy; default: false

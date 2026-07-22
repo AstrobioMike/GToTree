@@ -14,7 +14,6 @@ problems that block many institutional / cluster networks.
 
 import sys
 import os
-import argparse
 import shutil
 import tarfile
 from gtotree.utils.messaging import (wprint, color_text, report_message,
@@ -40,27 +39,6 @@ PROFILES_TARBALL = "profiles.tar.gz"
 DATE_FILENAME = "date-retrieved.txt"
 
 
-################################################################################
-
-def main():
-
-    parser = argparse.ArgumentParser(
-        description="Setup the KOFamScan data",
-        epilog="Example usage: gtt-get-kofamscan-data"
-    )
-
-    parser.add_argument("-f", "--force-update",
-                        help="Re-download the KOFamScan data even if it is already "
-                             "present",
-                        action="store_true")
-
-    args = parser.parse_args()
-
-    get_kofamscan_data(force_update=args.force_update)
-
-################################################################################
-
-
 def check_location_var_is_set():
     """
     Ensure that the environment variable 'KO_data_dir' is set.
@@ -70,7 +48,7 @@ def check_location_var_is_set():
         ko_data_dir = os.environ['KO_data_dir']
     except KeyError:
         wprint(color_text("The environment variable 'KO_data_dir' does not seem to be set :(", "red"))
-        wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
+        wprint("This shouldn't happen, check on things with `gtt data locations check`.")
         sys.exit(1)
     return ko_data_dir
 
@@ -220,6 +198,3 @@ def get_kofamscan_data(force_update=False):
     print(color_text("\n    Downloading required KO data (only needs to be done once)...\n", "yellow"))
     download_kofamscan_data(ko_data_dir)
 
-
-if __name__ == "__main__":
-    main()

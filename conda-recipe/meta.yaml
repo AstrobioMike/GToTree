@@ -17,6 +17,7 @@ requirements:
     - tar
 
   run:
+    - argcomplete =3.6
     - bc
     - biopython
     - coreutils =9.1
@@ -39,6 +40,8 @@ requirements:
     - python ={{ py }}
     - pytest
     - pytest-cov
+    - rich
+    - rich-argparse
     - requests =2.34
     - sed
     - snakemake =8.30.0

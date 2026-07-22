@@ -94,7 +94,7 @@ def check_for_minimum_args(args):
         report_very_early_exit(suggest_help=True)
     if not args.hmm:
         report_message("You need to specify the HMM file of the target-SCGs you want to tree! "
-                       "You can view the available gene-sets packaged with GToTree by running `gtt-hmms`.")
+                       "You can view the available gene-sets packaged with GToTree by running `gtt hmms`.")
         report_very_early_exit(suggest_help=True)
 
 

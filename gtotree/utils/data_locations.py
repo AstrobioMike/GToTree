@@ -2,7 +2,6 @@
 
 import sys
 import os
-import argparse
 import shutil
 from gtotree.utils.messaging import report_message, color_text, wprint
 
@@ -21,36 +20,6 @@ class PathNotWritable(Exception):
 
 class PathNotAbsolute(Exception):
     pass
-
-
-def main():
-    args = parse_args()
-
-    if args.task == "check":
-        check_and_report_env_variables()
-
-    elif args.task == "set":
-        paths_dict = set_env_variables()
-        modify_conda_activate_startup_script(paths_dict)
-        notify_to_reactivate_conda()
-
-
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(
-        description="Helper program to check and set GToTree database environment variables.",
-        epilog="Ex. usage: gtt-data-locations check\n",
-    )
-    parser.add_argument(
-        "task", choices=["check", "set"],
-        help="check or set database environment variables",
-    )
-
-    argv = sys.argv[1:] if argv is None else argv
-    if not argv:
-        parser.print_help(sys.stderr)
-        sys.exit(0)
-
-    return parser.parse_args(argv)
 
 
 ### check ###
@@ -77,7 +46,7 @@ def check_and_report_env_variables():
             report_message(
                 "The path set for the '" + variable + "' variable is not writable. "
                 "This may cause problems, so you might want to put it somewhere else "
-                "(with `gtt-data-locations set`).",
+                "(with `gtt data locations set`).",
                 "red",
             )
             print()
@@ -92,7 +61,7 @@ def check_location_var_is_set_and_writable(variable):
             "The environment variable '" + variable + "' does not seem to be set :(",
             "yellow",
         )
-        wprint("Try to set it with `gtt-data-locations set`.")
+        wprint("Try to set it with `gtt data locations set`.")
         print()
         sys.exit(1)
 
@@ -255,10 +224,6 @@ def notify_to_reactivate_conda():
         "yellow",
     )
     print(f"\n        `conda deactivate && conda activate {curr_conda_name}`\n")
-    wprint("Then you can double-check with `gtt-data-locations check`.")
+    wprint("Then you can double-check with `gtt data locations check`.")
     print(color_text("  " + "-" * 80, "green"))
     print(color_text("  " + "-" * 80 + "\n", "green"))
-
-
-if __name__ == "__main__":
-    main()

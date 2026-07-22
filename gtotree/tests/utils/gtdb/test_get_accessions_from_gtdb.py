@@ -84,14 +84,14 @@ def _read_accs(pattern):
 
 def test_plain_taxon_pull_derep_off(in_gtdb):
     _run(_args(target_taxon="Testophyla"))
-    accs = _read_accs("GTDB-Testophyla-phylum-accs.txt")
+    accs = _read_accs("gtdb-testophyla-phylum-accs.txt")
     assert len(accs) == 4  # all 4 genomes
-    assert os.path.exists("GTDB-Testophyla-phylum-metadata.tsv")
+    assert os.path.exists("gtdb-testophyla-phylum-metadata.tsv")
 
 
 def test_derep_by_class_keeps_one_per_class(in_gtdb):
     _run(_args(target_taxon="Testophyla", derep_rank="class"))
-    accs = _read_accs("GTDB-Testophyla-phylum-accs.txt")
+    accs = _read_accs("gtdb-testophyla-phylum-accs.txt")
     assert len(accs) == 2  # one best per class (ClassA, ClassB)
     # ClassA's best by quality is the 99.0-complete GCA_000000001.1
     assert "GCA_000000001.1" in accs
@@ -99,7 +99,7 @@ def test_derep_by_class_keeps_one_per_class(in_gtdb):
 
 def test_gtdb_representatives_only_filters(in_gtdb):
     _run(_args(target_taxon="Testophyla", gtdb_representatives_only=True))
-    accs = _read_accs("GTDB-Testophyla-phylum-GTDB-rep-accs.txt")
+    accs = _read_accs("gtdb-testophyla-phylum-gtdb-rep-accs.txt")
     # GCA_000000004.1 has gtdb_representative="f" -> excluded
     assert "GCA_000000004.1" not in accs
     assert len(accs) == 3
@@ -107,7 +107,7 @@ def test_gtdb_representatives_only_filters(in_gtdb):
 
 def test_all_taxon_bulk_dump(in_gtdb):
     _run(_args(target_taxon="all"))
-    accs = _read_accs("GTDB-arc-and-bac-accs.txt")
+    accs = _read_accs("gtdb-arc-and-bac-accs.txt")
     assert len(accs) == 4
 
 

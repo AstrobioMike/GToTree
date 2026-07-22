@@ -14,7 +14,6 @@ own columns
 import sys
 import os
 import socket
-import argparse
 import urllib
 import urllib.error
 
@@ -34,22 +33,6 @@ VERSION_FILENAME = "VERSION.txt"
 GTDB_DATA_URL = f"{_RELEASE_BASE}/{PARQUET_FILENAME}"
 GTDB_VERSION_URL = f"{_RELEASE_BASE}/{VERSION_FILENAME}"
 
-
-################################################################################
-
-def main():
-
-    parser = argparse.ArgumentParser(
-        description="Setup the GTDB data")
-
-    parser.add_argument("-f", "--force-update",
-                        help="Re-download the prepared GTDB table even if it is "
-                             "already present",
-                        action="store_true")
-
-    args = parser.parse_args()
-
-    get_gtdb_data(force_update=args.force_update)
 
 ################################################################################
 
@@ -73,7 +56,7 @@ def check_gtdb_location_var_is_set():
         gtdb_data_dir = os.environ['GTDB_DIR']
     except KeyError:
         wprint(color_text("The environment variable 'GTDB_DIR' does not seem to be set :(", "red"))
-        wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
+        wprint("This shouldn't happen, check on things with `gtt data locations check`.")
         sys.exit(1)
     return gtdb_data_dir
 
@@ -118,7 +101,7 @@ def report_gtdb_unreachable(err):
     print(f"        {color_text(GTDB_DATA_URL)}")
     print(f"        {color_text(GTDB_VERSION_URL)}")
     report_message(f"and placed (as '{PARQUET_FILENAME}' and '{VERSION_FILENAME}') in the "
-                   "directory shown by `gtt-data-locations check`.", color=None,
+                   "directory shown by `gtt data locations check`.", color=None,
                    ii="    ", si="    ")
     print("")
     report_early_exit(None, copy_log=False)
@@ -205,6 +188,3 @@ def report_gtdb_version_info(location):
                 version_info.append(line)
     return version_info[0], version_info[1]
 
-
-if __name__ == "__main__":
-    main()

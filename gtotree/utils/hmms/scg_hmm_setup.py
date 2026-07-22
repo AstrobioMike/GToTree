@@ -46,7 +46,7 @@ def check_hmm_location_var_is_set():
         hmm_data_dir = os.environ['GToTree_HMM_dir']
     except KeyError:
         wprint(color_text("The environment variable 'GToTree_HMM_dir' does not seem to be set :(", "red"))
-        wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
+        wprint("This shouldn't happen, check on things with `gtt data locations check`.")
         sys.exit(1)
     return hmm_data_dir
 
@@ -79,7 +79,7 @@ def get_target_hmm_url(hmm_file, hmm_arg):
         target_hmm_url = df.loc[df['file'] == hmm_file, 'link'].values[0]
     except IndexError:
         report_message(f"You specified \"{hmm_arg}\" as the HMM file to use, but that file can't be found.", "red")
-        report_message("You can see the available gene-sets packaged with GToTree by running `gtt-hmms`.")
+        report_message("You can see the available gene-sets packaged with GToTree by running `gtt hmms`.")
         report_early_exit(None, copy_log = False)
     return target_hmm_url
 

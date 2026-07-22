@@ -12,7 +12,6 @@ fixed release asset.
 
 import sys
 import os
-import argparse
 import shutil
 import gzip
 import tarfile
@@ -45,26 +44,6 @@ _DECOMPRESS_PAIRS = ((HMM_GZ_FILENAME, HMM_FILENAME),
                      (INFO_GZ_FILENAME, INFO_FILENAME))
 
 
-################################################################################
-
-def main():
-
-    parser = argparse.ArgumentParser(
-        description="Setup the Pfam data",
-        epilog="Example usage: gtt-get-pfam-data"
-    )
-
-    parser.add_argument("-f", "--force-update",
-                        help="Re-download the Pfam data even if it is already present",
-                        action="store_true")
-
-    args = parser.parse_args()
-
-    get_pfam_data(force_update=args.force_update)
-
-################################################################################
-
-
 def check_location_var_is_set():
     """
     Ensure that the environment variable 'Pfam_data_dir' is set.
@@ -74,7 +53,7 @@ def check_location_var_is_set():
         pfam_data_dir = os.environ['Pfam_data_dir']
     except KeyError:
         wprint(color_text("The environment variable 'Pfam_data_dir' does not seem to be set :(", "red"))
-        wprint("This shouldn't happen, check on things with `gtt-data-locations check`.")
+        wprint("This shouldn't happen, check on things with `gtt data locations check`.")
         sys.exit(1)
     return pfam_data_dir
 
@@ -239,6 +218,3 @@ def _report_version(location):
     if version:
         print(color_text(f"\n    Pfam version: {version}\n", "yellow"))
 
-
-if __name__ == "__main__":
-    main()

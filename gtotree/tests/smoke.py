@@ -1,3 +1,4 @@
+import argparse
 import json
 import shutil
 import sys
@@ -5,6 +6,7 @@ from contextlib import ExitStack
 from importlib import resources
 from pathlib import Path
 
+from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.cli.parser import parser
 from gtotree.main import main as run_gtotree
 from gtotree.utils.messaging import report_message, color_text
@@ -70,7 +72,42 @@ def _cleanup(cwd, output_dir):
         shutil.rmtree(output_dir, ignore_errors=True)
 
 
-def main(argv=None):
+def build_parser(parent_subparsers=None):
+
+    desc = ("This program runs an end-to-end smoke test of the installed GToTree "
+            "environment against bundled mock amino-acid files and a mock HMM, "
+            "verifying a tree is produced. It takes no arguments.")
+
+    if parent_subparsers is not None:
+        parser_ = parent_subparsers.add_parser(
+            "test",
+            description=desc,
+            formatter_class=CustomRichHelpFormatter,
+            add_help=False,
+        )
+    else:
+        parser_ = argparse.ArgumentParser(
+            description=desc,
+            epilog="Ex. usage: `gtt test`",
+            formatter_class=CustomRichHelpFormatter,
+            add_help=False,
+        )
+
+    optional = parser_.add_argument_group("Optional Parameters")
+    add_help(optional)
+    add_version_arg(optional)
+
+    return parser_
+
+
+def main():
+    # parse (handles -h/-v via the shared help machinery); the smoke test itself
+    # takes no arguments, so anything parsed is discarded
+    build_parser().parse_args()
+    sys.exit(run_smoke_test())
+
+
+def run_smoke_test(argv=None):
     cwd = Path.cwd()
     listing = cwd / LISTING_NAME
     output_dir = cwd / OUTPUT_NAME
@@ -124,4 +161,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run_smoke_test())
