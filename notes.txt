@@ -28,6 +28,7 @@
     # modularize and reduce code redundancy in my user-side standalone scripts like:
         # gtt-gen-SCG-HMMs (don't forget to include updates made to the v1 GToTree)
         # gtt-pfam-search (if keeping this, basically dump the v1 standalone script and start re-building from what's available already in v2)
+        # gtt-ko-search (might as well have these, they are convenient if you just want to search for functions using gtotree's input flexibility)
 
 
     # figure out all helper scripts that are no longer needed and remove them
@@ -52,14 +53,6 @@
     # create new SCG-sets for all main phyla (and proteos/pseudomonadota) of gtdb (and archaea/bacteria)
         # continue hosting them as github assets
         # make an organized output for gtt-hmms that breaks done by domain for easier reading and selection
-
-    # switch to only using http when available
-        # affects:
-            # get_ncbi_assembly_tables.py (DONE)
-            # ncbi assembly downloads (DONE)
-            # kofamscan data is only available via ftp (maybe host this somewhere else for GToTree; if it rarely changes)
-                # looks like it does update regularly, i might just have to catch and report when this download fails and say it might be because it's only available via ftp
-                # maybe it's small enough i can github asset this too? Then i could have it auto-update in there every so often like ncbi assembly summaries
 
     # still need to implement nucleotide mode?
 

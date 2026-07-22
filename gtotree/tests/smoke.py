@@ -75,8 +75,7 @@ def _cleanup(cwd, output_dir):
 def build_parser(parent_subparsers=None):
 
     desc = ("This program runs an end-to-end smoke test of the installed GToTree "
-            "environment against bundled mock amino-acid files and a mock HMM, "
-            "verifying a tree is produced. It takes no arguments.")
+            "environment against bundled mock amino-acid files and a mock HMM.")
 
     if parent_subparsers is not None:
         parser_ = parent_subparsers.add_parser(
