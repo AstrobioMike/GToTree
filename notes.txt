@@ -4,21 +4,32 @@
 
 ### TO DO STILL ###
 
+    # major speedups with dropping snakemake for some stages (downlaod/accession preprocessing, SCG-searching, KO/PFam-searching)
+        # consider other ones to i maybe should dump snakemake, like maybe filtering stages
+
+    # build in/port over these from v1 (or make new) as subcommands under gtt
+        # gtt-gen-scg-hmms from v1 and make it a subcommand under gtt
+        # gtt-pfam-search -> gtt search-pfams (should take all input types that gtotree can take, including --wanted-ref-tax)
+        # gtt-ko-search -> gtt search-kos (totally new one; should take all input types that gtotree can take, including --wanted-ref-tax))
+
+
     # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data, "Decompressing" in get-pfam-data, etc.)
         # maybe add spinners to writing out the gtdb and ncbi tables (--get-table) from the get-accs helpers
+        # spinner when getting/organizing pfams and kos for additional target searching
 
     # maybe add a notice and spinner when selecting ref genomes to include (as it happens before the run outputs any info)
-        # probably have this after -- RUN INFO -- header
+        # probably have this after the -- RUN INFO -- header
 
-    # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can pick based on the --wanted-ref-tax for them
+    # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can auto-pick based on the --wanted-ref-tax for them
 
     # consider richargparse for the main gtotree parser, instead of my manual one that i've stuck to for legacy reasons...
+        # either way, make a condensed standard help and a --show-detailed-help for the full help (so it's less overwhelming at first glance)
 
     # pursue faster and better handling of reading and writing my run_data object when passing around to/from snakemake calls
 
-    # maybe have a check when the user provides an additional-ko-targets file (-K) that they start with K
+    # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
         # same for pfam, that they start with PF
-        # also, see how it handles if a target KO isn't found
+        # also, doublecheck how it handles if a target KO/PFam isn't found
 
 
     # still need to implement iToL-file generation for both pfam and ko searching results
@@ -32,7 +43,6 @@
 
     # incorporate latest changes from master GToTree
         # gtt-gen-SCG-HMMs has been updated a bit (v1.8.17)
-        # bit's way of downloading assemblies with increased robustness (maybe even drop snakemake for that phase?)
         # check for others via all commits since they split... ... ... (yes, that's worth 3 ellipses)
 
     # modularize and reduce code redundancy in my user-side standalone scripts like:
@@ -86,18 +96,11 @@
     # think about bioconda recipe, that will probably still need to be maintained separately from the conda-recipe in this repo
     # revisit all pages on the gtotree wiki and update them as needed
     # made the CHANGELOG.md (and release notes) really comprehensive about the v1 to v2 changes, and put a link to the initial release notes somewhere on the wiki maybe
+    # make sure itol files honor any swapped labels appropriately so they match the final tree
+
+    ### TEST ALL FUNCTIONALITY ###
 
 
-# example tests
-rm -rf gtotree-output/ ; gtotree -a ncbi-accessions.txt -H Universal
-
-gtotree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -t -P
-
-GToTree -a ncbi_accessions.txt -g genbank_files.txt -A amino_acid_files.txt -f fasta_files.txt -H Universal -j 4 -t -P -F
-
-gtotree -a ncbi_accessions.txt -g GToTree-test-data/genbank_files.txt -f GToTree-test-data/fasta_files.txt -A GToTree-test-data/amino_acid_files.txt -t -P
-
-gtotree -a problem-accs.txt -o new-problem-accs -H Universal -d -G 0.1 -r 0.3 -F
 
 cat problem-accs.txt
 # GCA_902755425.1

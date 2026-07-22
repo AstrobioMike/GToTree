@@ -18,6 +18,7 @@ from gtotree.main_stages.updating_headers import update_headers
 from gtotree.main_stages.treeing import make_tree
 from gtotree.utils.citations import generate_citations_info
 from gtotree.utils.summary_info import generate_primary_summary_table
+from gtotree.utils.itol import generate_all_search_itol_files
 from gtotree.utils.general import cleanup
 
 def main(args = None):
@@ -60,12 +61,10 @@ def main(args = None):
 
     generate_primary_summary_table(args, run_data)
 
+    generate_all_search_itol_files(args, run_data)
+
     cleanup(args, run_data)
 
     summarize_results(args, run_data)
 
     copy_log_function(run_data)
-
-    # print(f"\n\n{run_data}\n\n")
-    # print(f"\n\n{args}\n\n")
-

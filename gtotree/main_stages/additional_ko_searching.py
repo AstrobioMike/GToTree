@@ -127,6 +127,9 @@ def get_ko_counts(ko_ids, results_tsv):
 
     counts = Counter()
 
+    if not os.path.isfile(results_tsv):
+        return [0 for _ in ko_ids]
+
     with open(results_tsv, "r") as results_file:
         for line in results_file:
             parts = line.strip().split("\t")
