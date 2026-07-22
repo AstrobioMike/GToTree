@@ -1,9 +1,14 @@
 import pandas as pd # type: ignore
 import urllib.request
+import urllib.error
 import gzip
 import shutil
 import os
+import time
+import random
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm # type: ignore
 from gtotree.utils.messaging import (report_early_exit,
                                      report_processing_stage,
                                      report_ncbi_update,
@@ -13,10 +18,16 @@ from gtotree.utils.messaging import (report_early_exit,
                                      report_genome_preprocessing_update)
 from gtotree.utils.ncbi.parse_ncbi_assembly_summary import parse_assembly_summary
 from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_summary_tab
+from gtotree.utils.seqs import filter_and_rename_fasta
 from gtotree.utils.general import (write_run_data,
                                    read_run_data,
                                    get_snakefile_path,
                                    run_snakemake)
+
+# capping concurrent NCBI download threads regardless of --num-jobs
+# client to NCBI (mirrors bit's max_threads ceiling).
+MAX_NCBI_DOWNLOAD_THREADS = 20
+NCBI_DOWNLOAD_MAX_RETRIES = 5
 
 
 def preprocess_genomes(args, run_data):
@@ -39,17 +50,10 @@ def preprocess_ncbi_genomes(args, run_data):
 
         run_data = parse_assembly_summary(get_ncbi_assembly_summary_tab(), run_data)
 
-        num_ncbi_accs_remaining = len(run_data.get_ncbi_accs_for_snakemake_preprocessing())
+        accs_to_process = run_data.get_ncbi_accs_for_snakemake_preprocessing()
 
-        if num_ncbi_accs_remaining > 0:
-            # writing run_data to file so it can be accessed by snakemake
-            write_run_data(run_data)
-            snakefile = get_snakefile_path("preprocess-ncbi-accessions.smk")
-            description = "Preprocessing NCBI accessions"
-
-            run_snakemake(snakefile, num_ncbi_accs_remaining, args, run_data, description)
-
-            run_data = read_run_data(run_data.run_data_path)
+        if len(accs_to_process) > 0:
+            run_data = download_and_preprocess_ncbi_accessions(accs_to_process, args, run_data)
             run_data = capture_ncbi_failed_downloads(run_data)
 
         report_ncbi_update(run_data)
@@ -57,8 +61,116 @@ def preprocess_ncbi_genomes(args, run_data):
     return run_data
 
 
-def prepare_accession(acc, run_data):
-    base_link, acc_assembly_str = get_base_link(acc, run_data)
+def download_and_preprocess_ncbi_accessions(accs_to_process, args, run_data):
+
+    num_workers = max(1, min(args.num_jobs, MAX_NCBI_DOWNLOAD_THREADS))
+
+    base_link_map = build_base_link_map(run_data)
+
+    bar_format = (
+        "      {percentage:3.0f}%|{bar}| "
+        "{n_fmt}/{total_fmt} "
+        "[time elapsed: {elapsed} | est. remaining: {remaining}]"
+    )
+
+    print("")
+    with ThreadPoolExecutor(max_workers=num_workers) as pool, \
+         tqdm(total=len(accs_to_process), bar_format=bar_format, ncols=76) as pbar:
+
+        futures = {
+            pool.submit(_process_one_ncbi_accession, acc_gd, run_data, base_link_map): acc_gd
+            for acc_gd in accs_to_process
+        }
+
+        for future in as_completed(futures):
+            acc_gd = futures[future]
+            status = future.result()
+            _apply_ncbi_accession_status(acc_gd, status, run_data)
+            pbar.update(1)
+
+    return run_data
+
+
+def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
+    """
+    Worker: run one accession's download + (optional) prodigal + filter/rename.
+    Returns a status dict of the same shape the old Snakefile carried through its
+    per-accession JSON, so the bookkeeping step is unchanged. Runs in a worker
+    thread, so it must not mutate shared run_data state -- only local files and
+    the returned dict. All GenomeData mutation happens back on the main thread in
+    _apply_ncbi_accession_status.
+    """
+    try:
+        done, nt = prepare_accession(acc_gd.id, run_data, base_link_map=base_link_map)
+        downloaded = bool(done)
+
+        if done and nt:
+            done = run_prodigal(acc_gd.id, run_data, group="ncbi")
+            prodigal_used = True
+        else:
+            prodigal_used = False
+
+        if done:
+            done, final_AA_path, num_genes, final_nt_path = \
+                filter_and_rename_fasta(acc_gd.id, run_data, run_data.ncbi_processing_dir)
+        else:
+            final_AA_path = None
+            final_nt_path = None
+            num_genes = 0
+
+        return {
+            "done": bool(done),
+            "downloaded": downloaded,
+            "prodigal_used": prodigal_used,
+            "final_AA_path": final_AA_path,
+            "final_nt_path": final_nt_path,
+            "num_genes": int(num_genes or 0),
+        }
+    except BaseException:
+        # a worker must never take down the whole pool; treat any unexpected
+        # failure as a non-downloaded processing failure and let the bookkeeping
+        # step mark it removed
+        return {
+            "done": False,
+            "downloaded": False,
+            "prodigal_used": False,
+            "final_AA_path": None,
+            "final_nt_path": None,
+            "num_genes": 0,
+        }
+
+
+def _apply_ncbi_accession_status(acc_gd, status, run_data):
+    """
+    Apply one worker's result to its GenomeData. Mirrors the reduce logic in the
+    old preprocess-ncbi-accessions.smk `rule all`. Called on the main thread only.
+    """
+    done = bool(status.get("done"))
+    downloaded = bool(status.get("downloaded", False))
+    prodigal_used = bool(status.get("prodigal_used", False))
+
+    acc_gd.num_genes = int(status.get("num_genes", 0) or 0)
+
+    if done:
+        acc_gd.mark_preprocessing_done()
+        acc_gd.final_AA_path = status.get("final_AA_path")
+        acc_gd.final_nt_path = status.get("final_nt_path")
+        acc_gd.acc_was_downloaded = downloaded
+    else:
+        if downloaded:
+            acc_gd.acc_was_downloaded = True
+            acc_gd.mark_removed("acc processing failed after download")
+        else:
+            acc_gd.acc_was_downloaded = False
+            acc_gd.mark_removed("acc download failed")
+
+    acc_gd.prodigal_used = prodigal_used
+    if prodigal_used:
+        run_data.tools_used.prodigal_used = True
+
+
+def prepare_accession(acc, run_data, base_link_map=None):
+    base_link, acc_assembly_str = get_base_link(acc, run_data, base_link_map=base_link_map)
 
     # an unresolvable download directory (no ftp_path and nothing to rebuild
     # from) comes through as "na" -> there's nothing to download, fail cleanly
@@ -92,45 +204,83 @@ def prepare_accession(acc, run_data):
     return done, nt
 
 
-def download_and_unzip_accession(link, filepath):
+def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_RETRIES):
     # Atomic write: fetch to a temp gzip and unzip into a `.part` temp alongside
     # the destination, then os.replace() into place only on a fully successful
     # unzip. An interrupted download or a truncated/corrupt gzip (process kill,
     # `-R` interrupted mid-run, disk full) therefore never leaves a truncated
     # file at `filepath` that a later os.path.isfile() / resume check would
     # mistake for a complete genome. Both temps are cleaned up on any failure.
-    # The function still raises on failure, which prepare_accession relies on to
-    # fall back from amino-acid to nucleotide downloads.
+    # The function still raises on final failure, which prepare_accession relies
+    # on to fall back from amino-acid to nucleotide downloads.
+    #
+    # Transient failures (network blips, truncated/corrupt gzip, transient HTTP
+    # 429/5xx) are retried with exponential backoff + jitter. A 404 is permanent
+    # (the requested format doesn't exist for this accession) so we fail fast
+    # rather than burning retries -- prepare_accession will then try the other format.
     tmp_gzip = filepath + ".gz"
     tmp_out = filepath + ".part"
-    try:
-        urllib.request.urlretrieve(link, tmp_gzip)
-        with gzip.open(tmp_gzip, 'rb') as f_in, open(tmp_out, 'wb') as f_out:
-            shutil.copyfileobj(f_in, f_out)
-        os.replace(tmp_out, filepath)
-    except BaseException:
-        # BaseException so Ctrl-C (KeyboardInterrupt) also cleans up the partials
+
+    def cleanup_partials():
         for tmp in (tmp_gzip, tmp_out):
             try:
                 os.remove(tmp)
             except OSError:
                 pass
-        raise
-    else:
+
+    last_err = None
+    for attempt in range(1, max_retries + 1):
         try:
-            os.remove(tmp_gzip)
-        except OSError:
-            pass
+            urllib.request.urlretrieve(link, tmp_gzip)
+            with gzip.open(tmp_gzip, 'rb') as f_in, open(tmp_out, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+            os.replace(tmp_out, filepath)
+            try:
+                os.remove(tmp_gzip)
+            except OSError:
+                pass
+            return
+        except KeyboardInterrupt:
+            cleanup_partials()
+            raise
+        except urllib.error.HTTPError as e:
+            cleanup_partials()
+            # 404 -> requested format not available; permanent, don't retry
+            if e.code == 404:
+                raise
+            last_err = e
+        except (urllib.error.URLError, OSError, EOFError, gzip.BadGzipFile) as e:
+            cleanup_partials()
+            last_err = e
+
+        if attempt < max_retries:
+            _sleep_backoff(attempt)
+
+    # exhausted retries -> raise so prepare_accession falls back / marks failure
+    raise last_err if last_err is not None else RuntimeError(f"failed to download {link}")
 
 
-def get_base_link(acc, run_data):
+def _sleep_backoff(attempt):
+    # exponential backoff with jitter (like i do in bit)
+    time.sleep((2 ** (attempt - 1)) + random.uniform(0, 1))
+
+
+def build_base_link_map(run_data):
     df = pd.read_csv(run_data.tmp_dir + "/ncbi-accessions-info.tsv", sep="\t",
                      usecols=["input_accession", "http_base_link"])
-    base_link = df.loc[df['input_accession'] == acc, 'http_base_link'].values[0]
-    base_link = str(base_link).replace(" ", "_")
+    return dict(zip(df["input_accession"], df["http_base_link"]))
+
+
+def _normalize_base_link(raw_base_link):
+    base_link = str(raw_base_link).replace(" ", "_")
     base_link = base_link.rstrip("/")
     acc_assembly_str = base_link.split("/")[-1]
     return base_link, acc_assembly_str
+
+
+def get_base_link(acc, run_data, base_link_map=None):
+    raw_base_link = base_link_map[acc]
+    return _normalize_base_link(raw_base_link)
 
 
 def capture_ncbi_failed_downloads(run_data):
