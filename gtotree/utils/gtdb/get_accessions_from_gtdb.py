@@ -43,9 +43,10 @@ def build_parser(parent_subparsers=None):
             add_help=False,
         )
 
+    required = parser.add_argument_group("Required Parameters")
     optional = parser.add_argument_group("Optional Parameters")
 
-    optional.add_argument(
+    required.add_argument(
         "-t",
         "--target-taxon",
         metavar="<STR>",
@@ -56,19 +57,17 @@ def build_parser(parent_subparsers=None):
     optional.add_argument(
         "-r",
         "--target-rank",
-        metavar="<STR>",
+        choices=list(RANKS),
         help=("Target rank (if needed to disambiguate a taxon name that exists at multiple ranks)"),
         action="store",
     )
     optional.add_argument(
         "--derep-rank",
-        metavar="<STR>",
+        choices=["auto", "off"] + list(RANKS),
         default="off",
-        help=("Dereplicate the pulled genomes down to a single best genome "
-              "per unique value of this rank (e.g., '--derep-rank family' "
-              "keeps one genome per family within the target taxon). "
-              "Default: off (all matching genomes are returned). Use 'auto' "
-              "for two ranks finer than the target, or pass an explicit rank."),
+        help=("Dereplicate the pulled genomes down to a single best genome per unique "
+              "value of this rank (default: off). E.g., '--derep-rank family' keeps one genome per "
+              "family within the target taxon). Use 'auto' for two ranks finer than the target."),
         action="store",
     )
 

@@ -58,9 +58,10 @@ def build_parser(parent_subparsers=None):
             add_help=False,
         )
 
+    required = parser.add_argument_group("Required Parameters")
     optional = parser.add_argument_group("Optional Parameters")
 
-    optional.add_argument(
+    required.add_argument(
         "-t",
         "--target-taxon",
         metavar="<STR>",
@@ -72,41 +73,37 @@ def build_parser(parent_subparsers=None):
     optional.add_argument(
         "-r",
         "--target-rank",
-        metavar="<STR>",
-        # choices=list(RANKS),
-        help=("Target rank (if needed to disambiguate a taxon name that exists at multiple ranks"),
+        choices=list(RANKS),
+        help=("Target rank (if needed to disambiguate a taxon name that exists at multiple ranks)"),
         action="store",
     )
 
     optional.add_argument(
         "--derep-rank",
-        metavar="<STR>",
+        choices=["auto", "off"] + list(RANKS),
         default="off",
         help=("Dereplicate the pulled genomes down to a single best genome per unique "
-              "value of this rank (e.g. '--derep-rank family' keeps one genome per "
-              "family within the target taxon). Default: off (all matching genomes are "
-              "returned). Use 'auto' for two ranks finer than the target, or an explicit "
-              "rank. Only applies to a taxon-name search (not a taxid or 'all')."),
+              "value of this rank (default: off). E.g., '--derep-rank family' keeps one genome per "
+              "family within the target taxon). Use 'auto' for two ranks finer than the target. "
+              "Only applies to a taxon-name search (not a taxid or 'all')."),
         action="store",
     )
 
     optional.add_argument(
         "-s",
         "--source",
-        metavar="<STR>",
         default="refseq",
         choices=["refseq", "genbank", "both"],
-        help=("Which assemblies to consider by accession prefix: 'refseq' (GCF_), "
-              "'genbank' (GCA_), or 'both'. Default: refseq."),
+        help=("Specify which section of NCBI to pull from (default: refseq)"),
         action="store",
     )
 
     optional.add_argument(
         "-a",
         "--assembly-level",
-        metavar="<STR>",
-        help=("Restrict to one or more assembly levels (comma-separated). Choose from: "
-              + ", ".join(_ASSEMBLY_LEVELS) + "."),
+        choices=list(_ASSEMBLY_LEVELS),
+        nargs="+",
+        help=("Restrict to one or more assembly levels (can be multiple space-separated)"),
         action="store",
     )
 
@@ -201,13 +198,13 @@ def get_accessions_from_ncbi(args):
 
     if args.get_taxon_counts:
         print("")
-        wprint(f"There are {len(rows):,} genome(s) under {label} with the specified "
+        wprint(f"There are {len(rows):,} genome(s) under {label} with any specified "
                "filters.")
         print("")
         sys.exit(0)
 
     if not rows:
-        wprint(color_text(f"No genomes were found under {label} with the specified "
+        wprint(color_text(f"No genomes were found under {label} with any specified "
                           "filters.", "yellow"))
         print("")
         sys.exit(0)
@@ -429,7 +426,9 @@ def _select_by_taxid(table_path, taxid, reps_only=False):
 def parse_assembly_levels(value):
     if not value:
         return []
-    parts = [v.strip().lower() for v in str(value).split(",") if v.strip()]
+    if isinstance(value, str):
+        value = value.split(",")
+    parts = [v.strip().lower() for v in value if str(v).strip()]
     unknown = [p for p in parts if p not in _ASSEMBLY_LEVELS]
     if unknown:
         raise ValueError(

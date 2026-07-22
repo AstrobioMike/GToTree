@@ -1,10 +1,5 @@
 ### TO DO STILL ###
 
-    # make gtt an entry point with subcommands for all the gtt scripts (maybe)
-        # make helpers richargparse-based
-        # add tab-complete for subcommands and their args (like i did for bit)
-
-
     # add choices to the --target-rank and --derep-rank parameters in the parser, based on the RANKS list in tax_ranks.py
 
     # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can pick based on the --wanted-ref-tax for them
@@ -31,8 +26,6 @@
         # check for others via all commits since they split... ... ... (yes, that's worth 3 ellipses)
 
     # modularize and reduce code redundancy in my user-side standalone scripts like:
-        # gtt-get-accessions-from-GTDB (use what we can from utils/gtdb/get_gtdb_data.py; also see what i've done in bit already)
-            # bring over bit-get-accessions-from-ncbi also
         # gtt-gen-SCG-HMMs (don't forget to include updates made to the v1 GToTree)
         # gtt-pfam-search (if keeping this, basically dump the v1 standalone script and start re-building from what's available already in v2)
 
@@ -131,22 +124,25 @@ cat problem-accs.txt
 
 ### ADDED ###
 
-# --taxon parameter added
-    # this allows specifying a taxon at any rank in order to make a tree of genomes from that taxon (will only use species representatives)
+# --wanted-ref-tax parameter added to main `gtotree` program
+    # this allows specifying a taxon at any rank in order to make a tree of genomes from that taxon
     # this is so the user no longer needs to collect their own accession input lists anymore
 # added a gene-represenation cutoff (-g) parameter
     # this is the minimum proportion of genomes required to have hits to a target gene for that target gene to be retained for downstream processing
     # e.g., with 100 input genomes and a -g of the default 0.2, any target gene that has hits in less than 20 genomes will be filtered out
     # This is calculated based on the total number of genomes remaining
     #   after preprocessing steps, but before genome filtering based on the '-G'
-    #   parameter, and it is not revisited after genome-level filtering. This
-    #   is to avoid iterative pruning effects between the '-g' and '-G' parameters.
+    #   parameter, and it is not revisited after genome-level filtering (so as to
+    #   avoid iterative pruning effects between the '-g' and '-G' parameters)
 # --resume flag added to attempt to continue interrupted runs
+# helper programs are now subcommands under `gtt`
+    # run `gtt` by itself or `gtt -h` for an overview
 
 # lots of things since initial v1 release, but were integrated before v2
 
 ### CHANGED ###
 
+# command callable with lowercase `gtotree` or original `GToTree` now (i don't know what i was thinking almost a decade ago)
 # the code-base has been virtually entirely rewritten from
 # when calculating percent of target genes required to be found (-X parameter)
     # now it uses the amount remaining after filtering out target genes with too few genomes having hits as the denominator
