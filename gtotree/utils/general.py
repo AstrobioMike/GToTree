@@ -219,6 +219,7 @@ class GenomeData:
     was_gzipped: bool = False
     acc_was_found: bool = None
     acc_was_downloaded: bool = None
+    from_wanted_ref_tax: bool = False
     mapping: str = None
     hmm_search_done: bool = False
     hmm_search_failed: bool = None
@@ -473,7 +474,9 @@ class RunData:
         for acc in accessions:
             if acc in existing:
                 continue
-            self.ncbi_accs.append(GenomeData.from_acc(acc))
+            gd = GenomeData.from_acc(acc)
+            gd.from_wanted_ref_tax = True
+            self.ncbi_accs.append(gd)
             existing.add(acc)
             added += 1
         if added:
@@ -506,6 +509,12 @@ class RunData:
 
     def get_input_ncbi_accs(self) -> List[str]:
         return [gd.id for gd in self.ncbi_accs]
+
+    def get_user_provided_ncbi_accs(self) -> List[str]:
+        return [gd.id for gd in self.ncbi_accs if not gd.from_wanted_ref_tax]
+
+    def get_wanted_ref_tax_accs(self) -> List[str]:
+        return [gd.id for gd in self.ncbi_accs if gd.from_wanted_ref_tax]
 
     def get_input_genbank_ids(self) -> List[str]:
         return [gd.id for gd in self.genbank_files]

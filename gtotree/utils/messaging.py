@@ -213,7 +213,10 @@ def display_initial_run_info(args, run_data):
     report_message("  Input-genome sources include:")
 
     if args.ncbi_accessions:
-        print(f"      - NCBI accessions listed in {args.ncbi_accessions} ({len(run_data.get_input_ncbi_accs())} genomes)", flush=True)
+        print(f"      - NCBI accessions listed in {args.ncbi_accessions} ({len(run_data.get_user_provided_ncbi_accs())} genomes)", flush=True)
+    if args.wanted_ref_tax:
+        num_wanted_ref_tax = len(run_data.get_wanted_ref_tax_accs())
+        print(f"      - NCBI accessions selected for --wanted-ref-tax '{args.wanted_ref_tax}' ({num_wanted_ref_tax} genomes)", flush=True)
     if args.genbank_files:
         print(f"      - Genbank files listed in {args.genbank_files} ({len(run_data.get_input_genbank_ids())} genomes)", flush=True)
     if args.fasta_files:
@@ -271,104 +274,81 @@ def report_update(message, color = "green"):
 ### specific notices
 def check_and_report_any_changed_default_behavior(args, run_data):
 
-    conditions = [
-        args.output_dir != "gtotree-output",
-        args.mapping_file,
-        args.nucleotide_mode,
-        args.no_tree,
-        args.add_gtdb_tax,
-        args.add_ncbi_tax,
-        args.lineage != "Domain,Phylum,Class,Genus,Species",
-        args.tree_program != "FastTreeMP",
-        args.best_hit_mode,
-        args.seq_length_cutoff != 0.2,
-        args.gene_representation_cutoff != 0.2,
-        args.genome_hits_cutoff != 0.5,
-        args.num_jobs != 1,
-        args.num_muscle_threads != 5,
-        args.no_super5,
-        args.keep_gene_alignments,
-        args.resume and args.output_already_existed,
-        args.force_overwrite and args.output_already_existed,
-        args.debug,
-        args.target_pfams_file,
-        args.target_kos_file,
-    ]
+    lines = []
 
-    if any(conditions):
-        report_message("  Other options set:")
-
+    # output-dir / resume / overwrite: mutually exclusive messaging in one place
     if args.resume and args.output_already_existed:
-        print(f"      - Attempting to resume a previous run with outputs in \"{args.output_dir}\"")
+        lines.append(f"Attempting to resume a previous run with outputs in \"{args.output_dir}\"")
+    elif args.force_overwrite and args.output_already_existed:
+        lines.append(f"Due to the `-F` flag, this output directory is being overwritten:\n          \"{args.output_dir}\"")
+    elif args.output_dir != "gtotree-output":
+        lines.append(f"The output directory has been set to: \"{args.output_dir}\"")
 
-    if args.force_overwrite:
-        if args.output_already_existed:
-            print(f"      - Due to the `-F` flag, this output directory is being overwritten:\n          \"{args.output_dir}\"")
-        else:
-            print(f"      - The output directory has been set to: \"{args.output_dir}\"")
-
-    if args.output_dir != "gtotree-output" and not args.resume and not args.force_overwrite:
-        print(f"      - The output directory has been set to: \"{args.output_dir}\"")
+    if args.derep_rank != "auto":
+        lines.append(f"The dereplication rank has been set to: \"{args.derep_rank}\"")
 
     if args.mapping_file:
-        print(f"      - Labels of the specified input genomes will be modified based on: \"{args.mapping_file}\"")
+        lines.append(f"Labels of the specified input genomes will be modified based on: \"{args.mapping_file}\"")
 
     if args.nucleotide_mode:
-        print("      - Working towards nucleotide alignments, as the `-z` flag was provided\n"
-              "          (amino-acid seqs are still used for HMM-searching of target genes)")
+        lines.append("Working towards nucleotide alignments, as the `-z` flag was provided\n"
+                     "          (amino-acid seqs are still used for HMM-searching of target genes)")
 
     if args.no_tree:
-        print("      - Only generating alignment, and no tree, as the `-N` flag was provided")
+        lines.append("Only generating alignment, and no tree, as the `-N` flag was provided")
 
     if args.add_gtdb_tax:
-        print("      - GTDB taxonomic info will be added to labels where possible")
+        lines.append("GTDB taxonomic info will be added to labels where possible")
         if args.add_ncbi_tax:
-            print("      - NCBI taxonomic info will be added where possible when GTDB is not")
-
-    if args.add_ncbi_tax and not args.add_gtdb_tax:
-        print("      - NCBI taxonomic info will be added to labels where possible")
+            lines.append("NCBI taxonomic info will be added where possible when GTDB is not")
+    elif args.add_ncbi_tax:
+        lines.append("NCBI taxonomic info will be added to labels where possible")
 
     if args.lineage != "Domain,Phylum,Class,Genus,Species":
-        print(f"      - Lineage info added to labels will be: \"{args.lineage}\"")
+        lines.append(f"Lineage info added to labels will be: \"{args.lineage}\"")
 
     if args.tree_program != "FastTreeMP":
-        print(f"      - The treeing program used will be: \"{args.tree_program}\"")
+        lines.append(f"The treeing program used will be: \"{args.tree_program}\"")
 
     if args.best_hit_mode:
-        print("      - Running in \"best-hit\" mode")
+        lines.append("Running in \"best-hit\" mode")
 
     if args.seq_length_cutoff != 0.2:
-        print(f"      - Gene-length filtering cutoff threshold (`-c`) has been set to: {args.seq_length_cutoff}")
+        lines.append(f"Gene-length filtering cutoff threshold (`-c`) has been set to: {args.seq_length_cutoff}")
 
     if args.gene_representation_cutoff != 0.1:
-        print(f"      - Gene-representation cutoff threshold (`-r`) has been set to: {args.gene_representation_cutoff}")
+        lines.append(f"Gene-representation cutoff threshold (`-r`) has been set to: {args.gene_representation_cutoff}")
 
     if args.genome_hits_cutoff != 0.5:
-        print(f"      - Genome minimum target-gene-copy threshold (`-G`) has been set to: {args.genome_hits_cutoff}")
+        lines.append(f"Genome minimum target-gene-copy threshold (`-G`) has been set to: {args.genome_hits_cutoff}")
 
     if args.num_jobs != 4:
-        print(f"      - The number of jobs to run during parallelizable steps has been set to: {args.num_jobs}")
+        lines.append(f"The number of jobs to run during parallelizable steps has been set to: {args.num_jobs}")
 
     if args.num_muscle_threads != 5:
-        print(f"      - The number of threads used for `muscle` calls will be: {args.muscle_threads}")
+        lines.append(f"The number of threads used for `muscle` calls will be: {args.num_muscle_threads}")
 
     if args.no_super5:
-        print("      - The 'super5' muscle algorithm will not be used even with greater than 1,000 input genomes")
+        lines.append("The 'super5' muscle algorithm will not be used even with greater than 1,000 input genomes")
 
     if args.keep_gene_alignments:
-        print("      - Individual protein-alignment files will retained, due to the `-k` flag being provided")
+        lines.append("Individual protein-alignment files will retained, due to the `-k` flag being provided")
 
     if args.debug:
-        print("      - Debug mode is enabled, so the temp directory won't be removed at the end of the run")
+        lines.append("Debug mode is enabled, so the temp directory won't be removed at the end of the run")
 
     if args.target_pfams_file:
-        print(f"      - Genomes will be searched for Pfams listed in: {args.target_pfams_file} ({run_data.total_pfam_targets} targets)")
+        lines.append(f"Genomes will be searched for Pfams listed in: {args.target_pfams_file} ({run_data.total_pfam_targets} targets)")
 
     if args.target_kos_file:
-        print(f"      - Genomes will be searched for KOs listed in: {args.target_kos_file} ({run_data.total_ko_targets} targets)")
+        lines.append(f"Genomes will be searched for KOs listed in: {args.target_kos_file} ({run_data.total_ko_targets} targets)")
 
-    if any(conditions):
-        print("")
+    if not lines:
+        return
+
+    report_message("  Other options set:")
+    for line in lines:
+        print(f"      - {line}")
 
 
 def many_genomes_notice(total_input_genomes):

@@ -32,7 +32,8 @@ def preprocess_genomes(args, run_data):
 
 
 def preprocess_ncbi_genomes(args, run_data):
-    if args.ncbi_accessions:
+
+    if run_data.ncbi_accs:
 
         report_processing_stage("ncbi", run_data)
 

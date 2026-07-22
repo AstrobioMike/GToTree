@@ -1,6 +1,6 @@
 ### TO DO STILL ###
 
-    # add choices to the --target-rank and --derep-rank parameters in the parser, based on the RANKS list in tax_ranks.py
+    # maybe add a notice and spinner when selecting ref genomes to include (as it happens before the run outputs any info)
 
     # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can pick based on the --wanted-ref-tax for them
 

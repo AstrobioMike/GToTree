@@ -622,7 +622,7 @@ def final_setups(args, run_data):
     run_data.gtotree_logs_dir = os.path.join(logs_dir, "gtotree-logs")
     os.makedirs(run_data.gtotree_logs_dir, exist_ok=True)
 
-    if args.ncbi_accessions:
+    if run_data.ncbi_accs:
         ncbi_processing_dir_rel = os.path.join(args.tmp_dir, "ncbi-acc-processing")
         ncbi_processing_dir = os.path.abspath(ncbi_processing_dir_rel)
         os.makedirs(ncbi_processing_dir, exist_ok=True)

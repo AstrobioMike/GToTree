@@ -1,14 +1,13 @@
-import pandas as pd
+import pandas as pd # type: ignore
 
 def generate_primary_summary_table(args, run_data):
-    # building a lookup if needed
-    if args.ncbi_accessions:
+
+    if run_data.ncbi_sub_table_path:
         ncbi_df     = pd.read_csv(run_data.ncbi_sub_table_path, sep="\t", header=0)
         taxid_map   = dict(zip(ncbi_df["input_accession"], ncbi_df["taxid"]))
     else:
         taxid_map   = {}
 
-    # quick alias for mapping dict
     m = run_data.mapping_dict
 
     rows = []
@@ -20,8 +19,8 @@ def generate_primary_summary_table(args, run_data):
             or g.id
         )
 
-        # lookup taxid only if requested
-        taxid = taxid_map.get(g.id, "NA") if args.ncbi_accessions else "NA"
+        # lookup taxid only if an NCBI sub-table was produced
+        taxid = taxid_map.get(g.id, "NA") if run_data.ncbi_sub_table_path else "NA"
 
         rows.append({
             "assembly_id":                   g.id,
