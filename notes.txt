@@ -1,10 +1,5 @@
 ### TO DO STILL ###
 
-    # add my with_spinner() from bit for things like
-        # Gathering genomes needs to be moved inside -- RUN INFO --
-        # probably the treeing step, putting it after where it says the log file can be monitored
-            # need to remove one empty line before the bottom border after adding this
-
 
     # build in/port over these from v1 (or make new) as subcommands under gtt
         # gtt-gen-scg-hmms from v1 and make it a subcommand under gtt
@@ -24,20 +19,11 @@
         # same for pfam, that they start with PF
         # also, doublecheck how it handles if a target KO/PFam isn't found
 
-
-    # still need to implement iToL-file generation for both pfam and ko searching results
-        # the per-genome rules in the snakefiles (search-kos.smk and search-pfams.smk) might be the best place to start the info needed for this (if it's not already done)
-            # actually it's probably just easier to read in the <output_dir>/ko-search-results/KO-hit-counts.tsv table and make it based on that
-        # be sure to take into account if we are modifying the genome names so the iToL files match the final alignment/tree files
-        # make a helper function that does this, and it will take just the path to the table and if it's for KOs or PFams
-            # if they have different formats it'd need a KO or PFam designation. If they are the same format, maybe not
-
     # go through general.py GenomeData and RunData classes and see which methods i put in that i'm not using anywhere anymore
 
     # incorporate latest changes from master GToTree
         # gtt-gen-SCG-HMMs has been updated a bit (v1.8.17)
         # check for others via all commits since they split... ... ... (yes, that's worth 3 ellipses)
-
 
     # figure out all helper scripts that are no longer needed and remove them
 
@@ -48,21 +34,11 @@
 
     # fix entry points/console scripts as needed in pyproject.toml
 
-    # wherever I have this:
-        # with tarfile.open(taxdump_path) as tarball:
-            # tarball.extractall(location)
-    # do this to get rid of warning message:
-        # with tarfile.open(tarball_path) as tarball:
-            # tarball.extractall(path=location, filter=lambda ti: ti)
-
-
     # add FAQ page about differences between GToTree v1 and v2
 
     # create new SCG-sets for all main phyla (and proteos/pseudomonadota) of gtdb (and archaea/bacteria)
         # continue hosting them as github assets
         # make an organized output for gtt-hmms that breaks done by domain for easier reading and selection
-
-    # still need to implement nucleotide mode?
 
     # if it's a re-run, and a genome was dropped later due to, e.g., not enough hit targets, the preprocessing summary is misleading as it says the genome was dropped earlier
 

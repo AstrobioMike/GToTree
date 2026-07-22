@@ -107,7 +107,7 @@ def _real_terminal_stream():
 
 
 @contextlib.contextmanager
-def spinner(in_progress_msg, complete_msg, indent="    ", clear_on_done=False):  # pragma: no cover
+def spinner(in_progress_msg, complete_msg, indent="    ", clear_on_done=False, reclaim_line=False):  # pragma: no cover
     """
     Show a spinner while a block runs, then print a single completion line.
 
@@ -135,6 +135,8 @@ def spinner(in_progress_msg, complete_msg, indent="    ", clear_on_done=False): 
             time.sleep(0.1)
         # clear the animated line so the completion line (or an error) starts clean
         term.write("\r" + " " * (len(indent) + len(in_progress_msg) + 4) + "\r")
+        if clear_on_done and reclaim_line:
+            term.write("\033[F")
         term.flush()
 
     t = threading.Thread(target=spin)
@@ -854,13 +856,14 @@ def summarize_results(args, run_data):
         add_border(extra_line=False)
 
     run_log_relative_path = run_data.output_dir_rel + "/gtotree-runlog.txt"
-    print(f"\n  Log file written to:\n      {color_text(run_log_relative_path, 'green')}")
+    print(f"\n    Log file written to:")
+    print(f"        {color_text(run_log_relative_path, 'green')}")
 
     add_border(extra_line=False)
 
     citations_relative_path = args.output_dir + "/citations.txt"
-    print(f"\n  {color_text("Programs used and their citations have been written to:", 'yellow')}")
-    print(f"      {color_text(citations_relative_path, 'green')}")
+    print(f"\n    Programs used and their citations have been written to:")
+    print(f"        {color_text(citations_relative_path, 'green')}")
 
     add_border(extra_line=False)
 

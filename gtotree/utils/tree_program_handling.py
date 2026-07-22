@@ -22,7 +22,7 @@ def run_tree_building(args, run_data):
 
     try:
         print()
-        with spinner("Building tree...", "", clear_on_done=True):
+        with spinner("Building tree...", "", clear_on_done=True, reclaim_line=True):
             result = subprocess.run(cmd, shell=True)
             if result.returncode != 0:
                 raise RuntimeError("tree build failed")
