@@ -464,13 +464,6 @@ def report_processing_stage(stage, run_data):
     # time.sleep(1)
 
 
-def report_snakemake_failure(description, log, run_data):
-    time.sleep(1)
-    report_message(f"\nSnakemake failed while running the \"{description}\" workflow.\n", width = 90, color = "red")
-    print(color_text(f"  Check the log at:\n    {log}", "yellow"))
-    report_early_exit(run_data)
-
-
 def report_ncbi_accs_not_found(num_accs, path):
     report_notice(f"    {num_accs} accession(s) not successfully found at NCBI.\n\n"
                 f"    Reported in {path}/ncbi-accessions-not-found.txt")

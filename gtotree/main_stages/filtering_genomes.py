@@ -1,10 +1,9 @@
+import shutil
 from gtotree.utils.messaging import (report_message, report_processing_stage,
                                      report_genome_filtering_update)
-from gtotree.utils.seqs import check_target_SCGs_have_seqs
+from gtotree.utils.seqs import check_target_SCGs_have_seqs, filter_seqs_by_genome_ids
 from gtotree.utils.general import (write_run_data,
-                                   read_run_data,
-                                   get_snakefile_path,
-                                   run_snakemake)
+                                   run_pooled_stage)
 
 def filter_genomes(args, run_data):
 
@@ -30,13 +29,26 @@ def filter_genomes(args, run_data):
                 reason = "too few SCG hits" if args.best_hit_mode else "too few unique SCG hits"
                 genome.mark_removed(reason)
 
+        genome_ids_to_remove = {gd.id for gd in run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering()}
+        scgs = run_data.get_all_SCG_targets_remaining()
+
+        def worker(scg, run_data):
+            inpath = run_data.found_SCG_seqs_dir + f"/{scg.id}-gene-filtered{run_data.general_ext}"
+            outpath = run_data.found_SCG_seqs_dir + f"/{scg.id}-genome-filtered{run_data.general_ext}"
+            # per-SCG file only; no shared state touched here
+            if len(genome_ids_to_remove) == 0:
+                shutil.copy(inpath, outpath)
+            else:
+                filter_seqs_by_genome_ids(inpath, genome_ids_to_remove, outpath)
+            return None
+
+        def apply_result(scg, result, run_data):
+            pass
+
+        run_data = run_pooled_stage(scgs, worker, apply_result, args, run_data)
+
+        run_data.genomes_filtered_for_min_SCG_hits = True
         write_run_data(run_data)
-        snakefile = get_snakefile_path("filter-genomes.smk")
-        description = "Filtering genomes"
-
-        run_snakemake(snakefile, num_remaining_SCG_targets, args, run_data, description)
-
-        run_data = read_run_data(run_data.run_data_path)
         capture_removed_genomes(run_data)
 
         run_data = check_target_SCGs_have_seqs(run_data, f"-genome-filtered{run_data.general_ext}")

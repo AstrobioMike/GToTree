@@ -18,14 +18,14 @@ from gtotree.utils.messaging import (report_early_exit,
                                      report_genome_preprocessing_update)
 from gtotree.utils.ncbi.parse_ncbi_assembly_summary import parse_assembly_summary
 from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_summary_tab
-from gtotree.utils.seqs import filter_and_rename_fasta
+from gtotree.utils.seqs import (filter_and_rename_fasta,
+                                extract_filter_and_rename_cds_amino_acids_from_gb,
+                                extract_fasta_from_gb)
 from gtotree.utils.general import (write_run_data,
-                                   read_run_data,
-                                   get_snakefile_path,
-                                   run_snakemake)
+                                   gunzip_if_needed,
+                                   run_pooled_stage)
 
 # capping concurrent NCBI download threads regardless of --num-jobs
-# client to NCBI (mirrors bit's max_threads ceiling).
 MAX_NCBI_DOWNLOAD_THREADS = 20
 NCBI_DOWNLOAD_MAX_RETRIES = 5
 
@@ -50,7 +50,7 @@ def preprocess_ncbi_genomes(args, run_data):
 
         run_data = parse_assembly_summary(get_ncbi_assembly_summary_tab(), run_data)
 
-        accs_to_process = run_data.get_ncbi_accs_for_snakemake_preprocessing()
+        accs_to_process = run_data.get_ncbi_accs_for_preprocessing()
 
         if len(accs_to_process) > 0:
             run_data = download_and_preprocess_ncbi_accessions(accs_to_process, args, run_data)
@@ -93,10 +93,8 @@ def download_and_preprocess_ncbi_accessions(accs_to_process, args, run_data):
 
 def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
     """
-    Worker: run one accession's download + (optional) prodigal + filter/rename.
-    Returns a status dict of the same shape the old Snakefile carried through its
-    per-accession JSON, so the bookkeeping step is unchanged. Runs in a worker
-    thread, so it must not mutate shared run_data state -- only local files and
+    Worker: run one accession's download + (optional) prodigal + filter/rename. Runs in a worker
+    thread, so it must not mutate shared run_data state, only local files and
     the returned dict. All GenomeData mutation happens back on the main thread in
     _apply_ncbi_accession_status.
     """
@@ -142,8 +140,7 @@ def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
 
 def _apply_ncbi_accession_status(acc_gd, status, run_data):
     """
-    Apply one worker's result to its GenomeData. Mirrors the reduce logic in the
-    old preprocess-ncbi-accessions.smk `rule all`. Called on the main thread only.
+    Apply one worker's result to its GenomeData. Called on the main thread only.
     """
     done = bool(status.get("done"))
     downloaded = bool(status.get("downloaded", False))
@@ -180,8 +177,7 @@ def prepare_accession(acc, run_data, base_link_map=None):
 
     # first trying amino acids
     try:
-        # going directly to nucleotides if running in nucleotide mode
-        # (so we can call our own genes and CDS and protein match up as expected)
+        # well, actually going directly to nucleotides if running in nucleotide mode
         if run_data.nucleotide_mode:
             raise Exception
         amino_acid_link = base_link + "/" + acc_assembly_str + "_protein.faa.gz"
@@ -217,7 +213,7 @@ def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_R
     # Transient failures (network blips, truncated/corrupt gzip, transient HTTP
     # 429/5xx) are retried with exponential backoff + jitter. A 404 is permanent
     # (the requested format doesn't exist for this accession) so we fail fast
-    # rather than burning retries -- prepare_accession will then try the other format.
+    # rather than burning retries, prepare_accession will then try the other format.
     tmp_gzip = filepath + ".gz"
     tmp_out = filepath + ".part"
 
@@ -296,24 +292,88 @@ def preprocess_genbank_genomes(args, run_data):
 
         report_processing_stage("genbank", run_data)
 
-        num_genbank_files_remaining = len([gd for gd in run_data.genbank_files if not gd.preprocessing_done and not gd.removed])
+        gbs_to_process = [gd for gd in run_data.genbank_files if not gd.preprocessing_done and not gd.removed]
 
-        if num_genbank_files_remaining > 0:
-            # writing run_data to file so it can be accessed by snakemake
+        if len(gbs_to_process) > 0:
+            run_data = run_pooled_stage(gbs_to_process,
+                                        _process_one_genbank_file,
+                                        _apply_genbank_status,
+                                        args, run_data)
             write_run_data(run_data)
-            snakefile = get_snakefile_path("preprocess-genbank-files.smk")
-            description = "Preprocessing genbank files"
-
-            run_snakemake(snakefile,
-                          num_genbank_files_remaining,
-                          args, run_data, description)
-
-            run_data = read_run_data(run_data.run_data_path)
             capture_failed_genbank_files(run_data)
 
         report_genbank_update(run_data)
 
     return run_data
+
+
+def _process_one_genbank_file(gb, run_data):
+    """
+    Worker: preprocess one genbank file. Tries CDS AA extraction first; falls back
+    to extracting nucleotides + calling genes with prodigal. Runs in a worker
+    thread, touches only per-file paths and returns a status dict; all GenomeData
+    mutation happens on the main thread in _apply_genbank_status.
+    """
+    try:
+        path, was_gzipped = gunzip_if_needed(gb.full_path)
+
+        prodigal_used = False
+        final_nt_path = None
+        final_AA_path = None
+        num_genes = 0
+
+        done, final_AA_path, num_genes = extract_filter_and_rename_cds_amino_acids_from_gb(gb.id, path, run_data)
+
+        if not done:
+            extract_fasta_from_gb(gb.id, path, run_data)
+            done = run_prodigal(gb.id, run_data, path, "genbank")
+            prodigal_used = True
+            if done:
+                done, final_AA_path, num_genes, final_nt_path = filter_and_rename_fasta(gb.id, run_data, run_data.genbank_processing_dir)
+            else:
+                prodigal_used = False
+
+        if was_gzipped:
+            os.remove(path)
+
+        return {
+            "done": bool(done),
+            "prodigal_used": prodigal_used,
+            "was_gzipped": bool(was_gzipped),
+            "final_AA_path": final_AA_path,
+            "final_nt_path": final_nt_path,
+            "num_genes": int(num_genes or 0),
+        }
+    except BaseException:
+        return {
+            "done": False,
+            "prodigal_used": False,
+            "was_gzipped": False,
+            "final_AA_path": None,
+            "final_nt_path": None,
+            "num_genes": 0,
+        }
+
+
+def _apply_genbank_status(gb, status, run_data):
+    """
+    Apply one worker's result to its GenomeData. Main thread only.
+    """
+    gb.num_genes = int(status.get("num_genes", 0) or 0)
+
+    if status.get("done"):
+        if status.get("was_gzipped"):
+            gb.mark_was_gzipped()
+        gb.mark_preprocessing_done()
+        gb.final_AA_path = status.get("final_AA_path")
+        gb.final_nt_path = status.get("final_nt_path")
+    else:
+        gb.mark_removed("genbank-file processing failed")
+        gb.preprocessing_failed = True
+
+    if status.get("prodigal_used"):
+        gb.mark_prodigal_used()
+        run_data.tools_used.prodigal_used = True
 
 
 def capture_failed_genbank_files(run_data):
@@ -329,24 +389,79 @@ def preprocess_fasta_genomes(args, run_data):
 
         report_processing_stage("fasta", run_data)
 
-        num_fasta_files_remaining = len([fd for fd in run_data.fasta_files if not fd.preprocessing_done and not fd.removed])
+        fastas_to_process = [fd for fd in run_data.fasta_files if not fd.preprocessing_done and not fd.removed]
 
-        if num_fasta_files_remaining > 0:
-            # writing run_data to file so it can be accessed by snakemake
+        if len(fastas_to_process) > 0:
+            run_data = run_pooled_stage(fastas_to_process,
+                                        _process_one_fasta_file,
+                                        _apply_fasta_status,
+                                        args, run_data)
             write_run_data(run_data)
-            snakefile = get_snakefile_path("preprocess-fasta-files.smk")
-            description = "Preprocessing fasta files"
-
-            run_snakemake(snakefile,
-                          num_fasta_files_remaining,
-                          args, run_data, description)
-
-            run_data = read_run_data(run_data.run_data_path)
             capture_failed_fasta_files(run_data)
 
         report_fasta_update(run_data)
 
     return run_data
+
+
+def _process_one_fasta_file(fasta, run_data):
+    """
+    Worker: preprocess one nucleotide FASTA -- call genes with prodigal, then
+    filter/rename. Runs in a worker thread; per-file paths only, returns a status
+    dict. GenomeData mutation happens on the main thread in _apply_fasta_status.
+    """
+    try:
+        path, was_gzipped = gunzip_if_needed(fasta.full_path)
+
+        done = run_prodigal(fasta.id, run_data, path, "fasta")
+
+        if was_gzipped:
+            os.remove(path)
+
+        if done:
+            done, final_AA_path, num_genes, final_nt_path = filter_and_rename_fasta(fasta.id, run_data, run_data.fasta_processing_dir)
+        else:
+            final_AA_path = None
+            final_nt_path = None
+            num_genes = 0
+
+        return {
+            "done": bool(done),
+            "was_gzipped": bool(was_gzipped),
+            "prodigal_used": bool(done),
+            "final_AA_path": final_AA_path,
+            "final_nt_path": final_nt_path,
+            "num_genes": int(num_genes or 0),
+        }
+    except BaseException:
+        return {
+            "done": False,
+            "was_gzipped": False,
+            "prodigal_used": False,
+            "final_AA_path": None,
+            "final_nt_path": None,
+            "num_genes": 0,
+        }
+
+
+def _apply_fasta_status(fasta, status, run_data):
+    """
+    Apply one worker's result to its GenomeData. Main thread only.
+    """
+    fasta.num_genes = int(status.get("num_genes", 0) or 0)
+
+    if status.get("done"):
+        if status.get("was_gzipped"):
+            fasta.mark_was_gzipped()
+        fasta.mark_preprocessing_done()
+        fasta.final_AA_path = status.get("final_AA_path")
+        fasta.final_nt_path = status.get("final_nt_path")
+    else:
+        fasta.mark_removed("fasta-file processing failed")
+        fasta.preprocessing_failed = True
+
+    if status.get("prodigal_used"):
+        run_data.tools_used.prodigal_used = True
 
 
 def capture_failed_fasta_files(run_data):
@@ -362,24 +477,67 @@ def preprocess_amino_acid_files(args, run_data):
 
         report_processing_stage("amino-acid", run_data)
 
-        num_AA_files_remaining = len([fd for fd in run_data.amino_acid_files if not fd.preprocessing_done and not fd.removed])
+        AAs_to_process = [fd for fd in run_data.amino_acid_files if not fd.preprocessing_done and not fd.removed]
 
-        if num_AA_files_remaining > 0:
-            # writing run_data to file so it can be accessed by snakemake
+        if len(AAs_to_process) > 0:
+            run_data = run_pooled_stage(AAs_to_process,
+                                        _process_one_amino_acid_file,
+                                        _apply_amino_acid_status,
+                                        args, run_data)
             write_run_data(run_data)
-            snakefile = get_snakefile_path("preprocess-amino-acid-files.smk")
-            description = "Preprocessing amino-acid files"
-
-            run_snakemake(snakefile,
-                          num_AA_files_remaining,
-                          args, run_data, description)
-
-            run_data = read_run_data(run_data.run_data_path)
             capture_failed_amino_acid_files(run_data)
 
         report_AA_update(run_data)
 
     return run_data
+
+
+def _process_one_amino_acid_file(AA, run_data):
+    """
+    Worker: preprocess one amino-acid FASTA -- just filter/rename (no gene calling).
+    Runs in a worker thread; per-file paths only, returns a status dict. GenomeData
+    mutation happens on the main thread in _apply_amino_acid_status.
+    """
+    try:
+        path, was_gzipped = gunzip_if_needed(AA.full_path)
+
+        done, final_AA_path, num_genes, final_nt_path = filter_and_rename_fasta(AA.id, run_data, path, full_path=True)
+
+        if was_gzipped:
+            os.remove(path)
+
+        return {
+            "done": bool(done),
+            "was_gzipped": bool(was_gzipped),
+            "final_AA_path": final_AA_path,
+            "final_nt_path": final_nt_path,
+            "num_genes": int(num_genes or 0),
+        }
+    except BaseException:
+        return {
+            "done": False,
+            "was_gzipped": False,
+            "final_AA_path": None,
+            "final_nt_path": None,
+            "num_genes": 0,
+        }
+
+
+def _apply_amino_acid_status(AA, status, run_data):
+    """
+    Apply one worker's result to its GenomeData. Main thread only.
+    """
+    AA.num_genes = int(status.get("num_genes", 0) or 0)
+
+    if status.get("done"):
+        if status.get("was_gzipped"):
+            AA.mark_was_gzipped()
+        AA.mark_preprocessing_done()
+        AA.final_AA_path = status.get("final_AA_path")
+        AA.final_nt_path = status.get("final_nt_path")
+    else:
+        AA.mark_removed("amino-acid-file processing failed")
+        AA.preprocessing_failed = True
 
 
 def capture_failed_amino_acid_files(run_data):

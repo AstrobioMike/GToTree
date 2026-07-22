@@ -7,7 +7,6 @@ from importlib.metadata import version
 @dataclass
 class CitationsInfo:
     gtotree = "Lee MD. GToTree: a user-friendly workflow for phylogenomics. Bioinformatics. 2019; (March):1-3. doi.org/10.1093/bioinformatics/btz188\n\n"
-    snakemake = "Koster J and Rahmann S. Snakemake - a scalable bioinformatics workflow engine. Bioinformatics. 2012; 28, 2520-2522. doi.org/10.1093/bioinformatics/bts480\n\n"
     hmmer = "Eddy SR. Accelerated profile HMM searches. PLoS Comput. Biol. 2011; (7)10. doi.org/10.1371/journal.pcbi.1002195\n\n"
     muscle = "Edgar RC. MUSCLE v5 enables improved estimates of phylogenetic tree confidence by ensemble bootstrapping. bioRxiv. 2021.06.20.449169. doi.org/10.1101/2021.06.20.449169\n\n"
     trimal = "Gutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972-1973. doi.org/10.1093/bioinformatics/btp348\n\n"
@@ -34,9 +33,6 @@ def generate_citations_info(run_data):
 
         outfile.write(f"GToTree v{version('GToTree')}\n")
         outfile.write(citations_info.gtotree)
-
-        outfile.write(f"Snakemake v{get_snakemake_version()}\n")
-        outfile.write(citations_info.snakemake)
 
         outfile.write(f"HMMER v{get_hmmer_version()}\n")
         outfile.write(citations_info.hmmer)
@@ -79,11 +75,6 @@ def generate_citations_info(run_data):
             outfile.write(f"Universal SCG-set\n")
             outfile.write(citations_info.universal_SCG_set)
 
-
-def get_snakemake_version():
-    snakemake_version = subprocess.run('snakemake -v',
-                                       shell = True, capture_output = True, text = True)
-    return snakemake_version.stdout.strip()
 
 def get_hmmer_version():
     hmm_version = subprocess.run('hmmsearch -h | head -n 2 | tail -n 1 | tr -s " " "\t" | cut -f 3',

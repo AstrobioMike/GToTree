@@ -44,7 +44,6 @@ requirements:
     - rich-argparse
     - requests =2.34
     - sed
-    - snakemake =8.30.0
     - tqdm =4.68
     - trimal
     - veryfasttree

@@ -7,17 +7,13 @@ import json
 import time
 import socket
 import argparse
-import pandas as pd # type: ignore
 from dataclasses import dataclass, field, asdict
 from typing import List
 from tqdm import tqdm # type: ignore
-import subprocess
 import urllib.request
 import urllib.error
 from datetime import datetime
-import importlib.resources as pkg_resources
-from gtotree.utils.messaging import (report_early_exit, report_snakemake_failure,
-                                     report_message, color_text, wprint)
+from gtotree.utils.messaging import (report_message, color_text, wprint)
 
 
 @dataclass
@@ -363,6 +359,9 @@ class RunData:
     hmm_path: str = ""
     mapping_file_path: str = ""
     mapping_dict: dict = field(default_factory=dict)
+    # input_acc -> {rank: value for the 7 ranks (+ 'strain' for NCBI)}; populated by
+    # the gtdb/ncbi tax handlers and consumed by the summary-table builder
+    tax_info_dict: dict = field(default_factory=dict)
     initial_mapping_IDs_from_user: List[str] = field(default_factory=list)
     ready_genome_files_dir: str = ""
     hmm_results_dir: str = ""
@@ -528,7 +527,7 @@ class RunData:
     def found_ncbi_accs(self) -> List[GenomeData]:
         return [gd for gd in self.ncbi_accs if gd.acc_was_found]
 
-    def get_ncbi_accs_for_snakemake_preprocessing(self) -> List[GenomeData]:
+    def get_ncbi_accs_for_preprocessing(self) -> List[GenomeData]:
         return [gd for gd in self.ncbi_accs if gd.acc_was_found and not gd.preprocessing_done and not gd.removed]
 
     def remaining_ncbi_accs(self) -> List[GenomeData]:
@@ -699,10 +698,6 @@ def read_run_data(path):
         pass
 
 
-def get_snakefile_path(basename):
-    return pkg_resources.files("gtotree") / f"smk/{basename}"
-
-
 def touch(path):
     with open(path, 'a'):
         os.utime(path, None)
@@ -751,54 +746,6 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
             pbar.update(1)
 
     return run_data
-
-
-def run_snakemake(snakefile, tqdm_jobs, args, run_data, description, print_lines=False):
-    print("")
-    num_finished = 0 # counting this so it doesn't flip the progress bar when it counts the final "all" rule
-    log = f"{run_data.logs_dir}/{description.replace(' ', '-').lower()}.log"
-    log_dir_rel = f"{run_data.logs_dir_rel}/{description.replace(' ', '-').lower()}.log"
-
-    cmd = [
-        "snakemake",
-        "--snakefile", snakefile,
-        "--cores", f"{args.num_jobs}",
-        "--default-resources", f"tmpdir='{run_data.tmp_dir}'",
-        "--config", f"run_data_path={run_data.run_data_path}",
-        "--directory", run_data.run_files_dir
-    ]
-
-    # bar_format = "      {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
-    bar_format = (
-    "      {percentage:3.0f}%|{bar}| "
-    "{n_fmt}/{total_fmt} "
-    "[time elapsed: {elapsed} | est. remaining: {remaining}]"
-    )
-
-    with open(log, "w") as log_file, tqdm(total = tqdm_jobs, bar_format = bar_format, ncols = 76) as pbar:
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1
-        )
-        for line in iter(process.stdout.readline, ""):
-            log_file.write(line)
-            log_file.flush()
-
-            if "Finished job" in line:
-                num_finished += 1
-                if num_finished <= tqdm_jobs:
-                    pbar.update(1)
-            if print_lines:
-                print(line, end="")
-
-        process.wait()
-
-        if process.returncode != 0:
-            report_snakemake_failure(description, log_dir_rel, run_data)
-            report_early_exit(run_data)
 
 
 def gunzip_if_needed(path):

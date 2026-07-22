@@ -1,5 +1,7 @@
 import pandas as pd # type: ignore
 
+from gtotree.utils.taxonomy.tax_ranks import RANKS
+
 def generate_primary_summary_table(args, run_data):
 
     if run_data.ncbi_sub_table_path:
@@ -46,20 +48,24 @@ def generate_primary_summary_table(args, run_data):
 
 def add_tax_info(df, run_data, args):
 
-    if args.add_gtdb_tax:
-        tax_df_path = run_data.tmp_dir + "/gtdb-subset-tax.tsv"
-    else:
-        tax_df_path = run_data.tmp_dir + "/ncbi-accession-tax.tsv"
+    # taxonomy was resolved from the hosted Parquet asset during header-updating and
+    # stashed on run_data as {input_acc: {rank: value, ...}}; build the summary
+    # columns from that rather than re-reading anything from disk
+    tax_info = run_data.tax_info_dict or {}
 
-    tax_df = pd.read_csv(tax_df_path, sep="\t", header=0)
+    tax_cols = list(RANKS)
 
-    # getting taxonomy columns
-    start_col = list(tax_df.columns).index("domain")
-    tax_cols = tax_df.columns[start_col:].tolist()
+    tax_df = pd.DataFrame(
+        [
+            {"input_acc": acc, **{rank: ranks.get(rank, "NA") for rank in tax_cols}}
+            for acc, ranks in tax_info.items()
+        ],
+        columns=["input_acc"] + tax_cols,
+    )
 
     # merging
     df = df.merge(
-        tax_df[["input_acc"] + tax_cols],
+        tax_df,
         how = "left",
         left_on = "assembly_id",
         right_on = "input_acc",

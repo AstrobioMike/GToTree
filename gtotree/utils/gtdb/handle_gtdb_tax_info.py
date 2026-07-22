@@ -18,6 +18,8 @@ def update_mapping_dict_with_gtdb_tax_info(args, run_data):
 
     tax_rows = subset_gtdb_info(run_data)
 
+    run_data.tax_info_dict = tax_rows
+
     for input_acc, ranks in tax_rows.items():
         if input_acc in run_data.mapping_dict:
             continue

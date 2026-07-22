@@ -1,11 +1,10 @@
-### TO FIX STILL ###
-
-    # adding gtdb tax is failing currently after new parquet and --wanted-ref-tax additions (ncbi not tested yet)
-
 ### TO DO STILL ###
 
-    # major speedups with dropping snakemake for some stages (downlaod/accession preprocessing, SCG-searching, KO/PFam-searching)
-        # consider other ones to i maybe should dump snakemake, like maybe filtering stages
+    # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data, "Decompressing" in get-pfam-data, etc.)
+        # maybe add spinners to writing out the gtdb and ncbi tables (--get-table) from the get-accs helpers
+        # spinner when getting/organizing pfams and kos for additional target searching
+        # probably the treeing step, putting it after where it says the log file can be monitored
+
 
     # build in/port over these from v1 (or make new) as subcommands under gtt
         # gtt-gen-scg-hmms from v1 and make it a subcommand under gtt
@@ -13,19 +12,17 @@
         # gtt-ko-search -> gtt search-kos (totally new one; should take all input types that gtotree can take, including --wanted-ref-tax))
 
 
-    # add my with_spinner() from bit for things like extracting the tarballs (e.g., get-kofamscan-data, "Decompressing" in get-pfam-data, etc.)
-        # maybe add spinners to writing out the gtdb and ncbi tables (--get-table) from the get-accs helpers
-        # spinner when getting/organizing pfams and kos for additional target searching
 
     # maybe add a notice and spinner when selecting ref genomes to include (as it happens before the run outputs any info)
         # probably have this after the -- RUN INFO -- header
 
     # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can auto-pick based on the --wanted-ref-tax for them
+        # find lowest rank in the associated taxonomy that has a pre-built SCG-set and use that one
 
     # consider richargparse for the main gtotree parser, instead of my manual one that i've stuck to for legacy reasons...
         # either way, make a condensed standard help and a --show-detailed-help for the full help (so it's less overwhelming at first glance)
 
-    # pursue faster and better handling of reading and writing my run_data object when passing around to/from snakemake calls
+    # pursue faster and better handling of reading and writing my run_data object (if that's still done at all now that snakemake is dropped)
 
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
         # same for pfam, that they start with PF
@@ -96,7 +93,10 @@
     # think about bioconda recipe, that will probably still need to be maintained separately from the conda-recipe in this repo
     # revisit all pages on the gtotree wiki and update them as needed
     # made the CHANGELOG.md (and release notes) really comprehensive about the v1 to v2 changes, and put a link to the initial release notes somewhere on the wiki maybe
-    # make sure itol files honor any swapped labels appropriately so they match the final tree
+    # i built a lot of this in snakemake at first, with a lot of dancing around to pass info back and forth
+        # then i dropped all of the snakemake
+        # revisit everything and make sure i'm not doing any unnecessary jumping through hoops still
+
 
     ### TEST ALL FUNCTIONALITY ###
 
@@ -185,7 +185,6 @@ cat problem-accs.txt
     # unit tests (though it did fine without them for 7 years)
 # instead of just exiting and informing when input files have problems, GToTree2 fixes them
     # e.g., duplicate entries will be unique'd, windows line-endings will be converted, changes written to a new file that is then used
-# snakemake control over the main components for easier restart capabilities
 # things i've added over time
     # gtt-gen-SCG-HMMs
     # gtt-get-GTDB-accessions
@@ -201,7 +200,7 @@ cat problem-accs.txt
 # successfully continually maintained over this time despite its foundation being a main runner
 # of ~4,000 lines of BASH and dozens of independent python and BASH helper scripts with a lot
 # of redundancy in its code base. Among several other improvements and feature additions, GToTree
-# has now been rewritten from the ground up in python with its major stages being powered by
-# Snakemake workflows - enabling the potential for resuming failed or interrupted runs. This paper highlights
-# some of the new additions to GToTree since its initial launch.
+# has now been rewritten from the ground up in python with robustification and restart capabilities
+# for failed or interrupted runs. This paper highlights some of the many new additions to GToTree
+# since its initial launch.
 ### """
