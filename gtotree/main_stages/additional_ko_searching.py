@@ -8,10 +8,7 @@ from Bio import SeqIO # type: ignore
 from gtotree.utils.ko.ko_handling import parse_kofamscan_targets
 from gtotree.utils.messaging import (report_processing_stage,
                                      report_ko_searching_update)
-from gtotree.utils.general import (write_run_data,
-                                   read_run_data,
-                                   get_snakefile_path,
-                                   run_snakemake)
+from gtotree.utils.general import (run_pooled_stage)
 
 
 def search_kos(args, run_data):
@@ -29,17 +26,32 @@ def search_kos(args, run_data):
 
     if len(run_data.found_ko_targets) > 0:
 
-        num_genomes_to_search = len(run_data.get_all_input_genomes_for_ko_search())
+        genomes_to_search = run_data.get_all_input_genomes_for_ko_search()
 
-        if num_genomes_to_search > 0:
-            # writing run_data to file so it can be accessed by snakemake
-            write_run_data(run_data)
-            snakefile = get_snakefile_path("search-kos.smk")
-            description = "Searching KOs"
+        if len(genomes_to_search) > 0:
 
-            run_snakemake(snakefile, num_genomes_to_search, args, run_data, description)
+            count_rows = []
 
-            run_data = read_run_data(run_data.run_data_path)
+            def apply_ko(genome, status, run_data):
+                if status.get("ko_search_failed"):
+                    genome.mark_ko_search_failed()
+                else:
+                    genome.mark_ko_search_done()
+                ko_results_tsv = f"{run_data.ko_results_dir}/individual-genome-results/{genome.id}/kofamscan-results.tsv"
+                counts_list = get_ko_counts(run_data.found_ko_targets, ko_results_tsv)
+                count_rows.append([genome.id, genome.num_genes] + counts_list)
+
+            run_data = run_pooled_stage(
+                genomes_to_search,
+                _ko_search_worker,
+                apply_ko,
+                args, run_data,
+            )
+
+            cols = ['assembly_id', 'total_gene_count'] + run_data.found_ko_targets
+            ko_counts_df = pd.DataFrame(count_rows, columns=cols)
+            ko_counts_df.to_csv(
+                f"{run_data.ko_results_dir}/ko-hit-counts.tsv", sep='\t', index=False)
 
         print("") ; print("Combining KO search results...".center(82))
 
@@ -51,6 +63,30 @@ def search_kos(args, run_data):
     report_ko_searching_update(run_data)
 
     return run_data
+
+
+def _ko_search_worker(genome, run_data):
+    """
+    Per-genome KO search (kofamscan) in a worker thread. Writes this genome's own
+    results tsv and per-KO tmp hit fastas. Returns a status dict. Must not mutate
+    shared run_data state.
+    """
+    ID = genome.id
+    AA_path = genome.final_AA_path
+
+    base_outpath = f"{run_data.ko_results_dir}/individual-genome-results/{ID}/"
+    os.makedirs(base_outpath, exist_ok=True)
+    ko_search_failed = run_ko_search(run_data.target_ko_profiles_dir,
+                                     run_data.target_kos_tsv,
+                                     base_outpath,
+                                     AA_path)
+
+    if not ko_search_failed:
+        results_tsv = f"{run_data.ko_results_dir}/individual-genome-results/{ID}/kofamscan-results.tsv"
+        out_base = f"{run_data.tmp_ko_results_dir}/{ID}/"
+        write_out_tmp_ko_hits(results_tsv, out_base, AA_path)
+
+    return {"ko_search_failed": bool(ko_search_failed)}
 
 
 def run_ko_search(profiles_dir, ko_file, base_outpath, AA_file):

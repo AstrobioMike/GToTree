@@ -8,12 +8,17 @@
         # maybe add spinners to writing out the gtdb and ncbi tables (--get-table) from the get-accs helpers
 
     # maybe add a notice and spinner when selecting ref genomes to include (as it happens before the run outputs any info)
+        # probably have this after -- RUN INFO -- header
 
     # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can pick based on the --wanted-ref-tax for them
 
     # consider richargparse for the main gtotree parser, instead of my manual one that i've stuck to for legacy reasons...
 
     # pursue faster and better handling of reading and writing my run_data object when passing around to/from snakemake calls
+
+    # maybe have a check when the user provides an additional-ko-targets file (-K) that they start with K
+        # same for pfam, that they start with PF
+        # also, see how it handles if a target KO isn't found
 
 
     # still need to implement iToL-file generation for both pfam and ko searching results

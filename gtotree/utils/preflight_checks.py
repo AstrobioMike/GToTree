@@ -25,6 +25,7 @@ from gtotree.utils.hmms.scg_hmm_setup import check_hmm_file
 from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data
+from gtotree.utils.pfam.get_pfam_data import get_pfam_data
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import AmbiguousTaxon, TaxonNotFound
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
@@ -554,6 +555,8 @@ def check_for_required_dbs(args):
         get_gtdb_data()
     if args.target_kos_file:
         get_kofamscan_data()
+    if args.target_pfams_file:
+        get_pfam_data()
 
 
 def track_tools_used(args, run_data):

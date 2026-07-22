@@ -574,7 +574,7 @@ class RunData:
         return [gd.provided_path for gd in self.amino_acid_files if gd.removed and gd.preprocessing_failed]
 
     def get_failed_hmm_search_paths(self) -> List[str]:
-        return [gd.provided_path for gd in self.all_input_genomes if gd.preprocessing_done and not gd.hmm_search_done]
+        return [(gd.provided_path or gd.id) for gd in self.all_input_genomes if gd.preprocessing_done and not gd.hmm_search_done]
 
     def get_prodigal_used_genbank_ids(self) -> List[str]:
         return [gd.id for gd in self.genbank_files if gd.prodigal_used]
@@ -706,6 +706,51 @@ def get_snakefile_path(basename):
 def touch(path):
     with open(path, 'a'):
         os.utime(path, None)
+
+
+GTT_PROGRESS_BAR_FORMAT = (
+    "      {percentage:3.0f}%|{bar}| "
+    "{n_fmt}/{total_fmt} "
+    "[time elapsed: {elapsed} | est. remaining: {remaining}]"
+)
+
+
+def run_pooled_stage(items, worker, apply_result, args, run_data,
+                     max_workers_cap=None):
+    """
+    Dispatches `worker(item, run_data)` across a ThreadPoolExecutor and, as each
+    future completes, calls `apply_result(item, result, run_data)` on the MAIN
+    thread. This split is deliberate and load-bearing:
+
+      - `worker` runs concurrently in a thread. It must only touch per-item files
+        and return a plain result object; it must NOT mutate shared run_data
+        state or append to shared output files (that would race)
+      - `apply_result` runs single-threaded here, in completion order, so all
+        GenomeData/SCG bookkeeping, shared-table appends, and shared counters are
+        safe
+
+    `max_workers_cap` optionally clamps the worker count below --num-jobs (e.g., like
+    how i limit concurrent downloads from ncbi); None means just use --num-jobs
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    num_workers = max(1, args.num_jobs)
+    if max_workers_cap is not None:
+        num_workers = min(num_workers, max_workers_cap)
+
+    print("")
+    with ThreadPoolExecutor(max_workers=num_workers) as pool, \
+         tqdm(total=len(items), bar_format=GTT_PROGRESS_BAR_FORMAT, ncols=76) as pbar:
+
+        futures = {pool.submit(worker, item, run_data): item for item in items}
+
+        for future in as_completed(futures):
+            item = futures[future]
+            result = future.result()
+            apply_result(item, result, run_data)
+            pbar.update(1)
+
+    return run_data
 
 
 def run_snakemake(snakefile, tqdm_jobs, args, run_data, description, print_lines=False):
