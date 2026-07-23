@@ -3,9 +3,11 @@
 
     # build in/port over these from v1 (or make new) as subcommands under gtt
         # gtt-gen-scg-hmms from v1 and make it a subcommand under gtt
+            # maybe make it in the style of bit gen-mg with regard to sections and spinners vs progress bars
         # gtt-pfam-search -> gtt search-pfams (should take all input types that gtotree can take, including --wanted-ref-tax)
+            # set up spinner and progress bars similar to main gtotree run at this task
         # gtt-ko-search -> gtt search-kos (totally new one; should take all input types that gtotree can take, including --wanted-ref-tax))
-
+            # set up spinner and progress bars similar to main gtotree run at this task
 
     # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can auto-pick based on the --wanted-ref-tax for them
         # find lowest rank in the associated taxonomy that has a pre-built SCG-set and use that one
