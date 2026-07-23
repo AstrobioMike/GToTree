@@ -29,9 +29,7 @@ ASSEMBLY_LEVEL_ORDER = {
 # but only if it is not actually bad. These gates are deliberately loose, here to
 # catch junk, not to replace all "reference" genomes
 REF_MIN_COMPLETENESS = 85.0
-
 REF_MAX_CONTAMINATION = 10.0
-
 MISSING_CONTAMINATION = float("inf")
 
 # How many ranks FINER than the target the default derep-rank
@@ -57,7 +55,7 @@ def resolve_derep_rank(wanted_rank, derep_rank="auto"):
     derep_rank:
       "auto"            -> DEFAULT_DEREP_BY_TARGET_RANK (two ranks finer, clamped)
       "off"/None/"none" -> no dereplication
-      an explicit rank  -> honoured, but must not be COARSER than the target
+      an explicit rank  -> honored, but must not be COARSER than the target
     """
     warnings = []
     w_rank = RANKS[rank_index(wanted_rank)]
@@ -71,7 +69,7 @@ def resolve_derep_rank(wanted_rank, derep_rank="auto"):
             warnings.append(
                 f"Dereplication is off by default for a target at '{w_rank}' rank: the "
                 f"default derep rank would be '{w_rank}' itself, which returns a single "
-                f"genome. For this run, all genomes under the taxon will be used. If you DID want a "
+                f"genome. For this run, all genomes under the taxon will be used. If you do want a "
                 f"single best representative (e.g., as an outgroup), pass "
                 f"--derep-rank {w_rank} explicitly.")
         return eff, warnings
@@ -114,6 +112,7 @@ def size_advice(n_selected, wanted_rank, derep_rank):
         return [f"Only {n_selected:,} reference genome(s) selected. Consider a finer "
                 f"--derep-rank (e.g., '{RANKS[d + 1]}') for more genomes to be included."]
     return []
+
 
 def _num(value, default=None):
     if value in (None, "", NA, "na"):
