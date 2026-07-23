@@ -12,7 +12,7 @@ TaxonNotFound / AmbiguousTaxon / ValueError). The CLI translation -- friendly me
 stay thin and be exercised without a process exit.
 """
 
-from gtotree.utils.taxonomy.tax_derep import select_ref_genomes
+from gtotree.utils.taxonomy.tax_derep import select_ref_genomes, size_advice
 from gtotree.utils.gtdb.get_gtdb_data import gtdb_data_table_path
 from gtotree.utils.ncbi.get_ncbi_assembly_data import ncbi_data_table_path
 
@@ -79,5 +79,10 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
         raise WantedRefTaxError(
             f"No accessions were found for the --wanted-ref-tax target "
             f"'{selection.canonical}'.")
+
+    selection.warnings.extend(
+        size_advice(len(selection.accessions),
+                    selection.resolved_rank,
+                    selection.effective_derep_rank))
 
     return selection.accessions, selection
