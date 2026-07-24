@@ -246,7 +246,7 @@ def _phase_counter():
 
 
 def section(title):
-    print(color_text(f"\n  {title}", "yellow"))
+    print(color_text(f"\n  {title}\n", "yellow"))
 
 
 def section_border():
