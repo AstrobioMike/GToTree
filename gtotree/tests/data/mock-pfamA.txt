@@ -1,0 +1,5 @@
+PF90001	MockA	Domain	Mock domain A	x	y	z	a	b	c	d	e	f	g	h	41	i	j	k	l	m	n	o	p	q	r	s	3	t	u	v	40.0	35	75.5	w
+PF90002	MockB	Family	Mock domain B	x	y	z	a	b	c	d	e	f	g	h	41	i	j	k	l	m	n	o	p	q	r	s	7	t	u	v	41.0	40	60.2	w
+PF90003	MockC	Domain	Mock domain C	x	y	z	a	b	c	d	e	f	g	h	41	i	j	k	l	m	n	o	p	q	r	s	1	t	u	v	38.0	30	50.0	w
+PF90004	MockD	Family	Mock domain D	x	y	z	a	b	c	d	e	f	g	h	41	i	j	k	l	m	n	o	p	q	r	s	2	t	u	v	39.0	33	12.4	w
+PF90005	MockE	Domain	Below cutoff	x	y	z	a	b	c	d	e	f	g	h	41	i	j	k	l	m	n	o	p	q	r	s	9	t	u	v	20.0	25	104.7	w

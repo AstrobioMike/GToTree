@@ -7,8 +7,6 @@ import os
 import time
 import random
 import subprocess
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm # type: ignore
 from gtotree.utils.messaging import (report_early_exit,
                                      report_processing_stage,
                                      report_ncbi_update,
@@ -27,7 +25,23 @@ from gtotree.utils.general import (write_run_data,
 
 # capping concurrent NCBI download threads regardless of --num-jobs
 MAX_NCBI_DOWNLOAD_THREADS = 20
-NCBI_DOWNLOAD_MAX_RETRIES = 5
+NCBI_DOWNLOAD_MAX_RETRIES = 10
+
+# Retry/backoff policy, mirroring bit's dl-ncbi-assemblies.
+#
+# HTTP statuses that mean we're specifically being rate-limited, as opposed to a plain
+# server hiccup. These get true exponential backoff; everything else transient gets the
+# sawtooth below.
+NCBI_THROTTLE_STATUS = {429}
+
+# ceiling on any single retry sleep (seconds), applied to the throttled path
+NCBI_MAX_BACKOFF = 30
+
+# separate, larger ceiling for a server-specified Retry-After
+NCBI_MAX_RETRY_AFTER = 300
+
+# length of the non-throttled sawtooth cycle, e.g., with 5 set here: 1, 2, 4, 8, 16, then start over
+NCBI_SAWTOOTH_CYCLE = 5
 
 
 def preprocess_genomes(args, run_data):
@@ -63,32 +77,18 @@ def preprocess_ncbi_genomes(args, run_data):
 
 def download_and_preprocess_ncbi_accessions(accs_to_process, args, run_data):
 
-    num_workers = max(1, min(args.num_jobs, MAX_NCBI_DOWNLOAD_THREADS))
-
     base_link_map = build_base_link_map(run_data)
 
-    bar_format = (
-        "      {percentage:3.0f}%|{bar}| "
-        "{n_fmt}/{total_fmt} "
-        "[time elapsed: {elapsed} | est. remaining: {remaining}]"
-    )
+    # base_link_map is built once up front and shared read-only across workers, so it's
+    # closed over here rather than rebuilt per accession
+    def worker(acc_gd, rd):
+        return _process_one_ncbi_accession(acc_gd, rd, base_link_map)
 
-    print("")
-    with ThreadPoolExecutor(max_workers=num_workers) as pool, \
-         tqdm(total=len(accs_to_process), bar_format=bar_format, ncols=76) as pbar:
-
-        futures = {
-            pool.submit(_process_one_ncbi_accession, acc_gd, run_data, base_link_map): acc_gd
-            for acc_gd in accs_to_process
-        }
-
-        for future in as_completed(futures):
-            acc_gd = futures[future]
-            status = future.result()
-            _apply_ncbi_accession_status(acc_gd, status, run_data)
-            pbar.update(1)
-
-    return run_data
+    return run_pooled_stage(accs_to_process,
+                            worker,
+                            _apply_ncbi_accession_status,
+                            args, run_data,
+                            max_workers_cap=MAX_NCBI_DOWNLOAD_THREADS)
 
 
 def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
@@ -211,9 +211,12 @@ def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_R
     # on to fall back from amino-acid to nucleotide downloads.
     #
     # Transient failures (network blips, truncated/corrupt gzip, transient HTTP
-    # 429/5xx) are retried with exponential backoff + jitter. A 404 is permanent
-    # (the requested format doesn't exist for this accession) so we fail fast
-    # rather than burning retries, prepare_accession will then try the other format.
+    # 429/5xx) are retried, with the backoff policy chosen by why the attempt failed:
+    # an explicit throttle (429, or any response carrying Retry-After) gets capped
+    # exponential backoff, while a plain hiccup gets a sawtooth that never grows past
+    # ~16s. A 404 is permanent (the requested format doesn't exist for this accession)
+    # so we fail fast rather than burning retries; prepare_accession will then try the
+    # other format.
     tmp_gzip = filepath + ".gz"
     tmp_out = filepath + ".part"
 
@@ -225,6 +228,7 @@ def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_R
                 pass
 
     last_err = None
+    throttled = False
     for attempt in range(1, max_retries + 1):
         try:
             urllib.request.urlretrieve(link, tmp_gzip)
@@ -240,25 +244,98 @@ def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_R
             cleanup_partials()
             raise
         except urllib.error.HTTPError as e:
+            # NOTE: HTTPError subclasses URLError, so this must stay ahead of the
+            # broader except below or status codes would never be seen.
             cleanup_partials()
             # 404 -> requested format not available; permanent, don't retry
             if e.code == 404:
                 raise
             last_err = e
+            throttled = _is_throttle(e)
         except (urllib.error.URLError, OSError, EOFError, gzip.BadGzipFile) as e:
             cleanup_partials()
             last_err = e
+            # a connection reset or corrupt gzip carries no server instruction,
+            # so it takes the sawtooth path
+            throttled = False
 
         if attempt < max_retries:
-            _sleep_backoff(attempt)
+            _sleep_backoff(attempt, err=last_err, throttled=throttled)
 
     # exhausted retries -> raise so prepare_accession falls back / marks failure
     raise last_err if last_err is not None else RuntimeError(f"failed to download {link}")
 
 
-def _sleep_backoff(attempt):
-    # exponential backoff with jitter (like i do in bit)
-    time.sleep((2 ** (attempt - 1)) + random.uniform(0, 1))
+def _sleep_backoff(attempt, err=None, throttled=False):
+    """
+    Sleep before a retry. Two policies, chosen by WHY the attempt failed (same split
+    as bit's dl-ncbi-assemblies):
+
+    throttled=True  -- the server is explicitly rate-limiting us (HTTP 429, or any
+                       response carrying Retry-After). Honor Retry-After if given
+                       (capped at NCBI_MAX_RETRY_AFTER), otherwise true exponential
+                       backoff capped at NCBI_MAX_BACKOFF. Backing off progressively
+                       is the point here: retrying faster accelerates into the thing
+                       that's throttling us and tends to extend the penalty window.
+
+    throttled=False -- a generic transient failure (5xx, connection reset, timeout,
+                       truncated/corrupt gzip). These are blips or genuinely dead
+                       URLs, and there's no politeness argument for stretching the
+                       interval forever, so the wait SAWTOOTHS: 1, 2, 4, 8, 16, 1, 2,
+                       4, 8, 16, ... That keeps a straggler from parking a pool thread
+                       for many minutes while still spacing requests out, and we find
+                       out a file is dead far sooner.
+
+    `err` is the exception that caused the retry; its headers are consulted for
+    Retry-After when throttled.
+    """
+    if throttled:
+        retry_after = _retry_after_seconds(err)
+        if retry_after is not None:
+            time.sleep(min(retry_after, NCBI_MAX_RETRY_AFTER))
+            return
+        time.sleep(min((2 ** (attempt - 1)) + random.uniform(0, 1), NCBI_MAX_BACKOFF))
+        return
+
+    # sawtooth: exponential within a short cycle, then start over
+    step = (attempt - 1) % NCBI_SAWTOOTH_CYCLE
+    time.sleep((2 ** step) + random.uniform(0, 1))
+
+
+def _retry_after_seconds(err):
+    """
+    Pull a numeric Retry-After (seconds) off an HTTPError, or None if absent/unusable.
+
+    urllib's HTTPError carries the response headers, so unlike a bare urlretrieve call
+    we can see the server's instruction here. A non-numeric value (HTTP allows an
+    HTTP-date form) is treated as absent so the caller falls back to exponential
+    backoff rather than guessing.
+    """
+    headers = getattr(err, "headers", None)
+    if not headers:
+        return None
+    try:
+        value = headers.get("Retry-After")
+    except AttributeError:
+        return None
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_throttle(err):
+    """
+    True when a failure is the server explicitly rate-limiting us, rather than a
+    generic hiccup: an explicit throttle status, or any response that bothered to
+    tell us when to come back.
+    """
+    code = getattr(err, "code", None)
+    if code in NCBI_THROTTLE_STATUS:
+        return True
+    return _retry_after_seconds(err) is not None
 
 
 def build_base_link_map(run_data):

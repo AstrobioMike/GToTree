@@ -53,7 +53,7 @@ def build_parser(parent_subparsers=None):
     else:
         parser = argparse.ArgumentParser(
             description=desc,
-            epilog="Ex. usage: `gtt get-accs-from-ncbi -t Nitrospirota --source refseq`",
+            epilog="Ex. usage: `gtt get-accs-from-ncbi -t Alteromonas`",
             formatter_class=CustomRichHelpFormatter,
             add_help=False,
         )

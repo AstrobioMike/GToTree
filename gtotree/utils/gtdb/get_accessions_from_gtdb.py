@@ -61,6 +61,7 @@ def build_parser(parent_subparsers=None):
         help=("Target rank (if needed to disambiguate a taxon name that exists at multiple ranks)"),
         action="store",
     )
+
     optional.add_argument(
         "--derep-rank",
         choices=["auto", "off"] + list(RANKS),

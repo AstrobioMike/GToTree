@@ -726,6 +726,17 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
 
     `max_workers_cap` optionally clamps the worker count below --num-jobs (e.g., like
     how i limit concurrent downloads from ncbi); None means just use --num-jobs
+
+    NOTE ON WORKERS AND EXCEPTIONS: `worker` must not raise. A worker exception
+    propagates out of `future.result()` here and aborts the whole stage partway
+    through, with some items applied and some not. Workers should wrap their body in
+    `try/except BaseException` and return a status object describing the failure, so
+    `apply_result` can record it and the stage can carry on. All the preprocessing and
+    search workers follow this.
+
+    On KeyboardInterrupt, queued-but-not-yet-started work is cancelled rather than
+    drained, so a ctrl-c during a big stage exits once the in-flight workers finish
+    instead of waiting for every remaining item.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -734,16 +745,24 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
         num_workers = min(num_workers, max_workers_cap)
 
     print("")
-    with ThreadPoolExecutor(max_workers=num_workers) as pool, \
-         tqdm(total=len(items), bar_format=GTT_PROGRESS_BAR_FORMAT, ncols=76) as pbar:
+    pool = ThreadPoolExecutor(max_workers=num_workers)
+    try:
+        with tqdm(total=len(items), bar_format=GTT_PROGRESS_BAR_FORMAT, ncols=76) as pbar:
 
-        futures = {pool.submit(worker, item, run_data): item for item in items}
+            futures = {pool.submit(worker, item, run_data): item for item in items}
 
-        for future in as_completed(futures):
-            item = futures[future]
-            result = future.result()
-            apply_result(item, result, run_data)
-            pbar.update(1)
+            for future in as_completed(futures):
+                item = futures[future]
+                result = future.result()
+                apply_result(item, result, run_data)
+                pbar.update(1)
+    except KeyboardInterrupt:
+        # drop anything still queued; in-flight workers can't be interrupted, but we
+        # don't wait on the rest of the backlog
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
+    finally:
+        pool.shutdown(wait=True)
 
     return run_data
 

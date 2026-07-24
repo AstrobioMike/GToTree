@@ -1,5 +1,12 @@
+##################################################################
+#### GToTree v2: a user-friendlier workflow for phylogenomics ####
+##################################################################
+
 ### TO DO STILL ###
 
+    # now that i don't *need* to do the download and SCG-searching separately, maybe put them together
+        # again so that not as much storage is used???
+        # preprocessing genomes can just become "processing genomes"
 
     # build in/port over these from v1 (or make new) as subcommands under gtt
         # gtt-gen-scg-hmms from v1 and make it a subcommand under gtt
