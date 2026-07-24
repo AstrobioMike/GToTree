@@ -204,14 +204,16 @@ def get_pfam_data(force_update=False):
         _clear_partial_state(pfam_data_dir)
         download_pfam_data(pfam_data_dir)
         # _report_version(pfam_data_dir)
-        return
+        return pfam_data_dir
 
     if check_if_data_present(pfam_data_dir):
-        return
+        return pfam_data_dir
 
     print(color_text("\n    Downloading required Pfam data (only needs to be done once)...\n", "yellow"))
     download_pfam_data(pfam_data_dir)
     # _report_version(pfam_data_dir)
+
+    return pfam_data_dir
 
 
 def _report_version(location):

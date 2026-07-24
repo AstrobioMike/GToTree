@@ -53,7 +53,7 @@ DEFAULT_OUTPUT_DIR = "gtt-gen-scg-hmms-output"
 DEFAULT_PERCENT_SINGLE_COPY = 90
 
 # Default thread count (only used for the hmmsearch stage in here)
-DEFAULT_THREADS = 4
+DEFAULT_THREADS = 8
 
 # low number of genomes message threshold
 FEW_GENOMES_THRESHOLD = 10
@@ -176,20 +176,20 @@ def build_parser(parent_subparsers=None):
     )
 
     optional.add_argument(
-        "-t", "--num-threads",
-        metavar="<INT>",
-        default=DEFAULT_THREADS,
-        type=int,
-        help=(f"Number of threads to use during hmmsearch (default: {DEFAULT_THREADS})"),
-        action="store",
-    )
-
-    optional.add_argument(
         "-j", "--num-jobs",
         metavar="<INT>",
         default=10,
         type=int,
         help=("Number of concurrent jobs like downloading/processing genomes (default: 10)"),
+        action="store",
+    )
+
+    optional.add_argument(
+        "-t", "--num-threads",
+        metavar="<INT>",
+        default=DEFAULT_THREADS,
+        type=int,
+        help=(f"Number of threads to use during hmmsearch (default: {DEFAULT_THREADS}; this does NOT multiply with `--num-jobs`)"),
         action="store",
     )
 
@@ -246,7 +246,7 @@ def _phase_counter():
 
 
 def section(title):
-    print(color_text(f"\n  {title}\n", "yellow"))
+    print(color_text(f"\n\n  {title}\n", "yellow"))
 
 
 def section_border():
