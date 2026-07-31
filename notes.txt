@@ -5,6 +5,7 @@
 ### TO DO STILL ###
 
     # gtt gen-scg-hmms needs testing and print-out formatting work still (as well as tuning for high numbers)
+        # currently working on timing phases and chunking streaming of seqs during the hmm scanning
         # make "Extracting profiles" -> "Extracting target profiles" and make it a progress bar iterating through the total number of profiles
             # since it's currently counting those (and it's NOT counting the ones we're pulling out)
 
