@@ -64,23 +64,23 @@
 
     # do i want to modify 'reason-removed' for SCGs to delineate bewteen 'no/multiple hits found'
         # and dropped due to length filtering?
-
-    # more unit tests once things are more decided and stable
+        # yes, i do, figure out if that's still needed and do it if so
 
     # sync the CHANGELOG.md with the latest in the master gtotree v1 branch
         # including needed updates that were done in the v1 branch that were not in the v2 branch :(
 
 
 ### other things to do prior to final launch ###
-    # think about bioconda recipe, that will probably still need to be maintained separately from the conda-recipe in this repo
+    # think about bioconda recipe, that will still need to be maintained separately from the conda-recipe in this repo
     # revisit all pages on the gtotree wiki and update them as needed
-    # made the CHANGELOG.md (and release notes) really comprehensive about the v1 to v2 changes, and put a link to the initial release notes somewhere on the wiki maybe
+    # make the CHANGELOG.md (and release notes) really comprehensive about the v1 to v2 changes, and put a link to the initial release notes somewhere on the wiki maybe
     # i built a lot of this in snakemake at first, with a lot of dancing around to pass info back and forth
         # then i dropped all of the snakemake
         # revisit everything and make sure i'm not doing any unnecessary jumping through hoops still
 
 
-    ### TEST ALL FUNCTIONALITY ###
+    ### TEST ALL FUNCTIONALITY MORE ###
+    ### MORE UNIT TESTS ###
 
 
 
@@ -102,12 +102,20 @@ cat problem-accs.txt
 
 ### Overview of change from v1 to v2 ###
 # The codebase has been virtually entirely rewritten from an 5,000 line bash runner and X disparate
-# python scripts for a total of XX,XXX lines of code into a (admittedly still poorly engineered and packaged)
-# python package now with XXX modules and snakefiles over XX,XXX lines of code.
+# python scripts that was a total of XX,XXX lines of code into a python package now with XXX modules
+# and XX,XXX lines of code.
 
 # Why did i do this? I don't know. It worked fine and I've successfully maintained it for 6 years and over 600 citations.
 
 # But i felt it might help me grow...
+
+### v2 HIGHLIGHTS ###
+# - can specify reference genomes to include by taxonomy instead of needing to gather your own accessions now (e.g., `--wanted-ref-tax "bacteria"` or `--wanted-ref-tax "pseudomonadota"`)
+# - many more prepackaged SCG sets for differet groups (run `gtt hmms` to see them)
+# - HMM can be auto-selected based on the `--wanted-ref-tax` specification
+# - resume interrupted runs with `--resume`
+# - all helpers are subcommands under `gtt` now (run `gtt` or `gtt -h` for an overview)
+# - main program callable with lowercase `gtotree` or original `GToTree` now
 
 
 ### ADDED ###
@@ -168,9 +176,11 @@ cat problem-accs.txt
 # instead of just exiting and informing when input files have problems, GToTree2 fixes them
     # e.g., duplicate entries will be unique'd, windows line-endings will be converted, changes written to a new file that is then used
 # things i've added over time
-    # gtt-gen-SCG-HMMs
-    # gtt-get-GTDB-accessions
-    # gtt-subset...
+    # gtt gen-SCG-HMMs
+    # gtt get-accs-from-gtdb
+    # gtt get-accs-from-ncbi
+    # gtt search-pfams
+    # gtt search-kos
     # new prepackaged HMMs based on GTDB taxonomy (originals, based on NCBI, still available)
     # in tandem scanning of target KOs or pfams, files for added vizualization in iToL
     # pre-built HMMs stored remotely and downloaded when used, to slim package size and install time
