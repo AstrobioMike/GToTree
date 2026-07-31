@@ -5,8 +5,10 @@
 ### TO DO STILL ###
 
     # gtt gen-scg-hmms needs testing and print-out formatting work still (as well as tuning for high numbers)
-        # making "Extracting profiles" -> "Extracting target profiles" and make it a progress bar iterating through the total number of profiles
-            # since it's counting those (and it's NOT counting the ones we're pulling out)
+        # make "Extracting profiles" -> "Extracting target profiles" and make it a progress bar iterating through the total number of profiles
+            # since it's currently counting those (and it's NOT counting the ones we're pulling out)
+
+    # do i still use/need the run_data object? maybe i don't need the reading/writing anymore?
 
     # now that i don't *need* to do the download and SCG-searching separately, maybe put them together
         # again so that not as much storage is used???
