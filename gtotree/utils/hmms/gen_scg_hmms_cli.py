@@ -21,13 +21,16 @@ import argparse
 from tqdm import tqdm  # type: ignore
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
-from gtotree.utils.general import run_pooled_stage
+from gtotree.utils.general import (run_pooled_stage,
+                                   GTT_PROGRESS_BAR_FORMAT_INDENTED,
+                                   GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED)
 from gtotree.utils import phase_stats
 from gtotree.utils.messaging import (report_message, color_text, spinner,
                                      report_very_early_exit, wprint)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
+                                                   describe_source_version,
                                                    WantedRefTaxError)
 from gtotree.utils.hmms.gen_scg_hmms import (GenSCGHMMsError, DEFAULT_MIN_PFAM_COVERAGE,
                                              pfam_data_paths,
@@ -294,15 +297,25 @@ def setup_output_dir(args):
 
     if getattr(args, "resume", False) and args.force_overwrite:
         raise GenSCGHMMsError(
-            "`--resume` and `-F`/`--force-overwrite` can't be used together -- one "
+            "`--resume` and `-F`/`--force-overwrite` can't be used together, one "
             "reuses the previous run and the other deletes it.")
 
     if os.path.exists(out_dir):
         if getattr(args, "resume", False):
-            if not os.path.isdir(work_dir):
+            completed_marker = os.path.join(out_dir, outputs.HMM_INFO_FILENAME)
+            if os.path.isfile(completed_marker):
                 report_message(
-                    "There's no working directory from a previous run to resume from, "
-                    "so we'll start fresh.", "yellow")
+                    f"The run in '{out_dir}' already finished, so there's nothing to "
+                    "resume. Use `-F` to rebuild it from scratch, or `-o` to write a "
+                    "new run to a different directory.\n", "yellow")
+                exit(0)
+
+            if not os.path.isdir(work_dir):
+                # output dir exists but no final table and no working dir: a run that
+                # never got far enough to leave resumable state, so start fresh.
+                report_message(
+                    f"There's no working directory in '{out_dir}' from a previous run "
+                    "to resume from, so we'll start fresh.", "yellow")
             os.makedirs(work_dir, exist_ok=True)
             return out_dir, work_dir
 
@@ -348,6 +361,10 @@ def phase_resolve_genomes(args):
               f"{args.target_accessions}")
 
     if args.wanted_ref_tax:
+        source_desc = describe_source_version(args.source)
+        if source_desc:
+            print(f"      Genome source being used: {color_text(source_desc, 'green')}\n")
+
         with spinner(f"Selecting reference genomes for '{args.wanted_ref_tax}'...",
                      "Selected reference genomes"):
             selected, selection = resolve_wanted_ref_tax_accessions(
@@ -437,8 +454,9 @@ def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, ar
     combined_path = os.path.join(work_dir, "all-target-proteins.faa")
 
     workers = max(1, min(int(args.num_jobs), MAX_DOWNLOAD_THREADS, max(len(to_fetch), 1)))
-    if to_fetch and workers > 1:
-        print(f"\n      Downloading with {workers} concurrent job(s)")
+    download_labelled = bool(to_fetch and workers > 1)
+    if download_labelled:
+        print(f"\n      Downloading with {workers} concurrent job(s):")
 
     with open(combined_path, "w") as combined:
 
@@ -463,7 +481,9 @@ def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, ar
 
         if to_fetch:
             fetch_amino_acids_pooled(
-                to_fetch, info, work_dir, args=args, on_result=absorb)
+                to_fetch, info, work_dir, args=args, on_result=absorb,
+                bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED if download_labelled else None,
+                lead_newline=not download_labelled)
 
         if local_genomes:
             if to_fetch:
@@ -528,7 +548,7 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
     print(f"      Pfam version being used: {color_text(pfam_version, 'green')}\n")
 
     with spinner("Filtering Pfams by average coverage...", "Filtered Pfams by coverage"):
-        pfam_info = load_coverage_filtered_pfams(
+        pfam_info, total_profiles = load_coverage_filtered_pfams(
             info_path, min_coverage=args.min_pfam_coverage)
 
     print(f"        {len(pfam_info):,} profile(s) with average coverage > "
@@ -543,8 +563,10 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
                      "Reused filtered Pfam profiles"):
             found = read_hmm_accessions(filtered_hmm_path)
     else:
-        print()
-        with tqdm(desc="    Extracting profiles", ncols=78, unit=" profile") as pbar:
+        print("\n      Extracting:")
+        with tqdm(total=total_profiles,
+                  bar_format=GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED,
+                  ncols=76) as pbar:
             found = write_filtered_pfam_hmms(
                 master_hmm_path, set(pfam_info), filtered_hmm_path,
                 progress_callback=pbar.update)
@@ -560,14 +582,12 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
 
 def phase_search(filtered_hmm_path, combined_path, filtered_accs, args):
     """Run the hmmsearch stage with a progress bar over profiles."""
-    print()
     with tqdm(total=len(filtered_accs), desc="    Progress", ncols=78,
               unit=" profile") as pbar:
         hits_by_genome = search_profiles(
             filtered_hmm_path, combined_path,
             threads=args.num_threads,
             progress_callback=pbar.update)
-    print()
     return hits_by_genome
 
 
@@ -612,13 +632,15 @@ def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_versio
                   missed_path, args):
     """Final summary block."""
     print()
-    report_message("-" * 78, "green", ii="  ", newline=False)
-    report_message(f"SCG-HMM set complete!".center(78), "green", ii="  ",
-                   newline=False)
-    report_message("-" * 78, "green", ii="  ", newline=False)
+    report_message("-" * 78, "green", ii="  ", newline=False,
+                   trailing_newline=False, width=90)
+    report_message("SCG-HMM set complete!".center(78), "green", ii="  ",
+                   newline=False, trailing_newline=False, width=90)
+    report_message("-" * 78, "green", ii="  ", newline=False,
+                   trailing_newline=False, width=90)
 
     print(f"\n      New SCG-HMM set holding {color_text(f'{num_targets:,}', 'green')} "
-          f"target genes (from Pfam v{pfam_version}),")
+          f"target genes,")
     print(f"      built from {color_text(f'{num_genomes:,}', 'green')} genome(s), written to:")
     print(f"        {color_text(final_hmm_path, 'green')}\n")
 
@@ -756,7 +778,7 @@ def gen_scg_hmms(args):  # pragma: no cover
                                work_dir=work_dir)
     resume.save_state(work_dir, state)
 
-    section(f"Phase {n()}: Searching genomes for Pfam profiles...")
+    section(f"Phase {n()}: Searching genomes with Pfam profiles...")
     cached_hits = _load_json(work_dir, SEARCH_STAGE_SIDECAR) if resuming else None
     if resuming and resume.stage_is_reusable(state, resume.STAGE_SEARCH, work_dir) \
             and cached_hits:

@@ -125,7 +125,8 @@ def resolve_download_info(accessions, table_path=None):
 
 def fetch_amino_acids_pooled(to_fetch, info, work_dir, args=None, num_jobs=1,
                              nucleotide_fallback=True, on_result=None,
-                             progress_callback=None):
+                             progress_callback=None, bar_format=None,
+                             lead_newline=True):
     """
     Fetch amino acids for many accessions concurrently.
 
@@ -176,7 +177,8 @@ def fetch_amino_acids_pooled(to_fetch, info, work_dir, args=None, num_jobs=1,
     run_pooled_stage(to_fetch, worker, apply_result, args,
                      {"info": info, "work_dir": work_dir,
                       "nucleotide_fallback": nucleotide_fallback},
-                     max_workers_cap=MAX_DOWNLOAD_THREADS)
+                     max_workers_cap=MAX_DOWNLOAD_THREADS,
+                     bar_format=bar_format, lead_newline=lead_newline)
 
 
 def fetch_amino_acids(accession, entry, work_dir, nucleotide_fallback=True):

@@ -2,7 +2,6 @@ import os
 import pytest # type: ignore
 from collections import Counter
 from pathlib import Path
-
 import pyhmmer # type: ignore
 
 from gtotree.utils.hmms.gen_scg_hmms import (
@@ -48,8 +47,24 @@ def test_decode_handles_bytes_and_str():
 ################################################################################
 
 def test_load_coverage_filtered_pfams_applies_cutoff():
-    kept = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO))
+    kept, _ = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO))
     assert set(kept) == {"PF90001.3", "PF90002.7", "PF90005.9"}
+
+
+def test_load_coverage_filtered_pfams_returns_total_scanned():
+    """
+    The second return value is the count of usable rows (the whole master set,
+    before the coverage filter), used to size the extraction progress bar. It must
+    be independent of the cutoff.
+    """
+    kept, total = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO))
+    kept_strict, total_strict = load_coverage_filtered_pfams(
+        str(MOCK_PFAM_INFO), min_coverage=70.0)
+
+    # total counts every usable row regardless of cutoff, so it doesn't move
+    assert total == total_strict
+    # and it's at least as large as any filtered set
+    assert total >= len(kept) >= len(kept_strict)
 
 
 def test_coverage_cutoff_is_strictly_greater_than():
@@ -57,12 +72,12 @@ def test_coverage_cutoff_is_strictly_greater_than():
     PF90003 sits exactly at the default cutoff of 50.0 and must be excluded -- v1 used
     `> 50`, not `>= 50`, and that boundary decides whether a marker is considered.
     """
-    kept = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO))
+    kept, _ = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO))
     assert "PF90003.1" not in kept
 
     # lowering the cutoff below 50 lets it through, confirming it's the cutoff and not
     # some other property of that row
-    kept_lower = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO), min_coverage=49.9)
+    kept_lower, _ = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO), min_coverage=49.9)
     assert "PF90003.1" in kept_lower
 
 
@@ -72,7 +87,7 @@ def test_coverage_above_100_is_kept():
     rows at Pfam 38.2, mostly viral/secreted families that are essentially all domain).
     Those rows must not be treated as invalid and silently dropped.
     """
-    kept = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO))
+    kept, _ = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO))
     assert "PF90005.9" in kept
     assert kept["PF90005.9"].coverage == pytest.approx(104.7)
 
@@ -82,7 +97,7 @@ def test_accession_key_is_versioned():
     The key must be `{acc}.{version}` because that's what the master Pfam-A.hmm carries
     in its ACC lines -- it's the join key the whole pipeline depends on.
     """
-    kept = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO))
+    kept, _ = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO))
     assert "PF90001.3" in kept
     assert "PF90001" not in kept
     assert kept["PF90001.3"].name == "MockA"
@@ -90,7 +105,7 @@ def test_accession_key_is_versioned():
 
 
 def test_load_coverage_filtered_pfams_custom_cutoff():
-    kept = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO), min_coverage=70.0)
+    kept, _ = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO), min_coverage=70.0)
     assert set(kept) == {"PF90001.3", "PF90005.9"}
 
 
@@ -100,7 +115,7 @@ def test_load_coverage_filtered_pfams_skips_short_rows(tmp_path):
     good = MOCK_PFAM_INFO.read_text().splitlines()[0]
     path.write_text("too\tfew\tcolumns\n" + good + "\n")
 
-    kept = load_coverage_filtered_pfams(str(path))
+    kept, _ = load_coverage_filtered_pfams(str(path))
     assert set(kept) == {"PF90001.3"}
 
 
@@ -126,7 +141,7 @@ def test_non_numeric_coverage_row_is_skipped(tmp_path):
     path = tmp_path / "info.txt"
     path.write_text("\t".join(row) + "\n" + MOCK_PFAM_INFO.read_text().splitlines()[1] + "\n")
 
-    kept = load_coverage_filtered_pfams(str(path))
+    kept, _ = load_coverage_filtered_pfams(str(path))
     assert set(kept) == {"PF90002.7"}
 
 

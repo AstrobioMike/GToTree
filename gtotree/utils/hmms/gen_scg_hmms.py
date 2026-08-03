@@ -88,8 +88,14 @@ def pfam_data_paths(pfam_data_dir):
 
 def load_coverage_filtered_pfams(info_path, min_coverage=DEFAULT_MIN_PFAM_COVERAGE):
     """
-    Parse pfamA.txt and return {versioned_acc: PfamProfileInfo} for profiles whose
-    average coverage of their underlying proteins exceeds `min_coverage`.
+    Parse pfamA.txt and return (kept, total_profiles) where `kept` is
+    {versioned_acc: PfamProfileInfo} for profiles whose average coverage of their
+    underlying proteins exceeds `min_coverage`, and `total_profiles` is the count
+    of usable rows (i.e. the number of profiles in the master set, before the
+    coverage filter).
+
+    `total_profiles` is returned so callers can size a progress bar for the
+    subsequent streaming pass over the master HMM without a second pass to count.
 
     Keyed by versioned accession (e.g. "PF00001.27") because that is what the master
     Pfam-A.hmm carries in its ACC lines, making it the reliable join key.
@@ -137,13 +143,17 @@ def load_coverage_filtered_pfams(info_path, min_coverage=DEFAULT_MIN_PFAM_COVERA
         raise PfamDataError(
             f"no Pfam profiles passed the average-coverage filter (> {min_coverage}%).")
 
-    return kept
+    return kept, usable_rows
 
 
 def write_filtered_pfam_hmms(master_hmm_path, wanted_accs, out_path,
                              progress_callback=None):
     """
     Stream the master Pfam-A.hmm and write out only the profiles in `wanted_accs`.
+
+    `progress_callback`, if given, is called once per profile *scanned* (not per
+    profile matched), so a caller can drive a bar whose total is the number of
+    profiles in the master file -- giving a steady fill as the file streams.
 
     Returns the list of versioned accessions actually found and written.
     """

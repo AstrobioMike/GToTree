@@ -1,7 +1,5 @@
 import os
-
 import pytest # type: ignore
-
 from gtotree.utils.hmms.gen_scg_hmms import GenSCGHMMsError
 from gtotree.utils.hmms.gen_scg_hmms_cli import (
     DEFAULT_PERCENT_SINGLE_COPY,
@@ -129,6 +127,22 @@ def test_resume_without_previous_run_starts_fresh(tmp_path, capsys):
         _parse("-a", "x.txt", "-o", str(out), "--resume"))
 
     assert os.path.isdir(work_dir)
+    assert "start fresh" in capsys.readouterr().out
+
+
+def test_resume_without_working_dir_but_no_final_output_starts_fresh(tmp_path, capsys):
+    """
+    Output dir exists (e.g. left behind by a run that died before writing outputs)
+    but has no final table and no working dir -> genuinely nothing to resume, so
+    starting fresh is right and the message should say so.
+    """
+    out = tmp_path / "out"
+    out_dir, work_dir = setup_output_dir(_parse("-a", "x.txt", "-o", str(out)))
+    import shutil
+    shutil.rmtree(work_dir)  # no final table was ever written
+
+    _, work_dir2 = setup_output_dir(_parse("-a", "x.txt", "-o", str(out), "--resume"))
+    assert os.path.isdir(work_dir2)
     assert "start fresh" in capsys.readouterr().out
 
 

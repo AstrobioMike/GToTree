@@ -2,7 +2,6 @@ import argparse
 import io
 import os
 from pathlib import Path
-
 import pytest # type: ignore
 
 from gtotree.utils.hmms.gen_scg_hmms import (
@@ -81,7 +80,7 @@ def test_full_pipeline_from_local_amino_acid_files(tmp_path):
             kept_ids.append(gd.id)
 
     # --- pfam stage ---------------------------------------------------------
-    pfam_info = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO), min_coverage=10.0)
+    pfam_info, _ = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO), min_coverage=10.0)
     filtered_hmm = work / "filtered.hmm"
     filtered_accs = write_filtered_pfam_hmms(
         str(MOCK_PFAM_HMM), set(pfam_info), str(filtered_hmm))
@@ -144,7 +143,7 @@ def test_pipeline_lowering_threshold_keeps_more(tmp_path):
             aa_path, _ = process_local_genome(gd, str(work))
             relabel_and_append(gd.id, aa_path, combined)
 
-    pfam_info = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO), min_coverage=10.0)
+    pfam_info, _ = load_coverage_filtered_pfams(str(MOCK_PFAM_INFO), min_coverage=10.0)
     filtered_hmm = work / "filtered.hmm"
     filtered_accs = write_filtered_pfam_hmms(
         str(MOCK_PFAM_HMM), set(pfam_info), str(filtered_hmm))

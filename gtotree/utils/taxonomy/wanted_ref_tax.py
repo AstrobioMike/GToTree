@@ -13,8 +13,12 @@ stay thin and be exercised without a process exit.
 """
 
 from gtotree.utils.taxonomy.tax_derep import select_ref_genomes, size_advice
-from gtotree.utils.gtdb.get_gtdb_data import gtdb_data_table_path
-from gtotree.utils.ncbi.get_ncbi_assembly_data import ncbi_data_table_path
+from gtotree.utils.gtdb.get_gtdb_data import (gtdb_data_table_path,
+                                              check_gtdb_location_var_is_set,
+                                              report_gtdb_version_info)
+from gtotree.utils.ncbi.get_ncbi_assembly_data import (ncbi_data_table_path,
+                                                       check_ncbi_assembly_info_location_var_is_set,
+                                                       read_date_retrieved)
 
 
 # source-of-taxonomy (-S) -> (core source name, table-path resolver). The driver's
@@ -28,6 +32,33 @@ _SOURCE_ASSETS = {
 
 class WantedRefTaxError(Exception):
     """A --wanted-ref-tax request that resolved to nothing usable."""
+
+
+def describe_source_version(source):
+    """
+    Best-effort one-line description of the taxonomy source actually in use, for the
+    Phase 1 banner (the counterpart to Phase 3's "Pfam version being used: ...").
+
+    GTDB -> "GTDB <release> (released <date>)"; NCBI -> "NCBI (accessed <date>)".
+
+    Returns None if the source is unknown or its version/date sidecar can't be read.
+    This is a display label, so a missing sidecar shouldn't abort the run -- the caller
+    just skips the line.
+    """
+    try:
+        if source == "gtdb":
+            location = check_gtdb_location_var_is_set()
+            version, release_date = report_gtdb_version_info(location)
+            if release_date:
+                return f"GTDB {version} (released {release_date})"
+            return f"GTDB {version}"
+        if source == "ncbi":
+            location = check_ncbi_assembly_info_location_var_is_set()
+            accessed = read_date_retrieved(location)
+            return f"NCBI (accessed {accessed})"
+    except (OSError, ValueError, IndexError, SystemExit):
+        return None
+    return None
 
 
 def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,

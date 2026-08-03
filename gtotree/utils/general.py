@@ -709,9 +709,20 @@ GTT_PROGRESS_BAR_FORMAT = (
     "[time elapsed: {elapsed} | est. remaining: {remaining}]"
 )
 
+GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED = (
+    "        {percentage:3.0f}%|{bar}| "
+    "[time elapsed: {elapsed} | est. remaining: {remaining}]"
+)
+
+GTT_PROGRESS_BAR_FORMAT_INDENTED = (
+    "        {percentage:3.0f}%|{bar}| "
+    "{n_fmt}/{total_fmt} "
+    "[time elapsed: {elapsed} | est. remaining: {remaining}]"
+)
+
 
 def run_pooled_stage(items, worker, apply_result, args, run_data,
-                     max_workers_cap=None):
+                     max_workers_cap=None, bar_format=None, lead_newline=True):
     """
     Dispatches `worker(item, run_data)` across a ThreadPoolExecutor and, as each
     future completes, calls `apply_result(item, result, run_data)` on the MAIN
@@ -726,6 +737,11 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
 
     `max_workers_cap` optionally clamps the worker count below --num-jobs (e.g., like
     how i limit concurrent downloads from ncbi); None means just use --num-jobs
+
+    `bar_format` overrides the tqdm bar format (default: GTT_PROGRESS_BAR_FORMAT).
+
+    `lead_newline` prints a blank line before the bar (the default). I needed to add this
+    after i started formatting differently in some uses
 
     NOTE ON WORKERS AND EXCEPTIONS: `worker` must not raise. A worker exception
     propagates out of `future.result()` here and aborts the whole stage partway
@@ -744,10 +760,12 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
     if max_workers_cap is not None:
         num_workers = min(num_workers, max_workers_cap)
 
-    print("")
+    if lead_newline:
+        print("")
     pool = ThreadPoolExecutor(max_workers=num_workers)
     try:
-        with tqdm(total=len(items), bar_format=GTT_PROGRESS_BAR_FORMAT, ncols=76) as pbar:
+        with tqdm(total=len(items),
+                  bar_format=bar_format or GTT_PROGRESS_BAR_FORMAT, ncols=76) as pbar:
 
             futures = {pool.submit(worker, item, run_data): item for item in items}
 
