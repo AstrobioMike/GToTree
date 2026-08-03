@@ -22,6 +22,7 @@ from tqdm import tqdm  # type: ignore
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.general import run_pooled_stage
+from gtotree.utils import phase_stats
 from gtotree.utils.messaging import (report_message, color_text, spinner,
                                      report_very_early_exit, wprint)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
@@ -246,6 +247,7 @@ def _phase_counter():
 
 
 def section(title):
+    phase_stats.begin(title)
     print(color_text(f"\n\n  {title}\n", "yellow"))
 
 
@@ -436,9 +438,8 @@ def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, ar
 
     workers = max(1, min(int(args.num_jobs), MAX_DOWNLOAD_THREADS, max(len(to_fetch), 1)))
     if to_fetch and workers > 1:
-        print(f"      Downloading with {workers} concurrent job(s)")
+        print(f"\n      Downloading with {workers} concurrent job(s)")
 
-    print()
     with open(combined_path, "w") as combined:
 
         def absorb(genome_id, aa_path, used_prodigal, error):
@@ -524,7 +525,7 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
     master_hmm_path, info_path = pfam_data_paths(pfam_data_dir)
     pfam_version = get_stored_pfam_version(pfam_data_dir) or "NA"
 
-    print(f"      Pfam version being used: {color_text(pfam_version, 'green')}")
+    print(f"      Pfam version being used: {color_text(pfam_version, 'green')}\n")
 
     with spinner("Filtering Pfams by average coverage...", "Filtered Pfams by coverage"):
         pfam_info = load_coverage_filtered_pfams(
@@ -778,6 +779,10 @@ def gen_scg_hmms(args):  # pragma: no cover
     if not args.keep_working_dir:
         shutil.rmtree(work_dir, ignore_errors=True)
 
+    # closes the final phase, so this has to happen before anything reads the table
+    phase_stats.finish()
+    phase_stats.write_tsv(out_dir)
+
     report_finish(out_dir, final_hmm_path, num_targets, len(kept_ids), pfam_version,
                   missed_path, args)
 
@@ -800,6 +805,10 @@ def main():  # pragma: no cover
         report_very_early_exit(str(e))
     except GenSCGHMMsError as e:
         report_very_early_exit(str(e))
+    finally:
+        # a run that died partway is exactly when the phase table is most useful,
+        # and the handlers above exit the process, so this can't live in them
+        phase_stats.report()
 
 
 if __name__ == "__main__":
