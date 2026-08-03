@@ -26,7 +26,7 @@ from gtotree.utils.general import (run_pooled_stage,
                                    GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED)
 from gtotree.utils import phase_stats
 from gtotree.utils.messaging import (report_message, color_text, spinner,
-                                     report_very_early_exit, wprint)
+                                     report_very_early_exit)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
@@ -563,16 +563,13 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
                      "Reused filtered Pfam profiles"):
             found = read_hmm_accessions(filtered_hmm_path)
     else:
-        print("\n      Extracting:")
+        print("\n      Extracting wanted Pfams:")
         with tqdm(total=total_profiles,
                   bar_format=GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED,
                   ncols=76) as pbar:
             found = write_filtered_pfam_hmms(
                 master_hmm_path, set(pfam_info), filtered_hmm_path,
                 progress_callback=pbar.update)
-        print()
-
-    print(f"      {color_text(f'{len(found):,} profile(s) to search against', 'green')}")
 
     # keep ordering stable and aligned with what was actually written
     filtered_accs = found
@@ -630,19 +627,16 @@ def phase_determine_and_write(out_dir, filtered_hmm_path, hits_by_genome, kept_i
 
 def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_version,
                   missed_path, args):
-    """Final summary block."""
+    border = color_text("  " + "-" * 78, "green")
+    title = color_text("  " + "SCG-HMM set complete!".center(78), "green")
     print()
-    report_message("-" * 78, "green", ii="  ", newline=False,
-                   trailing_newline=False, width=90)
-    report_message("SCG-HMM set complete!".center(78), "green", ii="  ",
-                   newline=False, trailing_newline=False, width=90)
-    report_message("-" * 78, "green", ii="  ", newline=False,
-                   trailing_newline=False, width=90)
+    print(border)
+    print(title)
+    print(border)
 
-    print(f"\n      New SCG-HMM set holding {color_text(f'{num_targets:,}', 'green')} "
-          f"target genes,")
-    print(f"      built from {color_text(f'{num_genomes:,}', 'green')} genome(s), written to:")
-    print(f"        {color_text(final_hmm_path, 'green')}\n")
+    print(f"\n      New SCG-HMM set holding {color_text(f'{num_targets:,}', 'green')} target gene(s), "
+          f"built from {color_text(f'{num_genomes:,}', 'green')} genome(s),")
+    print(f"      written to:\n        {color_text(final_hmm_path, 'green')}\n")
 
     print(f"      Supporting tables written to:")
     print(f"        {color_text(out_dir + '/', 'green')}\n")
@@ -651,12 +645,14 @@ def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_versio
         report_message("Any input accessions that didn't make it through are reported in:",
                        "yellow", ii="      ", si="      ")
         print(f"        {color_text(missed_path, 'yellow')}\n")
+    print()
 
-    if os.environ.get("GToTree_HMM_dir"):
-        wprint("If you'd like to add this new SCG-HMM set to the stored GToTree ones, "
-               "you can do so with the `gtt-store-SCG-HMMs` program :)",
-               ii="      ", si="      ")
-        print()
+    # if os.environ.get("GToTree_HMM_dir"):
+    #     hmm_path = os.environ["GToTree_HMM_dir"]
+    #     wprint("If you'd like to add this new SCG-HMM set to the stored GToTree ones, "
+    #            f"you can copy it into:\n  {hmm_path} :)",
+    #            ii="      ", si="      ")
+    #     print()
 
 
 GENOME_STAGE_SIDECAR = "genome-stage.json"

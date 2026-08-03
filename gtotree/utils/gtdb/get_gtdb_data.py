@@ -185,6 +185,6 @@ def report_gtdb_version_info(location):
         for line in version_info_file:
             line = line.strip()
             if line != "":
-                version_info.append(line)
+                version_info.append(line.replace("Released ", ""))
     return version_info[0], version_info[1]
 
