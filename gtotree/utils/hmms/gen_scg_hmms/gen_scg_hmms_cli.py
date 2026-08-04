@@ -32,23 +32,26 @@ from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
                                                    describe_source_version,
                                                    WantedRefTaxError)
-from gtotree.utils.hmms.gen_scg_hmms import (GenSCGHMMsError, DEFAULT_MIN_PFAM_COVERAGE,
-                                             pfam_data_paths,
-                                             load_coverage_filtered_pfams,
-                                             read_hmm_accessions,
-                                             write_filtered_pfam_hmms)
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
+    GenSCGHMMsError,
+    DEFAULT_MIN_PFAM_COVERAGE,
+    pfam_data_paths,
+    load_coverage_filtered_pfams,
+    read_hmm_accessions,
+    write_filtered_pfam_hmms,
+)
 from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_resume as resume
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (TargetGenomeError,
-                                                     read_accessions_file,
-                                                     resolve_download_info,
-                                                     fetch_amino_acids_pooled,
-                                                     relabel_and_append,
-                                                     MAX_DOWNLOAD_THREADS,
-                                                     MISSED_NOT_FOUND)
+                                                                  read_accessions_file,
+                                                                  resolve_download_info,
+                                                                  fetch_amino_acids_pooled,
+                                                                  relabel_and_append,
+                                                                  MAX_DOWNLOAD_THREADS,
+                                                                  MISSED_NOT_FOUND)
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local import (build_local_genomes,
-                                                   process_local_genome,
-                                                   SOURCE_GENBANK, SOURCE_FASTA,
-                                                   SOURCE_AMINO_ACID)
+                                                                process_local_genome,
+                                                                SOURCE_GENBANK, SOURCE_FASTA,
+                                                                SOURCE_AMINO_ACID)
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search import search_profiles
 from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_outputs as outputs
 
@@ -607,7 +610,7 @@ def phase_determine_and_write(out_dir, filtered_hmm_path, hits_by_genome, kept_i
                               filtered_accs, pfam_info, pfam_version, sources,
                               organism_names, missed, args):
     """Determine the single-copy set, extract it, and write all outputs."""
-    from gtotree.utils.hmms.gen_scg_hmms import count_single_copy_hits
+    from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import count_single_copy_hits
 
     with spinner("Determining single-copy genes...", "Determined single-copy genes"):
         wanted_accs, per_genome_counts = count_single_copy_hits(

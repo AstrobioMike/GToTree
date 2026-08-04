@@ -1,8 +1,7 @@
 import pytest # type: ignore
-from pathlib import Path
 import pyhmmer # type: ignore
 import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search as mod
-from gtotree.utils.hmms.gen_scg_hmms import count_single_copy_hits
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import count_single_copy_hits
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search import (
     HmmSearchError,
     open_target_proteins,
@@ -14,9 +13,9 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search import (
     estimated_chunk_bytes,
     _read_env_override,
 )
+from gtotree.tests.paths import DATA_DIR
 
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 MOCK_PFAM_HMM = DATA_DIR / "mock-pfams.hmm"
 
 # the four motifs the mock HMMs were built from; each matches exactly one profile

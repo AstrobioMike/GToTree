@@ -1,18 +1,17 @@
 import argparse
 import os
-from pathlib import Path
 import pyarrow as pa # type: ignore
 import pyarrow.parquet as pq # type: ignore
 import pytest # type: ignore
 import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli as cli
 import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes as genomes_mod
-from gtotree.utils.hmms.gen_scg_hmms import GenSCGHMMsError
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (
     TargetGenomeError,
     resolve_download_info,
 )
+from gtotree.tests.paths import DATA_DIR
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
 MOTIFS = {
     "PF90001.3": "MKVLAAAL",

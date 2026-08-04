@@ -23,7 +23,7 @@ the profiles.
 import os
 import tempfile
 import pyhmmer  # type: ignore
-from gtotree.utils.hmms.gen_scg_hmms import GenSCGHMMsError, _decode
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError, _decode
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import genome_id_from_protein_name
 
 

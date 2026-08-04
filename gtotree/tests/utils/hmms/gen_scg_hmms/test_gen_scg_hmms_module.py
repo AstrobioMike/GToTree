@@ -4,19 +4,19 @@ from collections import Counter
 from pathlib import Path
 import pyhmmer # type: ignore
 
-from gtotree.utils.hmms.gen_scg_hmms import (
-    DEFAULT_MIN_PFAM_COVERAGE,
-    GenSCGHMMsError,
-    PfamDataError,
-    _decode,
-    count_single_copy_hits,
-    load_coverage_filtered_pfams,
-    pfam_data_paths,
-    read_hmm_accessions,
-    write_filtered_pfam_hmms,
-)
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
+                                                                 DEFAULT_MIN_PFAM_COVERAGE,
+                                                                 GenSCGHMMsError,
+                                                                 PfamDataError,
+                                                                 _decode,
+                                                                 count_single_copy_hits,
+                                                                 load_coverage_filtered_pfams,
+                                                                 pfam_data_paths,
+                                                                 read_hmm_accessions,
+                                                                 write_filtered_pfam_hmms,
+                                                                 )
+from gtotree.tests.paths import DATA_DIR
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 MOCK_PFAM_INFO = DATA_DIR / "mock-pfamA.txt"
 MOCK_PFAM_HMM = DATA_DIR / "mock-pfams.hmm"
 

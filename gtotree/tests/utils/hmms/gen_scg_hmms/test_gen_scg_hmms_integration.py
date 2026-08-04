@@ -1,21 +1,23 @@
 import argparse
 import io
 import os
-from pathlib import Path
 import pytest # type: ignore
 
-from gtotree.utils.hmms.gen_scg_hmms import (
-    count_single_copy_hits,
-    load_coverage_filtered_pfams,
-    read_hmm_accessions,
-    write_filtered_pfam_hmms,
-)
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
+                                                                 count_single_copy_hits,
+                                                                 load_coverage_filtered_pfams,
+                                                                 read_hmm_accessions,
+                                                                 write_filtered_pfam_hmms,
+                                                                 )
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import relabel_and_append
-from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local import build_local_genomes, process_local_genome
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local import (
+    build_local_genomes,
+    process_local_genome,
+)
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search import search_profiles
 from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_outputs as outputs
+from gtotree.tests.paths import DATA_DIR
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 MOCK_PFAM_HMM = DATA_DIR / "mock-pfams.hmm"
 MOCK_PFAM_INFO = DATA_DIR / "mock-pfamA.txt"
 

@@ -20,7 +20,7 @@ import pyarrow.parquet as pq  # type: ignore
 from gtotree.utils.general import run_pooled_stage
 from gtotree.utils.ncbi.get_ncbi_assembly_data import ncbi_data_table_path
 from gtotree.utils.ncbi.parse_ncbi_assembly_summary import resolve_base_link
-from gtotree.utils.hmms.gen_scg_hmms import GenSCGHMMsError, _remove_quietly
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError, _remove_quietly
 
 
 MAX_DOWNLOAD_THREADS = 20
