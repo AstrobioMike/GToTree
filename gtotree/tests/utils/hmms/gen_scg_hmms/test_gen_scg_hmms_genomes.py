@@ -6,9 +6,9 @@ import time
 
 import pytest # type: ignore
 
-import gtotree.utils.hmms.gen_scg_hmms_genomes as mod
+import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes as mod
 from gtotree.utils.hmms.gen_scg_hmms import GenSCGHMMsError
-from gtotree.utils.hmms.gen_scg_hmms_genomes import (
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (
     MAX_DOWNLOAD_THREADS,
     MISSED_NO_PROTEINS,
     TargetGenomeError,

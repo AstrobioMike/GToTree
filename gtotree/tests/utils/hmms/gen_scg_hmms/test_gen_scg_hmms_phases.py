@@ -1,15 +1,13 @@
 import argparse
 import os
 from pathlib import Path
-
 import pyarrow as pa # type: ignore
 import pyarrow.parquet as pq # type: ignore
 import pytest # type: ignore
-
-import gtotree.utils.hmms.gen_scg_hmms_cli as cli
-import gtotree.utils.hmms.gen_scg_hmms_genomes as genomes_mod
+import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli as cli
+import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes as genomes_mod
 from gtotree.utils.hmms.gen_scg_hmms import GenSCGHMMsError
-from gtotree.utils.hmms.gen_scg_hmms_genomes import (
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (
     TargetGenomeError,
     resolve_download_info,
 )
@@ -289,8 +287,9 @@ def test_phase_search_returns_hit_counts(tmp_path):
     combined, kept, _, _, _ = cli.phase_get_amino_acids(
         [], local, missing, str(work), args)
 
-    hits = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined,
-                            ["PF90001.3", "PF90002.7"], args)
+    # phase_search now takes just (filtered_hmm_path, combined_path, args); it sizes
+    # its own progress bar by counting sequences in the combined fasta
+    hits = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined, args)
 
     assert hits["g1"]["PF90001.3"] == 1
     assert hits["g1"]["PF90002.7"] == 1

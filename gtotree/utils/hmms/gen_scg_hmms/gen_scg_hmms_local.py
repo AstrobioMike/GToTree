@@ -30,7 +30,7 @@ from gtotree.utils.seqs import (extract_filter_and_rename_cds_amino_acids_from_g
                                 extract_fasta_from_gb,
                                 _filter_and_rename_fasta)
 from gtotree.utils.hmms.gen_scg_hmms import GenSCGHMMsError
-from gtotree.utils.hmms.gen_scg_hmms_genomes import (TargetGenomeError,
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (TargetGenomeError,
                                                      MISSED_NO_PROTEINS,
                                                      MISSED_PRODIGAL_FAILED,
                                                      run_prodigal)

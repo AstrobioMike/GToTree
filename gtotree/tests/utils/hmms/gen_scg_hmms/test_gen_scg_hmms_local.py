@@ -5,10 +5,10 @@ import os
 
 import pytest # type: ignore
 
-import gtotree.utils.hmms.gen_scg_hmms_local as mod
+import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local as mod
 from gtotree.utils.hmms.gen_scg_hmms import GenSCGHMMsError
-from gtotree.utils.hmms.gen_scg_hmms_genomes import TargetGenomeError
-from gtotree.utils.hmms.gen_scg_hmms_local import (
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import TargetGenomeError
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local import (
     SOURCE_AMINO_ACID,
     SOURCE_FASTA,
     SOURCE_GENBANK,

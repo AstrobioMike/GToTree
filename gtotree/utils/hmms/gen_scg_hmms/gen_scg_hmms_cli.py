@@ -37,20 +37,20 @@ from gtotree.utils.hmms.gen_scg_hmms import (GenSCGHMMsError, DEFAULT_MIN_PFAM_C
                                              load_coverage_filtered_pfams,
                                              read_hmm_accessions,
                                              write_filtered_pfam_hmms)
-from gtotree.utils.hmms import gen_scg_hmms_resume as resume
-from gtotree.utils.hmms.gen_scg_hmms_genomes import (TargetGenomeError,
+from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_resume as resume
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (TargetGenomeError,
                                                      read_accessions_file,
                                                      resolve_download_info,
                                                      fetch_amino_acids_pooled,
                                                      relabel_and_append,
                                                      MAX_DOWNLOAD_THREADS,
                                                      MISSED_NOT_FOUND)
-from gtotree.utils.hmms.gen_scg_hmms_local import (build_local_genomes,
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local import (build_local_genomes,
                                                    process_local_genome,
                                                    SOURCE_GENBANK, SOURCE_FASTA,
                                                    SOURCE_AMINO_ACID)
-from gtotree.utils.hmms.gen_scg_hmms_search import search_profiles
-from gtotree.utils.hmms import gen_scg_hmms_outputs as outputs
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search import search_profiles
+from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_outputs as outputs
 
 
 DEFAULT_OUTPUT_DIR = "gtt-gen-scg-hmms-output"
@@ -563,7 +563,7 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
                      "Reused filtered Pfam profiles"):
             found = read_hmm_accessions(filtered_hmm_path)
     else:
-        print("\n      Extracting wanted Pfams:")
+        print("\n      Extracting target profiles:")
         with tqdm(total=total_profiles,
                   bar_format=GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED,
                   ncols=76) as pbar:
@@ -577,10 +577,25 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
     return filtered_hmm_path, pfam_info, filtered_accs, pfam_version
 
 
-def phase_search(filtered_hmm_path, combined_path, filtered_accs, args):
-    """Run the hmmsearch stage with a progress bar over profiles."""
-    with tqdm(total=len(filtered_accs), desc="    Progress", ncols=78,
-              unit=" profile") as pbar:
+def _count_sequences(fasta_path):
+    """
+    Count records in a fasta by header lines, this is just for a progress bar total
+    """
+    n = 0
+    with open(fasta_path, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            if line.startswith(">"):
+                n += 1
+    return n
+
+
+def phase_search(filtered_hmm_path, combined_path, args):
+    """
+    Run the hmmsearch stage with a progress bar over sequences
+    """
+    total_seqs = _count_sequences(combined_path)
+    with tqdm(total=total_seqs, desc="    Progress", ncols=78,
+              unit=" seq") as pbar:
         hits_by_genome = search_profiles(
             filtered_hmm_path, combined_path,
             threads=args.num_threads,
@@ -781,7 +796,7 @@ def gen_scg_hmms(args):  # pragma: no cover
         with spinner("Reusing previous search results...", "Reused previous search results"):
             hits_by_genome = cached_hits
     else:
-        hits_by_genome = phase_search(filtered_hmm_path, combined_path, filtered_accs, args)
+        hits_by_genome = phase_search(filtered_hmm_path, combined_path, args)
         _save_json(work_dir, SEARCH_STAGE_SIDECAR, hits_by_genome)
         resume.mark_stage_complete(
             state, resume.STAGE_SEARCH,

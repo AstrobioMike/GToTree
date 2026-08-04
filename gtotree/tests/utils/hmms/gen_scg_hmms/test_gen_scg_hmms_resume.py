@@ -5,7 +5,7 @@ import time
 
 import pytest # type: ignore
 
-from gtotree.utils.hmms import gen_scg_hmms_resume as resume
+from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_resume as resume
 
 
 def _args(**kw):

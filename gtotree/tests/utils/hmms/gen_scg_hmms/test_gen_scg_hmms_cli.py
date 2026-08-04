@@ -1,7 +1,7 @@
 import os
 import pytest # type: ignore
 from gtotree.utils.hmms.gen_scg_hmms import GenSCGHMMsError
-from gtotree.utils.hmms.gen_scg_hmms_cli import (
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli import (
     DEFAULT_PERCENT_SINGLE_COPY,
     DEFAULT_THREADS,
     build_parser,
