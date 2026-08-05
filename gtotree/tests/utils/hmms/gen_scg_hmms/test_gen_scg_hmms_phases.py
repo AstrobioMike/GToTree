@@ -286,9 +286,9 @@ def test_phase_search_returns_hit_counts(tmp_path):
     combined, kept, _, _, _ = cli.phase_get_amino_acids(
         [], local, missing, str(work), args)
 
-    # phase_search now takes just (filtered_hmm_path, combined_path, args); it sizes
-    # its own progress bar by counting sequences in the combined fasta
-    hits = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined, args)
+    # phase_search takes the genome count to size a per-genome progress bar; the caller
+    # already knows it, so no pre-pass over the combined fasta is needed
+    hits = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined, len(kept), args)
 
     assert hits["g1"]["PF90001.3"] == 1
     assert hits["g1"]["PF90002.7"] == 1

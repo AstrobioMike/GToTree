@@ -4,8 +4,7 @@
 
 ### TO DO STILL ###
 
-    # gtt gen-scg-hmms needs testing and print-out formatting work still (as well as tuning for high numbers)
-        # currently working on timing phases and chunking streaming of seqs during the hmm scanning
+    # gtt gen-scg-hmms may still need some formatting tweaks if i'm feeling neurotic
 
     # do i still use/need the run_data object? maybe i don't need the reading/writing anymore?
 
@@ -14,8 +13,6 @@
         # preprocessing genomes can just become "processing genomes"
 
     # build in/port over these from v1 (or make new) as subcommands under gtt
-        # gtt-gen-scg-hmms from v1 and make it a subcommand under gtt
-            # maybe make it in the style of bit gen-mg with regard to sections and spinners vs progress bars
         # gtt-pfam-search -> gtt search-pfams (should take all input types that gtotree can take, including --wanted-ref-tax)
             # set up spinner and progress bars similar to main gtotree run at this task
         # gtt-ko-search -> gtt search-kos (totally new one; should take all input types that gtotree can take, including --wanted-ref-tax))

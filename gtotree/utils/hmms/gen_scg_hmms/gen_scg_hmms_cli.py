@@ -426,6 +426,8 @@ def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, ar
 
     Returns (combined_path, kept_ids, missed, organism_names, sources_extra).
     """
+    phase_stats.checkpoint("phase 2 start")
+
     missed = list(local_missing)
     organism_names = {}
     sources_extra = {}
@@ -437,6 +439,8 @@ def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, ar
     if accessions:
         with spinner("Resolving download locations...", "Resolved download locations"):
             info, not_found = resolve_download_info(accessions)
+
+        phase_stats.checkpoint("phase 2 after resolve_download_info (NCBI parquet)")
 
         missed.extend((acc, MISSED_NOT_FOUND) for acc in not_found)
         if not_found:
@@ -487,6 +491,8 @@ def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, ar
                 to_fetch, info, work_dir, args=args, on_result=absorb,
                 bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED if download_labelled else None,
                 lead_newline=not download_labelled)
+
+        phase_stats.checkpoint("phase 2 after downloads + prodigal + relabel")
 
         if local_genomes:
             if to_fetch:
@@ -580,25 +586,12 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
     return filtered_hmm_path, pfam_info, filtered_accs, pfam_version
 
 
-def _count_sequences(fasta_path):
+def phase_search(filtered_hmm_path, combined_path, num_genomes, args):
     """
-    Count records in a fasta by header lines, this is just for a progress bar total
+    Run the hmmsearch stage with a progress bar over genomes
     """
-    n = 0
-    with open(fasta_path, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            if line.startswith(">"):
-                n += 1
-    return n
-
-
-def phase_search(filtered_hmm_path, combined_path, args):
-    """
-    Run the hmmsearch stage with a progress bar over sequences
-    """
-    total_seqs = _count_sequences(combined_path)
-    with tqdm(total=total_seqs, desc="    Progress", ncols=78,
-              unit=" seq") as pbar:
+    with tqdm(total=num_genomes, desc="    Progress", ncols=78,
+              unit=" genome") as pbar:
         hits_by_genome = search_profiles(
             filtered_hmm_path, combined_path,
             threads=args.num_threads,
@@ -799,7 +792,7 @@ def gen_scg_hmms(args):  # pragma: no cover
         with spinner("Reusing previous search results...", "Reused previous search results"):
             hits_by_genome = cached_hits
     else:
-        hits_by_genome = phase_search(filtered_hmm_path, combined_path, args)
+        hits_by_genome = phase_search(filtered_hmm_path, combined_path, len(kept_ids), args)
         _save_json(work_dir, SEARCH_STAGE_SIDECAR, hits_by_genome)
         resume.mark_stage_complete(
             state, resume.STAGE_SEARCH,

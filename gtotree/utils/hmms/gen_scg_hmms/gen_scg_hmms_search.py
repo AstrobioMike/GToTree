@@ -137,16 +137,31 @@ def search_profiles(filtered_hmm_path, fasta_path, threads=1,
 
     Proteins are streamed in residue-budgeted chunks
 
-    `progress_callback`, if given, is called once per chunk with that chunk's sequence
-    count, so a caller can drive a bar totalled by sequence count.
+    `progress_callback`, if given, is called with the number of genomes *finished* since
+    the last call, so a caller can drive a bar totalled by genome count. A genome counts
+    as finished once a protein from a later genome has been seen (or the file ends):
+    chunks don't respect genome boundaries, so the genome a chunk ends on is usually
+    still mid-read and isn't reported until the chunk that completes it.
 
     `residue_budget` overrides the chunk policy for deterministic testing; left None it
-    uses `resolve_residue_budget`
+    uses `resolve_residue_budget`, which also takes the size of this fasta into account
+    so that a small run still gets several chunks (and so a steadily moving bar) rather
+    than a single one that jumps from 0 to 100% at the end.
     """
-    budget = residue_budget if residue_budget is not None else resolve_residue_budget()
+    if residue_budget is not None:
+        budget = residue_budget
+    else:
+        budget = resolve_residue_budget(total_residues=_estimate_total_residues(fasta_path))
 
     hits_by_genome = {}
     total_seqs = 0
+
+    # genome-completion tracking; proteins of a genome are contiguous in the combined
+    # fasta (see relabel_and_append), so a change of genome id means the previous one
+    # is finished
+    genomes_started = 0
+    genomes_reported = 0
+    current_genome = None
 
     alphabet, seq_file = open_target_proteins(fasta_path)
 
@@ -159,20 +174,33 @@ def search_profiles(filtered_hmm_path, fasta_path, threads=1,
                 break
 
             # register every genome in this chunk before searching, so genomes that hit
-            # nothing still end up as keys
+            # nothing still end up as keys; the same pass tracks genome transitions
             for seq in chunk:
-                hits_by_genome.setdefault(
-                    genome_id_from_protein_name(_decode(seq.name)), {})
+                genome_id = genome_id_from_protein_name(_decode(seq.name))
+                hits_by_genome.setdefault(genome_id, {})
+                if genome_id != current_genome:
+                    genomes_started += 1
+                    current_genome = genome_id
 
             _search_one_chunk(pressed_base, chunk, threads, hits_by_genome)
 
             total_seqs += len(chunk)
+
+            # all but the genome this chunk ended on are definitely complete; that last
+            # one may continue into the next chunk, so it waits
             if progress_callback is not None:
-                progress_callback(len(chunk))
+                finished = max(0, genomes_started - 1)
+                if finished > genomes_reported:
+                    progress_callback(finished - genomes_reported)
+                    genomes_reported = finished
 
             # drop the chunk before reading the next one -- this is what bounds the
             # resident sequence memory
             del chunk
+
+    # end of file: whatever genome we ended on is complete too
+    if progress_callback is not None and genomes_started > genomes_reported:
+        progress_callback(genomes_started - genomes_reported)
 
     if total_seqs == 0:
         raise HmmSearchError(
@@ -208,30 +236,26 @@ overhead at realistic protein lengths (~150-500 aa); very short sequences shift 
 So, to size the budget for a target sequence-block footprint:
 
     budget_residues  ~=  target_bytes / 2.9
-
-What is NOT yet measured is the *hmmsearch pipeline's* own working memory per chunk
-(DP matrices, per-thread scratch, accumulated TopHits), which sits on top of the block
-and scales with profile count and thread count rather than with genome count. The
-default below therefore leaves generous headroom for that term. Reading the real
-combined figure off a `GTT_DEBUG_TIMING=1` run against the true ~10-20k-profile
-filtered Pfam set is what would let the default be tightened.
 """
 
 # Env var to force a fixed residues-per-chunk, bypassing the default. Two audiences:
 # (1) calibration: pin the budget to read a peak off each of several runs;
-# (2) an escape hatch for a user hitting an edge the default gets wrong. An env var
-# rather than a CLI flag so it avoids cluttering `--help`
+# (2) an escape hatch for a user hitting an edge the default gets wrong.
+# I made this an env var rather than a CLI flag to avoid cluttering `--help`
 CHUNK_ENV_VAR = "GTT_SCG_CHUNK"
 
 # Measured resident cost per residue for a digital amino-acid sequence block; see the
 # CALIBRATION note. Used only to document/derive the default, not at runtime.
 MEASURED_BYTES_PER_RESIDUE = 2.9
 
-# Default residues per chunk. At the measured ~2.9 B/residue this is a ~140 MB
-# sequence block, chosen to leave room for the (still unmeasured) hmmsearch pipeline
-# term on top. Raising it means fewer, larger chunk passes; the pressed profile set
+# Default residues per chunk. At the measured ~2.9 B/residue this is a ~1 GB
+# sequence block. Raising it means fewer, larger chunk passes; the pressed profile set
 # makes each pass cheap, so the cost of a smaller budget is modest.
-DEFAULT_MAX_RESIDUES_PER_CHUNK = 50_000_000
+
+# This only ever binds on very large runs, the granularity rule below tightens the
+# budget so a smaller run is still split into ~TARGET_CHUNKS pieces (so progress bar is
+# informative, as there is minimal impact on speed or memory use).
+DEFAULT_MAX_RESIDUES_PER_CHUNK = 350_000_000
 
 
 class ChunkSizeError(ValueError):
@@ -265,13 +289,58 @@ def _read_env_override(env=None):
     return value
 
 
-def resolve_residue_budget(env=None):
+# Aim for at least roughly this many chunks so the progress bar actually moves during
+# the phase instead of jumping from 0 to 100% at the end
+TARGET_CHUNKS = 10
+
+# Bytes of fasta per residue, used only to estimate a file's residue count from its size
+# for the granularity calculation above. Protein fasta carries headers and newlines on
+# top of the residues themselves, so this is deliberately approximate. It never affects
+# the memory cap, which is applied separately and exactly.
+_APPROX_FASTA_BYTES_PER_RESIDUE = 1.1
+
+
+def _estimate_total_residues(fasta_path):
     """
-    The residues-per-chunk budget for this run: the env override if set, else the
-    default. Always >= 1.
+    Cheap O(1) estimate of the residues in a fasta, from its size on disk.
+
+    Used only to pick a chunk granularity; being off by 10-20% just shifts the chunk
+    count slightly. Returns None if the size can't be read, in which case the caller
+    falls back to the plain memory-capped budget.
+    """
+    try:
+        size = os.path.getsize(fasta_path)
+    except OSError:
+        return None
+    return int(size / _APPROX_FASTA_BYTES_PER_RESIDUE)
+
+
+def resolve_residue_budget(env=None, total_residues=None, target_chunks=TARGET_CHUNKS):
+    """
+    The residues-per-chunk budget for this run.
+
+    Precedence:
+      1. `GTT_SCG_CHUNK`, if set, wins outright.
+      2. otherwise the memory cap (`DEFAULT_MAX_RESIDUES_PER_CHUNK`), tightened if
+         needed so a run smaller than the cap is still split into `target_chunks`
+         chunks rather than one.
+
+    The memory cap is only ever *lowered* by the granularity rule, never raised, so a
+    large run stays bounded by memory and simply gets more than `target_chunks` chunks.
     """
     override = _read_env_override(env)
-    return override if override is not None else DEFAULT_MAX_RESIDUES_PER_CHUNK
+    if override is not None:
+        return override
+
+    budget = DEFAULT_MAX_RESIDUES_PER_CHUNK
+
+    if total_residues and target_chunks and target_chunks > 1:
+        # ceil division, so target_chunks is a floor on the chunk count rather than a
+        # value we can undershoot by rounding
+        per_chunk = -(-total_residues // target_chunks)
+        budget = min(budget, per_chunk)
+
+    return max(1, budget)
 
 
 def estimated_chunk_bytes(residue_budget):

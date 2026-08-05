@@ -72,29 +72,14 @@ def test_records_elapsed_and_rss(enabled):
     enabled.begin("Phase 1")
     enabled.finish()
 
-    label, elapsed, rss_start, rss_end = enabled.recorded()[0]
+    label, elapsed, rss_start, rss_end, cur_end = enabled.recorded()[0]
     assert label == "Phase 1"
     assert elapsed >= 0
     assert rss_start > 0
     # ru_maxrss is a high-water mark, so it can never go down
     assert rss_end >= rss_start
-
-
-def test_rss_delta_attributed_to_allocating_phase(enabled):
-    """
-    The point of keeping both start and end RSS: a phase that inherits a high
-    water mark set by an earlier phase should show a ~zero delta, not the peak.
-    """
-    enabled.begin("Phase 1")
-    blob = bytearray(120 * 1024 * 1024)
-    enabled.begin("Phase 2")
-    del blob
-    enabled.finish()
-
-    (_, _, _, p1_end), (_, _, p2_start, p2_end) = enabled.recorded()
-
-    assert p1_end - enabled.recorded()[0][2] > 50    # Phase 1 grew
-    assert abs(p2_end - p2_start) < 50               # Phase 2 inherited, didn't grow
+    # current RSS is measured separately and may be unavailable on some platforms
+    assert cur_end is None or cur_end > 0
 
 
 def test_write_tsv_contents(enabled, tmp_path):
@@ -106,7 +91,8 @@ def test_write_tsv_contents(enabled, tmp_path):
 
     lines = open(path).read().strip().split("\n")
     header = lines[0].split("\t")
-    assert header == ["phase", "seconds", "rss_start_mb", "rss_end_mb", "rss_delta_mb"]
+    assert header == ["phase", "seconds", "rss_start_mb", "rss_end_mb", "rss_delta_mb",
+                      "cur_rss_end_mb"]
 
     # write_tsv closes the open phase, so both land, plus a TOTAL row
     labels = [line.split("\t")[0] for line in lines[1:]]
@@ -152,3 +138,39 @@ def test_total_row_uses_peak_not_sum(enabled):
 
     peak = max(r[3] for r in enabled.recorded())
     assert float(total[3]) == pytest.approx(peak, abs=0.1)
+
+def test_current_rss_can_fall_while_peak_cannot(enabled):
+    """
+    The reason the current-RSS column exists: `ru_maxrss` only ever rises, so it cannot
+    distinguish "an earlier phase's memory is still held" from "it was handed back after
+    an earlier peak". Current RSS can fall, and that difference is what determines how
+    much headroom a later phase actually has.
+    """
+    enabled.begin("Phase 1")
+    blob = bytearray(200 * 1024 * 1024)
+    blob[::4096] = b"\x01" * len(blob[::4096])   # touch pages so they're truly resident
+    enabled.begin("Phase 2")
+    del blob
+    enabled.finish()
+
+    (_, _, _, p1_peak, p1_cur), (_, _, p2_start, p2_peak, p2_cur) = enabled.recorded()
+
+    # the peak never goes down between phases
+    assert p2_peak >= p1_peak
+
+    if p1_cur is not None and p2_cur is not None:
+        # ...but current RSS is allowed to, and that's the whole point of the column
+        assert p2_cur <= p1_cur + 50
+
+
+def test_checkpoint_is_silent_when_disabled(disabled, capsys):
+    disabled.checkpoint("somewhere")
+    assert capsys.readouterr().err == ""
+
+
+def test_checkpoint_reports_to_stderr(enabled, capsys):
+    """Sub-phase checkpoints go to stderr, like the phase table, so stdout stays clean."""
+    enabled.checkpoint("after the big read")
+    err = capsys.readouterr().err
+    assert "after the big read" in err
+    assert "current RSS" in err

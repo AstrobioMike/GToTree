@@ -15,6 +15,8 @@ import os
 import subprocess
 from types import SimpleNamespace
 
+import pyarrow as pa  # type: ignore
+import pyarrow.compute as pc  # type: ignore
 import pyarrow.parquet as pq  # type: ignore
 
 from gtotree.utils.general import run_pooled_stage
@@ -100,27 +102,87 @@ def resolve_download_info(accessions, table_path=None):
 
     wanted = set(accessions)
 
-    table = pq.read_table(
-        table_path,
-        columns=["assembly_accession", "asm_name", "ftp_path", "organism_name"],
-        filters=[("assembly_accession", "in", wanted)],
-    )
-
-    info = {}
-    for row in table.to_pylist():
-        acc = row.get("assembly_accession")
-        if not acc:
-            continue
-        base_link = resolve_base_link(row.get("ftp_path"), acc, row.get("asm_name"))
-        info[acc] = {
-            "base_link": base_link,
-            "assembly_name": row.get("asm_name"),
-            "organism_name": row.get("organism_name"),
-        }
+    info = _lookup_in_assembly_table(table_path, wanted)
 
     not_found = [acc for acc in accessions if acc not in info]
 
     return info, not_found
+
+
+# columns needed to build a download link and report what was found
+_ASSEMBLY_COLUMNS = ["assembly_accession", "asm_name", "ftp_path", "organism_name"]
+
+
+def _lookup_in_assembly_table(table_path, wanted):
+    """
+    Pull the rows for `wanted` out of the NCBI assembly Parquet, one row group at a time.
+
+    Returns {accession: {base_link, assembly_name, organism_name}}.
+
+    Reading group-by-group and dropping each before the next bounds the peak at one row
+    group instead of the whole table
+
+    Row-group statistics are used to skip groups whose accession range can't contain any
+    wanted accession. That's pure upside when the wanted set is clustered and simply
+    doesn't fire when it isn't, so it never costs more than the full scan it replaces.
+    """
+    info = {}
+    if not wanted:
+        return info
+
+    # a sorted Arrow array of the wanted accessions, built once and reused as the
+    # `is_in` value set for every row group
+    value_set = pa.array(sorted(wanted))
+    lo, hi = min(wanted), max(wanted)
+
+    parquet_file = pq.ParquetFile(table_path)
+
+    for group in range(parquet_file.num_row_groups):
+        if _row_group_cannot_match(parquet_file, group, lo, hi):
+            continue
+
+        table = parquet_file.read_row_group(group, columns=_ASSEMBLY_COLUMNS)
+        table = table.filter(
+            pc.is_in(table.column("assembly_accession"), value_set=value_set))
+
+        for row in table.to_pylist():
+            acc = row.get("assembly_accession")
+            if not acc:
+                continue
+            base_link = resolve_base_link(row.get("ftp_path"), acc, row.get("asm_name"))
+            info[acc] = {
+                "base_link": base_link,
+                "assembly_name": row.get("asm_name"),
+                "organism_name": row.get("organism_name"),
+            }
+
+        # drop this group before reading the next -- this is what bounds the peak
+        del table
+
+        if len(info) == len(wanted):
+            break                      # everything found; no need to read further
+
+    return info
+
+
+def _row_group_cannot_match(parquet_file, group, lo, hi):
+    """
+    True if this row group's accession range provably excludes every wanted accession.
+
+    Conservative: any missing statistics, or any doubt, returns False so the group is
+    read. Skipping a group that did contain a match would silently drop a genome.
+    """
+    try:
+        stats = parquet_file.metadata.row_group(group).column(0).statistics
+    except Exception:
+        return False
+
+    if stats is None or stats.min is None or stats.max is None:
+        return False
+
+    # the wanted set spans [lo, hi]; if that interval doesn't overlap this group's
+    # [min, max] then nothing in here can match
+    return hi < stats.min or lo > stats.max
 
 
 def fetch_amino_acids_pooled(to_fetch, info, work_dir, args=None, num_jobs=1,

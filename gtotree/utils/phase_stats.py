@@ -33,12 +33,19 @@ import sys
 import time
 import resource
 
+_OFF_VALUES = {"", "0", "false", "no", "off"}
+
+def debug_timing_enabled(environ=None):
+    """True if the GTT_DEBUG_TIMING switch is set to anything meaning "on"."""
+    raw = (os.environ if environ is None else environ).get("GTT_DEBUG_TIMING", "")
+    return str(raw).strip().lower() not in _OFF_VALUES
+
 # read once at import; this is a developer switch, not runtime-configurable
-DEBUG_TIMING = bool(os.environ.get("GTT_DEBUG_TIMING"))
+DEBUG_TIMING = debug_timing_enabled()
 
 STATS_FILENAME = "phase-stats.tsv"
 
-# (label, elapsed_seconds, rss_start_mb, rss_end_mb)
+# (label, elapsed_seconds, rss_start_mb, rss_end_mb, cur_rss_end_mb)
 _completed = []
 _current = None
 
@@ -56,6 +63,59 @@ def _peak_rss_mb():
     if sys.platform == "darwin":
         return rss / (1024 ** 2)
     return rss / 1024
+
+
+def _current_rss_mb():
+    """
+    Process RSS *right now*, in MB -- the value that can go down again.
+
+    This is the necessary companion to `_peak_rss_mb`. Because `ru_maxrss` only ever
+    rises, it cannot answer the question that actually matters when deciding how much
+    memory a later phase may safely use: is an earlier phase's memory still resident, or
+    was it handed back? A phase's `rss_start` of 1.4 GB is equally consistent with 1.4 GB
+    still being held and with 100 MB being held after an earlier peak of 1.4 GB, and
+    those two worlds imply very different headroom.
+
+    There's no stdlib call for this, and psutil isn't a dependency, so it's read from
+    /proc on Linux and from `ps` on macOS. Returns None if it can't be determined, which
+    callers render as "n/a" rather than guessing.
+    """
+    try:
+        if sys.platform.startswith("linux"):
+            with open("/proc/self/statm") as f:
+                pages = int(f.read().split()[1])
+            return pages * os.sysconf("SC_PAGE_SIZE") / (1024 ** 2)
+
+        if sys.platform == "darwin":
+            import subprocess
+            out = subprocess.run(
+                ["ps", "-o", "rss=", "-p", str(os.getpid())],
+                capture_output=True, text=True, timeout=5)
+            value = out.stdout.strip()
+            if value:
+                return int(value) / 1024      # ps reports KiB on macOS
+    except Exception:
+        # instrumentation must never take down a run
+        return None
+
+    return None
+
+
+def checkpoint(label):
+    """
+    Print current RSS at a point *inside* a phase, when GTT_DEBUG_TIMING is on.
+
+    The phase table shows where memory ended up per phase, which is enough to see that a
+    phase retained something but not enough to see *which step* did. Dropping a couple of
+    these into a phase localizes it: the step whose checkpoint jumps is the one holding
+    the memory. No-op unless the debug switch is set, so these can be left in place.
+    """
+    if not DEBUG_TIMING:
+        return
+
+    cur = _current_rss_mb()
+    shown = "n/a" if cur is None else f"{cur:.1f} MB"
+    print(f"      [GTT_DEBUG_TIMING] {label}: current RSS {shown}", file=sys.stderr)
 
 
 def begin(label):
@@ -83,7 +143,8 @@ def finish():
         return
 
     label, started, rss_start = _current
-    _completed.append((label, time.monotonic() - started, rss_start, _peak_rss_mb()))
+    _completed.append((label, time.monotonic() - started, rss_start, _peak_rss_mb(),
+                       _current_rss_mb()))
     _current = None
 
 
@@ -102,17 +163,18 @@ def recorded():
 def _rows():
     """Completed phases plus a total row, as display-ready string tuples."""
     rows = []
-    for label, elapsed, rss_start, rss_end in _completed:
+    for label, elapsed, rss_start, rss_end, cur_end in _completed:
         rows.append((label,
                      f"{elapsed:.2f}",
                      f"{rss_start:.1f}",
                      f"{rss_end:.1f}",
-                     f"{rss_end - rss_start:+.1f}"))
+                     f"{rss_end - rss_start:+.1f}",
+                     "n/a" if cur_end is None else f"{cur_end:.1f}"))
 
     if _completed:
         total_elapsed = sum(r[1] for r in _completed)
         peak = max(r[3] for r in _completed)
-        rows.append(("TOTAL", f"{total_elapsed:.2f}", "", f"{peak:.1f}", ""))
+        rows.append(("TOTAL", f"{total_elapsed:.2f}", "", f"{peak:.1f}", "", ""))
 
     return rows
 
@@ -127,7 +189,8 @@ def report(indent="      "):
     if not rows:
         return
 
-    header = ("phase", "seconds", "rss_start_mb", "rss_end_mb", "rss_delta_mb")
+    header = ("phase", "seconds", "rss_start_mb", "rss_end_mb", "rss_delta_mb",
+              "cur_rss_end_mb")
     widths = [max(len(header[i]), max(len(r[i]) for r in rows))
               for i in range(len(header))]
 
@@ -161,7 +224,8 @@ def write_tsv(out_dir):
     tmp_path = path + ".part"
     try:
         with open(tmp_path, "w") as out:
-            out.write("phase\tseconds\trss_start_mb\trss_end_mb\trss_delta_mb\n")
+            out.write("phase\tseconds\trss_start_mb\trss_end_mb\trss_delta_mb"
+                      "\tcur_rss_end_mb\n")
             for row in rows:
                 out.write("\t".join(row) + "\n")
         os.replace(tmp_path, path)

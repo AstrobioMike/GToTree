@@ -11,6 +11,8 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search import (
     ChunkSizeError,
     resolve_residue_budget,
     estimated_chunk_bytes,
+    TARGET_CHUNKS,
+    _estimate_total_residues,
     _read_env_override,
 )
 from gtotree.tests.paths import DATA_DIR
@@ -148,40 +150,76 @@ def test_search_recovers_genome_ids_with_underscores(tmp_path):
     assert set(hits) == {"GCF_000091665.1"}
 
 
-def test_search_progress_callback_fires_per_chunk_with_count(tmp_path):
+def test_search_progress_reports_genomes_completed(tmp_path):
     """
-    The callback fires once per chunk completed, receiving that chunk's sequence
-    count. The counts must sum to the total number of sequences searched, regardless
-    of how the residues chunked.
+    The callback reports genomes *finished*, so the reported total must equal the
+    genome count -- not the sequence count, and not the chunk count.
     """
     faa = _write_proteome(tmp_path / "t.faa", {
         "g1": list(MOTIFS),   # 4 seqs
         "g2": list(MOTIFS),   # 4 seqs
         "g3": list(MOTIFS),   # 4 seqs
-    })  # 12 sequences total, each 8 residues -> 96 residues
+    })  # 12 sequences, 3 genomes, each seq 8 residues
 
-    # a small budget forces multiple chunks; counts must still sum to 12
     counts = []
     search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=16,
                     progress_callback=lambda n: counts.append(n))
-    assert sum(counts) == 12
+    assert sum(counts) == 3
     assert all(c >= 1 for c in counts)
 
 
+def test_search_progress_counts_each_genome_exactly_once(tmp_path):
+    """
+    Chunks don't respect genome boundaries, so a genome can straddle a boundary. It
+    must be reported once and only once -- never double counted by the chunk that ends
+    mid-genome and the chunk that finishes it, and never dropped.
+
+    Genomes have differing protein counts so boundaries land mid-genome at some budgets.
+    """
+    faa = _write_proteome(tmp_path / "t.faa", {
+        "g1": ["PF90001.3"] * 5,
+        "g2": ["PF90002.7"] * 3,
+        "g3": ["PF90003.1"] * 7,
+        "g4": ["PF90004.2"] * 1,
+        "g5": ["PF90001.3"] * 4,
+    })
+
+    for budget in (8, 16, 24, 40, 10 ** 9):
+        counts = []
+        search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=budget,
+                        progress_callback=lambda n: counts.append(n))
+        assert sum(counts) == 5, f"budget {budget} reported {sum(counts)} genomes"
+
+
 def test_search_progress_total_is_chunk_independent(tmp_path):
-    """The summed sequence count must not change with the residue budget."""
+    """The reported genome total must not change with the residue budget."""
     faa = _write_proteome(tmp_path / "t.faa", {
         "g1": list(MOTIFS), "g2": list(MOTIFS), "g3": list(MOTIFS),
     })
 
-    def total_counted(budget):
+    def total_reported(budget):
         counts = []
         search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=budget,
                         progress_callback=lambda n: counts.append(n))
         return sum(counts)
 
-    assert total_counted(1) == 12          # every sequence its own chunk
-    assert total_counted(10 ** 9) == 12    # one chunk
+    assert total_reported(1) == 3           # every sequence its own chunk
+    assert total_reported(10 ** 9) == 3     # one chunk
+
+
+def test_search_progress_reaches_total_even_in_one_chunk(tmp_path):
+    """
+    The single-chunk case is the one that looked broken in practice (bar stuck at 0,
+    then jumping to 100%). Even with one chunk every genome must still be reported, so
+    the bar finishes filled rather than short.
+    """
+    faa = _write_proteome(tmp_path / "t.faa", {
+        "g1": list(MOTIFS), "g2": list(MOTIFS),
+    })
+    counts = []
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=10 ** 9,
+                    progress_callback=lambda n: counts.append(n))
+    assert sum(counts) == 2
 
 
 def test_search_wraps_lazy_iteration_errors(tmp_path, monkeypatch):
@@ -366,6 +404,59 @@ def test_env_override_rejects_nonpositive():
 
 def test_resolve_prefers_override():
     assert resolve_residue_budget(env={CHUNK_ENV_VAR: "500"}) == 500
+
+
+def test_override_beats_the_granularity_rule():
+    """An explicit override must not be second-guessed by the chunk-count targeting."""
+    assert resolve_residue_budget(
+        env={CHUNK_ENV_VAR: "777"}, total_residues=38_000_000) == 777
+
+
+def test_granularity_splits_a_small_run_into_several_chunks():
+    """
+    A run smaller than the memory cap would otherwise be a single chunk, which makes the
+    progress bar jump straight from 0 to 100%. The budget should tighten so the run is
+    split into roughly TARGET_CHUNKS pieces instead.
+    """
+    total = 38_000_000          # well under the memory cap
+    budget = resolve_residue_budget(env={}, total_residues=total)
+    assert budget < DEFAULT_MAX_RESIDUES_PER_CHUNK
+    chunks = -(-total // budget)
+    assert chunks >= TARGET_CHUNKS
+
+
+def test_granularity_never_raises_the_memory_cap():
+    """
+    The granularity rule may only tighten the budget. On a run far larger than the cap,
+    total/TARGET_CHUNKS exceeds the cap, and the cap must win -- yielding more chunks,
+    not a bigger one.
+    """
+    total = 4_000_000_000
+    budget = resolve_residue_budget(env={}, total_residues=total)
+    assert budget == DEFAULT_MAX_RESIDUES_PER_CHUNK
+    assert -(-total // budget) > TARGET_CHUNKS
+
+
+def test_unknown_total_falls_back_to_the_cap():
+    """With no size estimate available the plain memory-capped budget is used."""
+    assert resolve_residue_budget(env={}, total_residues=None) == \
+        DEFAULT_MAX_RESIDUES_PER_CHUNK
+
+
+def test_estimate_total_residues_is_roughly_right(tmp_path):
+    """
+    The estimate only picks chunk granularity, so it needs to be in the right ballpark
+    rather than exact -- but a wildly wrong figure would defeat the purpose.
+    """
+    faa = _write_proteome(tmp_path / "t.faa", {"g1": list(MOTIFS), "g2": list(MOTIFS)})
+    actual = 8 * 8   # 8 sequences of 8 residues
+    est = _estimate_total_residues(faa)
+    assert est is not None
+    assert 0.2 * actual < est < 5 * actual
+
+
+def test_estimate_returns_none_for_missing_file(tmp_path):
+    assert _estimate_total_residues(str(tmp_path / "nope.faa")) is None
 
 
 def test_resolve_falls_back_to_default():

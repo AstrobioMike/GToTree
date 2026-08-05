@@ -366,3 +366,102 @@ def test_fetch_raises_when_nucleotide_download_fails(tmp_path, monkeypatch):
     with pytest.raises(TargetGenomeError, match="download failed"):
         mod.fetch_amino_acids("GCA_1.1", {"base_link": "https://x/GCA_1.1_ASM"},
                               str(tmp_path))
+
+
+################################################################################
+# assembly-table lookup (row-group at a time)
+################################################################################
+
+def _write_assembly_parquet(path, n_rows, row_group_size=500):
+    """A stand-in NCBI assembly table, written with several row groups."""
+    import pyarrow as pa  # type: ignore
+    import pyarrow.parquet as pq  # type: ignore
+
+    table = pa.table({
+        "assembly_accession": pa.array([f"GCF_{i:09d}.1" for i in range(n_rows)]),
+        "asm_name": pa.array([f"ASM{i}v1" for i in range(n_rows)]),
+        "ftp_path": pa.array(
+            [f"https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/{i}" for i in range(n_rows)]),
+        "organism_name": pa.array([f"Species {i}" for i in range(n_rows)]),
+    })
+    pq.write_table(table, str(path), row_group_size=row_group_size)
+    return str(path)
+
+
+def test_lookup_finds_scattered_accessions(tmp_path):
+    """Accessions spread across many row groups must all be found."""
+    path = _write_assembly_parquet(tmp_path / "ncbi.parquet", 5000)
+    wanted = {f"GCF_{i:09d}.1" for i in (3, 800, 1600, 2400, 3999, 4999)}
+
+    info = mod._lookup_in_assembly_table(path, wanted)
+
+    assert set(info) == wanted
+    sample = info["GCF_000000800.1"]
+    assert sample["assembly_name"] == "ASM800v1"
+    assert sample["organism_name"] == "Species 800"
+    assert sample["base_link"]
+
+
+def test_lookup_reports_only_what_exists(tmp_path):
+    """Accessions absent from the table simply don't come back."""
+    path = _write_assembly_parquet(tmp_path / "ncbi.parquet", 2000)
+    wanted = {"GCF_000000005.1", "GCF_999999999.9"}
+
+    info = mod._lookup_in_assembly_table(path, wanted)
+
+    assert set(info) == {"GCF_000000005.1"}
+
+
+def test_lookup_handles_empty_wanted_set(tmp_path):
+    path = _write_assembly_parquet(tmp_path / "ncbi.parquet", 100)
+    assert mod._lookup_in_assembly_table(path, set()) == {}
+
+
+def test_lookup_matches_a_whole_table_read(tmp_path):
+    """
+    The row-group loop is an optimization, so it has to agree exactly with the
+    straightforward whole-table filtered read it replaced.
+    """
+    import pyarrow.parquet as pq  # type: ignore
+
+    path = _write_assembly_parquet(tmp_path / "ncbi.parquet", 3000)
+    wanted = {f"GCF_{i:09d}.1" for i in range(0, 3000, 137)}
+
+    info = mod._lookup_in_assembly_table(path, wanted)
+
+    table = pq.read_table(path, columns=["assembly_accession"],
+                          filters=[("assembly_accession", "in", wanted)])
+    expected = {r["assembly_accession"] for r in table.to_pylist()}
+    assert set(info) == expected
+
+
+def test_row_group_skipping_is_conservative(tmp_path):
+    """
+    Skipping a row group that did contain a match would silently drop a genome, so the
+    statistics check must only skip when the ranges provably don't overlap.
+    """
+    import pyarrow.parquet as pq  # type: ignore
+
+    path = _write_assembly_parquet(tmp_path / "ncbi.parquet", 2000)
+    pf = pq.ParquetFile(path)
+
+    # a wanted range covering everything must never let a group be skipped
+    for group in range(pf.num_row_groups):
+        assert not mod._row_group_cannot_match(
+            pf, group, "GCF_000000000.1", "GCF_999999999.9")
+
+    # a range entirely above the table can skip every group
+    assert all(
+        mod._row_group_cannot_match(pf, group, "GCZ_000000000.1", "GCZ_000000001.1")
+        for group in range(pf.num_row_groups))
+
+
+def test_row_group_skipping_falls_back_without_statistics(tmp_path):
+    """Missing/unreadable statistics must mean 'read it', never 'skip it'."""
+    class _NoStats:
+        class metadata:
+            @staticmethod
+            def row_group(_):
+                raise RuntimeError("no metadata here")
+
+    assert mod._row_group_cannot_match(_NoStats, 0, "a", "z") is False
