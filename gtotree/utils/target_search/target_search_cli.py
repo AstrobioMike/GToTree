@@ -37,6 +37,8 @@ from gtotree.utils.target_search.target_search_setup import (
     setup_output_dir,
     build_run_data,
     adopt_genome_progress,
+    ensure_processing_dirs,
+    ensure_reference_data,
     validate_input_files,
     fill_in_shared_args,
 )
@@ -383,11 +385,13 @@ def run_search(args, spec):  # pragma: no cover
     section(f"Phase {n()}: Resolving input genomes...")
     args = validate_input_files(args, spec)
     run_data = build_run_data(args, spec, out_dir, work_dir, previous=previous)
+
+    ensure_reference_data(args, spec)
+
     run_data, _selection = stages.phase_resolve_genomes(args, run_data)
 
-    # only now is the genome set final (-w accessions are merged in above), so this is
-    # where a resumed run's per-genome progress can be folded onto it. Doing it earlier
-    # would wipe the progress of any -w genome, which arrives after build_run_data.
+    ensure_processing_dirs(run_data)
+
     carried = adopt_genome_progress(run_data, previous)
     if carried:
         print(f"      {carried:,} genome(s) carried over from the previous run")

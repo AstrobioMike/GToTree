@@ -221,11 +221,120 @@ def test_an_unresponsive_server_times_out_and_is_retried(stalling_server, tmp_pa
 
     dest = tmp_path / "genome.faa"
     started = time.monotonic()
-    with pytest.raises(OSError):
+    # exhausted retries now surface as AssemblyDownloadFailed rather than the raw
+    # TimeoutError, so callers can tell "this accession didn't come down" apart from a
+    # local problem like an unwritable directory. The original error is kept as
+    # __cause__ so nothing about why it failed is lost.
+    with pytest.raises(P.AssemblyDownloadFailed) as excinfo:
         P.download_and_unzip_accession(f"{stalling_server}/stall", str(dest),
                                        max_retries=3)
+    assert isinstance(excinfo.value.__cause__, OSError)
     elapsed = time.monotonic() - started
 
     assert elapsed < 15, f"took {elapsed:.1f}s -- the timeout is not being applied"
     assert backoffs == [1, 2], "a timeout should be retried like any transient failure"
     assert sorted(p.name for p in tmp_path.iterdir()) == [], "partial files left behind"
+
+
+
+# ---------------------------------------------------------------------------
+# failure classification (narrowed from the old bare `except:`)
+# ---------------------------------------------------------------------------
+
+def test_a_404_is_reported_as_the_format_being_unavailable(tmp_path):
+    """
+    The one failure that legitimately means "try the other format". It has its own type
+    so `prepare_accession` can fall back on it and nothing else.
+    """
+    dest = tmp_path / "genome.faa"
+    with patch.object(P, "_fetch_to_file", side_effect=_http_error(404)):
+        with pytest.raises(P.AssemblyFormatNotAvailable):
+            P.download_and_unzip_accession("http://example/x", str(dest), max_retries=3)
+
+
+def test_a_missing_download_directory_fails_immediately_as_an_oserror(tmp_path):
+    """
+    Regression test for the bug that motivated all this.
+
+    An unwritable or absent destination is a local problem, not a download problem. It
+    must (a) not be retried -- otherwise every retry and its backoff burns before
+    failing, per genome -- and (b) not be one of the accession-level exception types,
+    so a caller handling "this accession didn't work" can't swallow it.
+    """
+    attempted = []
+    with patch.object(P, "_fetch_to_file", side_effect=lambda *a, **k: attempted.append(1)):
+        with pytest.raises(OSError) as excinfo:
+            P.download_and_unzip_accession("http://example/x",
+                                           str(tmp_path / "nope" / "genome.faa"))
+
+    assert attempted == [], "a bad destination must not reach the network at all"
+    assert not isinstance(excinfo.value, (P.AssemblyFormatNotAvailable,
+                                          P.AssemblyDownloadFailed))
+
+
+def test_prepare_accession_lets_a_local_error_propagate(tmp_path):
+    """
+    The heart of the fix. The old bare `except:` caught OSError, so an unset
+    `ncbi_processing_dir` came back as an ordinary "acc download failed" for every
+    genome, with nothing anywhere saying why.
+    """
+    class _RunData:
+        nucleotide_mode = False
+        # the shape the -w bug produced: a processing directory that was never created.
+        # A missing directory rather than the literal "" the bug left, because ""
+        # resolves the download to "/<acc>_protein.faa" and whether that's writable
+        # depends on who's running the tests -- as root it is, so the assertion would
+        # pass or fail by environment rather than by behavior.
+        ncbi_processing_dir = None
+
+    _RunData.ncbi_processing_dir = str(tmp_path / "never-created")
+
+    attempted = []
+    with patch.object(P, "_fetch_to_file", side_effect=lambda *a, **k: attempted.append(1)):
+        with pytest.raises(OSError):
+            P.prepare_accession("GCF_000000001.1", _RunData(),
+                                base_link_map={"GCF_000000001.1": "http://example/GCF_x"})
+
+    assert attempted == [], "a bad destination must not reach the network at all"
+
+
+def test_prepare_accession_falls_back_to_nucleotides_on_a_missing_protein_file(tmp_path):
+    """The intended fallback still works, now triggered only by the 404 type."""
+    class _RunData:
+        nucleotide_mode = False
+        ncbi_processing_dir = str(tmp_path)
+
+    calls = []
+
+    def fake_download(link, filepath, **kwargs):
+        calls.append(link)
+        if link.endswith("_protein.faa.gz"):
+            raise P.AssemblyFormatNotAvailable("nope")
+
+    with patch.object(P, "download_and_unzip_accession", fake_download):
+        done, nt = P.prepare_accession(
+            "GCF_000000001.1", _RunData(),
+            base_link_map={"GCF_000000001.1": "http://example/GCF_x"})
+
+    assert (done, nt) == (True, True)
+    assert len(calls) == 2 and calls[1].endswith("_genomic.fna.gz")
+
+
+def test_nucleotide_mode_skips_the_protein_attempt_without_raising(tmp_path):
+    """
+    This used to be spelled `raise Exception` inside the protein try block, using an
+    exception as a goto into the fallback. It's a branch now.
+    """
+    class _RunData:
+        nucleotide_mode = True
+        ncbi_processing_dir = str(tmp_path)
+
+    calls = []
+    with patch.object(P, "download_and_unzip_accession",
+                      lambda link, fp, **kw: calls.append(link)):
+        done, nt = P.prepare_accession(
+            "GCF_000000001.1", _RunData(),
+            base_link_map={"GCF_000000001.1": "http://example/GCF_x"})
+
+    assert (done, nt) == (True, True)
+    assert len(calls) == 1 and calls[0].endswith("_genomic.fna.gz")

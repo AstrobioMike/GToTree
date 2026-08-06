@@ -23,6 +23,8 @@ from gtotree.utils.target_search.target_search_setup import (
     setup_output_dir,
     build_run_data,
     adopt_genome_progress,
+    ensure_processing_dirs,
+    ensure_reference_data,
     validate_input_files,
     make_args,
     WORKING_DIR_NAME,
@@ -392,3 +394,101 @@ def test_adopt_genome_progress_skips_a_changed_source(built, spec):
 def test_adopt_genome_progress_with_no_previous_run_is_a_noop(built, spec):
     _args, run_data, _out, _work = built
     assert adopt_genome_progress(run_data, None) == 0
+
+
+################################################################################
+# processing directories
+################################################################################
+
+"""
+Regression tests for a real download failure.
+
+`--wanted-ref-tax` accessions are merged into `run_data.ncbi_accs` during phase 1,
+which is AFTER `build_run_data` runs. Directory creation used to be gated on
+`run_data.ncbi_accs` being non-empty at build time, so a run whose only NCBI accessions
+came from `-w` left `ncbi_processing_dir` as "". `prepare_accession` concatenates that
+into its download path, so every genome was downloaded to "/<acc>_protein.faa" at the
+filesystem root, failed on permissions, and got swallowed by that function's bare
+`except:` -- surfacing only as "acc download failed" for every genome.
+"""
+
+
+def test_wanted_ref_tax_only_run_gets_a_processing_dir(spec, tmp_path, listing,
+                                                       write_genome):
+    args = make_args(wanted_ref_tax="Nitrospirota",
+                     target_pfams_file=listing("t.txt", ["PF90001"]),
+                     output_dir=str(tmp_path / "out"))
+    args = validate_input_files(args, spec)
+    out_dir, work_dir = setup_output_dir(args, spec)
+    run_data = build_run_data(args, spec, out_dir, work_dir)
+
+    # nothing to download yet, so nothing is set up yet
+    assert run_data.ncbi_processing_dir == ""
+
+    # ... this is what phase 1 does
+    run_data.merge_wanted_ref_tax_accessions(["GCF_000008865.2", "GCF_000005845.2"])
+    ensure_processing_dirs(run_data)
+
+    assert run_data.ncbi_processing_dir
+    assert os.path.isdir(run_data.ncbi_processing_dir)
+    # the actual failure mode: a download target at the filesystem root
+    assert not run_data.ncbi_processing_dir.startswith("/GCF")
+
+
+def test_ensure_processing_dirs_is_idempotent(spec, tmp_path, listing, write_genome):
+    """Called twice on every run -- once at build, once after the genome set is final."""
+    genome = write_genome("g1", ["PF90001"])
+    args = make_args(amino_acid_files=listing("aa.txt", [genome]),
+                     target_pfams_file=listing("t.txt", ["PF90001"]),
+                     output_dir=str(tmp_path / "out"))
+    args = validate_input_files(args, spec)
+    out_dir, work_dir = setup_output_dir(args, spec)
+    run_data = build_run_data(args, spec, out_dir, work_dir)
+
+    first = run_data.AA_processing_dir
+    ensure_processing_dirs(run_data)
+    ensure_processing_dirs(run_data)
+
+    assert run_data.AA_processing_dir == first
+    assert os.path.isdir(first)
+
+
+def test_accession_file_run_has_its_processing_dir_at_build_time(spec, tmp_path,
+                                                                 listing):
+    """The `-a` path was never broken; this pins it so a fix here can't regress it."""
+    args = make_args(ncbi_accessions=listing("accs.txt", ["GCF_000008865.2"]),
+                     target_pfams_file=listing("t.txt", ["PF90001"]),
+                     output_dir=str(tmp_path / "out"))
+    out_dir, work_dir = setup_output_dir(args, spec)
+    run_data = build_run_data(args, spec, out_dir, work_dir)
+
+    assert os.path.isdir(run_data.ncbi_processing_dir)
+
+
+def test_reference_data_is_fetched_for_every_ncbi_bearing_input(spec, monkeypatch):
+    """
+    These subcommands only ever resolved *paths* into the data dirs; nothing fetched
+    the assets. A machine that had never run the main program would fail on a missing
+    NCBI/GTDB table rather than downloading it.
+    """
+    import gtotree.utils.ncbi.get_ncbi_assembly_data as ncbi_mod
+    import gtotree.utils.gtdb.get_gtdb_data as gtdb_mod
+
+    calls = []
+    monkeypatch.setattr(ncbi_mod, "get_ncbi_assembly_data",
+                        lambda *a, **kw: calls.append("ncbi"))
+    monkeypatch.setattr(gtdb_mod, "get_gtdb_data", lambda *a, **kw: calls.append("gtdb"))
+
+    # a GTDB -w selection still yields NCBI accessions to download, so both are needed
+    calls.clear()
+    ensure_reference_data(make_args(wanted_ref_tax="Nitrospirota", source="gtdb"), spec)
+    assert sorted(calls) == ["gtdb", "ncbi"]
+
+    calls.clear()
+    ensure_reference_data(make_args(ncbi_accessions="accs.txt"), spec)
+    assert calls == ["ncbi"]
+
+    # local files only: neither table is touched
+    calls.clear()
+    ensure_reference_data(make_args(amino_acid_files="aa.txt"), spec)
+    assert calls == []

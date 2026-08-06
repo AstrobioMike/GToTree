@@ -19,11 +19,12 @@ from gtotree.utils.seqs import (filter_and_rename_fasta,
 from gtotree.utils.general import (gunzip_if_needed,
                                    remove_file_if_exists)
 
+
 # Concurrent NCBI downloads are capped for politeness toward NCBI, NOT because of
 # local resources. Capping the whole pool at this number would also throttle the
 # CPU-bound following work to 20-wide no matter what `-j` said. So the cap is applied as a
 # semaphore around the download call alone, the pool itself runs at --num-jobs
-MAX_NCBI_DOWNLOAD_THREADS = 20
+MAX_NCBI_DOWNLOAD_THREADS = 30
 _NCBI_DOWNLOAD_SEMAPHORE = threading.Semaphore(MAX_NCBI_DOWNLOAD_THREADS)
 NCBI_DOWNLOAD_MAX_RETRIES = 10
 
@@ -41,6 +42,25 @@ NCBI_DOWNLOAD_TIMEOUT = 60
 
 # length of the non-throttled sawtooth cycle, e.g., with 5 set here: 1, 2, 4, 8, 16, then start over
 NCBI_SAWTOOTH_CYCLE = 5
+
+
+class AssemblyFormatNotAvailable(Exception):
+    """
+    NCBI has no file of the requested format for this accession (HTTP 404).
+
+    This is the ONE failure that legitimately means "try the other format". Everything
+    else -- a dead network, a corrupt gzip, an unwritable directory, a bug in our own
+    code -- means something is wrong, not that this assembly ships nucleotides instead
+    of proteins.
+    """
+
+
+class AssemblyDownloadFailed(Exception):
+    """
+    Downloading this accession failed after exhausting retries: network, HTTP, or a
+    corrupt archive. An accession-level failure, so it's reported per genome rather
+    than aborting the run.
+    """
 
 
 def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
@@ -79,10 +99,10 @@ def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
             "final_nt_path": final_nt_path,
             "num_genes": int(num_genes or 0),
         }
-    except BaseException:
+    except BaseException as e:
         # a worker must never take down the whole pool; treat any unexpected
         # failure as a non-downloaded processing failure and let the bookkeeping
-        # step mark it removed
+        # step mark it removed. The message is carried out with it
         return {
             "done": False,
             "downloaded": False,
@@ -90,6 +110,7 @@ def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
             "final_AA_path": None,
             "final_nt_path": None,
             "num_genes": 0,
+            "error": f"{type(e).__name__}: {e}",
         }
 
 
@@ -109,12 +130,16 @@ def _apply_ncbi_accession_status(acc_gd, status, run_data):
         acc_gd.final_nt_path = status.get("final_nt_path")
         acc_gd.acc_was_downloaded = downloaded
     else:
+        error = status.get("error")
         if downloaded:
             acc_gd.acc_was_downloaded = True
-            acc_gd.mark_removed("acc processing failed after download")
+            reason = "acc processing failed after download"
         else:
             acc_gd.acc_was_downloaded = False
-            acc_gd.mark_removed("acc download failed")
+            reason = "acc download failed"
+        # the reason lands in the summary table, so an unexpected failure says what it
+        # was instead of being indistinguishable from a genuinely missing assembly
+        acc_gd.mark_removed(f"{reason} ({error})" if error else reason)
 
     acc_gd.prodigal_used = prodigal_used
     if prodigal_used:
@@ -129,29 +154,27 @@ def prepare_accession(acc, run_data, base_link_map=None):
     if not base_link or base_link.lower() == "na":
         return False, False
 
-    # first trying amino acids
-    try:
-        # well, actually going directly to nucleotides if running in nucleotide mode
-        if run_data.nucleotide_mode:
-            raise Exception
+    # Nucleotide mode goes straight to the genomic fasta. This used to be spelled
+    # `raise Exception` inside the amino-acid try block, using an exception as a goto
+    # into the fallback
+    if not run_data.nucleotide_mode:
         amino_acid_link = base_link + "/" + acc_assembly_str + "_protein.faa.gz"
         amino_acid_filepath = run_data.ncbi_processing_dir + "/" + acc + "_protein.faa"
-        download_and_unzip_accession(amino_acid_link, amino_acid_filepath)
-        done = True
-        nt = False
-    except:
-        # then trying nucleotides
         try:
-            nucleotide_link = base_link + "/" + acc_assembly_str + "_genomic.fna.gz"
-            nucleotide_file = run_data.ncbi_processing_dir + "/" + acc + "_genomic.fna"
-            download_and_unzip_accession(nucleotide_link, nucleotide_file)
-            done = True
-            nt = True
-        except:
-            done = False
-            nt = False
+            download_and_unzip_accession(amino_acid_link, amino_acid_filepath)
+            return True, False
+        except (AssemblyFormatNotAvailable, AssemblyDownloadFailed):
+            # no protein fasta for this assembly (or it wouldn't come down) -> fall
+            # through and call genes off the nucleotides instead
+            pass
 
-    return done, nt
+    nucleotide_link = base_link + "/" + acc_assembly_str + "_genomic.fna.gz"
+    nucleotide_file = run_data.ncbi_processing_dir + "/" + acc + "_genomic.fna"
+    try:
+        download_and_unzip_accession(nucleotide_link, nucleotide_file)
+        return True, True
+    except (AssemblyFormatNotAvailable, AssemblyDownloadFailed):
+        return False, False
 
 
 def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_RETRIES):
@@ -162,6 +185,17 @@ def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_R
     # ~16s. A 404 is permanent (the requested format doesn't exist for this accession)
     # so we fail fast rather than burning retries; prepare_accession will then try the
     # other format.
+    # A local filesystem problem is not a download problem, and must not be retried as
+    # one: an unwritable destination would otherwise burn every retry and its backoff
+    # before failing, per genome. Checked once, up front, and raised as a plain OSError,
+    # deliberately NOT one of the typed exceptions above, so callers that handle
+    # "this accession didn't work" can't accidentally swallow "our directory is wrong".
+    dest_dir = os.path.dirname(os.path.abspath(filepath))
+    if not os.path.isdir(dest_dir):
+        raise OSError(f"the download directory '{dest_dir}' does not exist")
+    if not os.access(dest_dir, os.W_OK):
+        raise OSError(f"the download directory '{dest_dir}' is not writable")
+
     tmp_gzip = filepath + ".gz"
     tmp_out = filepath + ".part"
 
@@ -194,7 +228,8 @@ def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_R
             cleanup_partials()
             # 404 -> requested format not available; permanent, don't retry
             if e.code == 404:
-                raise
+                raise AssemblyFormatNotAvailable(
+                    f"no file of this format at {link}") from e
             last_err = e
             throttled = _is_throttle(e)
         except (urllib.error.URLError, OSError, EOFError, gzip.BadGzipFile) as e:
@@ -208,7 +243,10 @@ def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_R
             _sleep_backoff(attempt, err=last_err, throttled=throttled)
 
     # exhausted retries -> raise so prepare_accession falls back / marks failure
-    raise last_err if last_err is not None else RuntimeError(f"failed to download {link}")
+    if last_err is not None:
+        raise AssemblyDownloadFailed(
+            f"{type(last_err).__name__}: {last_err}") from last_err
+    raise AssemblyDownloadFailed(f"failed to download {link}")
 
 
 def _fetch_to_file(link, dest, timeout=None):

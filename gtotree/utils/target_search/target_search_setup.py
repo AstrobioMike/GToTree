@@ -101,15 +101,7 @@ def _check_dangling_ref_tax_args(args):
 
 def check_dependencies(args, spec):
     """
-    Check only what this run actually needs.
-
-    Deliberately separate from the main driver's `check_for_essential_deps()`, which
-    demands muscle and trimal -- neither subcommand aligns or trims anything, so
-    requiring them would turn a working setup into a spurious failure.
-
-    prodigal is conditional: it's only invoked for nucleotide fastas (`-f`), for NCBI
-    accessions with no protein file, and as the GenBank fallback. Amino-acid input
-    alone never needs it.
+    Check only what this run actually needs
     """
     missing = []
 
@@ -162,12 +154,7 @@ def check_env_vars(spec):
 
 def setup_output_dir(args, spec):
     """
-    Create the output dir and its working dir, honoring -F and -R.
-
-    Returns (out_dir, work_dir). The working dir holds the resume state, the saved
-    run-data, and all intermediates; it's removed on success unless
-    `--keep-working-dir` was given, which is also what makes a resumed run possible
-    after a failure.
+    Create the output dir and its working dir, honoring -F and -R
     """
     out_dir = args.output_dir.rstrip("/")
     work_dir = os.path.join(out_dir, WORKING_DIR_NAME)
@@ -272,9 +259,20 @@ def build_run_data(args, spec, out_dir, work_dir, previous=None):
     setattr(run_data, spec.total_targets_attr, getattr(args, "total_targets", 0) or 0)
 
     run_data.ready_genome_files_dir = os.path.join(tmp_dir, "ready-genome-files")
+    os.makedirs(getattr(run_data, spec.tmp_results_dir_attr), exist_ok=True)
+    os.makedirs(run_data.ready_genome_files_dir, exist_ok=True)
 
-    dirs = [getattr(run_data, spec.tmp_results_dir_attr),
-            run_data.ready_genome_files_dir]
+    ensure_processing_dirs(run_data)
+
+    return run_data
+
+
+def ensure_processing_dirs(run_data):
+    """
+    Create the per-source processing directories for whichever sources have genomes
+    """
+    tmp_dir = run_data.tmp_dir
+    dirs = []
 
     if run_data.ncbi_accs:
         run_data.ncbi_processing_dir = os.path.join(tmp_dir, "ncbi-acc-processing")
@@ -296,6 +294,17 @@ def build_run_data(args, spec, out_dir, work_dir, previous=None):
     return run_data
 
 
+def ensure_reference_data(args, spec):
+    """
+    Fetch the managed reference datasets this run will read
+    """
+    from gtotree.utils.data_locations import ensure_reference_data as _ensure
+
+    _ensure(has_ncbi_accessions=bool(args.ncbi_accessions),
+            wanted_ref_tax=args.wanted_ref_tax,
+            source=args.source)
+
+
 # run-level fields worth carrying across a resume, beyond the spec-named ones.
 # Everything else is either re-derived each run or a path this run relays out itself.
 _SHARED_CARRIED_FIELDS = ("pfam_dict", "all_pfam_targets_hmm_path", "target_kos_tsv",
@@ -310,11 +319,10 @@ _GENOME_IDENTITY_FIELDS = frozenset(
 
 def _adopt_run_level_state(run_data, previous, spec):
     """
-    Carry the previous run's resolved target set and its assets onto a fresh RunData.
+    Carry the previous run's resolved target set and its assets onto a fresh RunData
 
     Whether any of it is actually trusted is decided later by
-    `target_stage_is_reusable`, which checks the artifacts are still on disk -- this
-    just makes the state available to check.
+    `target_stage_is_reusable`, which checks the artifacts are still on disk
     """
     for attr in (spec.found_targets_attr, spec.failed_targets_attr,
                  spec.searching_done_attr, *_SHARED_CARRIED_FIELDS):
@@ -337,7 +345,7 @@ def _adopt_run_level_state(run_data, previous, spec):
 
 def adopt_genome_progress(run_data, previous):
     """
-    Copy per-genome progress flags from a resumed run onto the current genome set.
+    Copy per-genome progress flags from a resumed run onto the current genome set
 
     Matched by genome ID, which is stable across runs because it's derived by the same
     `GenomeData.from_path` / `from_acc` factories from the same inputs. A genome present
@@ -415,11 +423,11 @@ def _read_entries(path):
 
 def validate_input_files(args, spec):
     """
-    Run the shared single-column input checks over every provided input file.
+    Run the shared single-column input checks over every provided input file
 
-    These are the same checks the main driver applies -- whitespace, CRLF line endings,
+    These are the same checks the main driver applies: whitespace, CRLF line endings,
     duplicate entries, and (for the file-listing flags) that every listed genome file
-    actually exists -- so an input list that works with `GToTree` works here.
+    actually exists
     """
     from gtotree.utils.preflight_checks import check_expected_single_column_input
 

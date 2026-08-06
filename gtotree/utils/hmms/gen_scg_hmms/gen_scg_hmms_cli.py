@@ -27,6 +27,7 @@ from gtotree.utils.general import (run_pooled_stage,
 from gtotree.utils import phase_stats
 from gtotree.utils.messaging import (report_message, color_text, spinner,
                                      report_very_early_exit)
+from gtotree.utils.data_locations import ensure_reference_data
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
@@ -410,6 +411,11 @@ def phase_resolve_genomes(args):
     Returns (accessions, sources) where `sources` maps accession -> where it came
     from, for the target-genomes table.
     """
+
+    ensure_reference_data(has_ncbi_accessions=bool(args.target_accessions),
+                          wanted_ref_tax=args.wanted_ref_tax,
+                          source=args.source)
+
     accessions = []
     sources = {}
 

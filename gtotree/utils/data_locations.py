@@ -227,3 +227,18 @@ def notify_to_reactivate_conda():
     wprint("Then you can double-check with `gtt data locations check`.")
     print(color_text("  " + "-" * 80, "green"))
     print(color_text("  " + "-" * 80 + "\n", "green"))
+
+
+def ensure_reference_data(has_ncbi_accessions=False, wanted_ref_tax=None, source=None):
+    """
+    Fetch whichever managed reference datasets a run is about to need
+    """
+    from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
+    from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
+
+    key = source.strip().lower() if (wanted_ref_tax and source) else None
+
+    if has_ncbi_accessions or key in ("ncbi", "gtdb"):
+        get_ncbi_assembly_data()
+    if key == "gtdb":
+        get_gtdb_data()

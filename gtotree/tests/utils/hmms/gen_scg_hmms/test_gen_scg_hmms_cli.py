@@ -1,5 +1,6 @@
 import os
 import pytest # type: ignore
+from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_cli as cli
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli import (
     build_parser,
@@ -164,3 +165,73 @@ def test_source_accepts_lowercase():
 
 def test_derep_rank_accepts_auto():
     assert _parse("-w", "X", "--derep-rank", "auto").derep_rank == "auto"
+
+
+################################################################################
+# reference data
+################################################################################
+
+def _resolve_args(**overrides):
+    import argparse
+
+    base = dict(target_accessions=None, wanted_ref_tax=None, source="gtdb",
+                target_rank=None, derep_rank="off", genbank_files=None,
+                fasta_files=None, amino_acid_files=None)
+    base.update(overrides)
+    return argparse.Namespace(**base)
+
+
+def test_phase_one_fetches_the_ncbi_table_for_target_accessions(reference_data_fetches,
+                                                                monkeypatch, tmp_path):
+    """
+    Regression test. This module reaches the NCBI table through `ncbi_data_table_path`,
+    which only resolves a path -- nothing here ever downloaded the asset. On a machine
+    that had never run the main GToTree program that's a missing-file failure, and on
+    one that had, it silently used a stale copy forever.
+    """
+    accs = tmp_path / "accs.txt"
+    accs.write_text("GCF_000008865.2\n")
+
+    monkeypatch.setattr(cli, "read_accessions_file", lambda p: ["GCF_000008865.2"])
+    monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([], []))
+
+    cli.phase_resolve_genomes(_resolve_args(target_accessions=str(accs)))
+
+    assert reference_data_fetches == ["ncbi"]
+
+
+def test_phase_one_fetches_both_tables_for_a_gtdb_wanted_ref_tax(reference_data_fetches,
+                                                                 monkeypatch):
+    """
+    A GTDB selection needs both: GTDB resolves the taxon, but the assemblies it names
+    are NCBI accessions, screened against and downloaded using the NCBI summary.
+    """
+    monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([], []))
+    monkeypatch.setattr(cli, "describe_source_version", lambda source: None)
+
+    class _Selection:
+        canonical = "Nitrospirota"
+        resolved_rank = "phylum"
+        effective_derep_rank = None
+        warnings = []
+
+    monkeypatch.setattr(cli, "resolve_wanted_ref_tax_accessions",
+                        lambda *a, **kw: (["GCF_000008865.2"], _Selection()))
+
+    cli.phase_resolve_genomes(_resolve_args(wanted_ref_tax="Nitrospirota",
+                                            source="gtdb"))
+
+    assert sorted(reference_data_fetches) == ["gtdb", "ncbi"]
+
+
+def test_phase_one_fetches_nothing_for_a_local_files_only_run(reference_data_fetches,
+                                                              monkeypatch):
+    """Local genome files never touch either table, so neither should be fetched."""
+    from gtotree.utils.general import GenomeData
+
+    gd = GenomeData.from_path("/tmp/g1.faa", "amino-acid")
+    monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([gd], []))
+
+    cli.phase_resolve_genomes(_resolve_args(amino_acid_files="aa.txt"))
+
+    assert reference_data_fetches == []
