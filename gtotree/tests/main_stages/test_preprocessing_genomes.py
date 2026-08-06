@@ -1,6 +1,7 @@
 import gzip
 import http.server
 import io
+import socket
 import threading
 import time
 import urllib.error
@@ -136,6 +137,29 @@ def test_404_fails_fast_without_retrying():
 # download timeouts
 # ---------------------------------------------------------------------------
 
+def _loopback_is_usable(timeout=2.0):
+    """
+    Can this host connect to a socket it just bound on 127.0.0.1?
+    """
+    srv = socket.socket()
+    try:
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(1)
+        with socket.create_connection(srv.getsockname(), timeout=timeout):
+            return True
+    except OSError:
+        return False
+    finally:
+        srv.close()
+
+
+needs_loopback = pytest.mark.skipif(
+    not _loopback_is_usable(),
+    reason="cannot connect to a local listening socket -- loopback TCP is blocked on "
+           "this host (endpoint security agent, packet filter, or lo0 misconfigured)",
+)
+
+
 class _TimeoutHandler(http.server.BaseHTTPRequestHandler):
     """Serves /ok as gzip; /stall sends headers then goes quiet."""
 
@@ -150,8 +174,6 @@ class _TimeoutHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Length", "1000000")
             self.end_headers()
-            # waits on an Event rather than time.sleep: `P.time` is the global time
-            # module, so a test patching P.time.sleep would otherwise disable the stall
             threading.Event().wait(self.stall_seconds)
             return
 
@@ -175,14 +197,18 @@ def stalling_server():
     srv.server_close()
 
 
-def test_download_fetches_and_gunzips(stalling_server, tmp_path):
+@needs_loopback
+def test_download_fetches_and_gunzips(stalling_server, tmp_path, monkeypatch):
+    monkeypatch.setattr(P, "NCBI_DOWNLOAD_TIMEOUT", 5)
+
     dest = tmp_path / "genome.faa"
-    P.download_and_unzip_accession(f"{stalling_server}/ok", str(dest))
+    P.download_and_unzip_accession(f"{stalling_server}/ok", str(dest), max_retries=1)
 
     assert dest.read_bytes() == _TimeoutHandler.payload
     assert sorted(p.name for p in tmp_path.iterdir()) == ["genome.faa"]
 
 
+@needs_loopback
 def test_an_unresponsive_server_times_out_and_is_retried(stalling_server, tmp_path,
                                                          monkeypatch):
     """

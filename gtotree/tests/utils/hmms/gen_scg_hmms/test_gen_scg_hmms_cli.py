@@ -26,7 +26,7 @@ def test_requires_at_least_one_input():
     ["-g", "genbanks.txt"],
     ["-f", "fastas.txt"],
     ["-A", "aa.txt"],
-    ["-W", "Nitrospirota"],
+    ["-w", "Nitrospirota"],
 ])
 def test_each_input_source_accepted_alone(argv):
     """All five genome sources the main GToTree driver takes are valid on their own."""
@@ -34,7 +34,7 @@ def test_each_input_source_accepted_alone(argv):
 
 
 def test_input_sources_can_be_combined():
-    args = _parse("-a", "accs.txt", "-W", "Nitrospirota",
+    args = _parse("-a", "accs.txt", "-w", "Nitrospirota",
                   "-g", "gb.txt", "-f", "fa.txt", "-A", "aa.txt")
     check_args(args)
     assert args.target_accessions == "accs.txt"
@@ -159,8 +159,8 @@ def test_parser_sets_func_default():
 
 
 def test_source_accepts_lowercase():
-    assert _parse("-W", "X", "-S", "ncbi").source == "ncbi"
+    assert _parse("-w", "X", "-S", "ncbi").source == "ncbi"
 
 
 def test_derep_rank_accepts_auto():
-    assert _parse("-W", "X", "--derep-rank", "auto").derep_rank == "auto"
+    assert _parse("-w", "X", "--derep-rank", "auto").derep_rank == "auto"
