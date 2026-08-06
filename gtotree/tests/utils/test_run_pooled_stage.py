@@ -242,3 +242,65 @@ def test_a_slow_item_does_not_stall_the_window():
     assert len(applied) == 60
     # if the slow item blocked top-ups, the other 59 would queue behind it
     assert elapsed < 1.0, f"took {elapsed:.2f}s -- the window appears to stall"
+
+
+# ---------------------------------------------------------------------------
+# context propagation into workers
+# ---------------------------------------------------------------------------
+
+def test_workers_see_the_callers_contextvars():
+    """
+    A bare thread starts with an empty context, so a ContextVar set on the calling
+    thread would read back as its default inside a worker. `log_file_var` is the one
+    that matters: preflight sets it to an absolute path inside the output directory,
+    and a worker seeing the relative default would send any reporter output to the
+    user's cwd instead.
+    """
+    from gtotree.utils.context import log_file_var
+
+    wanted = "/tmp/some-output-dir/gtotree-runlog.txt"
+    token = log_file_var.set(wanted)
+    try:
+        seen = []
+        run_pooled_stage(list(range(20)),
+                         lambda item, rd: log_file_var.get(),
+                         lambda item, result, rd: seen.append(result),
+                         _args(4), None)
+    finally:
+        log_file_var.reset(token)
+
+    assert set(seen) == {wanted}, \
+        "workers fell back to the ContextVar default instead of the caller's value"
+
+
+def test_worker_contextvar_writes_do_not_leak_back_to_the_caller():
+    """Each worker gets its own copy, so a stray set() inside one stays contained."""
+    from gtotree.utils.context import log_file_var
+
+    token = log_file_var.set("caller-value")
+    try:
+        run_pooled_stage(list(range(10)),
+                         lambda item, rd: log_file_var.set(f"worker-{item}"),
+                         lambda item, result, rd: None,
+                         _args(4), None)
+        assert log_file_var.get() == "caller-value"
+    finally:
+        log_file_var.reset(token)
+
+
+def test_concurrent_workers_do_not_share_one_context():
+    """
+    A Context cannot be entered re-entrantly, so reusing a single copy across
+    concurrent submissions would raise RuntimeError rather than run.
+    """
+    barrier = threading.Barrier(4, timeout=5)
+
+    def worker(item, rd):
+        barrier.wait()          # forces genuine overlap
+        return item
+
+    applied = []
+    run_pooled_stage(list(range(16)), worker,
+                     lambda i, r, rd: applied.append(r), _args(4), None)
+
+    assert sorted(applied) == list(range(16))

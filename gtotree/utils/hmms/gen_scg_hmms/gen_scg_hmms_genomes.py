@@ -49,7 +49,7 @@ def _download_and_unzip():
     download behavior itself (atomic write, retry/backoff, fast-fail on 404) is
     deliberately shared rather than reimplemented.
     """
-    from gtotree.main_stages.preprocessing_genomes import download_and_unzip_accession
+    from gtotree.utils.preprocessing_genomes import download_and_unzip_accession
     return download_and_unzip_accession
 
 

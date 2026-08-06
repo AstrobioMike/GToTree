@@ -6,7 +6,8 @@ from contextlib import ExitStack
 from importlib import resources
 from pathlib import Path
 
-from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
+from gtotree.cli.common import (CustomRichHelpFormatter, add_help, add_version_arg,
+                                wrap_help)
 from gtotree.cli.parser import parser
 from gtotree.main import main as run_gtotree
 from gtotree.utils.context import log_file_var
@@ -68,10 +69,17 @@ def _verify(output_dir):
     return ok
 
 
-def _cleanup(cwd, output_dir):
+def _cleanup(cwd, output_dir, keep=False):
+
     listing = cwd / LISTING_NAME
     if listing.exists():
         listing.unlink()
+
+    if keep:
+        report_message(f"Test output left in place at:", ii="    ", newline=False, color=None)
+        report_message(f"{output_dir}", "yellow", ii="      ", newline=False, trailing_newline=True)
+        return
+
     if output_dir.exists():
         shutil.rmtree(output_dir, ignore_errors=True)
 
@@ -97,6 +105,13 @@ def build_parser(parent_subparsers=None):
         )
 
     optional = parser_.add_argument_group("Optional Parameters")
+    optional.add_argument(
+        "-k",
+        "--keep",
+        action="store_true",
+        help=wrap_help("Keep the test output directory (\"" + OUTPUT_NAME + "\") "
+                       "after the run instead of removing it"),
+    )
     add_help(optional)
     add_version_arg(optional)
 
@@ -105,11 +120,13 @@ def build_parser(parent_subparsers=None):
 
 def main():
 
-    build_parser().parse_args()
     sys.exit(run_smoke_test())
 
 
 def run_smoke_test(argv=None):
+
+    cli_args = build_parser().parse_args(sys.argv[1:] if argv is None else argv)
+
     cwd = Path.cwd()
     listing = cwd / LISTING_NAME
     output_dir = cwd / OUTPUT_NAME
@@ -155,7 +172,7 @@ def run_smoke_test(argv=None):
             report_message(f"Smoke test errored: {e}", "red")
             return 1
         finally:
-            _cleanup(cwd, output_dir)
+            _cleanup(cwd, output_dir, keep=cli_args.keep)
             log_file_var.reset(log_file_token)
 
     return 0 if ok else 1

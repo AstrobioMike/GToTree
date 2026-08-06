@@ -1,7 +1,7 @@
 """Unit tests for gtotree/main_stages/hmm_searching.py."""
 
 
-from gtotree.main_stages.hmm_searching import (parse_hmmer_results,
+from gtotree.utils.hmms.hmm_searching import (parse_hmmer_results,
                                                 rebuild_combined_SCG_outputs)
 from gtotree.utils.general import RunData, SCGset
 
@@ -120,7 +120,7 @@ def test_worker_reports_failure_instead_of_raising(monkeypatch):
     `run_pooled_stage` aborts a whole stage on a worker exception, so the worker reports
     problems in its status dict rather than propagating them.
     """
-    from gtotree.main_stages import hmm_searching
+    from gtotree.utils.hmms import hmm_searching
     from gtotree.utils.general import GenomeData
 
     def exploding(*a, **k):

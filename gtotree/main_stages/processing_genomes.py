@@ -16,7 +16,7 @@ from gtotree.utils.pfam.pfam_handling import get_additional_pfam_targets
 from gtotree.utils.ko.ko_handling import parse_kofamscan_targets
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 
-from gtotree.main_stages.preprocessing_genomes import (
+from gtotree.utils.preprocessing_genomes import (
     build_base_link_map,
     capture_ncbi_failed_downloads,
     capture_failed_genbank_files,
@@ -31,18 +31,18 @@ from gtotree.main_stages.preprocessing_genomes import (
     _process_one_amino_acid_file,
     _apply_amino_acid_status,
 )
-from gtotree.main_stages.hmm_searching import (
+from gtotree.utils.hmms.hmm_searching import (
     _hmm_search_worker,
     _apply_hmm_search_result,
     capture_hmm_search_failures,
     rebuild_combined_SCG_outputs,
 )
-from gtotree.main_stages.additional_pfam_searching import (
+from gtotree.utils.pfam.additional_pfam_searching import (
     _pfam_search_worker,
     combine_all_pfam_hits,
     write_pfam_counts_table,
 )
-from gtotree.main_stages.additional_ko_searching import (
+from gtotree.utils.ko.additional_ko_searching import (
     _ko_search_worker,
     combine_all_ko_hits,
     write_ko_counts_table,

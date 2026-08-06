@@ -7,25 +7,78 @@ from gtotree.utils.hmms.hmm_searching_engine import profiles_missing_gathering_c
 import pyhmmer #type: ignore
 
 
+# aliases that aren't simply the file stem of a packaged set
+HMM_SET_ALIASES = {"universal": "Universal-Hug-et-al"}
+
+
+def with_hmm_suffix(name):
+    return name if name.endswith(".hmm") else f"{name}.hmm"
+
+
+def find_local_hmm_file(hmm_arg):
+    """
+    Absolute path if `-H` points at a real file on disk, else None
+    """
+    for candidate in (with_hmm_suffix(hmm_arg), hmm_arg):
+        if os.path.isfile(candidate):
+            return os.path.abspath(candidate)
+    return None
+
+
+def packaged_scg_set_names():
+    """
+    Official names of the pre-packaged SCG-sets, as file stems
+    """
+    try:
+        df = read_in_hmm_summary_table()
+    except Exception:
+        return []
+    names = []
+    for entry in df["file"]:
+        entry = str(entry)
+        names.append(entry[:-4] if entry.lower().endswith(".hmm") else entry)
+    return names
+
+
+def canonicalize_hmm_arg(hmm_arg):
+    """
+    Resolve a requested SCG-set to the official spelling of its name
+
+    e.g., `-H bacteria`, `-H BACTERIA`, and `-H Bacteria.HMM` all -> `Bacteria.hmm`
+    Matching case-insensitively is not sufficient on its own: the value is reused as a
+    filename under GToTree_HMM_dir, as the lookup key into hmm-sources-and-info.tsv, and
+    in run reporting. Left as typed, `-H bacteria` would download a second copy to
+    `bacteria.hmm` alongside the existing `Bacteria.hmm` on a case-sensitive filesystem.
+
+    Returned unchanged when it doesn't name a packaged set, so user paths and genuine
+    typos both flow on to the existing handling.
+    """
+    stem = hmm_arg[:-4] if hmm_arg.lower().endswith(".hmm") else hmm_arg
+    key = stem.lower()
+
+    if key in HMM_SET_ALIASES:
+        return HMM_SET_ALIASES[key]
+
+    for name in packaged_scg_set_names():
+        if name.lower() == key:
+            return name
+
+    return hmm_arg
+
+
 def check_hmm_file(args, run_data):
-    if args.hmm == "Universal":
-        hmm_arg = "Universal-Hug-et-al"
-        args.hmm = "Universal-Hug-et-al"
-    else:
+    # a real path wins outright
+    local_path = find_local_hmm_file(args.hmm)
+
+    if local_path is not None:
         hmm_arg = args.hmm
-
-    # adding .hmm to end if not present
-    if not hmm_arg.endswith(".hmm"):
-        hmm_file = f"{hmm_arg}.hmm"
+        run_data.hmm_path = local_path
     else:
-        hmm_file = hmm_arg
-
-    # getting hmm path
-    if os.path.isfile(hmm_file): # handles if user-provided full path
-        run_data.hmm_path = os.path.abspath(hmm_file)
-    else:
-        # getting hmm from prepackaged table
-        run_data.hmm_path = get_hmm_path(hmm_file, args.hmm)
+        # rewritten in place so downstream reporting, the tools_used check in
+        # preflight_checks, and the on-disk filename all see the "official" spelling
+        args.hmm = canonicalize_hmm_arg(args.hmm)
+        hmm_arg = args.hmm
+        run_data.hmm_path = get_hmm_path(with_hmm_suffix(hmm_arg), hmm_arg)
 
     check_gathering_cutoffs(run_data.hmm_path, hmm_arg)
 
@@ -37,16 +90,10 @@ def check_hmm_file(args, run_data):
 
 def check_gathering_cutoffs(hmm_path, hmm_arg):
     """
-    Fail early if any profile lacks a gathering (GA) threshold.
+    Fail early if any profile lacks a gathering (GA) threshold
 
     Searching uses gathering thresholds (the `--cut_ga` equivalent), so a profile
-    without one can't be searched. This was already true of the old subprocess
-    `hmmsearch --cut_ga`, but it surfaced as every single genome failing its search with
-    no explanation. Checking here means a user who built their own HMM without `GA`
-    lines is told once, up front, before anything is downloaded or searched.
-
-    Deliberately not falling back to an E-value cutoff: that would silently change which
-    genes are called, which is a scientific difference, not an implementation detail.
+    without one can't be searched
     """
     try:
         missing = profiles_missing_gathering_cutoffs(hmm_path)
@@ -97,7 +144,7 @@ def download_prepackaged_hmm(dest_path, hmm_arg):
 
     print(color_text(f"    Downloading the prebuilt \"{hmm_arg}\" HMM set (only needs to be done once)...\n", "yellow"))
 
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)  # guard in case the dir doesn't exist yet
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
     try:
         download_with_tqdm(target_hmm_url, f"        {hmm_arg} HMM file", dest_path)
@@ -115,13 +162,12 @@ def read_in_hmm_summary_table():
 
 def get_target_hmm_url(hmm_file, hmm_arg):
     df = read_in_hmm_summary_table()
-    try:
-        target_hmm_url = df.loc[df['file'] == hmm_file, 'link'].values[0]
-    except IndexError:
+    match = df.loc[df["file"].astype(str).str.lower() == hmm_file.lower(), "link"]
+    if len(match) == 0:
         report_message(f"You specified \"{hmm_arg}\" as the HMM file to use, but that file can't be found.", "red")
         report_message("You can see the available gene-sets packaged with GToTree by running `gtt hmms`.")
         report_early_exit(None, copy_log = False)
-    return target_hmm_url
+    return match.values[0]
 
 
 def get_SCG_hmm_targets(hmm_path):

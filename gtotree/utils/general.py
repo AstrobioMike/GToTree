@@ -810,6 +810,7 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
     instead of waiting for every remaining item.
     """
     from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
+    from contextvars import copy_context
     from itertools import islice
 
     num_workers = max(1, args.num_jobs)
@@ -823,6 +824,24 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
     if lead_newline:
         print("")
     pool = ThreadPoolExecutor(max_workers=num_workers)
+
+    def submit(item):
+        """
+        Submit `worker` carrying a copy of this thread's context.
+
+        A new thread starts with an empty context, so ContextVars set on the main
+        thread fall back to their defaults inside a worker. That matters for
+        `log_file_var`: preflight sets it to an absolute path inside the output
+        directory, but a worker would see the relative default and any reporter it
+        called would append `gtotree-runlog.txt` to the user's cwd instead. No worker
+        currently reaches a reporter, so this defends the invariant rather than fixing
+        a live bug -- but it's an easy one to break by adding a per-item warning.
+
+        A fresh copy per submission: a Context cannot be entered re-entrantly, so
+        reusing one across concurrent workers would raise.
+        """
+        return pool.submit(copy_context().run, worker, item, run_data)
+
     remaining = iter(items)
     in_flight = {}
     try:
@@ -830,7 +849,7 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
                   bar_format=bar_format or GTT_PROGRESS_BAR_FORMAT, ncols=76) as pbar:
 
             for item in islice(remaining, window):
-                in_flight[pool.submit(worker, item, run_data)] = item
+                in_flight[submit(item)] = item
 
             while in_flight:
                 done, _ = wait(in_flight, return_when=FIRST_COMPLETED)
@@ -845,7 +864,7 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
 
                 # top up by however many just completed, so the window stays full
                 for item in islice(remaining, len(done)):
-                    in_flight[pool.submit(worker, item, run_data)] = item
+                    in_flight[submit(item)] = item
 
     except KeyboardInterrupt:
         pool.shutdown(wait=False, cancel_futures=True)
