@@ -174,9 +174,9 @@ def process_local_genome(gd, work_dir, nucleotide_fallback=True):
     except TargetGenomeError:
         raise
     except OSError as e:
-        raise TargetGenomeError(f"{MISSED_UNREADABLE}: {e}")
+        raise TargetGenomeError(f"{MISSED_UNREADABLE}: {e}") from e
     except Exception as e:  # noqa: BLE001 - surfaced per-genome, run continues
-        raise TargetGenomeError(f"unexpected failure: {e}")
+        raise TargetGenomeError(f"unexpected failure: {e}") from e
     finally:
         if needs_cleanup:
             remove_file_if_exists(path)
@@ -244,7 +244,7 @@ def _prodigal_to_ready(gd, nt_path, shim, work_dir):
     except TargetGenomeError:
         raise
     except Exception as e:
-        raise TargetGenomeError(f"{MISSED_PRODIGAL_FAILED}: {e}")
+        raise TargetGenomeError(f"{MISSED_PRODIGAL_FAILED}: {e}") from e
 
     try:
         out_path = os.path.join(shim.ready_genome_files_dir, f"{gd.id}.faa")

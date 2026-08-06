@@ -431,7 +431,7 @@ def report_unique_taxa_counts_of_all_ranks(gtdb_path, representatives_source=Non
     print("\n    {:<10} {:}".format("Rank", "Num. Unique Taxa"))
     for rank in ranks:
         n = pc.count_distinct(tab.column(rank)).as_py()
-        print("    {:<10} {:}".format(rank, str(n)))
+        print(f"    {rank:<10} {str(n)}")
     print("")
 
     if representatives_source == "gtdb":
@@ -447,7 +447,7 @@ def report_unique_taxa_counts_of_all_ranks(gtdb_path, representatives_source=Non
         print("    {:<10} {:}".format("Rank", "Num. Unique Ref. Taxa"))
         for rank in ranks:
             n = pc.count_distinct(rep.column(rank)).as_py()
-            print("    {:<10} {:}".format(rank, str(n)))
+            print(f"    {rank:<10} {str(n)}")
         print("")
 
 

@@ -6,10 +6,7 @@ from gtotree.utils.messaging import (gtotree_header,
                                      display_initial_run_info,
                                      summarize_results,
                                      copy_log_function)
-from gtotree.main_stages.preprocessing_genomes import preprocess_genomes
-from gtotree.main_stages.additional_pfam_searching import search_pfams
-from gtotree.main_stages.additional_ko_searching import search_kos
-from gtotree.main_stages.hmm_searching import search_hmms
+from gtotree.main_stages.processing_genomes import process_genomes
 from gtotree.main_stages.filtering_genes import filter_genes
 from gtotree.main_stages.filtering_genomes import filter_genomes
 from gtotree.main_stages.aligning_and_preparing_SCG_sets import align_and_prepare_SCG_sets
@@ -20,6 +17,7 @@ from gtotree.utils.citations import generate_citations_info
 from gtotree.utils.summary_info import generate_primary_summary_table
 from gtotree.utils.itol import generate_all_search_itol_files
 from gtotree.utils.general import cleanup
+from gtotree.utils import phase_stats
 
 def main(args = None):
     if args is None:
@@ -31,40 +29,53 @@ def main(args = None):
 
     print(gtotree_header())
 
-    args, run_data = preflight_checks(args)
+    run_data = None
 
-    run_data = display_initial_run_info(args, run_data)
+    # phase_stats only runs if GTT_DEBUG_TIMING=1 was set as an env var (here for testing/dev/troubleshooting)
+    phase_stats.begin("preflight checks")
 
-    run_data = preprocess_genomes(args, run_data)
+    try:
+        args, run_data = preflight_checks(args)
 
-    if run_data.target_pfams_file:
-        run_data = search_pfams(args, run_data)
+        phase_stats.begin("initial run info")
+        run_data = display_initial_run_info(args, run_data)
 
-    if run_data.target_kos_file:
-        run_data = search_kos(args, run_data)
+        # process_genomes opens its own per-source sub-phases
+        run_data = process_genomes(args, run_data)
 
-    run_data = search_hmms(args, run_data)
+        phase_stats.begin("filtering genes")
+        run_data = filter_genes(args, run_data)
 
-    run_data = filter_genes(args, run_data)
+        phase_stats.begin("filtering genomes")
+        run_data = filter_genomes(args, run_data)
 
-    run_data = filter_genomes(args, run_data)
+        phase_stats.begin("aligning and preparing SCG sets")
+        run_data = align_and_prepare_SCG_sets(args, run_data)
 
-    run_data = align_and_prepare_SCG_sets(args, run_data)
+        phase_stats.begin("concatenating SCG sets")
+        run_data = concatenate_SCG_sets(run_data)
 
-    run_data = concatenate_SCG_sets(run_data)
+        phase_stats.begin("updating headers")
+        run_data = update_headers(args, run_data)
 
-    run_data = update_headers(args, run_data)
+        phase_stats.begin("treeing")
+        run_data = make_tree(args, run_data)
 
-    run_data = make_tree(args, run_data)
+        phase_stats.begin("summaries and citations")
+        generate_citations_info(run_data)
 
-    generate_citations_info(run_data)
+        generate_primary_summary_table(args, run_data)
 
-    generate_primary_summary_table(args, run_data)
+        generate_all_search_itol_files(args, run_data)
 
-    generate_all_search_itol_files(args, run_data)
+        cleanup(args, run_data)
 
-    cleanup(args, run_data)
+        summarize_results(args, run_data)
 
-    summarize_results(args, run_data)
+        copy_log_function(run_data)
 
-    copy_log_function(run_data)
+    finally:
+        phase_stats.finish()
+        if run_data is not None:
+            phase_stats.write_tsv(run_data.run_files_dir)
+        phase_stats.report()

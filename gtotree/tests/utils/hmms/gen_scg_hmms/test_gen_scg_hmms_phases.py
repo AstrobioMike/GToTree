@@ -1,10 +1,8 @@
 import argparse
-import os
 import pyarrow as pa # type: ignore
 import pyarrow.parquet as pq # type: ignore
 import pytest # type: ignore
 import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli as cli
-import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes as genomes_mod
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (
     TargetGenomeError,

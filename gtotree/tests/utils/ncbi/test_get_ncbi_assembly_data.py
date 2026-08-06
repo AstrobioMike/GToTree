@@ -7,7 +7,6 @@ download, Parquet-footer verification, atomic date-file write, and present/absen
 routing.
 """
 
-import socket
 import pyarrow as pa # type: ignore
 import pyarrow.parquet as pq # type: ignore
 import pytest # type: ignore
@@ -139,7 +138,7 @@ def test_download_verifies_parquet_and_bails_on_corruption(tmp_path):
 
 def test_download_network_error_is_translated(tmp_path):
     def _boom(*a, **k):
-        raise socket.timeout("no route")
+        raise TimeoutError("no route")
     with patch(f"{MODPATH}.download_with_tqdm", side_effect=_boom), \
          patch(f"{MODPATH}.report_early_exit", side_effect=SystemExit(1)):
         with pytest.raises(SystemExit):

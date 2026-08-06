@@ -33,7 +33,7 @@ def _read_summary(summary_path):
     """
     df = pd.read_csv(summary_path, sep="\t", header=0, dtype={"assembly_id": str})
 
-    label_map = dict(zip(df["assembly_id"], df["label"].astype(str)))
+    label_map = dict(zip(df["assembly_id"], df["label"].astype(str), strict=True))
     in_tree_set = set(df.loc[df["in_final_tree"] == "Yes", "assembly_id"])
 
     # a swap occurred if any label differs from its assembly_id

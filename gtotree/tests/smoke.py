@@ -9,6 +9,7 @@ from pathlib import Path
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.cli.parser import parser
 from gtotree.main import main as run_gtotree
+from gtotree.utils.context import log_file_var
 from gtotree.utils.messaging import report_message, color_text
 
 DATA_PKG = "gtotree.tests.data"
@@ -41,10 +42,13 @@ def _verify(output_dir):
             f"found {len(genomes)}", "red")
         ok = False
 
-    not_found = run_data.get("num_accs_not_found", 0)
-    if not_found:
+    removed = [g for g in genomes if g.get("removed")]
+    if removed:
+        detail = ", ".join(
+            f"{g.get('id')} ({g.get('reason_removed') or 'no reason recorded'})"
+            for g in removed)
         report_message(
-            f"Smoke test FAILED: {not_found} accessions not found (expected 0)", "red")
+            f"Smoke test FAILED: {len(removed)} genome(s) were dropped: {detail}", "red")
         ok = False
 
     tree = OUTPUT_NAME + "/test-gtotree-output.tre"
@@ -100,8 +104,7 @@ def build_parser(parent_subparsers=None):
 
 
 def main():
-    # parse (handles -h/-v via the shared help machinery); the smoke test itself
-    # takes no arguments, so anything parsed is discarded
+
     build_parser().parse_args()
     sys.exit(run_smoke_test())
 
@@ -111,24 +114,18 @@ def run_smoke_test(argv=None):
     listing = cwd / LISTING_NAME
     output_dir = cwd / OUTPUT_NAME
 
+    log_file_token = log_file_var.set(log_file_var.get())
+
     pkg = resources.files(DATA_PKG)
 
     with ExitStack() as stack:
-        # Resolve packaged data to real filesystem paths. On a conda (unpacked)
-        # install as_file() yields the real package path -- so the run info
-        # displays the package location as provenance. On a zipped install it
-        # yields a temp copy valid only inside this ExitStack, which is why the
-        # whole run happens in-block.
+
         aa_paths = [
             stack.enter_context(resources.as_file(pkg / name))
             for name in AA_FILES
         ]
         hmm_path = stack.enter_context(resources.as_file(pkg / HMM_FILE))
 
-        # Listing lives in cwd; its contents point at the package FASTAs.
-        # --- SEAM: this assumes preprocess_genomes READS the amino-acid files
-        # in place. If it writes anything beside them, point -A at copies in the
-        # output dir instead (materialize the FASTAs into a writable dir first).
         listing.write_text("\n".join(str(p) for p in aa_paths) + "\n")
 
         if output_dir.exists():
@@ -151,10 +148,15 @@ def run_smoke_test(argv=None):
         try:
             run_gtotree(args)
             ok = _verify(output_dir)
+        except SystemExit as e:
+            report_message(f"Smoke test exited early (status {e.code})", "red")
+            return 1
         except Exception as e:
             report_message(f"Smoke test errored: {e}", "red")
-            _cleanup(cwd, output_dir)          # leave nothing behind on error
             return 1
+        finally:
+            _cleanup(cwd, output_dir)
+            log_file_var.reset(log_file_token)
 
     return 0 if ok else 1
 

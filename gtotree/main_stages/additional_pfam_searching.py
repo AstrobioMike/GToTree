@@ -1,83 +1,42 @@
-import subprocess
 import shutil
 from collections import Counter
 import os
 from pathlib import Path
 import pandas as pd # type: ignore
 from Bio import SeqIO # type: ignore
-from gtotree.utils.pfam.pfam_handling import get_additional_pfam_targets
-from gtotree.utils.messaging import (report_processing_stage,
-                                     report_pfam_searching_update)
-from gtotree.utils.general import (run_pooled_stage)
+from gtotree.utils.general import (search_threads_per_genome,
+                                   atomic_write_text)
+from gtotree.utils.hmms.hmm_searching_engine import search_one_genome
 
 
-def search_pfams(args, run_data):
-
-    report_processing_stage("additional-pfam-searching", run_data)
-
-    if run_data.additional_pfam_searching_done:
-        report_pfam_searching_update(run_data)
-        return run_data
-
-    run_data = get_additional_pfam_targets(run_data)
-
-    if len(run_data.found_pfam_targets) > 0:
-
-        genomes_to_search = run_data.get_all_input_genomes_for_pfam_search()
-
-        if len(genomes_to_search) > 0:
-
-            count_rows = []
-
-            def apply_pfam(genome, status, run_data):
-                if status.get("pfam_search_failed"):
-                    genome.mark_pfam_search_failed()
-                else:
-                    genome.mark_pfam_search_done()
-                results_txt = (f"{run_data.pfam_results_dir}/individual-genome-results/"
-                               f"{genome.id}/pfam-hmmsearch.txt")
-                counts_list = get_pfam_counts(run_data.found_pfam_targets, results_txt)
-                count_rows.append([genome.id, genome.num_genes] + counts_list)
-
-            run_data = run_pooled_stage(
-                genomes_to_search,
-                _pfam_search_worker,
-                apply_pfam,
-                args, run_data,
-            )
-
-            cols = ['assembly_id', 'total_gene_count'] + run_data.found_pfam_targets
-            pfam_counts_df = pd.DataFrame(count_rows, columns=cols)
-            pfam_counts_df = pfam_counts_df.sort_values("assembly_id").reset_index(drop=True)
-            pfam_counts_df.to_csv(
-                f"{run_data.pfam_results_dir}/pfam-hit-counts.tsv", sep='\t', index=False)
-
-        print("") ; print("Combining Pfam search results...".center(82))
-        combine_all_pfam_hits(run_data.found_pfam_targets,
-                              run_data.tmp_pfam_results_dir,
-                              run_data.pfam_results_dir + "/pfam-hit-seqs")
-
-    run_data.additional_pfam_searching_done = True
-    report_pfam_searching_update(run_data)
-
-    return run_data
-
-
-def _pfam_search_worker(genome, run_data):
+def _pfam_search_worker(genome, run_data, aa_path=None, pressed_base=None):
     """
     Runs concurrently in a thread. Touches only per-genome files: runs
     hmmsearch against the combined target-Pfam HMM, writing the tblout into this
     genome's individual-genome-results dir, then extracts the hit sequences into
     this genome's own tmp dir. Must not mutate shared run_data.
+
+    `aa_path` overrides the path recorded on the GenomeData, for the fused processing
+    stage which searches a genome in the same worker that just produced its FASTA.
+
+    Wrapped so it cannot raise. A worker exception aborts the entire pooled stage.
     """
+    try:
+        return _pfam_search_worker_inner(genome, run_data, aa_path, pressed_base)
+    except BaseException as e:
+        return {"pfam_search_failed": True, "error": f"{type(e).__name__}: {e}"}
+
+
+def _pfam_search_worker_inner(genome, run_data, aa_path=None, pressed_base=None):
     ID = genome.id
-    AA_path = genome.final_AA_path
+    AA_path = aa_path if aa_path is not None else genome.final_AA_path
 
     results_dir = f"{run_data.pfam_results_dir}/individual-genome-results/{ID}"
     tmp_outpath = f"{run_data.tmp_pfam_results_dir}/{ID}"
 
     pfam_search_failed = run_pfam_search(run_data.all_pfam_targets_hmm_path,
-                                         results_dir, AA_path)
+                                         results_dir, AA_path,
+                                         pressed_base=pressed_base)
 
     results_txt = f"{results_dir}/pfam-hmmsearch.txt"
     have_hits = False
@@ -98,33 +57,53 @@ def _pfam_search_worker(genome, run_data):
     }
 
 
-def run_pfam_search(all_pfam_targets_hmm, base_outpath, AA_file):
+def write_pfam_counts_table(run_data):
+    """
+    Write pfam-hit-counts.tsv from the per-genome result files.
 
+    Idempotent, and complete regardless of how much of the work happened in this
+    invocation versus an earlier interrupted one.
+    """
+    genomes = [gd for gd in run_data.all_input_genomes
+               if gd.pfam_search_done and not gd.removed]
+
+    count_rows = []
+    for gd in genomes:
+        results_txt = (f"{run_data.pfam_results_dir}/individual-genome-results/"
+                       f"{gd.id}/pfam-hmmsearch.txt")
+        counts_list = get_pfam_counts(run_data.found_pfam_targets, results_txt)
+        count_rows.append([gd.id, gd.num_genes] + counts_list)
+
+    cols = ['assembly_id', 'total_gene_count'] + run_data.found_pfam_targets
+    pfam_counts_df = pd.DataFrame(count_rows, columns=cols)
+    if not pfam_counts_df.empty:
+        pfam_counts_df = pfam_counts_df.sort_values("assembly_id").reset_index(drop=True)
+    atomic_write_text(
+        f"{run_data.pfam_results_dir}/pfam-hit-counts.tsv",
+        lambda f: pfam_counts_df.to_csv(f, sep='\t', index=False))
+
+
+def run_pfam_search(all_pfam_targets_hmm, base_outpath, AA_file, pressed_base=None):
+    """
+    Search one genome against the combined target-Pfam profiles, in-process via pyhmmer.
+
+    Was a subprocess `hmmsearch --cut_ga` call. The tblout written here is
+    field-for-field identical to what the CLI produced, which matters more for Pfam than
+    for the SCG search: this file lands in the user-facing
+    `pfam-search-results/individual-genome-results/` directory, not just a temp dir.
+    """
     os.makedirs(base_outpath, exist_ok=True)
 
     outpath = f"{base_outpath}/pfam-hmmsearch.txt"
 
-    cmd = [
-        "hmmsearch",
-        "--cut_ga",
-        "--cpu", "2",
-        "--tblout", outpath,
-        all_pfam_targets_hmm,
-        AA_file
-    ]
-
     try:
-        subprocess.run(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
+        search_one_genome(all_pfam_targets_hmm, AA_file, outpath,
+                          pressed_base=pressed_base,
+                          cpus=search_threads_per_genome(None))
         pfam_search_failed = False
-    except subprocess.CalledProcessError as e:
-        stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
-        print(f"[pfam hmmsearch failed for {os.path.basename(base_outpath)}] "
-              f"exit {e.returncode}: {stderr.strip()}")
+    except Exception as e:
+        print(f"[Pfam search failed for {os.path.basename(base_outpath)}] "
+              f"{type(e).__name__}: {e}")
         pfam_search_failed = True
 
     return pfam_search_failed
@@ -137,7 +116,7 @@ def get_pfam_counts(pfam_ids, results_txt):
     if not os.path.isfile(results_txt):
         return [0 for _ in pfam_ids]
 
-    with open(results_txt, "r") as results_file:
+    with open(results_txt) as results_file:
         for line in results_file:
             if line.startswith("#"):
                 continue

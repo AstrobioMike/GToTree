@@ -16,6 +16,7 @@ from collections import Counter
 
 import pyhmmer  # type: ignore
 
+from gtotree.utils.general import decode_pyhmmer_text
 from gtotree.utils.pfam.get_pfam_data import HMM_FILENAME, INFO_FILENAME
 
 
@@ -43,18 +44,6 @@ class GenSCGHMMsError(Exception):
 
 class PfamDataError(GenSCGHMMsError):
     """The managed Pfam data is missing or not usable."""
-
-
-def _decode(value):
-    """
-    pyhmmer has returned `name`/`accession` as bytes in some versions and str in
-    others, so normalize rather than assuming either.
-    """
-    if value is None:
-        return None
-    if isinstance(value, (bytes, bytearray)):
-        return value.decode()
-    return str(value)
 
 
 class PfamProfileInfo:
@@ -103,7 +92,7 @@ def load_coverage_filtered_pfams(info_path, min_coverage=DEFAULT_MIN_PFAM_COVERA
     kept = {}
     usable_rows = 0
 
-    with open(info_path, "r", encoding="utf-8", errors="ignore") as f:
+    with open(info_path, encoding="utf-8", errors="ignore") as f:
         for line in f:
             parts = line.rstrip("\n").split("\t")
             if len(parts) < _PFAM_MIN_COLS:
@@ -165,7 +154,7 @@ def write_filtered_pfam_hmms(master_hmm_path, wanted_accs, out_path,
         with pyhmmer.plan7.HMMFile(master_hmm_path) as hmm_file, \
                 open(tmp_path, "wb") as out:
             for hmm in hmm_file:
-                acc = _decode(hmm.accession)
+                acc = decode_pyhmmer_text(hmm.accession)
                 if acc in wanted:
                     hmm.write(out)
                     found.append(acc)
@@ -230,9 +219,9 @@ def read_hmm_accessions(hmm_path):
     accs = []
     with pyhmmer.plan7.HMMFile(hmm_path) as hmm_file:
         for hmm in hmm_file:
-            acc = _decode(hmm.accession)
+            acc = decode_pyhmmer_text(hmm.accession)
             if acc is None:
-                acc = _decode(hmm.name)
+                acc = decode_pyhmmer_text(hmm.name)
             accs.append(acc)
 
     if not accs:

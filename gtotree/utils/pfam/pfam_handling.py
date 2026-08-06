@@ -1,6 +1,6 @@
 import os
 import sys
-from gtotree.utils.general import concat_files
+from gtotree.utils.general import concat_files, decode_pyhmmer_text
 from gtotree.utils.messaging import wprint, color_text, spinner
 from gtotree.utils.pfam.get_pfam_data import HMM_FILENAME, INFO_FILENAME
 import pyhmmer  # type: ignore
@@ -51,7 +51,7 @@ def get_additional_pfam_targets(run_data):
     # read requested targets, keyed by version-less accession
     pfam_dict = {}            # key: input_id (as given), value: pulled full acc or None
     wanted_by_core = {}       # key: version-less acc, value: input_id
-    with open(run_data.target_pfams_file, "r") as pfam_file:
+    with open(run_data.target_pfams_file) as pfam_file:
         for line in pfam_file:
             input_id = line.strip()
             if not input_id:
@@ -73,12 +73,12 @@ def get_additional_pfam_targets(run_data):
         # single streaming pass over the master HMM, pulling only wanted profiles
         with pyhmmer.plan7.HMMFile(master_hmm_path) as hmm_file:
             for hmm in hmm_file:
-                acc = hmm.accession.decode() if hmm.accession else ""
+                acc = decode_pyhmmer_text(hmm.accession) or ""
                 core = acc.split(".")[0]
 
                 # fall back to matching on NAME if accession isn't set on the profile
                 if core not in wanted_by_core:
-                    name = hmm.name.decode() if hmm.name else ""
+                    name = decode_pyhmmer_text(hmm.name) or ""
                     # map a requested name-less acc via the info table's name, if needed
                     core = next((c for c, iid in wanted_by_core.items()
                                  if acc_to_name.get(c) == name), core)

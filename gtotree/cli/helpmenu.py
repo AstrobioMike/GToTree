@@ -18,7 +18,7 @@ helpmenu += f"""
         - [{color_text("-g <file>", "teal", bold = True)}] single-column file with the paths to each GenBank file
         - [{color_text("-f <file>", "teal", bold = True)}] single-column file with the paths to each fasta file
         - [{color_text("-A <file>", "teal", bold = True)}] single-column file with the paths to each amino-acid file
-        - [{color_text("-W  <str>", "teal", bold = True)}] wanted ref tax to be included (see more details below)
+        - [{color_text("-w  <str>", "teal", bold = True)}] wanted ref tax to be included (see more details below)
 
       2)  [{color_text("-H <file>", "teal", bold = True)}] location of the uncompressed target SCGs HMM file being
                       used, or just the HMM name if the 'GToTree_HMM_dir'
@@ -36,29 +36,29 @@ helpmenu += f"""
 
       {color_text("Adding reference genomes by taxonomy:", "orange")}
 
-        - [{color_text("-W | --wanted-ref-tax <str>", "teal", bold = True)}] taxon to add reference genomes for; default: none
+        - [{color_text("-w | --wanted-ref-tax <str>", "teal", bold = True)}] taxon to add reference genomes for; default: none
                   A taxon name (e.g., "Bacteria", "Nitrospirota",
                   "Escherichia coli") whose reference genomes will be added to
                   the tree in addition to any genomes provided through the
                   other input parameters.
 
         - [{color_text("-S | --source <str>", "teal", bold = True)}] where to pull reference genomes from; default: GTDB
-                  Which database the `-W` taxon and its genomes are drawn from.
+                  Which database the `-w` taxon and its genomes are drawn from.
                   One of "{color_text("GTDB", "teal", bold = True)}" or "{color_text("NCBI", "teal", bold = True)}".
 
-        - [{color_text("--target-rank <str>", "teal", bold = True)}] rank of the `-W` taxon; default: auto-detected
-                  Only needed to disambiguate if the `-W` target taxon name occurs
+        - [{color_text("--target-rank <str>", "teal", bold = True)}] rank of the `-w` taxon; default: auto-detected
+                  Only needed to disambiguate if the `-w` target taxon name occurs
                   at more than one rank.
 
         - [{color_text("--derep-rank <str>", "teal", bold = True)}] dereplicate to one genome per rank; default: auto
                   Keeps a single best genome per unique value of this rank within
-                  the `-W` taxon's rank (to control tree size/complexity). For example, "-W Bacteria
+                  the `-w` taxon's rank (to control tree size/complexity). For example, "-w Bacteria
                   --derep-rank class" keeps one genome per bacterial class. The
                   default "auto" uses a rank two levels finer than the taxon's own
                   rank. Pass "none" to disable dereplication and include all genomes under the
                   requested taxon.
 
-                  Note: a `--derep-rank` set equal to the `-W` taxon's rank returns a
+                  Note: a `--derep-rank` set equal to the `-w` taxon's rank returns a
                   single best genome (e.g., could be useful for adding an outgroup).
 
 

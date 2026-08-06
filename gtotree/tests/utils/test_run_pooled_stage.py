@@ -169,3 +169,76 @@ def test_keyboard_interrupt_cancels_queued_work():
     assert elapsed < drain_time * 0.6, (
         f"took {elapsed:.2f}s; looks like the queued backlog was drained "
         f"(full drain would be ~{drain_time:.2f}s)")
+
+
+# ---------------------------------------------------------------------------
+# bounded submission
+# ---------------------------------------------------------------------------
+
+def test_submission_is_windowed_not_all_up_front():
+    """
+    Work is submitted in a rolling window, so queued futures and their results stay
+    O(window) rather than growing with the number of items.
+    """
+    import concurrent.futures as cf
+    from gtotree.utils.general import WORKER_QUEUE_DEPTH
+
+    workers = 2
+    items = 500
+    window = workers * WORKER_QUEUE_DEPTH
+
+    submitted = [0]
+    at_first_apply = []
+    real_submit = cf.ThreadPoolExecutor.submit
+
+    def counting_submit(self, fn, *a, **k):
+        submitted[0] += 1
+        return real_submit(self, fn, *a, **k)
+
+    def apply_result(item, result, rd):
+        if not at_first_apply:
+            at_first_apply.append(submitted[0])
+
+    cf.ThreadPoolExecutor.submit = counting_submit
+    try:
+        run_pooled_stage(list(range(items)), lambda i, rd: i, apply_result,
+                         _args(workers), None)
+    finally:
+        cf.ThreadPoolExecutor.submit = real_submit
+
+    assert at_first_apply, "apply_result never ran"
+    assert at_first_apply[0] <= window, (
+        f"{at_first_apply[0]} items were submitted before the first result was applied; "
+        f"the window is {window} -- submission is not bounded")
+    # and everything must still get submitted eventually
+    assert submitted[0] == items
+
+
+def test_every_item_is_processed_exactly_once():
+    """Topping up the window neither drops nor duplicates work."""
+    items = list(range(997))          # deliberately not a multiple of the window
+    applied = []
+
+    def apply_result(item, result, rd):
+        applied.append(result)
+
+    run_pooled_stage(items, lambda i, rd: i, apply_result, _args(4), None)
+
+    assert sorted(applied) == items
+
+
+def test_a_slow_item_does_not_stall_the_window():
+    """One long-running item does not hold back the rest."""
+    def worker(item, rd):
+        time.sleep(0.25 if item == 0 else 0.001)
+        return item
+
+    applied = []
+    start = time.time()
+    run_pooled_stage(list(range(60)), worker, lambda i, r, d: applied.append(i),
+                     _args(4), None)
+    elapsed = time.time() - start
+
+    assert len(applied) == 60
+    # if the slow item blocked top-ups, the other 59 would queue behind it
+    assert elapsed < 1.0, f"took {elapsed:.2f}s -- the window appears to stall"

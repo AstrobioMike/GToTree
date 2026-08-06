@@ -48,7 +48,7 @@ def generate_citations_info(run_data):
             outfile.write(citations_info.prodigal)
 
         if run_data.tools_used.gtdb_used:
-            outfile.write(f"Genome Taxonomy Database (GTDB)\n")
+            outfile.write("Genome Taxonomy Database (GTDB)\n")
             outfile.write(citations_info.gtdb)
 
         if run_data.tools_used.fasttree_used:
@@ -68,18 +68,25 @@ def generate_citations_info(run_data):
             outfile.write(citations_info.kofamscan)
 
         if run_data.tools_used.pfam_db_used:
-            outfile.write(f"Pfam Database\n")
+            outfile.write("Pfam Database\n")
             outfile.write(citations_info.pfam)
 
         if run_data.tools_used.universal_SCGs_used:
-            outfile.write(f"Universal SCG-set\n")
+            outfile.write("Universal SCG-set\n")
             outfile.write(citations_info.universal_SCG_set)
 
 
 def get_hmmer_version():
-    hmm_version = subprocess.run('hmmsearch -h | head -n 2 | tail -n 1 | tr -s " " "\t" | cut -f 3',
-                                 shell = True, capture_output = True, text = True)
-    return hmm_version.stdout.strip()
+    """
+    The HMMER version actually used for searching comes from pyhmmer now
+    (hmmer is still in the conda recipe for kofamscan)
+    """
+    import pyhmmer  # type: ignore
+
+    version = getattr(pyhmmer, "HMMER_VERSION", None)
+    if version:
+        return str(version)
+    return f"(via pyhmmer {pyhmmer.__version__})"
 
 def get_muscle_version():
     muscle_version = subprocess.run('muscle -version | tr -s " " "\t" | cut -f 2 | head -n 1',

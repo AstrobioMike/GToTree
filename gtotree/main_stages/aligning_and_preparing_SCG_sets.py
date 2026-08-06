@@ -2,7 +2,7 @@ import os
 from gtotree.utils.general import (write_run_data,
                                    run_pooled_stage,
                                    remove_file_if_exists,
-                                   check_file_exists_and_not_empty)
+                                   file_is_usable_else_clear)
 from gtotree.utils.messaging import (report_processing_stage,
                                      report_no_SCGs_remaining)
 from gtotree.utils.seqs import (copy_gene_alignments,
@@ -72,12 +72,12 @@ def _align_one_SCG(scg, run_data):
     final_part = final_path + ".part"
 
     # a valid final output already exists -> this SCG was completed on a prior run
-    if check_file_exists_and_not_empty(final_path):
+    if file_is_usable_else_clear(final_path):
         return {"skipped": True, "align_failed": False, "trimal_failed": False}
 
     # clean up anything left behind by a prior interrupted run before starting:
     # the leftover atomic temp, plus intermediates we're about to regenerate
-    # (check_file_exists_and_not_empty already drops a zero-byte -final for us)
+    # (file_is_usable_else_clear already drops a zero-byte -final for us)
     remove_file_if_exists(final_part)
     remove_file_if_exists(paths["aligned"])
     remove_file_if_exists(paths["trimmed"])

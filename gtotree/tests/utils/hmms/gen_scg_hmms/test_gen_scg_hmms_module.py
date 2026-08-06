@@ -1,20 +1,16 @@
-import os
 import pytest # type: ignore
 from collections import Counter
 from pathlib import Path
-import pyhmmer # type: ignore
-
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
-                                                                 DEFAULT_MIN_PFAM_COVERAGE,
                                                                  GenSCGHMMsError,
                                                                  PfamDataError,
-                                                                 _decode,
                                                                  count_single_copy_hits,
                                                                  load_coverage_filtered_pfams,
                                                                  pfam_data_paths,
                                                                  read_hmm_accessions,
                                                                  write_filtered_pfam_hmms,
                                                                  )
+from gtotree.utils.general import decode_pyhmmer_text
 from gtotree.tests.paths import DATA_DIR
 
 MOCK_PFAM_INFO = DATA_DIR / "mock-pfamA.txt"
@@ -28,18 +24,14 @@ MOCK_PFAM_HMM = DATA_DIR / "mock-pfams.hmm"
 #   PF90005.9  coverage 104.7  -> kept (real Pfam coverages can exceed 100; see below)
 
 
-################################################################################
-# _decode
-################################################################################
-
-def test_decode_handles_bytes_and_str():
+def test_decode_pyhmmer_text_handles_bytes_and_str():
     """
-    pyhmmer returns name/accession as bytes on 0.11.x and str on later versions, so
-    every call site goes through _decode. Both must normalize to str.
+    pyhmmer returns name/accession as bytes on 0.11.x and str on later versions, which
+    snagged me at some point, so i have this safety net
     """
-    assert _decode(b"PF00001.27") == "PF00001.27"
-    assert _decode("PF00001.27") == "PF00001.27"
-    assert _decode(None) is None
+    assert decode_pyhmmer_text(b"PF00001.27") == "PF00001.27"
+    assert decode_pyhmmer_text("PF00001.27") == "PF00001.27"
+    assert decode_pyhmmer_text(None) is None
 
 
 ################################################################################

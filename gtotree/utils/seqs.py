@@ -4,7 +4,8 @@ import statistics
 from Bio import SeqIO # type: ignore
 import subprocess
 from gtotree.utils.general import (remove_file_if_exists,
-                                   check_file_exists_and_not_empty)
+                                   file_is_usable_else_clear)
+
 
 def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_length = 99999):
     if full_path:
@@ -19,15 +20,14 @@ def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_le
         remove_file_if_exists(AA_outpath)
         return False, None, num, None
 
+    if run_data.nucleotide_mode:
+        nt_infile = f"{in_path}/{prefix}_cds.fasta"
+        nt_outpath = f"{run_data.ready_genome_files_dir}/{prefix}.fasta"
+        nt_max_length = (max_length * 3) + 3  # max length is 3x the AA max length + 3 for the stop codon
+        _filter_and_rename_fasta(nt_outpath, nt_infile, prefix, nt_max_length)
     else:
-        if run_data.nucleotide_mode:
-            nt_infile = f"{in_path}/{prefix}_cds.fasta"
-            nt_outpath = f"{run_data.ready_genome_files_dir}/{prefix}.fasta"
-            nt_max_length = (max_length * 3) + 3  # max length is 3x the AA max length + 3 for the stop codon
-            _filter_and_rename_fasta(nt_outpath, nt_infile, prefix, nt_max_length)
-        else:
-            nt_outpath = None
-        return True, AA_outpath, num, nt_outpath
+        nt_outpath = None
+    return True, AA_outpath, num, nt_outpath
 
 
 def fasta_has_single_record(path) -> bool:
@@ -41,7 +41,7 @@ def fasta_has_single_record(path) -> bool:
 
 def _filter_and_rename_fasta(outpath, infile, prefix, max_length):
     num = 0
-    with open(outpath, "w") as outfile, open(infile, "r") as in_file:
+    with open(outpath, "w") as outfile, open(infile) as in_file:
         for record in SeqIO.parse(in_file, "fasta"):
             if len(record.seq) <= max_length:
                 num += 1
@@ -57,9 +57,8 @@ def extract_filter_and_rename_cds_amino_acids_from_gb(prefix, input_gb, run_data
     location_terms_to_exclude = ["join", "<", ">"]
 
     try:
-        with open(input_gb, "r") as infile, open(output_file, "w") as outfile:
-            records = list(SeqIO.parse(infile, "genbank"))
-            for rec in records:
+        with open(input_gb) as infile, open(output_file, "w") as outfile:
+            for rec in SeqIO.parse(infile, "genbank"):
                 genes = [gene for gene in rec.features if gene.type == "CDS"]
                 for gene in genes:
                     location = str(gene.location)
@@ -81,8 +80,7 @@ def extract_filter_and_rename_cds_amino_acids_from_gb(prefix, input_gb, run_data
         if num == 0:
             remove_file_if_exists(output_file)
             return False, None, num
-        else:
-            return True, output_file, num
+        return True, output_file, num
     except:
         remove_file_if_exists(output_file)
         return False, None, num
@@ -93,9 +91,8 @@ def extract_fasta_from_gb(prefix, input_gb, run_data):
     num = 0
     output_file = f"{run_data.genbank_processing_dir}/{prefix}.fasta"
 
-    with open(input_gb, "r") as infile, open(output_file, "w") as outfile:
-        records = list(SeqIO.parse(infile, "genbank"))
-        for rec in records:
+    with open(input_gb) as infile, open(output_file, "w") as outfile:
+        for rec in SeqIO.parse(infile, "genbank"):
             num += 1
             outfile.write(f">{prefix}_{num}\n{rec.seq}\n")
 
@@ -112,7 +109,7 @@ def check_target_SCGs_have_seqs(run_data, ext):
 
         SCG = SCG_obj.id
         path = run_data.found_SCG_seqs_dir + f"/{SCG}{ext}"
-        present = check_file_exists_and_not_empty(path)
+        present = file_is_usable_else_clear(path)
         if not present:
             SCG_obj.mark_removed("no seqs found or no seqs remaining after length-filtering")
             SCG_targets_missing.append(SCG)
@@ -122,38 +119,61 @@ def check_target_SCGs_have_seqs(run_data, ext):
     return run_data
 
 
-def filter_seqs_by_length(path, cutoff):
+def _fasta_seq_lengths(path):
+    """
+    Sequence lengths from a FASTA, read as text without building any record objects
+    """
+    lengths = []
+    current = 0
+    started = False
+    with open(path) as fh:
+        for line in fh:
+            if line.startswith(">"):
+                if started:
+                    lengths.append(current)
+                current = 0
+                started = True
+            else:
+                current += len(line.strip())
+    if started:
+        lengths.append(current)
+    return lengths
 
-    # getting range allowed
-    lengths = [len(record.seq) for record in SeqIO.parse(path, "fasta")]
+
+def filter_seqs_by_length(path, cutoff):
+    """
+    Drop sequences whose length is outside `cutoff` of the set's median, writing the
+    survivors to a '-gene-filtered' file and returning their genome ids
+    """
+    lengths = _fasta_seq_lengths(path)
+    if not lengths:
+        raise ValueError(f"no sequences found in {path}")
+
     median = statistics.median(lengths)
     min_length = round(median - (median * cutoff))
     max_length = round(median + (median * cutoff))
 
-    # filtering and writing back out
-    records = list(SeqIO.parse(path, "fasta"))
-    genomes_with_hits_after_filtering = []
-    filtered_records = []
-    for record in records:
-        if min_length <= len(record.seq) <= max_length:
-            filtered_records.append(record)
-            genomes_with_hits_after_filtering.append(record.id)
-
     root, ext = os.path.splitext(path)
     out_path = f"{root}-gene-filtered{ext}"
+
+    genomes_with_hits_after_filtering = []
     with open(out_path, "w") as out_handle:
-        SeqIO.write(filtered_records, out_handle, "fasta")
+        for record in SeqIO.parse(path, "fasta"):
+            if min_length <= len(record.seq) <= max_length:
+                genomes_with_hits_after_filtering.append(record.id)
+                out_handle.write(f">{record.id}\n{record.seq}\n")
 
     return genomes_with_hits_after_filtering
 
 
 def filter_seqs_by_genome_ids(path, ids_to_remove, out_path):
-
-    records = list(SeqIO.parse(path, "fasta"))
-    filtered_records = [record for record in records if record.id not in ids_to_remove]
-
+    """
+    Copy `path` to `out_path`, dropping records whose id is in `ids_to_remove`
+    """
     with open(out_path, "w") as out_handle:
-        SeqIO.write(filtered_records, out_handle, "fasta")
+        for record in SeqIO.parse(path, "fasta"):
+            if record.id not in ids_to_remove:
+                out_handle.write(f">{record.id}\n{record.seq}\n")
 
 
 def run_muscle(id, run_data, inpath, outpath, log_path):
@@ -201,19 +221,26 @@ def run_trimal(inpath, output, log_path):
 
 
 def add_needed_gap_seqs(run_data, inpath, outpath):
-
+    """
+    Write one record per remaining genome, gap-filling any that this SCG has no hit for
+    """
     all_needed_ids = run_data.get_all_remaining_input_genome_ids()
-    records = list(SeqIO.parse(inpath, "fasta"))
-    align_len = len(records[0].seq)
-    record_dict = {record.id: record for record in records}
 
+    seq_by_id = {}
+    align_len = None
+    for record in SeqIO.parse(inpath, "fasta"):
+        seq = str(record.seq)
+        if align_len is None:
+            align_len = len(seq)
+        seq_by_id[record.id] = seq
+
+    if align_len is None:
+        raise ValueError(f"no sequences found in {inpath}")
+
+    gap_row = "-" * align_len
     with open(outpath, "w") as out_handle:
         for req_id in all_needed_ids:
-            if req_id in record_dict:
-                out_handle.write(f">{req_id}\n{record_dict[req_id].seq}\n")
-            else:
-                seq = "-" * align_len
-                out_handle.write(f">{req_id}\n{seq}\n")
+            out_handle.write(f">{req_id}\n{seq_by_id.get(req_id, gap_row)}\n")
 
 
 def concatenate_alignments(run_data):
@@ -290,12 +317,10 @@ def swap_labels_in_alignment(run_data):
     backup_alignment_path = os.path.join(run_data.run_files_dir, f"aligned-SCGs{run_data.general_ext}")
     new_alignment_path = os.path.join(run_data.output_dir, f"aligned-SCGs-mod-names{run_data.general_ext}")
 
-    sequences = list(SeqIO.parse(orig_alignment_path, "fasta"))
     with open(new_alignment_path, "w") as fh:
-        for seq in sequences:
-            if seq.id in run_data.mapping_dict:
-                seq.id = run_data.mapping_dict[seq.id]
-            fh.write(f">{seq.id}\n{str(seq.seq)}\n")
+        for seq in SeqIO.parse(orig_alignment_path, "fasta"):
+            label = run_data.mapping_dict.get(seq.id, seq.id)
+            fh.write(f">{label}\n{seq.seq}\n")
 
     shutil.move(orig_alignment_path, backup_alignment_path)
 
@@ -318,7 +343,7 @@ def copy_gene_alignments(run_data):
 
 def get_alignment_length(path):
 
-    with open(path, "r") as f:
+    with open(path) as f:
         next(f)
         num_sites = len(next(f).strip())
 

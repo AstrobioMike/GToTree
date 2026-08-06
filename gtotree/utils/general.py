@@ -5,7 +5,6 @@ import gzip
 import shutil
 import json
 import time
-import socket
 import argparse
 from dataclasses import dataclass, field, asdict
 from typing import List
@@ -14,6 +13,34 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 from gtotree.utils.messaging import (report_message, color_text, wprint)
+
+
+def atomic_write_text(path, write_fn, encoding="utf-8"):
+    tmp = f"{path}.part"
+    try:
+        with open(tmp, "w", encoding=encoding) as f:
+            write_fn(f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def decode_pyhmmer_text(value):
+    """
+    Normalize a pyhmmer text attribute (`name`, `accession`, `description`) to str
+    to be robust to a pyhmmer snag i hit earlier
+    """
+    if value is None:
+        return None
+    if isinstance(value, (bytes, bytearray)):
+        return value.decode()
+    return str(value)
 
 
 @dataclass
@@ -80,7 +107,7 @@ def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True,
                          probe_seconds, connect_timeout=probe_timeout)
             if leave:
                 sys.stderr.write("\n")
-            return
+            return None
 
         except _TooSlow as e:
             # performance failure: reroll immediately, no wait
@@ -103,8 +130,7 @@ def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True,
             time.sleep(retry_wait)
             continue
 
-        except (urllib.error.URLError, socket.timeout, TimeoutError,
-                ConnectionError, OSError) as err:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as err:
             # transient network failure: wait, then retry
             last_err = err
             if is_final:
@@ -236,7 +262,6 @@ class GenomeData:
         full_path = os.path.abspath(path)
         provided_path = path
         basename = os.path.basename(full_path)
-        source = source
 
         extensions_to_remove = [".gb", ".gbff", ".fasta", ".fna", ".fa", ".faa"]
 
@@ -429,11 +454,8 @@ class RunData:
     def num_incomplete_amino_acid_files(self) -> int:
         return len([gd for gd in self.amino_acid_files if not gd.preprocessing_done and not gd.removed])
 
-    def num_accs_not_found(self) -> int:
-        return len([gd for gd in self.ncbi_accs if gd.acc_not_found is True])
-
     def get_all_SCG_targets(self) -> List[SCGset]:
-        return [scg for scg in self.SCG_targets]
+        return list(self.SCG_targets)
 
     def get_all_SCG_targets_remaining(self) -> List[SCGset]:
         return [scg for scg in self.SCG_targets if scg.remaining and not scg.removed]
@@ -462,9 +484,9 @@ class RunData:
 
     def merge_wanted_ref_tax_accessions(self, accessions) -> int:
         """
-        Fold --wanted-ref-tax (-W) accessions into the NCBI-accession input pool,
+        Fold --wanted-ref-tax (-w) accessions into the NCBI-accession input pool,
         skipping any already provided by the user by accession id.
-        Order is preserved: existing accs first, then the new -W ones in the order
+        Order is preserved: existing accs first, then the new -w ones in the order
         the taxonomy core returned them. Refreshes all_input_genomes and returns the
         number actually added.
         """
@@ -612,24 +634,24 @@ def populate_run_data(args):
     run_data = RunData()
 
     if args.ncbi_accessions:
-        with open(args.ncbi_accessions, "r") as f:
+        with open(args.ncbi_accessions) as f:
             entries_list = f.read().splitlines()
         run_data.ncbi_accs = [GenomeData.from_acc(entry) for entry in entries_list]
 
     if args.genbank_files:
-        with open(args.genbank_files, "r") as f:
+        with open(args.genbank_files) as f:
             entries_list = f.read().splitlines()
         run_data.genbank_files = [GenomeData.from_path(entry, "genbank-file") for entry in entries_list]
 
     if args.fasta_files:
-        with open(args.fasta_files, "r") as f:
+        with open(args.fasta_files) as f:
             entries_list = f.read().splitlines()
         run_data.fasta_files = [GenomeData.from_path(entry, "nt-fasta-file") for entry in entries_list]
         for gd in run_data.fasta_files:
             gd.prodigal_used = True
 
     if args.amino_acid_files:
-        with open(args.amino_acid_files, "r") as f:
+        with open(args.amino_acid_files) as f:
             entries_list = f.read().splitlines()
         run_data.amino_acid_files = [GenomeData.from_path(entry, "aa-fasta-file") for entry in entries_list]
 
@@ -649,7 +671,7 @@ def write_args(args):
 
 
 def read_args(args_path):
-    with open(args_path, "r") as f:
+    with open(args_path) as f:
         args_dict = json.load(f)
     args = argparse.Namespace(**args_dict)
     return args
@@ -659,13 +681,20 @@ def write_run_data(run_data):
     run_data_dict = asdict(run_data)
     if isinstance(run_data.start_time, datetime):
         run_data_dict['start_time'] = run_data.start_time.isoformat()
-    with open(run_data.run_data_path, "w") as f:
-        json.dump(run_data_dict, f, indent=2)
+    atomic_write_text(run_data.run_data_path,
+                      lambda f: json.dump(run_data_dict, f, indent=2))
+
+
+class CorruptRunData(Exception):
+    """The saved run-data.json exists but can't be parsed back into a RunData."""
 
 
 def read_run_data(path):
+    """
+    Load a saved RunData, or return None if there isn't one at `path`
+    """
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             run_data_dict = json.load(f)
 
         if "ncbi_accs" in run_data_dict:
@@ -684,7 +713,7 @@ def read_run_data(path):
         else:
             run_data_dict["tools_used"] = ToolsUsed()
 
-        if "start_time" in run_data_dict:
+        if isinstance(run_data_dict.get("start_time"), str):
             run_data_dict["start_time"] = datetime.fromisoformat(run_data_dict["start_time"])
 
         if "SCG_targets" in run_data_dict:
@@ -695,7 +724,10 @@ def read_run_data(path):
         return run_data
 
     except FileNotFoundError:
-        pass
+        return None
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
+        raise CorruptRunData(
+            f"the saved run data at \"{path}\" couldn't be read back ({e})") from e
 
 
 def touch(path):
@@ -719,6 +751,29 @@ GTT_PROGRESS_BAR_FORMAT_INDENTED = (
     "{n_fmt}/{total_fmt} "
     "[time elapsed: {elapsed} | est. remaining: {remaining}]"
 )
+
+
+# How many items to keep queued per worker thread in run_pooled_stage. Enough that a
+# thread finishing early always has work waiting, small enough that the queued futures
+# and their results don't dominate memory on a large run
+WORKER_QUEUE_DEPTH = 4
+
+
+def required_count(total, fraction):
+    """
+    How many of `total` are needed to meet `fraction`, rounding halves up
+    """
+    return int(total * fraction + 0.5)
+
+
+def search_threads_per_genome(args):
+    """
+    Threads to hand an individual per-genome search (hmmsearch/kofamscan)
+
+    i'm keeping this as a function for now because i keep changing my mind if i
+    want it to be constant to determined...
+    """
+    return 2
 
 
 def run_pooled_stage(items, worker, apply_result, args, run_data,
@@ -754,29 +809,45 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
     drained, so a ctrl-c during a big stage exits once the in-flight workers finish
     instead of waiting for every remaining item.
     """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
+    from itertools import islice
 
     num_workers = max(1, args.num_jobs)
     if max_workers_cap is not None:
         num_workers = min(num_workers, max_workers_cap)
 
+    # Only ever keep this many items submitted at once, rather than queueing all of
+    # them up front (saves storage and time on an interrupt)
+    window = max(num_workers * WORKER_QUEUE_DEPTH, num_workers + 1)
+
     if lead_newline:
         print("")
     pool = ThreadPoolExecutor(max_workers=num_workers)
+    remaining = iter(items)
+    in_flight = {}
     try:
         with tqdm(total=len(items),
                   bar_format=bar_format or GTT_PROGRESS_BAR_FORMAT, ncols=76) as pbar:
 
-            futures = {pool.submit(worker, item, run_data): item for item in items}
+            for item in islice(remaining, window):
+                in_flight[pool.submit(worker, item, run_data)] = item
 
-            for future in as_completed(futures):
-                item = futures[future]
-                result = future.result()
-                apply_result(item, result, run_data)
-                pbar.update(1)
+            while in_flight:
+                done, _ = wait(in_flight, return_when=FIRST_COMPLETED)
+
+                for future in done:
+                    item = in_flight.pop(future)
+                    result = future.result()
+                    # apply_result still runs here on the MAIN thread, in completion
+                    # order, exactly as before
+                    apply_result(item, result, run_data)
+                    pbar.update(1)
+
+                # top up by however many just completed, so the window stays full
+                for item in islice(remaining, len(done)):
+                    in_flight[pool.submit(worker, item, run_data)] = item
+
     except KeyboardInterrupt:
-        # drop anything still queued; in-flight workers can't be interrupted, but we
-        # don't wait on the rest of the backlog
         pool.shutdown(wait=False, cancel_futures=True)
         raise
     finally:
@@ -791,8 +862,7 @@ def gunzip_if_needed(path):
         with gzip.open(path, 'rb') as f_in, open(gunzipped_path, 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
         return gunzipped_path, True
-    else:
-        return path, False
+    return path, False
 
 
 def remove_file_if_exists(path):
@@ -802,12 +872,14 @@ def remove_file_if_exists(path):
         pass
 
 
-def check_file_exists_and_not_empty(path):
+def file_is_usable_else_clear(path):
+    """
+    True if `path` exists and is non-empty. **Deletes it** if it exists but is empty
+    """
     try:
         if os.path.getsize(path) > 0:
             return True
-        else:
-            remove_file_if_exists(path)
+        remove_file_if_exists(path)
     except FileNotFoundError:
         pass
     return False
@@ -816,7 +888,7 @@ def check_file_exists_and_not_empty(path):
 def concat_files(file_list, output_file):
     with open(output_file, 'w') as outfile:
         for fname in file_list:
-            with open(fname, 'r') as infile:
+            with open(fname) as infile:
                 shutil.copyfileobj(infile, outfile)
 
 

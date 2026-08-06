@@ -23,8 +23,9 @@ the profiles.
 import os
 import tempfile
 import pyhmmer  # type: ignore
-from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError, _decode
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import genome_id_from_protein_name
+from gtotree.utils.general import decode_pyhmmer_text
 
 
 class HmmSearchError(GenSCGHMMsError):
@@ -43,7 +44,7 @@ def open_target_proteins(fasta_path):
         seq_file = pyhmmer.easel.SequenceFile(
             fasta_path, digital=True, alphabet=alphabet)
     except Exception as e:
-        raise HmmSearchError(f"failed to read the combined protein fasta: {e}")
+        raise HmmSearchError(f"failed to read the combined protein fasta: {e}") from e
 
     return alphabet, seq_file
 
@@ -59,7 +60,7 @@ def _read_chunk(seq_file, residue_budget):
     try:
         block = seq_file.read_block(residues=residue_budget)
     except Exception as e:
-        raise HmmSearchError(f"failed to read the combined protein fasta: {e}")
+        raise HmmSearchError(f"failed to read the combined protein fasta: {e}") from e
 
     if block is None or len(block) == 0:
         return None
@@ -81,7 +82,7 @@ def _press_profiles(filtered_hmm_path, press_dir):
         with pyhmmer.plan7.HMMFile(filtered_hmm_path) as hmm_file:
             pressed = pyhmmer.hmmer.hmmpress(hmm_file, base)
     except Exception as e:
-        raise HmmSearchError(f"failed to prepare (hmmpress) the filtered profiles: {e}")
+        raise HmmSearchError(f"failed to prepare (hmmpress) the filtered profiles: {e}") from e
 
     if not pressed:
         raise HmmSearchError(
@@ -108,14 +109,14 @@ def _search_one_chunk(pressed_base, seq_block, threads, hits_by_genome):
             for top_hits in results:
 
                 query = getattr(top_hits, "query", None)
-                acc = _decode(getattr(query, "accession", None))
+                acc = decode_pyhmmer_text(getattr(query, "accession", None))
                 if acc is None:
-                    acc = _decode(getattr(query, "name", None))
+                    acc = decode_pyhmmer_text(getattr(query, "name", None))
 
                 for hit in top_hits:
                     if not hit.included:
                         continue
-                    genome_id = genome_id_from_protein_name(_decode(hit.name))
+                    genome_id = genome_id_from_protein_name(decode_pyhmmer_text(hit.name))
                     counts = hits_by_genome.setdefault(genome_id, {})
                     counts[acc] = counts.get(acc, 0) + 1
 
@@ -124,7 +125,7 @@ def _search_one_chunk(pressed_base, seq_block, threads, hits_by_genome):
     except HmmSearchError:
         raise
     except Exception as e:
-        raise HmmSearchError(f"the hmmsearch step failed: {e}")
+        raise HmmSearchError(f"the hmmsearch step failed: {e}") from e
 
 
 def search_profiles(filtered_hmm_path, fasta_path, threads=1,
@@ -176,7 +177,7 @@ def search_profiles(filtered_hmm_path, fasta_path, threads=1,
             # register every genome in this chunk before searching, so genomes that hit
             # nothing still end up as keys; the same pass tracks genome transitions
             for seq in chunk:
-                genome_id = genome_id_from_protein_name(_decode(seq.name))
+                genome_id = genome_id_from_protein_name(decode_pyhmmer_text(seq.name))
                 hits_by_genome.setdefault(genome_id, {})
                 if genome_id != current_genome:
                     genomes_started += 1
@@ -278,9 +279,9 @@ def _read_env_override(env=None):
 
     try:
         value = int(raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as e:
         raise ChunkSizeError(
-            f"{CHUNK_ENV_VAR} must be a positive integer (residues) if set, got {raw!r}.")
+            f"{CHUNK_ENV_VAR} must be a positive integer (residues) if set, got {raw!r}.") from e
 
     if value < 1:
         raise ChunkSizeError(

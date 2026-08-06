@@ -1,5 +1,3 @@
-import os
-import pytest # type: ignore
 from gtotree.utils.gtdb.get_gtdb_data import VERSION_FILENAME
 from gtotree.utils.ncbi.get_ncbi_assembly_data import DATE_FILENAME
 from gtotree.utils.taxonomy.wanted_ref_tax import describe_source_version

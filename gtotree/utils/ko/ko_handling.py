@@ -35,7 +35,7 @@ def parse_kofamscan_targets(run_data):
 
 def get_wanted_KOs(run_data):
     wanted_KOs = []
-    with open(run_data.target_kos_file, "r") as target_KOs_file:
+    with open(run_data.target_kos_file) as target_KOs_file:
         for line in target_KOs_file:
             KO = line.strip()
             wanted_KOs.append(KO)

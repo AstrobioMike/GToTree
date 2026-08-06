@@ -1,10 +1,8 @@
 import pytest # type: ignore
-import pyhmmer # type: ignore
 import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search as mod
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import count_single_copy_hits
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search import (
     HmmSearchError,
-    open_target_proteins,
     search_profiles,
     CHUNK_ENV_VAR,
     DEFAULT_MAX_RESIDUES_PER_CHUNK,
@@ -114,7 +112,7 @@ def test_search_counts_hits_per_genome(tmp_path):
     hits = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1)
 
     assert set(hits) == {"g1", "g2"}
-    assert hits["g1"] == {acc: 1 for acc in MOTIFS}
+    assert hits["g1"] == dict.fromkeys(MOTIFS, 1)
 
 
 def test_search_counts_duplicates(tmp_path):

@@ -1,4 +1,3 @@
-import os
 import pytest # type: ignore
 from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_outputs as outputs
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import PfamProfileInfo

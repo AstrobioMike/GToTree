@@ -1,4 +1,5 @@
 from gtotree.utils.general import (write_run_data,
+                                   required_count,
                                    run_pooled_stage)
 from gtotree.utils.messaging import (report_message,
                                      report_processing_stage,
@@ -8,8 +9,8 @@ from gtotree.utils.seqs import check_target_SCGs_have_seqs, filter_seqs_by_lengt
 def filter_genes(args, run_data):
 
     report_processing_stage("filter-genes", run_data)
-    cutoff = "{:.0f}".format(run_data.seq_length_cutoff * 100)
-    in_genomes_cutoff_for_report = "{:.0f}".format(args.gene_representation_cutoff * 100)
+    cutoff = f"{run_data.seq_length_cutoff * 100:.0f}"
+    in_genomes_cutoff_for_report = f"{args.gene_representation_cutoff * 100:.0f}"
 
     message = (f"Keeping genes with lengths within {cutoff}% of the median for each gene set, "
                f"and keeping gene sets with hits in at least {in_genomes_cutoff_for_report}% of "
@@ -22,7 +23,7 @@ def filter_genes(args, run_data):
         genome_dict = {gd.id: gd for gd in run_data.get_all_input_genomes_for_filtering()}
 
         # accumulate per-genome surviving-hit counts across SCGs on the main thread
-        count_dict = {genome_id: 0 for genome_id in genome_dict}
+        count_dict = dict.fromkeys(genome_dict, 0)
 
         def worker(scg, run_data):
             path = run_data.found_SCG_seqs_dir + f"/{scg.id}{run_data.general_ext}"
@@ -48,14 +49,14 @@ def filter_genes(args, run_data):
     run_data = check_target_SCGs_have_seqs(run_data, f"-gene-filtered{run_data.general_ext}")
 
     total_genomes_remaining = len(run_data.get_all_input_genomes_for_filtering())
-    # not using round() to avoid banker's rounding, and already checked up front these will always be positive
-    min_genomes_required = int(total_genomes_remaining * args.gene_representation_cutoff + 0.5)
+    min_genomes_required = required_count(total_genomes_remaining,
+                                          args.gene_representation_cutoff)
 
     removed_any = False
     for scg in run_data.get_all_SCG_targets_remaining():
         count = getattr(scg, 'num_genomes_with_hits_after_len_filtering', 0)
         if count < min_genomes_required:
-            scg.mark_removed(f"too few genomes with hits")
+            scg.mark_removed(f"too few genomes with hits ({count} < {min_genomes_required} required)")
             removed_any = True
 
     if removed_any:

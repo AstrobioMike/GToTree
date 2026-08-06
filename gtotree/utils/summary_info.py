@@ -6,7 +6,7 @@ def generate_primary_summary_table(args, run_data):
 
     if run_data.ncbi_sub_table_path:
         ncbi_df     = pd.read_csv(run_data.ncbi_sub_table_path, sep="\t", header=0)
-        taxid_map   = dict(zip(ncbi_df["input_accession"], ncbi_df["taxid"]))
+        taxid_map   = dict(zip(ncbi_df["input_accession"], ncbi_df["taxid"], strict=True))
     else:
         taxid_map   = {}
 

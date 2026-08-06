@@ -98,7 +98,7 @@ def test_exhausts_attempts_then_raises(tmp_path, monkeypatch, no_sleep):
         if not isinstance(target, urllib.request.Request):
             return _FakeResp(headers={})       # size probe ok
         calls["n"] += 1
-        raise socket.timeout("nope")
+        raise TimeoutError("nope")
 
     monkeypatch.setattr(general.urllib.request, "urlopen", always_fail)
 
@@ -332,3 +332,113 @@ def test_stream_once_writes_full_payload_unknown_length(tmp_path, monkeypatch):
     from pathlib import Path
     assert Path(dest).read_bytes() == payload
     assert not (tmp_path / "out.bin.part").exists()
+
+
+# ---------------------------------------------------------------------------
+# atomic_write_text
+# ---------------------------------------------------------------------------
+
+class TestAtomicWriteText:
+    """Writes via a .part file that is only moved into place once the write succeeds."""
+
+    def test_writes_the_content(self, tmp_path):
+        target = tmp_path / "out.txt"
+        general.atomic_write_text(str(target), lambda f: f.write("hello"))
+        assert target.read_text() == "hello"
+
+    def test_a_failed_write_creates_no_target_and_leaves_no_part(self, tmp_path):
+        target = tmp_path / "out.txt"
+
+        def boom(f):
+            f.write("half a file")
+            raise RuntimeError("interrupted mid-write")
+
+        with pytest.raises(RuntimeError):
+            general.atomic_write_text(str(target), boom)
+
+        assert not target.exists()
+        assert not (tmp_path / "out.txt.part").exists()
+
+    def test_a_failed_write_preserves_the_previous_version(self, tmp_path):
+        target = tmp_path / "out.txt"
+        general.atomic_write_text(str(target), lambda f: f.write("good version"))
+
+        def boom(f):
+            f.write("corrupt")
+            raise RuntimeError("interrupted")
+
+        with pytest.raises(RuntimeError):
+            general.atomic_write_text(str(target), boom)
+
+        assert target.read_text() == "good version"
+
+    def test_cleans_up_after_a_keyboardinterrupt(self, tmp_path):
+        target = tmp_path / "out.txt"
+
+        def boom(f):
+            raise KeyboardInterrupt
+
+        with pytest.raises(KeyboardInterrupt):
+            general.atomic_write_text(str(target), boom)
+        assert not (tmp_path / "out.txt.part").exists()
+
+
+# ---------------------------------------------------------------------------
+# run data persistence
+# ---------------------------------------------------------------------------
+
+class TestRunDataPersistence:
+
+    def _run_data(self, tmp_path):
+        rd = general.RunData()
+        rd.run_data_path = str(tmp_path / "run-data.json")
+        rd.ncbi_accs = [general.GenomeData.from_acc("GCF_000000001.1")]
+        rd.update_all_input_genomes()
+        rd.args_hash = "deadbeef"
+        return rd
+
+    def test_round_trips(self, tmp_path):
+        rd = self._run_data(tmp_path)
+        general.write_run_data(rd)
+        back = general.read_run_data(rd.run_data_path)
+        assert back.args_hash == "deadbeef"
+        assert [g.id for g in back.ncbi_accs] == ["GCF_000000001.1"]
+
+    def test_reading_a_missing_file_returns_none(self, tmp_path):
+        assert general.read_run_data(str(tmp_path / "nope.json")) is None
+
+    def test_reading_a_damaged_file_raises_corrupt_run_data(self, tmp_path):
+        path = tmp_path / "run-data.json"
+        path.write_text('{"ncbi_accs": [{"id": "GCF_1", "source": "acc"')
+        with pytest.raises(general.CorruptRunData):
+            general.read_run_data(str(path))
+
+    def test_an_interrupted_write_preserves_the_loadable_previous_state(
+            self, tmp_path, monkeypatch):
+        """The resume checkpoint is written atomically."""
+        rd = self._run_data(tmp_path)
+        general.write_run_data(rd)
+
+        def exploding_dump(obj, fh, **kw):
+            fh.write('{"partial": ')
+            raise RuntimeError("interrupted mid-dump")
+
+        monkeypatch.setattr(general.json, "dump", exploding_dump)
+        rd.args_hash = "bad"
+        with pytest.raises(RuntimeError):
+            general.write_run_data(rd)
+        monkeypatch.undo()
+
+        assert not (tmp_path / "run-data.json.part").exists()
+        assert general.read_run_data(rd.run_data_path).args_hash == "deadbeef"
+
+
+@pytest.mark.parametrize("value,expected", [
+    (b"PF00001", "PF00001"),
+    ("PF00001", "PF00001"),
+    (bytearray(b"MOCK"), "MOCK"),
+    (None, None),
+])
+def test_decode_pyhmmer_text_normalizes_to_str(value, expected):
+    """pyhmmer returns name/accession as bytes or str depending on version."""
+    assert general.decode_pyhmmer_text(value) == expected

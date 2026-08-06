@@ -7,7 +7,7 @@ import shutil
 import itertools
 import threading
 from datetime import datetime
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from gtotree.utils.context import log_file_var
 
 
@@ -38,17 +38,23 @@ def color_text(text, color = 'green', bold = False):
     return f"{prefix}{text}\033[0m"
 
 
+def get_version():
+    """
+    The installed GToTree version, or "(dev)" if distribution metadata isn't present
+    """
+    try:
+        return version("GToTree")
+    except PackageNotFoundError:
+        return "(dev)"
+
+
 def gtotree_header():
     header = f"""
 
-                                  {color_text(f"GToTree v{version('GToTree')}", "green")}
+                                  {color_text(f"GToTree v{get_version()}", "green")}
                           github.com/AstrobioMike/GToTree
     """
     return header
-
-
-def get_version():
-    return version('GToTree')
 
 
 def wprint(text, width = 80, ii = "  ", si = "  "):
@@ -93,7 +99,7 @@ def _real_terminal_stream():
     `gtotree-runlog.txt`. We do not want the per-frame carriage-return redraws
     written to that log file, so the animation is sent to the real terminal
     directly (unwrapping the Tee to find it). If nothing in the chain is an
-    interactive tty, we animate nowhere -- the final line still prints normally.
+    interactive tty, we animate nowhere and the final line still prints normally.
     """
     stream = sys.stderr
     if isinstance(stream, Tee):
@@ -172,10 +178,21 @@ def capture_stdout_to_log(log_file):
             if isinstance(sys.stdout, Tee):
                 return func(*args, **kwargs)
             file_path = log_file() if callable(log_file) else log_file
-            with open(file_path, 'a', buffering = 1) as f:
-                tee = Tee(sys.stdout, f)
+            try:
+                handle = open(file_path, 'a', buffering=1)
+            except OSError:
+                # The log being unavailable (directory removed, disk full, read-only
+                # mount) must not take down the run: these wrappers sit on the
+                # *reporting* functions, so raising here would turn a cosmetic problem
+                # into a crash -- and often into a crash that hides the message the
+                # user actually needed to see. Report to the terminal only.
+                return func(*args, **kwargs)
+            try:
+                tee = Tee(sys.stdout, handle)
                 with contextlib.redirect_stdout(tee), contextlib.redirect_stderr(tee):
                     return func(*args, **kwargs)
+            finally:
+                handle.close()
         return wrapper
     return decorator
 
@@ -499,14 +516,14 @@ def absurd_number_of_genomes_notice(total_input_genomes):
 def report_processing_stage(stage, run_data):
 
     stages_dict = {
-        "ncbi":                        "PREPROCESSING THE GENOMES PROVIDED AS NCBI ACCESSIONS",
-        "genbank":                     "PREPROCESSING THE GENOMES PROVIDED AS GENBANK FILES",
-        "fasta":                       "PREPROCESSING THE GENOMES PROVIDED AS FASTA FILES",
-        "amino-acid":                  "PREPROCESSING THE GENOMES PROVIDED AS AMINO-ACID FILES",
-        "preprocessing-update":        "OVERALL SUMMARY OF INPUT-GENOME PREPROCESSING",
-        "additional-pfam-searching":   "SEARCHING GENOMES FOR SPECIFIED PFAM TARGETS",
-        "additional-ko-searching":     "SEARCHING GENOMES FOR SPECIFIED KO TARGETS",
-        "hmm-search":                  "SEARCHING GENOMES FOR TARGET SINGLE-COPY GENES",
+        "ncbi":                        "PROCESSING THE GENOMES PROVIDED AS NCBI ACCESSIONS",
+        "genbank":                     "PROCESSING THE GENOMES PROVIDED AS GENBANK FILES",
+        "fasta":                       "PROCESSING THE GENOMES PROVIDED AS FASTA FILES",
+        "amino-acid":                  "PROCESSING THE GENOMES PROVIDED AS AMINO-ACID FILES",
+        "preprocessing-update":        "OVERALL SUMMARY OF INPUT-GENOME PROCESSING",
+        "additional-pfam-searching":   "SUMMARY OF THE SPECIFIED PFAM-TARGET SEARCH",
+        "additional-ko-searching":     "SUMMARY OF THE SPECIFIED KO-TARGET SEARCH",
+        "hmm-search":                  "SUMMARY OF THE TARGET SINGLE-COPY-GENE SEARCH",
         "filter-genes":                "FILTERING GENES BY LENGTH AND REPRESENTATION",
         "filter-genomes":              "FILTERING GENOMES WITH TOO FEW HITS",
         "align-and-prepare-SCG-sets":  "ALIGNING, TRIMMING, AND PREPARING SCG-SETS",
@@ -518,9 +535,9 @@ def report_processing_stage(stage, run_data):
 
     try:
         desc = stages_dict[stage]
-    except KeyError:
+    except KeyError as e:
         allowed = ", ".join(stages_dict)
-        raise ValueError(f"Invalid stage: {stage!r}. Must be one of: {allowed!r}")
+        raise ValueError(f"Invalid stage: {stage!r}. Must be one of: {allowed!r}") from e
 
     add_border()
 
@@ -638,7 +655,7 @@ def report_genome_preprocessing_update(run_data):
     if num_input == num_remaining:
         message = (f"{color_text(f"All {num_input} input genomes were successfully preprocessed!".center(82), "green")}")
     else:
-        message = f"    Of all the input genomes provided:\n\n"
+        message = "    Of all the input genomes provided:\n\n"
         message += (f"      {color_text(f"{num_removed} failed preprocessing", "yellow")} as described above.\n\n")
         message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully preprocessed.", "yellow")}")
 
@@ -661,9 +678,9 @@ def report_pfam_searching_update(run_data):
     if num_pfams_found == num_pfam_targets:
         message = (f"{color_text(f"Genomes were searched for all {num_pfam_targets} input Pfam targets!".center(82), 'green')}")
     elif num_pfams_found == 0:
-        message = f"    {color_text(f"None of the input Pfam targets were found in the Pfam database", 'yellow')}, reported in:\n"
+        message = f"    {color_text("None of the input Pfam targets were found in the Pfam database", 'yellow')}, reported in:\n"
         message += (f"      {run_data.run_files_dir_rel}/failed-pfam-targets.txt\n\n")
-        message += (f"{color_text(f"So the input genomes were not searched for any Pfams :(".center(82), 'yellow')}")
+        message += (f"{color_text("So the input genomes were not searched for any Pfams :(".center(82), 'yellow')}")
     else:
         message = f"    {color_text(f"{num_pfams_failed} target Pfam(s) failed to be found in the Pfam database", "yellow")}, reported in:\n"
         message += (f"      {run_data.run_files_dir_rel}/failed-pfam-targets.txt\n\n")
@@ -681,9 +698,9 @@ def report_ko_searching_update(run_data):
     if num_kos_found == num_ko_targets:
         message = (f"{color_text(f"Genomes were searched for all {num_ko_targets} input KO targets!".center(82), 'green')}")
     elif num_kos_found == 0:
-        message = f"    {color_text(f"None of the input KO targets were found in the KO database", 'yellow')}, reported in:\n"
+        message = f"    {color_text("None of the input KO targets were found in the KO database", 'yellow')}, reported in:\n"
         message += (f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n")
-        message += (f"{color_text(f"So the input genomes were not searched for any KOs :(".center(82), 'yellow')}")
+        message += (f"{color_text("So the input genomes were not searched for any KOs :(".center(82), 'yellow')}")
     else:
         message = f"    {color_text(f"{num_kos_failed} target KO(s) failed to be found in the KO database", "yellow")}, reported in:\n"
         message += (f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n")
@@ -719,9 +736,9 @@ def report_genome_filtering_update(run_data):
     num_input = len(run_data.all_input_genomes)
 
     if num_removed_due_to_hit_cutoff == 0:
-        message = (f"{color_text(f"No genomes were removed due to having too few SCG hits!".center(82), "green")}")
+        message = (f"{color_text("No genomes were removed due to having too few SCG hits!".center(82), "green")}")
     else:
-        message = f"    Of the input genomes remaining:\n\n"
+        message = "    Of the input genomes remaining:\n\n"
         if not run_data.best_hit_mode:
             message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few unique SCG hits", "yellow")}, reported in:\n")
         else:
@@ -729,12 +746,12 @@ def report_genome_filtering_update(run_data):
         message += (f"        {run_data.run_files_dir_rel}/genomes-removed-for-too-few-SCG-hits.tsv\n\n")
 
         if not run_data.best_hit_mode:
-            message += (f"    If this is a problem for the genomes you're working with, you could\n")
-            message += (f"    consider running GToTree in \"best-hit\" mode or adjusting the `-G`\n")
-            message += (f"    parameter. See the help menu for more info.\n\n")
+            message += ("    If this is a problem for the genomes you're working with, you could\n")
+            message += ("    consider running GToTree in \"best-hit\" mode or adjusting the `-G`\n")
+            message += ("    parameter. See the help menu for more info.\n\n")
         else:
-            message += (f"    If this is a problem for the genomes you're working with, you could\n")
-            message += (f"    consider adjusting the `-G` parameter. See the help menu for more info.\n\n")
+            message += ("    If this is a problem for the genomes you're working with, you could\n")
+            message += ("    consider adjusting the `-G` parameter. See the help menu for more info.\n\n")
         message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} made it through the preprocessing gauntlet.", "yellow")}")
 
         if num_remaining >= 4:
@@ -821,7 +838,7 @@ def summarize_results(args, run_data):
 
     if num_remaining_genomes < num_initial_genomes or num_genes_removed > 0:
 
-        print(f"\n  Notes:\n")
+        print("\n  Notes:\n")
 
         num_accs_not_found = len(run_data.get_ncbi_accs_not_found())
         if num_accs_not_found > 0:
@@ -856,13 +873,13 @@ def summarize_results(args, run_data):
         add_border(extra_line=False)
 
     run_log_relative_path = run_data.output_dir_rel + "/gtotree-runlog.txt"
-    print(f"\n    Log file written to:")
+    print("\n    Log file written to:")
     print(f"        {color_text(run_log_relative_path, 'green')}")
 
     add_border(extra_line=False)
 
     citations_relative_path = args.output_dir + "/citations.txt"
-    print(f"\n    Programs used and their citations have been written to:")
+    print("\n    Programs used and their citations have been written to:")
     print(f"        {color_text(citations_relative_path, 'green')}")
 
     add_border(extra_line=False)
@@ -877,5 +894,4 @@ def get_path_rel_to_outdir(path, args):
     if idx != -1:
         sub_path = path[idx:]
         return(sub_path)
-    else:
-        raise ValueError(f"Directory {key_dir!r} not found in {path!r}")
+    raise ValueError(f"Directory {key_dir!r} not found in {path!r}")

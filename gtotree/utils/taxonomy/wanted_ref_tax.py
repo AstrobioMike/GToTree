@@ -1,8 +1,8 @@
 """
-Driver-side --wanted-ref-tax (-W) resolution.
+Driver-side --wanted-ref-tax (-w) resolution.
 
 This is the GToTree driver's counterpart to the standalone get-accs-from-*
-helpers: it turns a `-W <taxon>` request (scoped by `-S {gtdb,ncbi}`, and honouring
+helpers: it turns a `-w <taxon>` request (scoped by `-S {gtdb,ncbi}`, and honouring
 `--target-rank` / `--derep-rank`) into a list of assembly accessions to fold into the
 user's other input genomes
 
@@ -64,7 +64,7 @@ def describe_source_version(source):
 def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
                                       derep_rank="auto"):
     """
-    Resolve `-W <taxon>` to a list of assembly accessions plus the RefGenomeSelection
+    Resolve `-w <taxon>` to a list of assembly accessions plus the RefGenomeSelection
     it came from (for warnings / provenance the caller may want to surface).
 
     Parameters
@@ -72,7 +72,7 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
     source : str
         The driver's -S value ('GTDB' or 'NCBI'; case-insensitive here).
     taxon : str
-        The -W taxon name.
+        The -w taxon name.
     target_rank : str or None
         --target-rank; disambiguates a name that lives at multiple ranks.
     derep_rank : str

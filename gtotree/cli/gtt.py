@@ -231,7 +231,7 @@ def main():
     if subcommand not in SUBCOMMAND_MAP:
         from rich.console import Console  # type: ignore
         Console(stderr=True).print(f"\n    [yellow]Unknown subcommand:[/yellow] [cyan]{subcommand}[/cyan]\n")
-        Console(stderr=True).print(f"  Run [cyan]gtt[/cyan] by itself to see available subcommands.\n")
+        Console(stderr=True).print("  Run [cyan]gtt[/cyan] by itself to see available subcommands.\n")
         sys.exit(1)
 
     # rewrite argv so the target module's parser sees the right program name

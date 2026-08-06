@@ -1,4 +1,5 @@
 import os
+import shlex
 import shutil
 import subprocess
 from gtotree.utils.messaging import report_early_exit, report_notice, color_text, spinner
@@ -40,7 +41,7 @@ def run_tree_building(args, run_data):
     return run_data
 
 
-def get_out_tree_file(run_data, suffix="aligned-SCGs"):
+def get_out_tree_file(run_data):
     output_tree_basename = os.path.basename(run_data.output_dir)
     orig_out_tree = os.path.join(run_data.run_files_dir, f"{output_tree_basename}-non-mid-point-rooted.tre")
     final_out_tree = os.path.join(run_data.output_dir, f"{output_tree_basename}.tre")
@@ -53,7 +54,8 @@ def build_fasttree_cmd(args, run_data, out_tree):
     if exe == "FastTreeMP":
         exe = f"OMP_NUM_THREADS={args.num_jobs} FastTreeMP"
     nt = "-nt -gtr" if args.nucleotide_mode else ""
-    cmd = f"{exe} {nt} {run_data.final_alignment_path} > {out_tree} 2> {log}"
+    cmd = (f"{exe} {nt} {shlex.quote(run_data.final_alignment_path)}"
+           f" > {shlex.quote(out_tree)} 2> {shlex.quote(log)}")
     return cmd, log
 
 
@@ -61,7 +63,8 @@ def build_veryfasttree_cmd(args, run_data, out_tree):
     log = os.path.join(run_data.logs_dir_rel, "veryfasttree.log")
     threads = f"-threads {args.num_jobs}"
     nt = "-nt -gtr" if args.nucleotide_mode else ""
-    cmd = f"VeryFastTree {threads} {nt} {run_data.final_alignment_path} > {out_tree} 2> {log}"
+    cmd = (f"VeryFastTree {threads} {nt} {shlex.quote(run_data.final_alignment_path)}"
+           f" > {shlex.quote(out_tree)} 2> {shlex.quote(log)}")
     return cmd, log
 
 
@@ -77,10 +80,12 @@ def build_iqtree_cmd(args, run_data, out_tree):
         report_notice("Bootstrapping not performed with IQTREE with fewer than 4 genomes.")
         boot = ""
     pre  = os.path.join(out_dir, "iqtree")
+    # 2>&1 so IQ-TREE's stderr lands in the log rather than on the terminal, where
+    # it trampled the spinner
     cmd  = (
-        f"iqtree -s {run_data.final_alignment_path}"
+        f"iqtree -s {shlex.quote(run_data.final_alignment_path)}"
         f" -nt {args.num_jobs} -m MFP {boot}"
-        f" -pre {pre} -redo > {log}"
+        f" -pre {shlex.quote(pre)} -redo > {shlex.quote(log)} 2>&1"
     )
     return cmd, log
 

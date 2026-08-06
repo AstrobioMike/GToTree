@@ -132,8 +132,7 @@ def get_slim_ncbi_assembly_data(location):
 
         _download_date_file(date_path)
 
-    except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError,
-            ValueError, OSError) as err:
+    except (urllib.error.URLError, TimeoutError, ConnectionError, ValueError, OSError) as err:
         for p in (table_path, date_path):
             if os.path.exists(p):
                 try:

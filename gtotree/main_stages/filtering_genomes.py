@@ -3,12 +3,13 @@ from gtotree.utils.messaging import (report_message, report_processing_stage,
                                      report_genome_filtering_update)
 from gtotree.utils.seqs import check_target_SCGs_have_seqs, filter_seqs_by_genome_ids
 from gtotree.utils.general import (write_run_data,
+                                   required_count,
                                    run_pooled_stage)
 
 def filter_genomes(args, run_data):
 
     report_processing_stage("filter-genomes", run_data)
-    cutoff = "{:.0f}".format(args.genome_hits_cutoff * 100)
+    cutoff = f"{args.genome_hits_cutoff * 100:.0f}"
     if not args.best_hit_mode:
         message = f"Keeping those with single hits to at least {cutoff}% of the remaining target-SCGs."
     else:
@@ -19,10 +20,13 @@ def filter_genomes(args, run_data):
 
         genomes = run_data.get_all_input_genomes_for_filtering()
         num_remaining_SCG_targets = len([SCG.id for SCG in run_data.get_all_SCG_targets_remaining()])
-        # not using round() to avoid banker's rounding, and already checked up front these will always be positive
-        min_num_SCG_hits = int(num_remaining_SCG_targets * args.genome_hits_cutoff + 0.5)
+        min_num_SCG_hits = required_count(num_remaining_SCG_targets,
+                                          args.genome_hits_cutoff)
 
-        genome_ids_to_filter_out = [genome.id for genome in genomes if genome.num_SCG_hits_after_filtering < min_num_SCG_hits]
+        # `or 0` because num_SCG_hits_after_filtering is None until filter_genes has
+        # counted; a genome that reached here uncounted has no surviving hits
+        genome_ids_to_filter_out = [genome.id for genome in genomes
+                                    if (genome.num_SCG_hits_after_filtering or 0) < min_num_SCG_hits]
 
         for genome in genomes:
             if genome.id in genome_ids_to_filter_out:
@@ -40,7 +44,7 @@ def filter_genomes(args, run_data):
                 shutil.copy(inpath, outpath)
             else:
                 filter_seqs_by_genome_ids(inpath, genome_ids_to_remove, outpath)
-            return None
+            return
 
         def apply_result(scg, result, run_data):
             pass

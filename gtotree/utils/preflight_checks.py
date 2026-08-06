@@ -32,6 +32,7 @@ from gtotree.utils.taxonomy.tax_select import AmbiguousTaxon, TaxonNotFound
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
                                                    WantedRefTaxError)
 from gtotree.utils.general import (ToolsUsed,
+                                   CorruptRunData,
                                    populate_run_data,
                                    read_run_data)
 from gtotree.utils.context import log_file_var
@@ -60,7 +61,7 @@ def args_hash_function(args):
     return hashlib.sha256(args_json.encode("utf-8")).hexdigest()
 
 def check_for_essential_deps():
-    commands = ["muscle", "hmmsearch", "trimal"]
+    commands = ["muscle", "trimal"]
     for cmd in commands:
         program_check(cmd, essential = True)
 
@@ -173,10 +174,10 @@ def checks_for_nucleotide_mode(args):
 
 def check_wanted_ref_tax_args(args):
     """
-    Cross-argument validation for the --wanted-ref-tax (-W) family, done up front
+    Cross-argument validation for the --wanted-ref-tax (-w) family, done up front
     (before any asset is fetched or taxon resolved) so bad combinations fail fast:
 
-      * --target-rank / --derep-rank only mean something alongside -W.
+      * --target-rank / --derep-rank only mean something alongside -w.
       * --target-rank, when given, must be one of the 7 taxonomic ranks.
       * --derep-rank must be 'auto', 'off', or one of the 7 ranks.
     """
@@ -192,7 +193,7 @@ def check_wanted_ref_tax_args(args):
         if dangling:
             joined = " and ".join(dangling)
             report_message(f"You provided {joined}, but that only applies when adding "
-                           "reference genomes by taxonomy with `-W`/`--wanted-ref-tax`.")
+                           "reference genomes by taxonomy with `-w`/`--wanted-ref-tax`.")
             report_very_early_exit(suggest_help=True)
         return
 
@@ -213,7 +214,7 @@ def check_wanted_ref_tax_args(args):
 
 def resolve_wanted_ref_tax(args, run_data):
     """
-    CLI layer for --wanted-ref-tax (-W): call the driver-side resolver (which raises),
+    CLI layer for --wanted-ref-tax (-w): call the driver-side resolver (which raises),
     translate any failure into a friendly message + early exit, surface the selection's
     advisory warnings, and merge the resulting accessions into run_data's NCBI-accession
     input pool (deduping against user-provided accessions).
@@ -229,12 +230,12 @@ def resolve_wanted_ref_tax(args, run_data):
                 args.source, args.wanted_ref_tax,
                 target_rank=args.target_rank, derep_rank=args.derep_rank)
     except AmbiguousTaxon:
-        report_message(f"Since the `-W` taxon '{args.wanted_ref_tax}' occurs at more than "
-                       "1 rank, you'll need to specify which rank is wanted with "
+        report_message(f"Since the `-w` taxon '{args.wanted_ref_tax}' occurs at more than "
+                       "one rank, you'll need to specify which rank is wanted with "
                        "`--target-rank`.")
         report_very_early_exit(suggest_help=True)
     except TaxonNotFound:
-        report_message(f"The `-W` taxon '{args.wanted_ref_tax}' doesn't seem to exist at any "
+        report_message(f"The `-w` taxon '{args.wanted_ref_tax}' doesn't seem to exist at any "
                        f"rank in the {args.source} taxonomy :(")
         report_very_early_exit(suggest_help=True)
     except (WantedRefTaxError, ValueError) as err:
@@ -259,17 +260,27 @@ def check_input_files(args):
     if args.amino_acid_files:
         args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
 
-    if args.resume:
-        if os.path.exists(args.run_files_dir + "/run-data.json"):
-            run_data = read_run_data(args.run_files_dir + "/run-data.json")
-            if run_data.args_hash != args_hash_function(args):
-                report_message("We are trying to resume a previous run (specified by the `-R` or `--resume` flag), "
-                               "but it looks like the current arguments don't match the intial run's arguments. "
-                               "Your best bet may be to just start a completely fresh run by adding the `-F` flag to "
-                               "force-overwrite the previous outputs.")
-                report_very_early_exit()
+    run_data = None
 
-    if "run_data" not in locals():
+    if args.resume and os.path.exists(args.run_files_dir + "/run-data.json"):
+        try:
+            run_data = read_run_data(args.run_files_dir + "/run-data.json")
+        except CorruptRunData as e:
+            report_message(
+                "We are trying to resume a previous run (specified by the `-R` or `--resume` "
+                f"flag), but {e}. That usually means the previous run was interrupted while "
+                "saving its state. Your best bet is to start a fresh run by adding the `-F` "
+                "flag to force-overwrite the previous outputs.")
+            report_very_early_exit()
+
+        if run_data is not None and run_data.args_hash != args_hash_function(args):
+            report_message("We are trying to resume a previous run (specified by the `-R` or `--resume` flag), "
+                           "but it looks like the current arguments don't match the intial run's arguments. "
+                           "Your best bet may be to just start a completely fresh run by adding the `-F` flag to "
+                           "force-overwrite the previous outputs.")
+            report_very_early_exit()
+
+    if run_data is None:
         run_data = populate_run_data(args)
         run_data.args_hash = args_hash_function(args)
         run_data = check_hmm_file(args, run_data)
@@ -344,7 +355,7 @@ def check_expected_single_column_input(path, flag, get_count=False):
     check_inputs_exist(path, flag)
 
     if get_count:
-        with open(path, 'r') as f:
+        with open(path) as f:
             lines = [line.strip() for line in f if line.strip()]
         return path, len(lines)
 
@@ -354,18 +365,19 @@ def check_expected_single_column_input(path, flag, get_count=False):
 def check_for_whitespace(path, flag):
 
     # there should be no tabs or spaces in these input files
-    with open(path, 'r') as f:
+    with open(path) as f:
         lines = [line.strip() for line in f if line.strip()]
 
-    for line in lines:
-        if " " in line:
-            message = f'The specified input genomes file "{path}" (passed to `{flag}`) contains spaces in one or more entries. '
-            message += f'That is not expected and will break stuff. Please double-check things and remove any whitespace from the file.'
-            report_very_early_exit(suggest_help = True)
-        if "\t" in line:
-            message = f'The specified input genomes file "{path}" (passed to `{flag}`) contains tabs in one or more entries. '
-            message += f'That is not expected and will break stuff. Please double-check things and remove any whitespace from the file.'
-            report_very_early_exit(suggest_help = True)
+    for lineno, line in enumerate(lines, start=1):
+        for label, char in (("spaces", " "), ("tabs", "\t")):
+            if char in line:
+                message = (
+                    f'The specified input file "{path}" (passed to `{flag}`) contains '
+                    f'{label} in one or more entries, which is not expected and will break '
+                    f'things downstream.\n\nThe first one is on line {lineno}:\n\n'
+                    f'    {line}\n\n'
+                    'Please remove the whitespace from that file and try again.')
+                report_very_early_exit(message, suggest_help=True)
 
 
 def check_line_endings(path, flag):
@@ -392,12 +404,12 @@ def check_line_endings(path, flag):
 def check_for_duplicates(path, flag):
 
     # checking for duplicates in the input file
-    with open(path, 'r') as f:
+    with open(path) as f:
         lines = [line.strip() for line in f if line.strip()]
 
     if len(lines) != len(set(lines)):
         new_filename = f"{path}-unique"
-        new_lines = list(set(lines))
+        new_lines = list(dict.fromkeys(lines))
         with open(new_filename, 'w') as f:
             f.write("\n".join(new_lines))
 
@@ -413,7 +425,7 @@ def check_for_duplicates(path, flag):
 def check_inputs_exist(path, flag):
     if flag in ["-g", "-f", "-A"]:
         # checking that all the input files actually exist
-        with open(path, 'r') as f:
+        with open(path) as f:
             for line in f:
                 line = line.strip()
                 if not os.path.exists(line):
@@ -450,7 +462,7 @@ def check_mapping_file_problem_chars_and_fields(path):
 
     problematic_chars='()*&^#$@!/\\|[]:;'
     errors = []
-    with open(path, 'r') as f:
+    with open(path) as f:
         for lineno, line in enumerate(f, start=1):
             line = line.rstrip("\n")
             columns = line.split('\t')
@@ -462,13 +474,16 @@ def check_mapping_file_problem_chars_and_fields(path):
             # Check each field for any problematic characters.
             for i, field in enumerate(columns, start=1):
                 for char in problematic_chars:
-                    if char in field:
-                        # this is a special case for the "/" character, which is allowed in the first column
-                        if not i == 1 and char == "/":
-                            errors.append(
-                                f"Line {lineno}, column {i} contains at least one problematic character ('{char}'):\n  {field}"
-                            )
-                            break
+                    if char not in field:
+                        continue
+                    # "/" is the one allowed exception, and only in the first column
+                    # (input genome paths legitimately contain it)
+                    if i == 1 and char == "/":
+                        continue
+                    errors.append(
+                        f"Line {lineno}, column {i} contains at least one problematic character ('{char}'):\n  {field}"
+                    )
+                    break
     return errors
 
 
@@ -496,7 +511,7 @@ def make_mapping_dict(path):
         report_very_early_exit()
 
     mapping_dict = {}
-    for idx, row in df.iterrows():
+    for _idx, row in df.iterrows():
         key = row[0].strip()
         col2 = row[1].strip() if len(row) > 1 else ""
         col3 = row[2].strip() if len(row) > 2 else ""
@@ -522,7 +537,7 @@ def make_mapping_dict(path):
         )
         report_message(f'{"\n".join(duplicates)}', ii="    ", si="    ")
         report_message(
-            f'Each input genome must map to a unique label. Please address that and try again.'
+            'Each input genome must map to a unique label. Please address that and try again.'
         )
         report_very_early_exit()
 
@@ -541,7 +556,7 @@ def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
         )
         report_message(f'{"\n".join(missing_keys)}', ii="    ", si="    ")
         report_message(
-            f"Each input genome in the mapping file (column 1) must be present in one of the input-genome sources. Please address this and try again."
+            "Each input genome in the mapping file (column 1) must be present in one of the input-genome sources. Please address this and try again."
         )
         report_very_early_exit()
 
@@ -688,11 +703,6 @@ def final_setups(args, run_data):
         run_data = setup_ko_dirs(run_data)
 
     return args, run_data
-
-
-# def check_resume_acceptable(run_data):
-#     # this checks the run-data.json that exists has the same core components as the current run-data
-#     pass
 
 
 def setup_pfam_dirs(run_data):

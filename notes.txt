@@ -4,6 +4,14 @@
 
 ### TO DO STILL ###
 
+    # move additional_ko_searching/pfam_searching to utils/ko utils/pfam now that they aren't their own main stage
+        # same with hmm_searching -> utils/hmms/
+        # also move preprocessing_genomes.py out of main_stages
+
+    # make target-hmm set matching case-insensitive (so, e.g., universal and Universal work)
+
+    # make regular gtotree hmm-searching use pyhmmer instead of subprocess calls
+
     # gtt gen-scg-hmms may still need some formatting tweaks if i'm feeling neurotic
 
     # do i still use/need the run_data object? maybe i don't need the reading/writing anymore?

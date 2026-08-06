@@ -4,7 +4,7 @@ Target-genome handling for `gtt gen-scg-hmms`
 Resolves the requested target genomes (an accessions file and/or `--wanted-ref-tax`)
 and gets an amino-acid fasta for each, reusing GToTree's existing NCBI machinery:
 
-  * `select_ref_genomes` (via `resolve_wanted_ref_tax_accessions`) for `-W`, the same
+  * `select_ref_genomes` (via `resolve_wanted_ref_tax_accessions`) for `-w`, the same
     shared selection core the driver and get-accs-from-* helpers use
   * the hosted NCBI Parquet table for accession -> download-directory resolution
   * `download_and_unzip_accession` for the actual fetch (atomic writes, retry with
@@ -270,10 +270,10 @@ def fetch_amino_acids(accession, entry, work_dir, nucleotide_fallback=True):
         return aa_path, False
     except KeyboardInterrupt:
         raise
-    except Exception:
+    except Exception as e:
         _remove_quietly(aa_path)
         if not nucleotide_fallback:
-            raise TargetGenomeError(MISSED_DOWNLOAD_FAILED)
+            raise TargetGenomeError(MISSED_DOWNLOAD_FAILED) from e
 
     # no protein file -> get nucleotides and call genes
     nt_path = os.path.join(work_dir, f"{accession}_genomic.fna")
@@ -282,9 +282,9 @@ def fetch_amino_acids(accession, entry, work_dir, nucleotide_fallback=True):
             f"{base_link}/{assembly_str}_genomic.fna.gz", nt_path)
     except KeyboardInterrupt:
         raise
-    except Exception:
+    except Exception as e:
         _remove_quietly(nt_path)
-        raise TargetGenomeError(MISSED_DOWNLOAD_FAILED)
+        raise TargetGenomeError(MISSED_DOWNLOAD_FAILED) from e
 
     try:
         run_prodigal(nt_path, aa_path)
@@ -308,11 +308,11 @@ def run_prodigal(nucleotide_path, out_aa_path):
         if result.returncode != 0:
             raise TargetGenomeError(MISSED_PRODIGAL_FAILED)
         os.replace(tmp_path, out_aa_path)
-    except FileNotFoundError:
+    except FileNotFoundError as e:
         _remove_quietly(tmp_path)
         raise TargetGenomeError(
             "prodigal doesn't seem to be available, but it's needed for genomes that "
-            "have no protein file at NCBI.")
+            "have no protein file at NCBI.") from e
     except BaseException:
         _remove_quietly(tmp_path)
         raise
@@ -335,7 +335,7 @@ def relabel_and_append(accession, aa_path, combined_handle):
             combined_handle.write("\n")
             seq_chunks.clear()
 
-    with open(aa_path, "r", encoding="utf-8", errors="ignore") as f:
+    with open(aa_path, encoding="utf-8", errors="ignore") as f:
         for line in f:
             if line.startswith(">"):
                 flush()

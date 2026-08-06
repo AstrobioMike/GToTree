@@ -68,6 +68,12 @@ def test_overview_listing_matches_the_map():
         for group in PROGRAM_GROUPS
         for prog in group["programs"]
     }
-    # "test" is dispatchable but intentionally grouped separately, so compare both ways
-    assert listed <= set(SUBCOMMAND_MAP), \
-        f"advertised but not dispatchable: {sorted(listed - set(SUBCOMMAND_MAP))}"
+    mapped = set(SUBCOMMAND_MAP)
+
+    assert not (listed - mapped), \
+        f"advertised but not dispatchable: {sorted(listed - mapped)}"
+    # the direction that was previously unchecked, and the likelier drift: adding to
+    # SUBCOMMAND_MAP and forgetting PROGRAM_GROUPS gives a subcommand that works but is
+    # invisible in `gtt` help
+    assert not (mapped - listed), \
+        f"dispatchable but not advertised in the overview: {sorted(mapped - listed)}"

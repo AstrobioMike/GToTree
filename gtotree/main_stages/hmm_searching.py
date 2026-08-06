@@ -1,51 +1,47 @@
 import os
-import json
-import shutil
-import subprocess
+import contextlib
 import pandas as pd # type: ignore
 from Bio import SeqIO # type: ignore
 import pyhmmer.easel as easel #type: ignore
-from gtotree.utils.messaging import (report_processing_stage,
-                                     report_hmm_search_update)
-from gtotree.utils.general import (run_pooled_stage)
-from gtotree.utils.seqs import check_target_SCGs_have_seqs
+from gtotree.utils.general import (search_threads_per_genome,
+                                   atomic_write_text)
+from gtotree.utils.hmms.hmm_searching_engine import search_one_genome
 
 
-def search_hmms(args, run_data):
+def _hmm_search_worker(genome, run_data, aa_path=None, nt_path=None, pressed_base=None):
+    """
+    Per-genome SCG search.
 
-    report_processing_stage("hmm-search", run_data)
+    `aa_path`/`nt_path` override the paths recorded on the GenomeData. The fused
+    processing stage searches a genome inside the same worker that just produced its
+    FASTA, before apply_result has copied those paths onto the GenomeData, so it passes
+    them explicitly; the standalone path leaves them None and reads the object.
 
-    genomes_to_search = run_data.get_all_input_genomes_for_hmm_search()
-
-    if len(genomes_to_search) > 0:
-
-        start_combined_SCG_hit_count_tab(run_data)
-
-        run_data = run_pooled_stage(
-            genomes_to_search,
-            _hmm_search_worker,
-            _apply_hmm_search_result,
-            args, run_data,
-        )
-
-        capture_hmm_search_failures(run_data)
-
-    report_hmm_search_update(run_data)
-
-    run_data = check_target_SCGs_have_seqs(run_data, run_data.general_ext)
-
-    return run_data
+    Wrapped so it cannot raise: run_pooled_stage aborts the whole stage on a worker
+    exception, leaving some items applied and some not.
+    """
+    try:
+        return _hmm_search_worker_inner(genome, run_data, aa_path, nt_path, pressed_base)
+    except BaseException as e:
+        return {
+            "hmm_search_failed": True,
+            "extract_seqs_failed": False,
+            "num_SCG_hits": 0,
+            "num_unique_SCG_hits": 0,
+            "error": f"{type(e).__name__}: {e}",
+        }
 
 
-def _hmm_search_worker(genome, run_data):
+def _hmm_search_worker_inner(genome, run_data, aa_path=None, nt_path=None, pressed_base=None):
 
     ID = genome.id
-    AA_path = genome.final_AA_path
+    AA_path = aa_path if aa_path is not None else genome.final_AA_path
     out_dir = f"{run_data.hmm_results_dir}/{ID}"
     os.makedirs(out_dir, exist_ok=True)
     hmm_out_path = f"{out_dir}/SCG-hits-hmm.txt"
 
-    hmm_search_failed = run_hmm_search(ID, run_data, AA_path, hmm_out_path)
+    hmm_search_failed = run_hmm_search(ID, run_data, AA_path, hmm_out_path,
+                                       pressed_base=pressed_base)
 
     num_SCG_hits = 0
     num_unique_SCG_hits = 0
@@ -55,25 +51,36 @@ def _hmm_search_worker(genome, run_data):
         (dict_of_hit_counts, dict_of_hit_gene_ids,
          num_SCG_hits, num_unique_SCG_hits) = parse_hmmer_results(hmm_out_path, run_data)
 
-        with open(f"{out_dir}/SCG-hit-counts.txt", 'w') as f:
+        # These per-genome files are the source of truth the combined outputs are
+        # rebuilt from at the end of the stage, so they're written atomically
+        def _write_counts(f):
             f.write(f"{ID}")
             for count in dict_of_hit_counts.values():
                 f.write(f"\t{count}")
             f.write("\n")
 
+        atomic_write_text(f"{out_dir}/SCG-hit-counts.txt", _write_counts)
+
         AA_hit_seqs_dict, extract_seqs_failed = get_seqs(dict_of_hit_gene_ids, AA_path)
 
         if not extract_seqs_failed:
-            with open(f"{out_dir}/SCG-hits.faa", 'w') as f:
+            def _write_aa(f):
                 for gene_id, seq in AA_hit_seqs_dict.items():
                     if seq is not None:
                         f.write(f">{gene_id}\n{seq}\n")
+
+            atomic_write_text(f"{out_dir}/SCG-hits.faa", _write_aa)
+
             if run_data.nucleotide_mode:
-                nt_hit_seqs_dict, _ = get_seqs(dict_of_hit_gene_ids, genome.final_nt_path)
-                with open(f"{out_dir}/SCG-hits.fasta", 'w') as f:
+                genome_nt_path = nt_path if nt_path is not None else genome.final_nt_path
+                nt_hit_seqs_dict, _ = get_seqs(dict_of_hit_gene_ids, genome_nt_path)
+
+                def _write_nt(f):
                     for gene_id, seq in nt_hit_seqs_dict.items():
                         if seq is not None:
                             f.write(f">{gene_id}\n{seq}\n")
+
+                atomic_write_text(f"{out_dir}/SCG-hits.fasta", _write_nt)
 
     return {
         "hmm_search_failed": bool(hmm_search_failed),
@@ -93,39 +100,35 @@ def _apply_hmm_search_result(genome, status, run_data):
         genome.mark_removed("HMM search failed")
         genome.num_SCG_hits = 0
     else:
-        add_to_combined_SCG_hit_count_tab(genome.id, run_data)
         if extract_seqs_failed:
             genome.mark_extract_seqs_failed()
             genome.num_SCG_hits = 0
             genome.mark_removed("extracting sequences after HMM search failed")
         else:
-            write_out_SCG_hit_seqs(genome.id, run_data)
             genome.mark_hmm_search_done()
             genome.num_SCG_hits = int(status.get("num_SCG_hits", 0))
             genome.num_unique_SCG_hits = int(status.get("num_unique_SCG_hits", 0))
 
 
-def run_hmm_search(id, run_data, inpath, outpath):
-    cmd = [
-        "hmmsearch",
-        "--cut_ga",
-        "--cpu", "2",
-        "--tblout", outpath,
-        run_data.hmm_path,
-        inpath
-    ]
+def run_hmm_search(id, run_data, inpath, outpath, args=None, pressed_base=None):
+    """
+    Search one genome against the SCG profiles, in-process via pyhmmer.
 
+    Was a subprocess `hmmsearch --cut_ga` call, which spawned a process and re-parsed
+    the whole profile set from text for every genome. The tblout written here is
+    field-for-field identical to what the CLI produced, so everything downstream is
+    unchanged.
+
+    `pressed_base` points at the once-per-run hmmpress output; without it the plain HMM
+    file is read instead (slower, but keeps standalone callers working).
+    """
     try:
-        subprocess.run(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
+        search_one_genome(run_data.hmm_path, inpath, outpath,
+                          pressed_base=pressed_base,
+                          cpus=search_threads_per_genome(args))
         hmm_search_failed = False
-    except subprocess.CalledProcessError as e:
-        stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
-        print(f"[hmmsearch failed for {id}] exit {e.returncode}: {stderr.strip()}")
+    except Exception as e:
+        print(f"[SCG search failed for {id}] {type(e).__name__}: {e}")
         hmm_search_failed = True
 
     return hmm_search_failed
@@ -142,14 +145,17 @@ def read_hmmer_results(inpath):
 
 
 def parse_hmmer_results(inpath, run_data):
-
+    """
+    Tally per-SCG hits for one genome and pick the gene id to pull for each
+    """
     df = read_hmmer_results(inpath)
 
     remaining_SCG_targets = [SCG_target.id for SCG_target in run_data.get_all_SCG_targets_remaining()]
-    dict_of_hit_counts = dict.fromkeys(remaining_SCG_targets, 0)
-    for scg in remaining_SCG_targets:
-        dict_of_hit_counts[scg] = df[df["target_SCG"] == scg].shape[0]
 
+    counts = df["target_SCG"].value_counts()
+    first_gene_by_scg = df.groupby("target_SCG", sort=False)["gene_id"].first()
+
+    dict_of_hit_counts = {scg: int(counts.get(scg, 0)) for scg in remaining_SCG_targets}
     dict_of_hit_gene_ids = dict.fromkeys(remaining_SCG_targets, None)
 
     num_SCG_hits = 0
@@ -159,14 +165,12 @@ def parse_hmmer_results(inpath, run_data):
         if count == 1:
             num_SCG_hits += 1
             num_unique_SCG_hits += 1
-            gene_id = df.loc[df["target_SCG"] == scg, "gene_id"].iloc[0]
-            dict_of_hit_gene_ids[scg] = gene_id
+            dict_of_hit_gene_ids[scg] = first_gene_by_scg[scg]
 
         elif count > 1:
             num_SCG_hits += 1
             if run_data.best_hit_mode:
-                gene_id = df.loc[df["target_SCG"] == scg, "gene_id"].iloc[0]
-                dict_of_hit_gene_ids[scg] = gene_id
+                dict_of_hit_gene_ids[scg] = first_gene_by_scg[scg]
 
     return dict_of_hit_counts, dict_of_hit_gene_ids, num_SCG_hits, num_unique_SCG_hits
 
@@ -194,37 +198,53 @@ def get_seqs(dict_of_hit_gene_ids, path):
     return hit_seqs_dict, extract_seqs_failed
 
 
-def start_combined_SCG_hit_count_tab(run_data):
-    out_file = f"{run_data.output_dir}/SCG-hit-counts.tsv"
-    target_SCG_ids = [SCG_target.id for SCG_target in run_data.get_all_SCG_targets_remaining()]
-    with open(out_file, "w") as outfile:
-        outfile.write("assembly_id\t" + "\t".join(target_SCG_ids) + "\n")
+def rebuild_combined_SCG_outputs(run_data):
+    """
+    Rebuild the combined SCG outputs from the per-genome artifacts
+    """
+    genomes = [gd for gd in run_data.all_input_genomes
+               if gd.hmm_search_done and not gd.removed]
 
+    target_SCG_ids = [SCG.id for SCG in run_data.get_all_SCG_targets_remaining()]
 
-def add_to_combined_SCG_hit_count_tab(genome_id, run_data):
-    table_file = f"{run_data.output_dir}/SCG-hit-counts.tsv"
-    row_to_add_file = f"{run_data.hmm_results_dir}/{genome_id}/SCG-hit-counts.txt"
-    with open(table_file, 'ab') as outfile:
-        with open(row_to_add_file, 'rb') as infile:
-            shutil.copyfileobj(infile, outfile)
+    # --- the combined per-genome hit-count table ---
+    def _write_table(out):
+        out.write("assembly_id\t" + "\t".join(target_SCG_ids) + "\n")
+        for gd in genomes:
+            row_path = f"{run_data.hmm_results_dir}/{gd.id}/SCG-hit-counts.txt"
+            try:
+                with open(row_path) as row_file:
+                    contents = row_file.read()
+            except OSError:
+                continue
+            if contents and not contents.endswith("\n"):
+                contents += "\n"
+            out.write(contents)
 
+    atomic_write_text(f"{run_data.output_dir}/SCG-hit-counts.tsv", _write_table)
 
-def write_out_SCG_hit_seqs(genome_id, run_data):
-    input_fasta = f"{run_data.hmm_results_dir}/{genome_id}/SCG-hits{run_data.general_ext}"
-    out_dir = f"{run_data.found_SCG_seqs_dir}"
-    remaining_SCG_targets = [SCG_target.id for SCG_target in run_data.get_all_SCG_targets_remaining()]
-    output_paths = {target_SCG: f"{out_dir}/{target_SCG}{run_data.general_ext}" for target_SCG in remaining_SCG_targets}
+    ext = run_data.general_ext
+    out_paths = {t: f"{run_data.found_SCG_seqs_dir}/{t}{ext}" for t in target_SCG_ids}
 
-    output_handles = {target: open(path, "a") for target, path in output_paths.items()}
+    with contextlib.ExitStack() as stack:
+        handles = {
+            target: stack.enter_context(open(f"{path}.part", "w"))
+            for target, path in out_paths.items()
+        }
+        for gd in genomes:
+            hits_path = f"{run_data.hmm_results_dir}/{gd.id}/SCG-hits{ext}"
+            if not os.path.isfile(hits_path):
+                continue
+            with open(hits_path) as infile:
+                for record in SeqIO.parse(infile, "fasta"):
+                    handle = handles.get(record.id)
+                    if handle is not None:
+                        handle.write(f">{gd.id}\n{record.seq}\n")
 
-    with open(input_fasta, "r") as infile:
-        for record in SeqIO.parse(infile, "fasta"):
-            target = record.id
-            if target in output_handles:
-                output_handles[target].write(f">{genome_id}\n{record.seq}\n")
+    for path in out_paths.values():
+        os.replace(f"{path}.part", path)
 
-    for handle in output_handles.values():
-        handle.close()
+    return run_data
 
 
 def capture_hmm_search_failures(run_data):

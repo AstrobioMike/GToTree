@@ -131,8 +131,7 @@ def get_slim_gtdb_tab(location):
 
         _download_version_file(version_path)
 
-    except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError,
-            ValueError, OSError) as err:
+    except (urllib.error.URLError, TimeoutError, ConnectionError, ValueError, OSError) as err:
         for p in (table_path, version_path):
             if os.path.exists(p):
                 try:

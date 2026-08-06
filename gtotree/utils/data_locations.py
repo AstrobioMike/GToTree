@@ -38,7 +38,7 @@ def check_and_report_env_variables():
 
     print("\t  {:<38} {:>10}".format("\033[4mvariable\033[0m", "\033[4mpath\033[0m"))
     for variable in ENV_VARIABLES:
-        print("\t  {:<30} {:>10}".format(variable, paths[variable]))
+        print(f"\t  {variable:<30} {paths[variable]:>10}")
     print()
 
     for variable, writable in writable_dict.items():
@@ -107,8 +107,8 @@ def set_variable_path(variable, curr_path):
             if not os.path.isdir(new_path):
                 try:
                     os.makedirs(new_path)
-                except Exception:
-                    raise PathNotWritable
+                except Exception as e:
+                    raise PathNotWritable from e
 
             if not os.access(new_path, os.W_OK):
                 raise PathNotWritable

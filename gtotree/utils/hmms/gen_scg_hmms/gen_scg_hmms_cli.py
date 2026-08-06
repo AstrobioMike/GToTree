@@ -89,7 +89,7 @@ def build_parser(parent_subparsers=None):
     else:
         parser = argparse.ArgumentParser(
             description=desc,
-            epilog="Ex. usage: `gtt gen-scg-hmms -W Nitrospirota --derep-rank genus`",
+            epilog="Ex. usage: `gtt gen-scg-hmms -w Nitrospirota --derep-rank genus`",
             formatter_class=CustomRichHelpFormatter,
             add_help=False,
         )
@@ -129,7 +129,7 @@ def build_parser(parent_subparsers=None):
     )
 
     required.add_argument(
-        "-W", "--wanted-ref-tax",
+        "-w", "--wanted-ref-tax",
         metavar="<STR>",
         help=("A target taxon whose reference genomes should be used (e.g. "
               "'Nitrospirota')."),
@@ -273,7 +273,7 @@ def check_args(args):
         raise GenSCGHMMsError(
             "We need some target genomes to work with! Provide any combination of an "
             "accessions file (`-a`), GenBank files (`-g`), fasta files (`-f`), "
-            "amino-acid files (`-A`), and/or a target taxon (`-W`).")
+            "amino-acid files (`-A`), and/or a target taxon (`-w`).")
 
     if not 0 < args.percent_single_copy <= 100:
         raise GenSCGHMMsError(
@@ -345,7 +345,7 @@ def setup_output_dir(args):
 
 def phase_resolve_genomes(args):
     """
-    Resolve the target genomes from `-a` and/or `-W`.
+    Resolve the target genomes from `-a` and/or `-w`.
 
     Returns (accessions, sources) where `sources` maps accession -> where it came
     from, for the target-genomes table.
@@ -649,7 +649,7 @@ def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_versio
           f"built from {color_text(f'{num_genomes:,}', 'green')} genome(s),")
     print(f"      written to:\n        {color_text(final_hmm_path, 'green')}\n")
 
-    print(f"      Supporting tables written to:")
+    print("      Supporting tables written to:")
     print(f"        {color_text(out_dir + '/', 'green')}\n")
 
     if missed_path:

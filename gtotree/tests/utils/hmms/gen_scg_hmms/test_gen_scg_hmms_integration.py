@@ -1,7 +1,5 @@
 import argparse
 import io
-import os
-import pytest # type: ignore
 
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
                                                                  count_single_copy_hits,

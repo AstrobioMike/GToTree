@@ -460,7 +460,7 @@ def report_unique_taxa_counts_of_all_ranks(table_path, source="refseq", reps_onl
     print("\n    {:<10} {:}".format("Rank", f"Num. Unique Taxa ({label})"))
     for rank in ranks:
         n = pc.count_distinct(tab.column(rank)).as_py()
-        print("    {:<10} {:}".format(rank, str(n)))
+        print(f"    {rank:<10} {str(n)}")
     print("")
 
     if reps_only:
@@ -471,7 +471,7 @@ def report_unique_taxa_counts_of_all_ranks(table_path, source="refseq", reps_onl
         print("    {:<10} {:}".format("Rank", "Num. Unique Ref. Taxa"))
         for rank in ranks:
             n = pc.count_distinct(rep.column(rank)).as_py()
-            print("    {:<10} {:}".format(rank, str(n)))
+            print(f"    {rank:<10} {str(n)}")
         print("")
 
 

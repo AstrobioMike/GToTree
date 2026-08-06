@@ -95,8 +95,10 @@ def test_taxon_refseq_derep_off(in_ncbi):
 
 def test_source_scoping_precedes_derep(in_ncbi):
     """
-    The regression this whole fix is about: --source refseq + derep must keep one GCF
-    genome per family, NOT drop FamB because its best 'both'-pool genome was the GCA.
+    Source scoping applies before dereplication: with --source refseq, each family's
+    representative is picked from the RefSeq pool only. Otherwise a family whose overall
+    best genome is a GCA would be dropped entirely rather than represented by its best
+    GCF.
     """
     _run(_args(target_taxon="Testophyla", source="refseq", derep_rank="family"))
     accs = _read_accs("ncbi-testophyla-phylum-refseq-accs.txt")

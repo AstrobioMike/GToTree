@@ -4,7 +4,7 @@ Phase timing and peak-memory instrumentation
 This is deliberately *not* exposed as a CLI flag, it's enabled by setting the
 environment variable `GTT_DEBUG_TIMING` to a truthy value, e.g.:
 
-    GTT_DEBUG_TIMING=1 gtt gen-scg-hmms -W nitrospirota ...
+    GTT_DEBUG_TIMING=1 gtt gen-scg-hmms -w nitrospirota ...
 
 At initial writin git's just for gen-scg-hmms, but i'm putting it here and trying
 to make it somewhat generic in case it's helpful elsewhere at some point

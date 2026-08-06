@@ -1,3 +1,8 @@
+"""
+Per-source genome preprocessing: turn each kind of input into a filtered, renamed
+amino-acid FASTA (plus nucleotides in nucleotide mode).
+"""
+
 import pandas as pd # type: ignore
 import urllib.request
 import urllib.error
@@ -7,31 +12,22 @@ import os
 import time
 import random
 import subprocess
-from gtotree.utils.messaging import (report_early_exit,
-                                     report_processing_stage,
-                                     report_ncbi_update,
-                                     report_genbank_update,
-                                     report_fasta_update,
-                                     report_AA_update,
-                                     report_genome_preprocessing_update)
-from gtotree.utils.ncbi.parse_ncbi_assembly_summary import parse_assembly_summary
-from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_summary_tab
+import threading
 from gtotree.utils.seqs import (filter_and_rename_fasta,
                                 extract_filter_and_rename_cds_amino_acids_from_gb,
                                 extract_fasta_from_gb)
-from gtotree.utils.general import (write_run_data,
-                                   gunzip_if_needed,
-                                   run_pooled_stage)
+from gtotree.utils.general import (gunzip_if_needed,
+                                   remove_file_if_exists)
 
-# capping concurrent NCBI download threads regardless of --num-jobs
+# Concurrent NCBI downloads are capped for politeness toward NCBI, NOT because of
+# local resources. Capping the whole pool at this number would also throttle the
+# CPU-bound following work to 20-wide no matter what `-j` said. So the cap is applied as a
+# semaphore around the download call alone, the pool itself runs at --num-jobs
 MAX_NCBI_DOWNLOAD_THREADS = 20
+_NCBI_DOWNLOAD_SEMAPHORE = threading.Semaphore(MAX_NCBI_DOWNLOAD_THREADS)
 NCBI_DOWNLOAD_MAX_RETRIES = 10
 
-# Retry/backoff policy, mirroring bit's dl-ncbi-assemblies.
-#
-# HTTP statuses that mean we're specifically being rate-limited, as opposed to a plain
-# server hiccup. These get true exponential backoff; everything else transient gets the
-# sawtooth below.
+# Retry/backoff policy, mirroring bit's dl-ncbi-assemblies
 NCBI_THROTTLE_STATUS = {429}
 
 # ceiling on any single retry sleep (seconds), applied to the throttled path
@@ -40,55 +36,11 @@ NCBI_MAX_BACKOFF = 30
 # separate, larger ceiling for a server-specified Retry-After
 NCBI_MAX_RETRY_AFTER = 300
 
+# Socket timeout for a single accession download, in seconds
+NCBI_DOWNLOAD_TIMEOUT = 60
+
 # length of the non-throttled sawtooth cycle, e.g., with 5 set here: 1, 2, 4, 8, 16, then start over
 NCBI_SAWTOOTH_CYCLE = 5
-
-
-def preprocess_genomes(args, run_data):
-
-    run_data = preprocess_ncbi_genomes(args, run_data)
-    run_data = preprocess_genbank_genomes(args, run_data)
-    run_data = preprocess_fasta_genomes(args, run_data)
-    run_data = preprocess_amino_acid_files(args, run_data)
-
-    genome_preprocessing_update(run_data)
-
-    return run_data
-
-
-def preprocess_ncbi_genomes(args, run_data):
-
-    if run_data.ncbi_accs:
-
-        report_processing_stage("ncbi", run_data)
-
-        run_data = parse_assembly_summary(get_ncbi_assembly_summary_tab(), run_data)
-
-        accs_to_process = run_data.get_ncbi_accs_for_preprocessing()
-
-        if len(accs_to_process) > 0:
-            run_data = download_and_preprocess_ncbi_accessions(accs_to_process, args, run_data)
-            run_data = capture_ncbi_failed_downloads(run_data)
-
-        report_ncbi_update(run_data)
-
-    return run_data
-
-
-def download_and_preprocess_ncbi_accessions(accs_to_process, args, run_data):
-
-    base_link_map = build_base_link_map(run_data)
-
-    # base_link_map is built once up front and shared read-only across workers, so it's
-    # closed over here rather than rebuilt per accession
-    def worker(acc_gd, rd):
-        return _process_one_ncbi_accession(acc_gd, rd, base_link_map)
-
-    return run_pooled_stage(accs_to_process,
-                            worker,
-                            _apply_ncbi_accession_status,
-                            args, run_data,
-                            max_workers_cap=MAX_NCBI_DOWNLOAD_THREADS)
 
 
 def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
@@ -99,7 +51,10 @@ def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
     _apply_ncbi_accession_status.
     """
     try:
-        done, nt = prepare_accession(acc_gd.id, run_data, base_link_map=base_link_map)
+        # politeness cap toward NCBI, held only for the network work so the search
+        # steps that follow aren't throttled by it (see _NCBI_DOWNLOAD_SEMAPHORE)
+        with _NCBI_DOWNLOAD_SEMAPHORE:
+            done, nt = prepare_accession(acc_gd.id, run_data, base_link_map=base_link_map)
         downloaded = bool(done)
 
         if done and nt:
@@ -170,8 +125,7 @@ def prepare_accession(acc, run_data, base_link_map=None):
     base_link, acc_assembly_str = get_base_link(acc, run_data, base_link_map=base_link_map)
 
     # an unresolvable download directory (no ftp_path and nothing to rebuild
-    # from) comes through as "na" -> there's nothing to download, fail cleanly
-    # rather than building a bogus URL.
+    # from) comes through as "na" -> there's nothing to download
     if not base_link or base_link.lower() == "na":
         return False, False
 
@@ -201,15 +155,6 @@ def prepare_accession(acc, run_data, base_link_map=None):
 
 
 def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_RETRIES):
-    # Atomic write: fetch to a temp gzip and unzip into a `.part` temp alongside
-    # the destination, then os.replace() into place only on a fully successful
-    # unzip. An interrupted download or a truncated/corrupt gzip (process kill,
-    # `-R` interrupted mid-run, disk full) therefore never leaves a truncated
-    # file at `filepath` that a later os.path.isfile() / resume check would
-    # mistake for a complete genome. Both temps are cleaned up on any failure.
-    # The function still raises on final failure, which prepare_accession relies
-    # on to fall back from amino-acid to nucleotide downloads.
-    #
     # Transient failures (network blips, truncated/corrupt gzip, transient HTTP
     # 429/5xx) are retried, with the backoff policy chosen by why the attempt failed:
     # an explicit throttle (429, or any response carrying Retry-After) gets capped
@@ -231,7 +176,7 @@ def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_R
     throttled = False
     for attempt in range(1, max_retries + 1):
         try:
-            urllib.request.urlretrieve(link, tmp_gzip)
+            _fetch_to_file(link, tmp_gzip)
             with gzip.open(tmp_gzip, 'rb') as f_in, open(tmp_out, 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
             os.replace(tmp_out, filepath)
@@ -264,6 +209,29 @@ def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_R
 
     # exhausted retries -> raise so prepare_accession falls back / marks failure
     raise last_err if last_err is not None else RuntimeError(f"failed to download {link}")
+
+
+def _fetch_to_file(link, dest, timeout=None):
+    """
+    Stream `link` to `dest` with a socket timeout
+
+    `urlopen(..., timeout=)` bounds the connect and every individual read, so a stalled
+    server raises (and gets retried by the caller's backoff loop) rather than hanging.
+    Note this is a per-operation timeout, not a total-transfer deadline: a server
+    trickling bytes slowly will still be waited on, which is what we want, since large
+    genomes over a slow link are legitimate.
+
+    Errors propagate untouched so the caller keeps distinguishing HTTPError (status
+    codes, Retry-After) from generic transport failures.
+    """
+    # resolved at call time, not bound as a default, so the module constant stays the
+    # single source of truth (and remains patchable)
+    if timeout is None:
+        timeout = NCBI_DOWNLOAD_TIMEOUT
+
+    req = urllib.request.Request(link, headers={"User-Agent": "curl/8.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp, open(dest, "wb") as out:
+        shutil.copyfileobj(resp, out, length=1024 * 256)
 
 
 def _sleep_backoff(attempt, err=None, throttled=False):
@@ -341,7 +309,7 @@ def _is_throttle(err):
 def build_base_link_map(run_data):
     df = pd.read_csv(run_data.tmp_dir + "/ncbi-accessions-info.tsv", sep="\t",
                      usecols=["input_accession", "http_base_link"])
-    return dict(zip(df["input_accession"], df["http_base_link"]))
+    return dict(zip(df["input_accession"], df["http_base_link"], strict=True))
 
 
 def _normalize_base_link(raw_base_link):
@@ -361,26 +329,6 @@ def capture_ncbi_failed_downloads(run_data):
         with open(run_data.run_files_dir + "/ncbi-accessions-not-downloaded.txt", "w") as not_downloaded_file:
             for acc in run_data.get_ncbi_accs_not_downloaded():
                 not_downloaded_file.write(acc + "\n")
-    return run_data
-
-
-def preprocess_genbank_genomes(args, run_data):
-    if args.genbank_files:
-
-        report_processing_stage("genbank", run_data)
-
-        gbs_to_process = [gd for gd in run_data.genbank_files if not gd.preprocessing_done and not gd.removed]
-
-        if len(gbs_to_process) > 0:
-            run_data = run_pooled_stage(gbs_to_process,
-                                        _process_one_genbank_file,
-                                        _apply_genbank_status,
-                                        args, run_data)
-            write_run_data(run_data)
-            capture_failed_genbank_files(run_data)
-
-        report_genbank_update(run_data)
-
     return run_data
 
 
@@ -461,26 +409,6 @@ def capture_failed_genbank_files(run_data):
                 not_parsed_file.write(entry + "\n")
 
 
-def preprocess_fasta_genomes(args, run_data):
-    if args.fasta_files:
-
-        report_processing_stage("fasta", run_data)
-
-        fastas_to_process = [fd for fd in run_data.fasta_files if not fd.preprocessing_done and not fd.removed]
-
-        if len(fastas_to_process) > 0:
-            run_data = run_pooled_stage(fastas_to_process,
-                                        _process_one_fasta_file,
-                                        _apply_fasta_status,
-                                        args, run_data)
-            write_run_data(run_data)
-            capture_failed_fasta_files(run_data)
-
-        report_fasta_update(run_data)
-
-    return run_data
-
-
 def _process_one_fasta_file(fasta, run_data):
     """
     Worker: preprocess one nucleotide FASTA -- call genes with prodigal, then
@@ -549,26 +477,6 @@ def capture_failed_fasta_files(run_data):
                 failed_fastas_file.write(entry + "\n")
 
 
-def preprocess_amino_acid_files(args, run_data):
-    if args.amino_acid_files:
-
-        report_processing_stage("amino-acid", run_data)
-
-        AAs_to_process = [fd for fd in run_data.amino_acid_files if not fd.preprocessing_done and not fd.removed]
-
-        if len(AAs_to_process) > 0:
-            run_data = run_pooled_stage(AAs_to_process,
-                                        _process_one_amino_acid_file,
-                                        _apply_amino_acid_status,
-                                        args, run_data)
-            write_run_data(run_data)
-            capture_failed_amino_acid_files(run_data)
-
-        report_AA_update(run_data)
-
-    return run_data
-
-
 def _process_one_amino_acid_file(AA, run_data):
     """
     Worker: preprocess one amino-acid FASTA -- just filter/rename (no gene calling).
@@ -625,13 +533,10 @@ def capture_failed_amino_acid_files(run_data):
                 failed_amino_acids_file.write(entry + "\n")
 
 
-def genome_preprocessing_update(run_data):
-    report_processing_stage("preprocessing-update", run_data)
-    run_data.update_all_input_genomes()
-    report_genome_preprocessing_update(run_data)
-
-
 def run_prodigal(id, run_data, full_inpath = None, group = None):
+    """
+    Call genes with prodigal and strip the trailing '*' stop characters
+    """
     allowed_groups = ["ncbi", "fasta", "genbank"]
     if group not in allowed_groups:
         raise ValueError(f"Invalid group: {group}. Must be one of {', '.join(allowed_groups)}")
@@ -644,42 +549,71 @@ def run_prodigal(id, run_data, full_inpath = None, group = None):
         in_path = f"{run_data.genbank_processing_dir}/{id}.fasta"
         out_AA_path = f"{run_data.genbank_processing_dir}/{id}_protein.faa"
         out_nt_path = f"{run_data.genbank_processing_dir}/{id}_cds.fasta"
-    elif group == "fasta":
+    else:  # fasta
         in_path = full_inpath
         out_AA_path = f"{run_data.fasta_processing_dir}/{id}_protein.faa"
         out_nt_path = f"{run_data.fasta_processing_dir}/{id}_cds.fasta"
-    else:
-        report_early_exit(run_data, message = f"    Prodigal not yet implemented for \"{group}\".")
+
+    tmp_AA = f"{out_AA_path}.tmp"
+    tmp_nt = f"{out_nt_path}.tmp"
 
     prodigal_cmd = [
-        "prodigal",
-        "-c",
-        "-q",
-        "-i", f"{in_path}",
-        "-a", f"{out_AA_path}.tmp",
-        "-d", f"{out_nt_path}.tmp"
+        "prodigal", "-c", "-q",
+        "-i", in_path,
+        "-a", tmp_AA,
+        "-d", tmp_nt,
     ]
 
-    remove_AA_ast_cmd = f"tr -d '*' < {out_AA_path}.tmp > {out_AA_path}"
-    remove_nt_ast_cmd = f"tr -d '*' < {out_nt_path}.tmp > {out_nt_path}"
-
+    done = False
     try:
-        subprocess.run(prodigal_cmd, stdout=subprocess.DEVNULL)
-        subprocess.run(remove_AA_ast_cmd, shell=True)
+        subprocess.run(prodigal_cmd,
+                       stdout=subprocess.DEVNULL,
+                       stderr=subprocess.PIPE,
+                       check=True)
+
+        _strip_stop_chars(tmp_AA, out_AA_path)
         if run_data.nucleotide_mode:
-            subprocess.run(remove_nt_ast_cmd, shell=True)
-        os.remove(f"{out_AA_path}.tmp")
-        os.remove(f"{out_nt_path}.tmp")
+            _strip_stop_chars(tmp_nt, out_nt_path)
         done = True
-    except:
-        done = False
+
+    except subprocess.CalledProcessError as e:
+        stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
+        print(f"[prodigal failed for {id}] exit {e.returncode}: {stderr.strip()}")
+    except (OSError, ValueError):
+        # binary missing, unreadable input, or a failed strip/replace
+        pass
+    finally:
+        for tmp in (tmp_AA, tmp_nt):
+            remove_file_if_exists(tmp)
 
     # be defensive: if the output file doesn't exist or is empty, mark as not done
     if not os.path.exists(out_AA_path):
         done = False
-    else:
-        if os.path.getsize(out_AA_path) == 0:
-            os.remove(out_AA_path)
-            done = False
+    elif os.path.getsize(out_AA_path) == 0:
+        os.remove(out_AA_path)
+        done = False
 
     return done
+
+
+def _strip_stop_chars(src, dest):
+    """
+    Copy `src` to `dest` with '*' characters removed, atomically.
+
+    Streams in chunks rather than reading the whole proteome into memory, and writes
+    via `.part` + os.replace() so `dest` never exists in a partial state.
+    """
+    tmp = f"{dest}.part"
+    try:
+        with open(src, "r") as in_f, open(tmp, "w") as out_f:
+            while True:
+                chunk = in_f.read(1024 * 256)
+                if not chunk:
+                    break
+                out_f.write(chunk.replace("*", ""))
+            out_f.flush()
+            os.fsync(out_f.fileno())
+        os.replace(tmp, dest)
+    except BaseException:
+        remove_file_if_exists(tmp)
+        raise

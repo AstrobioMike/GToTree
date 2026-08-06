@@ -2,7 +2,8 @@ import os
 import sys
 from gtotree.utils.messaging import wprint, color_text, report_message, report_early_exit
 import pandas as pd # type: ignore
-from gtotree.utils.general import download_with_tqdm, SCGset
+from gtotree.utils.general import download_with_tqdm, SCGset, decode_pyhmmer_text
+from gtotree.utils.hmms.hmm_searching_engine import profiles_missing_gathering_cutoffs
 import pyhmmer #type: ignore
 
 
@@ -26,10 +27,49 @@ def check_hmm_file(args, run_data):
         # getting hmm from prepackaged table
         run_data.hmm_path = get_hmm_path(hmm_file, args.hmm)
 
+    check_gathering_cutoffs(run_data.hmm_path, hmm_arg)
+
     initial_SCG_targets = get_SCG_hmm_targets(run_data.hmm_path)
     run_data.SCG_targets = [SCGset.from_id(target) for target in initial_SCG_targets]
 
     return run_data
+
+
+def check_gathering_cutoffs(hmm_path, hmm_arg):
+    """
+    Fail early if any profile lacks a gathering (GA) threshold.
+
+    Searching uses gathering thresholds (the `--cut_ga` equivalent), so a profile
+    without one can't be searched. This was already true of the old subprocess
+    `hmmsearch --cut_ga`, but it surfaced as every single genome failing its search with
+    no explanation. Checking here means a user who built their own HMM without `GA`
+    lines is told once, up front, before anything is downloaded or searched.
+
+    Deliberately not falling back to an E-value cutoff: that would silently change which
+    genes are called, which is a scientific difference, not an implementation detail.
+    """
+    try:
+        missing = profiles_missing_gathering_cutoffs(hmm_path)
+    except Exception:
+        # unreadable HMM is reported elsewhere; don't mask it with a cutoffs message
+        return
+
+    if not missing:
+        return
+
+    shown = ", ".join(missing[:5])
+    if len(missing) > 5:
+        shown += f", ... ({len(missing)} total)"
+
+    report_message(
+        f'The HMM file for "{hmm_arg}" has {len(missing)} profile(s) with no gathering '
+        f"(GA) threshold: {shown}.", "red")
+    report_message(
+        "GToTree identifies target genes using each profile's gathering threshold, so "
+        "every profile needs a `GA` line. If you built this HMM yourself, you can add "
+        "gathering thresholds with `hmmbuild --cut_ga` inputs or by editing the `GA` "
+        "lines in directly.")
+    report_early_exit(None, copy_log=False)
 
 
 def get_hmm_path(hmm_file, hmm_arg):
@@ -87,5 +127,5 @@ def get_target_hmm_url(hmm_file, hmm_arg):
 def get_SCG_hmm_targets(hmm_path):
     with pyhmmer.plan7.HMMFile(hmm_path) as hmm_file:
         hmms = list(hmm_file)
-    SCG_targets = [hmm.name.decode() for hmm in hmms]
+    SCG_targets = [decode_pyhmmer_text(hmm.name) for hmm in hmms]
     return SCG_targets

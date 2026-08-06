@@ -1,8 +1,7 @@
 import argparse
 import sys
 from gtotree.cli.helpmenu import helpmenu
-from gtotree.utils.messaging import gtotree_header, get_version
-from gtotree.utils.preflight_checks import check_for_essential_deps
+from gtotree.utils.messaging import get_version
 
 class CustomHelpAction(argparse.Action):
     def __init__(self, option_strings, dest=argparse.SUPPRESS,
@@ -46,7 +45,7 @@ def parser():
     opt.add_argument("-m", "--mapping-file", metavar="<file>", type=str)
 
     # --- Adding Reference Genomes by Taxonomy ---
-    opt.add_argument("-W", "--wanted-ref-tax", metavar="<str>", type=str, default=None)
+    opt.add_argument("-w", "--wanted-ref-tax", metavar="<str>", type=str, default=None)
     opt.add_argument("--target-rank", metavar="<str>", type=str, default=None)
     opt.add_argument("--derep-rank", metavar="<str>", type=str, default="auto")
     opt.add_argument("-S", "--source", metavar="<str>", type=str,
