@@ -4,15 +4,22 @@
 
 ### TO DO STILL ###
 
-    # gtt gen-scg-hmms may still need some formatting tweaks if i'm feeling neurotic
-
-    # do i still use/need the run_data object? maybe i don't need the reading/writing anymore?
-
     # build in/port over these from v1 (or make new) as subcommands under gtt
         # gtt-pfam-search -> gtt search-pfams (should take all input types that gtotree can take, including --wanted-ref-tax)
             # set up spinner and progress bars similar to main gtotree run at this task
         # gtt-ko-search -> gtt search-kos (totally new one; should take all input types that gtotree can take, including --wanted-ref-tax))
             # set up spinner and progress bars similar to main gtotree run at this task
+
+        ## in progress, the downloads seem to be struggling
+
+    # do i still use/need the run_data object? maybe i don't need the reading/writing anymore?
+
+    # run the following with all 4 input types and make sure all messages make sense
+        # main gtotree
+        # gtt search-pfams
+        # gtt search-kos
+        # gtt gen-scg-hmms
+
 
     # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can auto-pick based on the --wanted-ref-tax for them
         # find lowest rank in the associated taxonomy that has a pre-built SCG-set and use that one
@@ -33,20 +40,17 @@
         # gtt-gen-SCG-HMMs has been updated a bit (v1.8.17)
         # check for others via all commits since they split... ... ... (yes, that's worth 3 ellipses)
 
-    # figure out all helper scripts that are no longer needed and remove them
-
     # modularize and reduce code redundancy in any of my helper scripts still remaining
+        # figure out all helper scripts that are no longer needed and remove them
 
     # when 0 accessions are found/make it through, at that stage summary the message is like "0 of total found...", it should probably explicitly check and say None
         # this is probably the case for all input-processing stages
-
-    # fix entry points/console scripts as needed in pyproject.toml
 
     # add FAQ page about differences between GToTree v1 and v2
 
     # create new SCG-sets for all main phyla (and proteos/pseudomonadota) of gtdb (and archaea/bacteria)
         # continue hosting them as github assets
-        # make an organized output for gtt-hmms that breaks done by domain for easier reading and selection
+        # make an organized output for gtt-hmms that breaks down by domain for easier reading and selection
 
     # if it's a re-run, and a genome was dropped later due to, e.g., not enough hit targets, the preprocessing summary is misleading as it says the genome was dropped earlier
 
@@ -61,6 +65,8 @@
 
     # sync the CHANGELOG.md with the latest in the master gtotree v1 branch
         # including needed updates that were done in the v1 branch that were not in the v2 branch :(
+
+    # gtt gen-scg-hmms may still need some formatting tweaks if i'm feeling neurotic
 
 
 ### other things to do prior to final launch ###

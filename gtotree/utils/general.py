@@ -440,7 +440,9 @@ class RunData:
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
-    args_hash: str = ""
+    # dict of the run parameters that affect what this run produces; compared on -R
+    # to decide whether resuming is safe. See preflight_checks.build_fingerprint
+    fingerprint: dict = field(default_factory=dict)
 
     @property
     def num_incomplete_genbank_files(self) -> int:

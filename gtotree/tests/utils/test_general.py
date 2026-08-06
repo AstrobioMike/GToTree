@@ -394,14 +394,14 @@ class TestRunDataPersistence:
         rd.run_data_path = str(tmp_path / "run-data.json")
         rd.ncbi_accs = [general.GenomeData.from_acc("GCF_000000001.1")]
         rd.update_all_input_genomes()
-        rd.args_hash = "deadbeef"
+        rd.fingerprint = {"hmm": "deadbeef"}
         return rd
 
     def test_round_trips(self, tmp_path):
         rd = self._run_data(tmp_path)
         general.write_run_data(rd)
         back = general.read_run_data(rd.run_data_path)
-        assert back.args_hash == "deadbeef"
+        assert back.fingerprint == {"hmm": "deadbeef"}
         assert [g.id for g in back.ncbi_accs] == ["GCF_000000001.1"]
 
     def test_reading_a_missing_file_returns_none(self, tmp_path):
@@ -424,13 +424,13 @@ class TestRunDataPersistence:
             raise RuntimeError("interrupted mid-dump")
 
         monkeypatch.setattr(general.json, "dump", exploding_dump)
-        rd.args_hash = "bad"
+        rd.fingerprint = {"hmm": "bad"}
         with pytest.raises(RuntimeError):
             general.write_run_data(rd)
         monkeypatch.undo()
 
         assert not (tmp_path / "run-data.json.part").exists()
-        assert general.read_run_data(rd.run_data_path).args_hash == "deadbeef"
+        assert general.read_run_data(rd.run_data_path).fingerprint == {"hmm": "deadbeef"}
 
 
 @pytest.mark.parametrize("value,expected", [

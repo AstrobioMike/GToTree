@@ -150,3 +150,110 @@ def test_nucleotide_mode_yields_nucleotide_hits_and_drops_both_files(
         assert len(seq) % 3 == 0
 
     assert os.listdir(run_data.ready_genome_files_dir) == []
+
+
+################################################################################
+# do_scg gating
+################################################################################
+
+"""
+`SearchPlan.do_scg` exists so `gtt search-pfams` / `gtt search-kos` can reuse this
+module's fused preprocess-then-search worker without an SCG set or a tree. It defaults
+to True, so the main pipeline never opts in -- which is exactly why it needs testing
+from this side too: a regression that ignored the flag would leave the subcommands
+trying to press and search `run_data.hmm_path`, which they never set.
+"""
+
+
+def test_search_plan_defaults_to_doing_the_scg_search():
+    """The main driver must never have to opt in."""
+    assert _plan().do_scg is True
+
+
+def test_do_scg_false_is_carried_on_the_plan():
+    plan = SearchPlan(do_pfam=True, do_ko=False, keep_genome_files=False, do_scg=False)
+    assert plan.do_scg is False
+    assert plan.do_pfam is True
+
+
+def test_genome_is_fully_processed_ignores_the_hmm_search_when_do_scg_is_off():
+    """
+    The gate that decides whether a genome still needs work. With do_scg off, a
+    preprocessed-and-pfam-searched genome is done; if the flag were ignored here, every
+    genome would be re-processed on every run because hmm_search_done never becomes
+    True.
+    """
+    from gtotree.main_stages.processing_genomes import genome_is_fully_processed
+
+    gd = _genome("g1", preprocessing_done=True, pfam_search_done=True)
+
+    scg_plan = SearchPlan(do_pfam=True, do_ko=False, keep_genome_files=False)
+    no_scg_plan = SearchPlan(do_pfam=True, do_ko=False, keep_genome_files=False,
+                             do_scg=False)
+
+    assert genome_is_fully_processed(gd, scg_plan) is False
+    assert genome_is_fully_processed(gd, no_scg_plan) is True
+
+
+def test_genomes_needing_processing_respects_do_scg():
+    no_scg_plan = SearchPlan(do_pfam=True, do_ko=False, keep_genome_files=False,
+                             do_scg=False)
+
+    done = _genome("done", preprocessing_done=True, pfam_search_done=True)
+    needs_search = _genome("needs", preprocessing_done=True, pfam_search_done=False)
+
+    remaining = genomes_needing_processing([done, needs_search], no_scg_plan)
+    assert [gd.id for gd in remaining] == ["needs"]
+
+
+def test_run_searches_skips_the_hmm_worker_when_do_scg_is_off(monkeypatch):
+    """
+    The load-bearing assertion: with do_scg off the SCG worker must not be called at
+    all. Calling it would fail on the unset hmm_path rather than no-op, so this is the
+    difference between the subcommands working and crashing.
+    """
+    from gtotree.main_stages import processing_genomes as pg
+
+    called = []
+
+    monkeypatch.setattr(pg, "_hmm_search_worker",
+                        lambda *a, **kw: called.append("hmm") or {})
+    monkeypatch.setattr(pg, "_pfam_search_worker",
+                        lambda *a, **kw: called.append("pfam") or {})
+
+    plan = SearchPlan(do_pfam=True, do_ko=False, keep_genome_files=False, do_scg=False)
+    status = {"final_AA_path": "/tmp/x.faa", "final_nt_path": None}
+
+    results = pg._run_searches(_genome("g1"), object(), plan, status)
+
+    assert called == ["pfam"]
+    assert "hmm" not in results
+
+
+def test_run_searches_still_runs_the_hmm_worker_by_default(monkeypatch):
+    """The other direction, so the gate can't be left permanently off."""
+    from gtotree.main_stages import processing_genomes as pg
+
+    called = []
+    monkeypatch.setattr(pg, "_hmm_search_worker",
+                        lambda *a, **kw: called.append("hmm") or {})
+
+    plan = SearchPlan(do_pfam=False, do_ko=False, keep_genome_files=False)
+    status = {"final_AA_path": "/tmp/x.faa", "final_nt_path": None}
+
+    pg._run_searches(_genome("g1"), object(), plan, status)
+    assert called == ["hmm"]
+
+
+def test_apply_searches_skips_the_hmm_result_when_do_scg_is_off(monkeypatch):
+    from gtotree.main_stages import processing_genomes as pg
+
+    called = []
+    monkeypatch.setattr(pg, "_apply_hmm_search_result",
+                        lambda *a, **kw: called.append("hmm"))
+
+    plan = SearchPlan(do_pfam=False, do_ko=False, keep_genome_files=False, do_scg=False)
+    # a stale "hmm" key must be ignored rather than applied
+    pg._apply_searches(_genome("g1"), {"hmm": {}}, object(), plan)
+
+    assert called == []

@@ -9,6 +9,8 @@ SUBCOMMAND_MAP = {
     "get-accs-from-ncbi":  "gtotree.utils.ncbi.get_accessions_from_ncbi",
     "hmms":                "gtotree.utils.hmms.gtt_hmms",
     "gen-scg-hmms":        "gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli",
+    "search-kos":          "gtotree.utils.ko.search_kos_cli",
+    "search-pfams":        "gtotree.utils.pfam.search_pfams_cli",
     "midpoint-root-tree":  "gtotree.utils.helper_scripts.gtt_midpoint_root_tree",
     "data":                "gtotree.cli.data",
     "test":                "gtotree.tests.smoke",
@@ -43,6 +45,19 @@ PROGRAM_GROUPS = [
         ],
     },
     {
+        "title": "Function searching",
+        "programs": [
+            {
+                "name": "search-kos",
+                "desc": "search input genomes for a set of target KOs",
+            },
+            {
+                "name": "search-pfams",
+                "desc": "search input genomes for a set of target Pfams",
+            },
+        ],
+    },
+    {
         "title": "Misc",
         "programs": [
             {
@@ -52,7 +67,7 @@ PROGRAM_GROUPS = [
         ],
     },
     {
-        "title": "GToTree-data management",
+        "title": "GToTree data management",
         "programs": [
             {
                 "name": "data",

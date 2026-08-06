@@ -40,7 +40,7 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
     read_hmm_accessions,
     write_filtered_pfam_hmms,
 )
-from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_resume as resume
+from gtotree.utils.resume_state import ResumeProfile, hash_strings, hash_local_genomes, STATE_VERSION
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (TargetGenomeError,
                                                                   read_accessions_file,
                                                                   resolve_download_info,
@@ -64,6 +64,66 @@ DEFAULT_THREADS = 8
 
 # low number of genomes message threshold
 FEW_GENOMES_THRESHOLD = 10
+
+
+################################################################################
+# resume
+################################################################################
+
+# stage names, in pipeline order
+STAGE_GENOMES = "genomes"
+STAGE_PFAMS = "pfams"
+STAGE_SEARCH = "search"
+
+STAGE_ORDER = [STAGE_GENOMES, STAGE_PFAMS, STAGE_SEARCH]
+
+RESUME = ResumeProfile(
+    name="gen-scg-hmms",
+    stages=STAGE_ORDER,
+    field_labels={
+        "state_version": "the run-state format",
+        "accessions_sha256": "the set of target genomes",
+        "local_genomes_sha256": "the local genome files (contents, paths, or set)",
+        "percent_single_copy": "--percent-single-copy",
+        "min_pfam_coverage": "--min-pfam-coverage",
+        "source": "--source",
+        "wanted_ref_tax": "--wanted-ref-tax",
+        "target_rank": "--target-rank",
+        "derep_rank": "--derep-rank",
+        "pfam_version": "the Pfam version",
+    },
+    # the Pfam version isn't resolved until the Pfam stage runs, so a run interrupted
+    # before then legitimately has None stored and shouldn't be refused on that basis
+    deferred_fields=("pfam_version",),
+)
+
+
+def build_fingerprint(accessions, args, pfam_version=None, local_genomes=None):
+    """
+    Everything that affects the final SCG set.
+
+    Deliberately does NOT include `--num-jobs`, `--num-threads`, `--keep-working-dir`,
+    or the output directory name: those change how the run executes, not what it
+    produces, so changing them shouldn't invalidate a resume.
+
+    Local genomes are hashed with size and mtime as well as path, because unlike an
+    NCBI accession a local file's contents can change while its path stays the same,
+    and resuming across that would silently mix old results with new input.
+    """
+    return {
+        "state_version": STATE_VERSION,
+        "accessions_sha256": hash_strings(accessions),
+        "num_accessions": len(set(accessions)),
+        "local_genomes_sha256": hash_local_genomes(local_genomes),
+        "num_local_genomes": len(local_genomes or []),
+        "percent_single_copy": args.percent_single_copy,
+        "min_pfam_coverage": args.min_pfam_coverage,
+        "source": (args.source or "").upper(),
+        "wanted_ref_tax": args.wanted_ref_tax,
+        "target_rank": args.target_rank,
+        "derep_rank": args.derep_rank,
+        "pfam_version": pfam_version,
+    }
 
 
 ################################################################################
@@ -567,7 +627,7 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
 
     # the extraction is a ~2 minute streaming pass over the 2 GB master HMM, so it's
     # well worth reusing when the previous run already produced it
-    if resuming and resume.stage_is_reusable(state, resume.STAGE_PFAMS, work_dir):
+    if resuming and RESUME.is_reusable(state, STAGE_PFAMS, work_dir):
         with spinner("Reusing previously filtered Pfam profiles...",
                      "Reused filtered Pfam profiles"):
             found = read_hmm_accessions(filtered_hmm_path)
@@ -707,7 +767,7 @@ def gen_scg_hmms(args):  # pragma: no cover
     out_dir, work_dir = setup_output_dir(args)
 
     resuming = bool(getattr(args, "resume", False))
-    state = resume.load_state(work_dir) if resuming else None
+    state = RESUME.load(work_dir) if resuming else None
 
     n = _phase_counter()
 
@@ -724,27 +784,23 @@ def gen_scg_hmms(args):  # pragma: no cover
 
     # the fingerprint can only be built once the genome set is known; the Pfam version
     # isn't known until later, so it starts as None and is filled in below
-    fingerprint = resume.build_fingerprint(
+    fingerprint = build_fingerprint(
         accessions, args, pfam_version=None, local_genomes=local_genomes)
 
     if resuming and state:
-        differences = resume.compare_fingerprints(state.get("fingerprint"), fingerprint)
+        differences = RESUME.compare(state.get("fingerprint"), fingerprint)
         if differences:
-            raise GenSCGHMMsError(
-                "`--resume` was specified, but this run doesn't match the previous one "
-                "in that directory:\n        - " + "\n        - ".join(differences) +
-                "\n\n      Resuming would mix results from two different runs. Use a new "
-                "output directory with `-o`, or start over with `-F`.")
+            raise GenSCGHMMsError(RESUME.refusal_message(differences))
         print(f"\n      {color_text('Resuming from the previous run', 'green')}")
     else:
-        state = resume.new_state(fingerprint)
-        resume.save_state(work_dir, state)
+        state = RESUME.new(fingerprint)
+        RESUME.save(work_dir, state)
 
     section(f"Phase {n()}: Getting target-genome amino acids...")
     combined_path = os.path.join(work_dir, "all-target-proteins.faa")
     sidecar = _load_json(work_dir, GENOME_STAGE_SIDECAR) if resuming else None
 
-    if resuming and resume.stage_is_reusable(state, resume.STAGE_GENOMES, work_dir) \
+    if resuming and RESUME.is_reusable(state, STAGE_GENOMES, work_dir) \
             and sidecar:
         kept_ids = sidecar["kept_ids"]
         missed = [tuple(m) for m in sidecar["missed"]]
@@ -764,11 +820,11 @@ def gen_scg_hmms(args):  # pragma: no cover
             "organism_names": organism_names,
             "sources_extra": sources_extra,
         })
-        resume.mark_stage_complete(
-            state, resume.STAGE_GENOMES,
+        RESUME.mark_complete(
+            state, STAGE_GENOMES,
             [combined_path, os.path.join(work_dir, GENOME_STAGE_SIDECAR)],
             work_dir=work_dir)
-        resume.save_state(work_dir, state)
+        RESUME.save(work_dir, state)
 
     section(f"Phase {n()}: Preparing Pfam profiles...")
     filtered_hmm_path, pfam_info, filtered_accs, pfam_version = phase_filter_pfams(
@@ -781,24 +837,24 @@ def gen_scg_hmms(args):  # pragma: no cover
             f"run ({state['fingerprint']['pfam_version']} -> {pfam_version}). Use a new "
             "output directory with `-o`, or start over with `-F`.")
     state.setdefault("fingerprint", {})["pfam_version"] = pfam_version
-    resume.mark_stage_complete(state, resume.STAGE_PFAMS, [filtered_hmm_path],
-                               work_dir=work_dir)
-    resume.save_state(work_dir, state)
+    RESUME.mark_complete(state, STAGE_PFAMS, [filtered_hmm_path],
+                         work_dir=work_dir)
+    RESUME.save(work_dir, state)
 
     section(f"Phase {n()}: Searching genomes with Pfam profiles...")
     cached_hits = _load_json(work_dir, SEARCH_STAGE_SIDECAR) if resuming else None
-    if resuming and resume.stage_is_reusable(state, resume.STAGE_SEARCH, work_dir) \
+    if resuming and RESUME.is_reusable(state, STAGE_SEARCH, work_dir) \
             and cached_hits:
         with spinner("Reusing previous search results...", "Reused previous search results"):
             hits_by_genome = cached_hits
     else:
         hits_by_genome = phase_search(filtered_hmm_path, combined_path, len(kept_ids), args)
         _save_json(work_dir, SEARCH_STAGE_SIDECAR, hits_by_genome)
-        resume.mark_stage_complete(
-            state, resume.STAGE_SEARCH,
+        RESUME.mark_complete(
+            state, STAGE_SEARCH,
             [os.path.join(work_dir, SEARCH_STAGE_SIDECAR)],
             work_dir=work_dir)
-        resume.save_state(work_dir, state)
+        RESUME.save(work_dir, state)
 
     section(f"Phase {n()}: Determining single-copy genes and writing outputs...")
     final_hmm_path, num_targets, missed_path = phase_determine_and_write(

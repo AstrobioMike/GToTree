@@ -4,7 +4,8 @@ import time
 
 import pytest # type: ignore
 
-from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_resume as resume
+from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_cli as cli
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli import RESUME
 
 
 def _args(**kw):
@@ -32,21 +33,21 @@ def test_fingerprint_is_order_independent():
     With threaded downloads and taxonomy-driven selection, the same genome set can
     legitimately arrive in a different order. What matters is WHICH genomes.
     """
-    a = resume.build_fingerprint(["A", "B", "C"], _args(), "38.2")
-    b = resume.build_fingerprint(["C", "A", "B"], _args(), "38.2")
+    a = cli.build_fingerprint(["A", "B", "C"], _args(), "38.2")
+    b = cli.build_fingerprint(["C", "A", "B"], _args(), "38.2")
     assert a == b
 
 
 def test_fingerprint_ignores_duplicates():
-    a = resume.build_fingerprint(["A", "B"], _args(), "38.2")
-    b = resume.build_fingerprint(["A", "B", "A"], _args(), "38.2")
+    a = cli.build_fingerprint(["A", "B"], _args(), "38.2")
+    b = cli.build_fingerprint(["A", "B", "A"], _args(), "38.2")
     assert a == b
 
 
 def test_fingerprint_detects_added_genome():
-    a = resume.build_fingerprint(["A", "B"], _args(), "38.2")
-    b = resume.build_fingerprint(["A", "B", "C"], _args(), "38.2")
-    diffs = resume.compare_fingerprints(a, b)
+    a = cli.build_fingerprint(["A", "B"], _args(), "38.2")
+    b = cli.build_fingerprint(["A", "B", "C"], _args(), "38.2")
+    diffs = RESUME.compare(a, b)
     assert any("target genomes" in d for d in diffs)
 
 
@@ -63,16 +64,16 @@ def test_fingerprint_detects_added_genome():
     (dict(derep_rank="genus"), "--derep-rank"),
 ])
 def test_result_affecting_params_invalidate(kwargs, expected):
-    base = resume.build_fingerprint(["A"], _args(), "38.2")
-    changed = resume.build_fingerprint(["A"], _args(**kwargs), "38.2")
-    diffs = resume.compare_fingerprints(base, changed)
+    base = cli.build_fingerprint(["A"], _args(), "38.2")
+    changed = cli.build_fingerprint(["A"], _args(**kwargs), "38.2")
+    diffs = RESUME.compare(base, changed)
     assert any(expected in d for d in diffs), diffs
 
 
 def test_pfam_version_change_invalidates():
-    base = resume.build_fingerprint(["A"], _args(), "38.2")
-    changed = resume.build_fingerprint(["A"], _args(), "37.0")
-    diffs = resume.compare_fingerprints(base, changed)
+    base = cli.build_fingerprint(["A"], _args(), "38.2")
+    changed = cli.build_fingerprint(["A"], _args(), "37.0")
+    diffs = RESUME.compare(base, changed)
     assert any("Pfam version" in d for d in diffs)
 
 
@@ -81,19 +82,19 @@ def test_unknown_pfam_version_does_not_invalidate():
     The Pfam version isn't resolved until the Pfam stage runs, so a run interrupted
     before then legitimately stores None and must not be refused on that basis.
     """
-    known = resume.build_fingerprint(["A"], _args(), "38.2")
-    unknown = resume.build_fingerprint(["A"], _args(), None)
-    assert resume.compare_fingerprints(known, unknown) == []
+    known = cli.build_fingerprint(["A"], _args(), "38.2")
+    unknown = cli.build_fingerprint(["A"], _args(), None)
+    assert RESUME.compare(known, unknown) == []
 
 
 def test_identical_fingerprints_have_no_differences():
-    fp = resume.build_fingerprint(["A", "B"], _args(), "38.2")
-    assert resume.compare_fingerprints(fp, fp) == []
+    fp = cli.build_fingerprint(["A", "B"], _args(), "38.2")
+    assert RESUME.compare(fp, fp) == []
 
 
 def test_missing_previous_state_is_reported():
-    fp = resume.build_fingerprint(["A"], _args(), "38.2")
-    diffs = resume.compare_fingerprints(None, fp)
+    fp = cli.build_fingerprint(["A"], _args(), "38.2")
+    diffs = RESUME.compare(None, fp)
     assert diffs == ["no previous run state was found"]
 
 
@@ -106,10 +107,10 @@ def test_local_genome_files_are_fingerprinted(tmp_path):
     f.write_text(">a\nMK\n")
     genomes = [_FakeGenome("g1", "amino-acid", str(f))]
 
-    with_local = resume.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
-    without = resume.build_fingerprint([], _args(), "38.2", local_genomes=[])
+    with_local = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
+    without = cli.build_fingerprint([], _args(), "38.2", local_genomes=[])
 
-    diffs = resume.compare_fingerprints(without, with_local)
+    diffs = RESUME.compare(without, with_local)
     assert any("local genome files" in d for d in diffs)
 
 
@@ -121,13 +122,13 @@ def test_edited_local_file_invalidates_resume(tmp_path):
     f = tmp_path / "g1.faa"
     f.write_text(">a\nMK\n")
     genomes = [_FakeGenome("g1", "amino-acid", str(f))]
-    before = resume.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
+    before = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
 
     time.sleep(1.1)  # mtime has second resolution
     f.write_text(">a\nMKVLAAA\n")
-    after = resume.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
+    after = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
 
-    assert resume.compare_fingerprints(before, after)
+    assert RESUME.compare(before, after)
 
 
 def test_local_fingerprint_stable_when_untouched(tmp_path):
@@ -135,14 +136,14 @@ def test_local_fingerprint_stable_when_untouched(tmp_path):
     f.write_text(">a\nMK\n")
     genomes = [_FakeGenome("g1", "amino-acid", str(f))]
 
-    a = resume.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
-    b = resume.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
+    a = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
+    b = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
     assert a == b
 
 
 def test_local_fingerprint_handles_missing_file(tmp_path):
     genomes = [_FakeGenome("ghost", "fasta", str(tmp_path / "gone.fna"))]
-    fp = resume.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
+    fp = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
     assert fp["local_genomes_sha256"] is not None
 
 
@@ -151,9 +152,9 @@ def test_runtime_only_params_do_not_invalidate():
     -n/-j/output dir change HOW a run executes, not WHAT it produces, so they must not
     force a full redo.
     """
-    a = resume.build_fingerprint(["A"], _args(), "38.2")
-    b = resume.build_fingerprint(["A"], _args(), "38.2")
-    assert resume.compare_fingerprints(a, b) == []
+    a = cli.build_fingerprint(["A"], _args(), "38.2")
+    b = cli.build_fingerprint(["A"], _args(), "38.2")
+    assert RESUME.compare(a, b) == []
 
 
 ################################################################################
@@ -161,30 +162,30 @@ def test_runtime_only_params_do_not_invalidate():
 ################################################################################
 
 def test_state_round_trips(tmp_path):
-    fp = resume.build_fingerprint(["A"], _args(), "38.2")
-    state = resume.new_state(fp)
-    resume.mark_stage_complete(state, resume.STAGE_GENOMES, [])
-    resume.save_state(str(tmp_path), state)
+    fp = cli.build_fingerprint(["A"], _args(), "38.2")
+    state = RESUME.new(fp)
+    RESUME.mark_complete(state, cli.STAGE_GENOMES, [])
+    RESUME.save(str(tmp_path), state)
 
-    loaded = resume.load_state(str(tmp_path))
+    loaded = RESUME.load(str(tmp_path))
     assert loaded["fingerprint"] == fp
-    assert resume.STAGE_GENOMES in loaded["completed"]
+    assert cli.STAGE_GENOMES in loaded["completed"]
 
 
 def test_load_state_returns_none_when_absent(tmp_path):
-    assert resume.load_state(str(tmp_path)) is None
+    assert RESUME.load(str(tmp_path)) is None
 
 
 def test_load_state_returns_none_when_corrupt(tmp_path):
     """A corrupt state file means we can't trust the prior run; start fresh."""
-    path = tmp_path / resume.STATE_FILENAME
+    path = tmp_path / RESUME.state_filename
     path.write_text("{not valid json")
-    assert resume.load_state(str(tmp_path)) is None
+    assert RESUME.load(str(tmp_path)) is None
 
 
 def test_save_state_is_atomic(tmp_path):
-    state = resume.new_state({"x": 1})
-    resume.save_state(str(tmp_path), state)
+    state = RESUME.new({"x": 1})
+    RESUME.save(str(tmp_path), state)
     leftovers = [f for f in os.listdir(tmp_path) if f.endswith(".part")]
     assert leftovers == []
 
@@ -197,26 +198,26 @@ def test_stage_reusable_when_artifacts_intact(tmp_path):
     artifact = tmp_path / "combined.faa"
     artifact.write_text(">a\nMK\n")
 
-    state = resume.new_state({})
-    resume.mark_stage_complete(state, resume.STAGE_GENOMES, [str(artifact)],
+    state = RESUME.new({})
+    RESUME.mark_complete(state, cli.STAGE_GENOMES, [str(artifact)],
                                work_dir=str(tmp_path))
-    assert resume.stage_is_reusable(state, resume.STAGE_GENOMES, str(tmp_path))
+    assert RESUME.is_reusable(state, cli.STAGE_GENOMES, str(tmp_path))
 
 
 def test_stage_not_reusable_when_never_run(tmp_path):
-    state = resume.new_state({})
-    assert not resume.stage_is_reusable(state, resume.STAGE_SEARCH, str(tmp_path))
+    state = RESUME.new({})
+    assert not RESUME.is_reusable(state, cli.STAGE_SEARCH, str(tmp_path))
 
 
 def test_stage_not_reusable_when_artifact_deleted(tmp_path):
     artifact = tmp_path / "combined.faa"
     artifact.write_text(">a\nMK\n")
-    state = resume.new_state({})
-    resume.mark_stage_complete(state, resume.STAGE_GENOMES, [str(artifact)],
+    state = RESUME.new({})
+    RESUME.mark_complete(state, cli.STAGE_GENOMES, [str(artifact)],
                                work_dir=str(tmp_path))
 
     artifact.unlink()
-    assert not resume.stage_is_reusable(state, resume.STAGE_GENOMES, str(tmp_path))
+    assert not RESUME.is_reusable(state, cli.STAGE_GENOMES, str(tmp_path))
 
 
 def test_stage_not_reusable_when_artifact_truncated(tmp_path):
@@ -226,36 +227,56 @@ def test_stage_not_reusable_when_artifact_truncated(tmp_path):
     """
     artifact = tmp_path / "filtered.hmm"
     artifact.write_text("HMM" * 100)
-    state = resume.new_state({})
-    resume.mark_stage_complete(state, resume.STAGE_PFAMS, [str(artifact)],
+    state = RESUME.new({})
+    RESUME.mark_complete(state, cli.STAGE_PFAMS, [str(artifact)],
                                work_dir=str(tmp_path))
 
     artifact.write_text("HMM")
-    assert not resume.stage_is_reusable(state, resume.STAGE_PFAMS, str(tmp_path))
+    assert not RESUME.is_reusable(state, cli.STAGE_PFAMS, str(tmp_path))
 
 
 def test_invalidate_from_cascades_downstream():
     """Re-running a stage invalidates everything computed from its output."""
-    state = resume.new_state({})
-    for stage in resume.STAGE_ORDER:
-        resume.mark_stage_complete(state, stage, [])
+    state = RESUME.new({})
+    for stage in cli.STAGE_ORDER:
+        RESUME.mark_complete(state, stage, [])
 
-    resume.invalidate_from(state, resume.STAGE_PFAMS)
+    RESUME.invalidate_from(state, cli.STAGE_PFAMS)
 
-    assert set(state["completed"]) == {resume.STAGE_GENOMES}
+    assert set(state["completed"]) == {cli.STAGE_GENOMES}
 
 
-def test_invalidate_from_unknown_stage_is_noop():
-    state = resume.new_state({})
-    resume.mark_stage_complete(state, resume.STAGE_GENOMES, [])
-    resume.invalidate_from(state, "not-a-stage")
-    assert resume.STAGE_GENOMES in state["completed"]
+def test_invalidate_from_unknown_stage_raises():
+    """
+    Deliberate change from the old free-function behavior, which silently no-oped.
+
+    A no-op is the worst outcome for a typo'd stage name: `invalidate_from("serach")`
+    would invalidate nothing, downstream results computed from stale input would be
+    reused, and there'd be no signal anywhere. The profile knows its own stage names,
+    so it can just say so.
+    """
+    state = RESUME.new({})
+    RESUME.mark_complete(state, cli.STAGE_GENOMES, [])
+
+    with pytest.raises(ValueError, match="unknown stage"):
+        RESUME.invalidate_from(state, "not-a-stage")
+
+    assert cli.STAGE_GENOMES in state["completed"]
+
+
+def test_mark_complete_rejects_an_unknown_stage():
+    """Same guard on the writing side, where a typo would record a stage nothing reads."""
+    state = RESUME.new({})
+    with pytest.raises(ValueError, match="unknown stage"):
+        RESUME.mark_complete(state, "not-a-stage", [])
 
 
 def test_stage_order_is_pipeline_order():
-    assert resume.STAGE_ORDER == [resume.STAGE_GENOMES,
-                                  resume.STAGE_PFAMS,
-                                  resume.STAGE_SEARCH]
+    assert cli.STAGE_ORDER == [cli.STAGE_GENOMES,
+                               cli.STAGE_PFAMS,
+                               cli.STAGE_SEARCH]
+    # the profile and the module constant must not drift
+    assert RESUME.stages == cli.STAGE_ORDER
 
 
 ################################################################################
@@ -266,11 +287,11 @@ def test_artifacts_stored_relative_to_work_dir(tmp_path):
     artifact = tmp_path / "combined.faa"
     artifact.write_text(">a\nMK\n")
 
-    state = resume.new_state({})
-    resume.mark_stage_complete(state, resume.STAGE_GENOMES, [str(artifact)],
+    state = RESUME.new({})
+    RESUME.mark_complete(state, cli.STAGE_GENOMES, [str(artifact)],
                                work_dir=str(tmp_path))
 
-    keys = list(state["completed"][resume.STAGE_GENOMES]["artifacts"])
+    keys = list(state["completed"][cli.STAGE_GENOMES]["artifacts"])
     assert keys == ["combined.faa"]
     assert not os.path.isabs(keys[0])
 
@@ -286,21 +307,21 @@ def test_renamed_output_dir_still_resumes(tmp_path):
     artifact = original / "combined.faa"
     artifact.write_text(">a\nMK\n")
 
-    state = resume.new_state({})
-    resume.mark_stage_complete(state, resume.STAGE_GENOMES, [str(artifact)],
+    state = RESUME.new({})
+    RESUME.mark_complete(state, cli.STAGE_GENOMES, [str(artifact)],
                                work_dir=str(original))
-    resume.save_state(str(original), state)
+    RESUME.save(str(original), state)
 
-    assert resume.stage_is_reusable(state, resume.STAGE_GENOMES, str(original))
+    assert RESUME.is_reusable(state, cli.STAGE_GENOMES, str(original))
 
     # user renames the output directory, then resumes pointing at the new name
     renamed = tmp_path / "runRenamed"
     (tmp_path / "runA").rename(renamed)
     moved_work_dir = renamed / "working-dir"
 
-    loaded = resume.load_state(str(moved_work_dir))
+    loaded = RESUME.load(str(moved_work_dir))
     assert loaded is not None
-    assert resume.stage_is_reusable(loaded, resume.STAGE_GENOMES, str(moved_work_dir))
+    assert RESUME.is_reusable(loaded, cli.STAGE_GENOMES, str(moved_work_dir))
 
 
 def test_truncation_still_detected_after_move(tmp_path):
@@ -310,8 +331,8 @@ def test_truncation_still_detected_after_move(tmp_path):
     artifact = original / "filtered.hmm"
     artifact.write_text("HMM" * 100)
 
-    state = resume.new_state({})
-    resume.mark_stage_complete(state, resume.STAGE_PFAMS, [str(artifact)],
+    state = RESUME.new({})
+    RESUME.mark_complete(state, cli.STAGE_PFAMS, [str(artifact)],
                                work_dir=str(original))
 
     renamed = tmp_path / "runRenamed"
@@ -319,7 +340,7 @@ def test_truncation_still_detected_after_move(tmp_path):
     moved = renamed / "working-dir"
 
     (moved / "filtered.hmm").write_text("HMM")
-    assert not resume.stage_is_reusable(state, resume.STAGE_PFAMS, str(moved))
+    assert not RESUME.is_reusable(state, cli.STAGE_PFAMS, str(moved))
 
 
 def test_artifact_outside_work_dir_stays_absolute(tmp_path):
@@ -334,13 +355,13 @@ def test_artifact_outside_work_dir_stays_absolute(tmp_path):
     artifact = elsewhere / "x.txt"
     artifact.write_text("y")
 
-    state = resume.new_state({})
-    resume.mark_stage_complete(state, resume.STAGE_PFAMS, [str(artifact)],
+    state = RESUME.new({})
+    RESUME.mark_complete(state, cli.STAGE_PFAMS, [str(artifact)],
                                work_dir=str(work_dir))
 
-    key = list(state["completed"][resume.STAGE_PFAMS]["artifacts"])[0]
+    key = list(state["completed"][cli.STAGE_PFAMS]["artifacts"])[0]
     assert os.path.isabs(key)
-    assert resume.stage_is_reusable(state, resume.STAGE_PFAMS, str(work_dir))
+    assert RESUME.is_reusable(state, cli.STAGE_PFAMS, str(work_dir))
 
 
 def test_legacy_absolute_state_still_readable(tmp_path):
@@ -348,19 +369,19 @@ def test_legacy_absolute_state_still_readable(tmp_path):
     artifact = tmp_path / "a.faa"
     artifact.write_text("z" * 10)
 
-    state = resume.new_state({})
-    resume.mark_stage_complete(state, resume.STAGE_GENOMES, [str(artifact)])  # no work_dir
+    state = RESUME.new({})
+    RESUME.mark_complete(state, cli.STAGE_GENOMES, [str(artifact)])  # no work_dir
 
-    assert resume.stage_is_reusable(state, resume.STAGE_GENOMES, str(tmp_path))
+    assert RESUME.is_reusable(state, cli.STAGE_GENOMES, str(tmp_path))
 
 
 def test_missing_artifact_recorded_with_none_size(tmp_path):
-    state = resume.new_state({})
-    resume.mark_stage_complete(state, resume.STAGE_GENOMES,
+    state = RESUME.new({})
+    RESUME.mark_complete(state, cli.STAGE_GENOMES,
                                [str(tmp_path / "never-made.faa")],
                                work_dir=str(tmp_path))
 
-    artifacts = state["completed"][resume.STAGE_GENOMES]["artifacts"]
+    artifacts = state["completed"][cli.STAGE_GENOMES]["artifacts"]
     assert list(artifacts.values()) == [None]
     # size None means "unknown", but the file still has to exist to be reusable
-    assert not resume.stage_is_reusable(state, resume.STAGE_GENOMES, str(tmp_path))
+    assert not RESUME.is_reusable(state, cli.STAGE_GENOMES, str(tmp_path))

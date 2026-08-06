@@ -52,21 +52,25 @@ from gtotree.utils.ko.additional_ko_searching import (
 
 class SearchPlan:
     """
-    Which per-genome searches this run performs, resolved once up front.
+    Which per-genome searches this run performs, resolved once up front
 
     The target sets (which Pfams, which KOs) are expensive to work out and identical
     for every genome, so they're resolved here rather than inside the worker.
+
+    `do_scg` is True for the main GToTree run, which always searches the SCG set. The
+    `gtt search-pfams` / `gtt search-kos` subcommands reuse this same fused
+    preprocess-then-search machinery but have no SCG set and no tree, so they set it
+    False
     """
 
-    __slots__ = ("do_pfam", "do_ko", "keep_genome_files",
+    __slots__ = ("do_pfam", "do_ko", "do_scg", "keep_genome_files",
                  "pressed_scg_base", "pressed_pfam_base")
 
-    def __init__(self, do_pfam, do_ko, keep_genome_files):
+    def __init__(self, do_pfam, do_ko, keep_genome_files, do_scg=True):
         self.do_pfam = do_pfam
         self.do_ko = do_ko
+        self.do_scg = do_scg
         self.keep_genome_files = keep_genome_files
-        # hmmpress output bases, filled in by process_genomes; None means the workers
-        # read the plain HMM text instead (correct, just slower)
         self.pressed_scg_base = None
         self.pressed_pfam_base = None
 
@@ -101,7 +105,7 @@ def genome_is_fully_processed(gd, plan):
     """
     if not gd.preprocessing_done:
         return False
-    if not gd.hmm_search_done:
+    if plan.do_scg and not gd.hmm_search_done:
         return False
     if plan.do_pfam and not gd.pfam_search_done:
         return False
@@ -141,9 +145,10 @@ def _run_searches(genome, run_data, plan, status):
     if plan.do_ko:
         results["ko"] = _ko_search_worker(genome, run_data, aa_path=aa_path)
 
-    results["hmm"] = _hmm_search_worker(genome, run_data,
-                                        aa_path=aa_path, nt_path=nt_path,
-                                        pressed_base=plan.pressed_scg_base)
+    if plan.do_scg:
+        results["hmm"] = _hmm_search_worker(genome, run_data,
+                                            aa_path=aa_path, nt_path=nt_path,
+                                            pressed_base=plan.pressed_scg_base)
     return results
 
 
@@ -166,7 +171,7 @@ def _apply_searches(genome, searches, run_data, plan):
         else:
             genome.mark_ko_search_done()
 
-    if "hmm" in searches:
+    if plan.do_scg and "hmm" in searches:
         _apply_hmm_search_result(genome, searches["hmm"], run_data)
 
 
@@ -209,8 +214,9 @@ def process_genomes(args, run_data):
     # text for every genome. The pressed files are scratch, so they live in a temp dir
     # that is cleaned up when the stage ends
     with tempfile.TemporaryDirectory(prefix="gtt-press-") as press_dir:
-        plan.pressed_scg_base = press_profiles(
-            run_data.hmm_path, press_dir, "scg-profiles")
+        if plan.do_scg:
+            plan.pressed_scg_base = press_profiles(
+                run_data.hmm_path, press_dir, "scg-profiles")
         if plan.do_pfam:
             plan.pressed_pfam_base = press_profiles(
                 run_data.all_pfam_targets_hmm_path, press_dir, "pfam-profiles")
@@ -340,13 +346,14 @@ def _finalize(args, run_data, plan):
         run_data.additional_ko_searching_done = True
         report_ko_searching_update(run_data)
 
-    capture_hmm_search_failures(run_data)
-    phase_stats.checkpoint("combining: before SCG rebuild")
-    run_data = rebuild_combined_SCG_outputs(run_data)
-    phase_stats.checkpoint("combining: after SCG rebuild")
-    report_hmm_search_update(run_data)
+    if plan.do_scg:
+        capture_hmm_search_failures(run_data)
+        phase_stats.checkpoint("combining: before SCG rebuild")
+        run_data = rebuild_combined_SCG_outputs(run_data)
+        phase_stats.checkpoint("combining: after SCG rebuild")
+        report_hmm_search_update(run_data)
 
-    run_data = check_target_SCGs_have_seqs(run_data, run_data.general_ext)
+        run_data = check_target_SCGs_have_seqs(run_data, run_data.general_ext)
 
     write_run_data(run_data)
 

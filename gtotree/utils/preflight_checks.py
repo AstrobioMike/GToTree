@@ -5,8 +5,6 @@ import time
 import pandas as pd # type: ignore
 import tempfile
 from collections import Counter
-import json
-import hashlib
 from gtotree.utils.messaging import (color_text,
                                      report_message,
                                      report_very_early_exit,
@@ -35,6 +33,8 @@ from gtotree.utils.general import (ToolsUsed,
                                    CorruptRunData,
                                    populate_run_data,
                                    read_run_data)
+from gtotree.utils.resume_state import (ResumeProfile, hash_file_contents,
+                                        STATE_VERSION)
 from gtotree.utils.context import log_file_var
 
 
@@ -50,15 +50,74 @@ def preflight_checks(args):
     return args, run_data
 
 
-def args_hash_function(args):
-    args_dict = vars(args).copy()
-    args_dict.pop("force_overwrite", False)
-    args_dict.pop("resume", False)
-    args_dict.pop("run_files_dir_rel", None)
-    args_dict.pop("run_files_dir", None)
-    args_dict.pop("output_already_existed", None)
-    args_json = json.dumps(args_dict, sort_keys=True)
-    return hashlib.sha256(args_json.encode("utf-8")).hexdigest()
+# The main driver has no stage list: it already records its progress inside
+# run-data.json (per-genome flags, SCG_hits_filtered, all_SCG_sets_aligned,
+# headers_updated, and so on). Adding a parallel run-state.json would duplicate that
+# and give two records that could disagree. So this profile is fingerprint-only.
+RESUME = ResumeProfile(
+    name="GToTree",
+    field_labels={
+        "state_version": "the run-state format",
+        "ncbi_accessions_sha256": "the NCBI accessions file (-a)",
+        "genbank_files_sha256": "the GenBank files list (-g)",
+        "fasta_files_sha256": "the fasta files list (-f)",
+        "amino_acid_files_sha256": "the amino-acid files list (-A)",
+        "mapping_file_sha256": "the mapping file (-m)",
+        "target_pfams_sha256": "the target Pfams file (-p)",
+        "target_kos_sha256": "the target KOs file (-K)",
+        "hmm": "-H/--hmm",
+        "wanted_ref_tax": "-w/--wanted-ref-tax",
+        "target_rank": "--target-rank",
+        "derep_rank": "--derep-rank",
+        "source": "-S/--source",
+        "add_gtdb_tax": "-D/--add-gtdb-tax",
+        "add_ncbi_tax": "-t/--add-ncbi-tax",
+        "lineage": "-L/--lineage",
+        "seq_length_cutoff": "-c/--seq-length-cutoff",
+        "gene_representation_cutoff": "-r/--gene-representation-cutoff",
+        "genome_hits_cutoff": "-G/--genome-hits-cutoff",
+        "best_hit_mode": "-B/--best-hit-mode",
+        "no_super5": "-X/--no-super5",
+        "no_tree": "-N/--no-tree",
+        "tree_program": "-T/--tree-program",
+        "nucleotide_mode": "-z/--nucleotide-mode",
+        "keep_gene_alignments": "-k/--keep-gene-alignments",
+    },
+)
+
+# input files are fingerprinted by CONTENTS, not by path
+_INPUT_FILE_FIELDS = (
+    ("ncbi_accessions_sha256", "ncbi_accessions"),
+    ("genbank_files_sha256", "genbank_files"),
+    ("fasta_files_sha256", "fasta_files"),
+    ("amino_acid_files_sha256", "amino_acid_files"),
+    ("mapping_file_sha256", "mapping_file"),
+    ("target_pfams_sha256", "target_pfams_file"),
+    ("target_kos_sha256", "target_kos_file"),
+)
+
+# args that change how the run executes, not what it produces. Listed explicitly
+# so adding any new flags is a deliberate decision about if they impact a resume attempt or not
+_EXECUTION_ONLY_ARGS = ("num_jobs", "num_muscle_threads", "debug", "tmp_dir",
+                        "force_overwrite", "resume", "output_dir", "run_files_dir",
+                        "run_files_dir_rel", "output_already_existed")
+
+
+def build_fingerprint(args):
+    """
+    Everything about this run that affects what it produces
+    """
+    fingerprint = {"state_version": STATE_VERSION}
+
+    for field, dest in _INPUT_FILE_FIELDS:
+        fingerprint[field] = hash_file_contents(getattr(args, dest, None))
+
+    for field in RESUME.field_labels:
+        if field in fingerprint:
+            continue
+        fingerprint[field] = getattr(args, field, None)
+
+    return fingerprint
 
 def check_for_essential_deps():
     commands = ["muscle", "trimal"]
@@ -273,16 +332,21 @@ def check_input_files(args):
                 "flag to force-overwrite the previous outputs.")
             report_very_early_exit()
 
-        if run_data is not None and run_data.args_hash != args_hash_function(args):
-            report_message("We are trying to resume a previous run (specified by the `-R` or `--resume` flag), "
-                           "but it looks like the current arguments don't match the intial run's arguments. "
-                           "Your best bet may be to just start a completely fresh run by adding the `-F` flag to "
-                           "force-overwrite the previous outputs.")
-            report_very_early_exit()
+        if run_data is not None:
+            differences = RESUME.compare(run_data.fingerprint, build_fingerprint(args))
+            if differences:
+                report_message(
+                    "We are trying to resume a previous run (specified by the `-R` or "
+                    "`--resume` flag), but this run doesn't match the previous one:\n"
+                    "        - " + "\n        - ".join(differences) + "\n\n"
+                    "  Resuming would mix results from two different runs. Your best "
+                    "bet is to start a fresh run by adding the `-F` flag to "
+                    "force-overwrite the previous outputs or specify a new output dir.")
+                report_very_early_exit()
 
     if run_data is None:
         run_data = populate_run_data(args)
-        run_data.args_hash = args_hash_function(args)
+        run_data.fingerprint = build_fingerprint(args)
         run_data = check_hmm_file(args, run_data)
 
     if args.mapping_file:
