@@ -13,7 +13,7 @@
             # this may require checking GTDB first (as that's what the pre-built hmms will be from, and then checking ncbi and linking back to gtdb if they provided an ncbi tax...)
 
 
-    # fix tracking and reporting for examples like the problem accs below
+    # fix tracking and reporting for examples like the problem accs below (bottom of this doc)
         # right now, on first run they are dropped for too few hits and reported as such,
         # but on a resumed run it incorrectly says they were dropped earlier with a nonsensical message
 
@@ -55,10 +55,7 @@
         # this is probably the case for all input-processing stages
 
 
-    # if it's a re-run, and a genome was dropped later due to, e.g., not enough hit targets, the preprocessing summary is misleading as it says the genome was dropped earlier
-
-
-    # if genome filtering drops all genes of a given SCG-set, things might break
+    # if genome-filtering drops all genes of a given SCG-set, things might break
         # build some guard for that
 
 
