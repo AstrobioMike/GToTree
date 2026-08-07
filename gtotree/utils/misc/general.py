@@ -1,11 +1,9 @@
-# import inspect
 import os
 import sys
 import gzip
 import shutil
 import json
 import time
-import argparse
 from dataclasses import dataclass, field, asdict, fields, is_dataclass
 from typing import List
 from tqdm import tqdm # type: ignore
@@ -55,7 +53,7 @@ class ToolsUsed:
     universal_SCGs_used: bool = False
 
 
-def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True,
+def download_with_tqdm(url, target, filename=None, leave=True,
                        retries=True, attempts=6, retry_wait=3,
                        speed_gate=False, min_mbps=2.0, probe_seconds=5.0,
                        probe_timeout=30):
@@ -78,16 +76,8 @@ def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True,
     accepts whatever speed it gets and runs to completion, so a persistently
     slow network still succeeds
 
-    `urlopen=True` returns the response
-
     Raises the last underlying error if every attempt fails.
     """
-    if urlopen:
-        opener = urllib.request.build_opener()
-        opener.addheaders = [('User-Agent', 'curl/8.0')]
-        urllib.request.install_opener(opener)
-        return urllib.request.urlopen(url)
-
     # a single attempt if retries are off
     if not retries:
         attempts = 1
@@ -99,7 +89,6 @@ def download_with_tqdm(url, target, filename=None, urlopen=False, leave=True,
         is_final = (attempt == attempts)
         # enforce the speed floor only on non-final attempts (and only if gated)
         floor = 0.0 if is_final else floor_bytes_per_s
-        # desc = target if attempt == 1 else f"{target} (retry {attempt - 1})"
         desc = target
 
         try:
@@ -212,17 +201,6 @@ def _stream_once(url, filename, desc, leave, floor_bytes_per_s,
             pass
         raise
 
-
-##### get rid of this after updating pfam handling to use our locally cached pfams
-def download_and_gunzip(url, target):
-
-    try:
-        with urllib.request.urlopen(url) as resp, gzip.GzipFile(fileobj=resp) as gzipped, open(target, "wb") as out_f:
-            shutil.copyfileobj(gzipped, out_f)
-        return True
-
-    except:
-        return False
 
 GENOME_SOURCE_FIELDS = ("ncbi_accs", "genbank_files", "fasta_files", "amino_acid_files")
 
@@ -358,9 +336,6 @@ class SCGset:
         self.reason_removed = reason
         self.remaining = False
 
-    def mark_gene_length_filtered(self, value=True):
-        self.gene_length_filtered = value
-
 
 @dataclass
 class RunData:
@@ -450,32 +425,14 @@ class RunData:
     # to decide whether resuming is safe. See preflight_checks.build_fingerprint
     fingerprint: dict = field(default_factory=dict)
 
-    @property
-    def num_incomplete_genbank_files(self) -> int:
-        return len([gd for gd in self.genbank_files if not gd.preprocessing_done and not gd.removed])
-
-    @property
-    def num_incomplete_fasta_files(self) -> int:
-        return len([gd for gd in self.fasta_files if not gd.preprocessing_done and not gd.removed])
-
-    @property
-    def num_incomplete_amino_acid_files(self) -> int:
-        return len([gd for gd in self.amino_acid_files if not gd.preprocessing_done and not gd.removed])
-
     def get_all_SCG_targets(self) -> List[SCGset]:
         return list(self.SCG_targets)
 
     def get_all_SCG_targets_remaining(self) -> List[SCGset]:
         return [scg for scg in self.SCG_targets if scg.remaining and not scg.removed]
 
-    def get_all_removed_SCG_targets(self) -> List:
-        return [scg.id for scg in self.SCG_targets if scg.removed]
-
     def get_all_SCG_targets_remaining_but_not_filtered(self) -> List[SCGset]:
         return [scg for scg in self.SCG_targets if scg.remaining and not scg.gene_length_filtered]
-
-    def get_all_SCG_targets_remaining_but_not_aligned(self) -> List[SCGset]:
-        return [scg for scg in self.SCG_targets if scg.remaining and not scg.aligned]
 
     def get_all_SCG_targets_ready_for_concatenation(self) -> List[SCGset]:
         return [scg for scg in self.SCG_targets if scg.ready_for_cat and not scg.removed]
@@ -516,26 +473,11 @@ class RunData:
     def get_all_preprocessed_genomes(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.preprocessing_done]
 
-    def get_all_input_genomes_for_hmm_search(self) -> List[GenomeData]:
-        return [gd for gd in self.all_input_genomes if gd.preprocessing_done and not gd.hmm_search_done and not gd.removed]
-
-    def get_all_input_genomes_for_ko_search(self) -> List[GenomeData]:
-        return [gd for gd in self.all_input_genomes if gd.preprocessing_done and not gd.ko_search_done and not gd.removed]
-
-    def get_all_input_genomes_for_pfam_search(self) -> List[GenomeData]:
-        return [gd for gd in self.all_input_genomes if gd.preprocessing_done and not gd.pfam_search_done and not gd.removed]
-
     def get_all_input_genomes_for_filtering(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.preprocessing_done and gd.hmm_search_done and not gd.removed]
 
     def get_all_input_genomes_due_for_SCG_min_hit_filtering(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.reason_removed == "too few SCG hits" or gd.reason_removed == "too few unique SCG hits"]
-
-    def get_all_input_genome_basenames(self) -> List[str]:
-        return [gd.basename for gd in self.all_input_genomes]
-
-    def get_all_input_genome_provided_paths(self) -> List[str]:
-        return [gd.provided_path for gd in self.all_input_genomes]
 
     def get_input_ncbi_accs(self) -> List[str]:
         return [gd.id for gd in self.ncbi_accs]
@@ -555,13 +497,7 @@ class RunData:
     def get_input_amino_acid_ids(self) -> List[str]:
         return [gd.id for gd in self.amino_acid_files]
 
-    def found_ncbi_accs(self) -> List[GenomeData]:
-        return [gd for gd in self.ncbi_accs if gd.acc_was_found]
-
-    def get_ncbi_accs_for_preprocessing(self) -> List[GenomeData]:
-        return [gd for gd in self.ncbi_accs if gd.acc_was_found and not gd.preprocessing_done and not gd.removed]
-
-    def remaining_ncbi_accs(self) -> List[GenomeData]:
+    def remaining_ncbi_accs(self) -> List[str]:
         return [gd.id for gd in self.ncbi_accs if not gd.removed]
 
     def get_ncbi_accs_not_downloaded(self) -> List[str]:
@@ -609,35 +545,6 @@ class RunData:
     def get_prodigal_used_genbank_ids(self) -> List[str]:
         return [gd.id for gd in self.genbank_files if gd.prodigal_used]
 
-    def incomplete_genbank_files(self) -> List[GenomeData]:
-        return [gd.provided_path for gd in self.genbank_files if not gd.preprocessing_done and not gd.removed]
-
-    def incomplete_fasta_files(self) -> List[GenomeData]:
-        return [gd.provided_path for gd in self.fasta_files if not gd.preprocessing_done and not gd.removed]
-
-    def incomplete_amino_acid_files(self) -> List[GenomeData]:
-        return [gd.provided_path for gd in self.amino_acid_files if not gd.preprocessing_done and not gd.removed]
-
-    def any_incomplete_genbank_files(self) -> bool:
-        return any(not gd.preprocessing_done and not gd.removed for gd in self.genbank_files)
-
-    def any_incomplete_fasta_files(self) -> bool:
-        return any(not gd.preprocessing_done and not gd.removed for gd in self.fasta_files)
-
-    def any_incomplete_amino_acid_files(self) -> bool:
-        return any(not gd.preprocessing_done and not gd.removed for gd in self.amino_acid_files)
-
-    def genbank_files_with_prodigal_used(self) -> List[GenomeData]:
-        return [gd for gd in self.genbank_files if gd.prodigal_used]
-
-
-    # def __setattr__(self, name, value):
-    #     """Debug when an attribute is changed."""
-    #     stack = inspect.stack()
-    #     caller = stack[1]  # Get the function that triggered the change
-    #     print(f"Setting `{name}` to `{value}` in {caller.filename}:{caller.lineno}, function {caller.function}")
-    #     super().__setattr__(name, value)
-
 
 def populate_run_data(args):
     run_data = RunData()
@@ -670,20 +577,6 @@ def populate_run_data(args):
     run_data.run_data_path = run_data.run_files_dir + "/run-data.json"
 
     return run_data
-
-
-def write_args(args):
-    args_path = args.tmp_dir + "/args.json"
-    with open(args_path, "w") as f:
-        json.dump(args.__dict__, f)
-    return args_path
-
-
-def read_args(args_path):
-    with open(args_path) as f:
-        args_dict = json.load(f)
-    args = argparse.Namespace(**args_dict)
-    return args
 
 
 def run_data_as_dict(run_data):
@@ -928,10 +821,15 @@ def file_is_usable_else_clear(path):
 
 
 def concat_files(file_list, output_file):
-    with open(output_file, 'w') as outfile:
+    """
+    Concatenate `file_list` into `output_file`, atomically
+    """
+    def _write(outfile):
         for fname in file_list:
             with open(fname) as infile:
                 shutil.copyfileobj(infile, outfile)
+
+    atomic_write_text(output_file, _write)
 
 
 def cleanup(args, run_data):

@@ -39,6 +39,3 @@ class FakeRunData:
 
     def get_input_ncbi_accs(self):
         return [gd.id for gd in self.ncbi_accs]
-
-    def get_ncbi_accs_for_preprocessing(self):
-        return [gd for gd in self.ncbi_accs if gd.acc_was_found and not gd.preprocessing_done and not gd.removed]

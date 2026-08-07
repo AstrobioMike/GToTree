@@ -9,9 +9,7 @@ production `get_additional_pfam_targets` runs unmodified against it.
 import os
 import shutil
 import dataclasses
-
 import pytest  # type: ignore
-
 from gtotree.tests.paths import MOCK_PFAM_HMM, MOCK_PFAM_INFO
 from gtotree.utils.pfam.get_pfam_data import (HMM_FILENAME, INFO_FILENAME,
                                               VERSION_FILENAME)
@@ -69,15 +67,30 @@ def write_genome(tmp_path):
 
     Repeating an ID gives that genome a second copy of the profile, which is how the
     multi-copy cases below are built.
+
+    The write is idempotent: asking for a genome whose file already holds exactly the
+    contents requested leaves the file alone. That matters for the resume tests, which
+    call a run twice over the "same" genomes. `hash_local_genomes` fingerprints local
+    inputs by size and `int(st_mtime)`, so a byte-identical rewrite is invisible only
+    while both writes land inside the same whole second -- when they straddled a second
+    boundary the fingerprint changed and resume was refused, making
+    `test_resume_reuses_finished_genomes` fail perhaps 1 run in 12. Not rewriting an
+    unchanged file removes the race outright, and is also the more faithful fixture:
+    a user resuming over untouched inputs hasn't re-saved them either.
+
+    A genome asked for with *different* contents is still rewritten, so a test wanting
+    to model an edited input can do so and will correctly invalidate the resume.
     """
     genome_dir = tmp_path / "genomes"
     genome_dir.mkdir()
 
     def _write(name, pfam_ids):
         path = genome_dir / f"{name}.faa"
-        with open(path, "w") as f:
-            for i, pfam_id in enumerate(pfam_ids, 1):
-                f.write(f">p{i}\n{MOTIFS[pfam_id]}\n")
+        contents = "".join(f">p{i}\n{MOTIFS[pfam_id]}\n"
+                           for i, pfam_id in enumerate(pfam_ids, 1))
+        if path.exists() and path.read_text() == contents:
+            return path
+        path.write_text(contents)
         return path
 
     return _write

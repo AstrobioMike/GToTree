@@ -13,9 +13,8 @@ or a search that silently never runs.
 """
 
 import os
-
+import time
 import pytest  # type: ignore
-
 from gtotree.utils.target_search import target_search_cli
 from gtotree.utils.target_search.target_search_setup import (TargetSearchError,
                                                              make_args,
@@ -209,6 +208,28 @@ def test_single_genome_run_works(run_pfam_search):
 ################################################################################
 # resume
 ################################################################################
+
+def test_rewriting_identical_genome_contents_leaves_the_file_alone(write_genome):
+    """
+    Guards the resume tests below. `hash_local_genomes` fingerprints local inputs by
+    size and `int(st_mtime)`, so re-saving a byte-identical genome between two runs
+    changes the fingerprint whenever the two writes straddle a whole-second boundary --
+    which made `test_resume_reuses_finished_genomes` fail intermittently. The fixture
+    now skips the write when nothing changed; if that's ever undone, this fails
+    deterministically instead of the resume test failing one run in twelve.
+    """
+    path = write_genome("stable", ["PF90001"])
+    before = path.stat().st_mtime_ns
+
+    time.sleep(0.01)
+    assert write_genome("stable", ["PF90001"]) == path
+    assert path.stat().st_mtime_ns == before
+
+    # a genuinely different genome is still rewritten, so tests can model an edit
+    time.sleep(0.01)
+    write_genome("stable", ["PF90002"])
+    assert path.stat().st_mtime_ns != before
+
 
 def test_resume_reuses_finished_genomes(run_pfam_search, tmp_path, pfam_spec, capsys):
     genomes = {"g1": ["PF90001"], "g2": ["PF90001"]}

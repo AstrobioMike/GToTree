@@ -174,20 +174,6 @@ def test_retries_disabled_single_shot(tmp_path, monkeypatch, no_sleep):
 
 
 # --------------------------------------------------------------------------- #
-# urlopen passthrough
-# --------------------------------------------------------------------------- #
-
-def test_urlopen_passthrough(monkeypatch):
-    """urlopen=True returns the response object directly, no file written."""
-    sentinel = _FakeResp(headers={"Content-Length": "5"})
-    monkeypatch.setattr(general.urllib.request, "urlopen",
-                        lambda *a, **k: sentinel)
-
-    result = download_with_tqdm("http://x/y", "label", urlopen=True)
-    assert result is sentinel
-
-
-# --------------------------------------------------------------------------- #
 # speed-gated route rerolling
 # --------------------------------------------------------------------------- #
 

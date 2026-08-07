@@ -16,10 +16,10 @@
 
 
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
-        # same for pfam, that they start with PF
+        # same for pfam, that they start with PF, and a note that says
+        # something like "these don't match the expected format (e.g., ...). Are you sure you passed the right file to the right parameter?"
         # also, doublecheck how it handles if a target KO/PFam isn't found
 
-    # go through general.py GenomeData and RunData classes and see which methods i put in that i'm not using anywhere anymore
 
     # when 0 accessions are found/make it through, at that stage summary the message is like "0 of total found...", it should probably explicitly check and say None
         # this is probably the case for all input-processing stages
