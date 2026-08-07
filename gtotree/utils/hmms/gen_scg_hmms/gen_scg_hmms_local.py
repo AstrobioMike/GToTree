@@ -25,8 +25,8 @@ import os
 import gzip
 import shutil
 
-from gtotree.utils.general import GenomeData, remove_file_if_exists
-from gtotree.utils.seqs import (extract_filter_and_rename_cds_amino_acids_from_gb,
+from gtotree.utils.misc.general import GenomeData, remove_file_if_exists
+from gtotree.utils.misc.seqs import (extract_filter_and_rename_cds_amino_acids_from_gb,
                                 extract_fasta_from_gb,
                                 _filter_and_rename_fasta)
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError

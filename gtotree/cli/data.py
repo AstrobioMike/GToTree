@@ -163,12 +163,12 @@ def _run_get(args):
 
 
 def _run_locations_check(args):
-    from gtotree.utils.data_locations import check_and_report_env_variables
+    from gtotree.utils.misc.data_locations import check_and_report_env_variables
     check_and_report_env_variables()
 
 
 def _run_locations_set(args):
-    from gtotree.utils.data_locations import (set_env_variables,
+    from gtotree.utils.misc.data_locations import (set_env_variables,
                                               modify_conda_activate_startup_script,
                                               notify_to_reactivate_conda)
     paths_dict = set_env_variables()
@@ -199,7 +199,7 @@ def main():
             sys.exit(0)
 
         if cmd in ("-v", "--version"):
-            from gtotree.utils.messaging import get_version
+            from gtotree.utils.misc.messaging import get_version
             print(f"GToTree v{get_version()}")
             sys.exit(0)
 

@@ -18,16 +18,16 @@ import tempfile
 
 from tqdm import tqdm  # type: ignore
 
-from gtotree.utils import phase_stats
-from gtotree.utils.general import (run_pooled_stage,
+from gtotree.utils.misc import phase_stats
+from gtotree.utils.misc.general import (run_pooled_stage,
                                    write_run_data,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED)
-from gtotree.utils.messaging import report_message, color_text, spinner
+from gtotree.utils.misc.messaging import report_message, color_text, spinner
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 from gtotree.main_stages.processing_genomes import (SearchPlan,
                                                     _fused,
                                                     genomes_needing_processing)
-from gtotree.utils.preprocessing_genomes import (
+from gtotree.utils.misc.preprocessing_genomes import (
     build_base_link_map,
     capture_ncbi_failed_downloads,
     capture_failed_genbank_files,

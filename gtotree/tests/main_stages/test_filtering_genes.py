@@ -3,8 +3,8 @@
 
 import pytest  # type: ignore
 
-from gtotree.utils.general import GenomeData, RunData, SCGset
-from gtotree.utils.general import required_count
+from gtotree.utils.misc.general import GenomeData, RunData, SCGset
+from gtotree.utils.misc.general import required_count
 from gtotree.main_stages.filtering_genes import write_out_removed_SCG_targets
 
 

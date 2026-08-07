@@ -5,7 +5,7 @@ import pyarrow.compute as pc # type: ignore
 import pyarrow.parquet as pq # type: ignore
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
-from gtotree.utils.messaging import wprint, color_text, report_message, spinner
+from gtotree.utils.misc.messaging import wprint, color_text, report_message, spinner
 from gtotree.utils.gtdb.get_gtdb_data import (get_gtdb_data, gtdb_data_table_path,
                                               report_gtdb_version_info as _read_gtdb_version_info)
 from gtotree.utils.taxonomy.tax_ranks import RANKS

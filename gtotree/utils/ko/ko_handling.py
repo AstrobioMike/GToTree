@@ -2,7 +2,7 @@ import os
 import pandas as pd # type: ignore
 import shutil
 
-from gtotree.utils.messaging import spinner, report_message
+from gtotree.utils.misc.messaging import spinner, report_message
 
 def parse_kofamscan_targets(run_data):
 

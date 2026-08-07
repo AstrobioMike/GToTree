@@ -1,8 +1,8 @@
 import sys
 from gtotree.cli.helpmenu import helpmenu
 from gtotree.cli.parser import parser
-from gtotree.utils.preflight_checks import preflight_checks
-from gtotree.utils.messaging import (gtotree_header,
+from gtotree.utils.misc.preflight_checks import preflight_checks
+from gtotree.utils.misc.messaging import (gtotree_header,
                                      display_initial_run_info,
                                      summarize_results,
                                      copy_log_function)
@@ -13,11 +13,11 @@ from gtotree.main_stages.aligning_and_preparing_SCG_sets import align_and_prepar
 from gtotree.main_stages.concatenating_SCG_sets import concatenate_SCG_sets
 from gtotree.main_stages.updating_headers import update_headers
 from gtotree.main_stages.treeing import make_tree
-from gtotree.utils.citations import generate_citations_info
-from gtotree.utils.summary_info import generate_primary_summary_table
-from gtotree.utils.itol import generate_all_search_itol_files
-from gtotree.utils.general import cleanup
-from gtotree.utils import phase_stats
+from gtotree.utils.misc.citations import generate_citations_info
+from gtotree.utils.misc.summary_info import generate_primary_summary_table
+from gtotree.utils.misc.itol import generate_all_search_itol_files
+from gtotree.utils.misc.general import cleanup, write_run_data
+from gtotree.utils.misc import phase_stats
 
 def main(args = None):
     if args is None:
@@ -69,6 +69,10 @@ def main(args = None):
         generate_all_search_itol_files(args, run_data)
 
         cleanup(args, run_data)
+
+        run_data.run_complete = True
+
+        write_run_data(run_data)
 
         summarize_results(args, run_data)
 

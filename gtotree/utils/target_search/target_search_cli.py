@@ -16,12 +16,12 @@ import shutil
 import argparse
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
-from gtotree.utils import phase_stats
-from gtotree.utils.general import read_run_data, write_run_data, CorruptRunData
-from gtotree.utils.resume_state import (ResumeProfile, hash_strings,
+from gtotree.utils.misc import phase_stats
+from gtotree.utils.misc.general import read_run_data, write_run_data, CorruptRunData
+from gtotree.utils.misc.resume_state import (ResumeProfile, hash_strings,
                                         hash_local_genomes, hash_file_contents,
                                         STATE_VERSION)
-from gtotree.utils.messaging import (report_message, color_text, spinner,
+from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
                                      report_very_early_exit)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon

@@ -15,9 +15,9 @@ import os
 import shutil
 import gzip
 import tarfile
-from gtotree.utils.messaging import (wprint, color_text, report_message,
+from gtotree.utils.misc.messaging import (wprint, color_text, report_message,
                                      report_early_exit, spinner)
-from gtotree.utils.general import download_with_tqdm
+from gtotree.utils.misc.general import download_with_tqdm
 
 
 # pre-built Pfam data, packaged as a single .tar.gz and rebuilt monthly by

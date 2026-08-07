@@ -1,7 +1,7 @@
 import argparse
 import sys
 from gtotree.cli.helpmenu import helpmenu
-from gtotree.utils.messaging import get_version
+from gtotree.utils.misc.messaging import get_version
 
 class CustomHelpAction(argparse.Action):
     def __init__(self, option_strings, dest=argparse.SUPPRESS,

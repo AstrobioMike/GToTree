@@ -10,8 +10,9 @@ from gtotree.cli.common import (CustomRichHelpFormatter, add_help, add_version_a
                                 wrap_help)
 from gtotree.cli.parser import parser
 from gtotree.main import main as run_gtotree
-from gtotree.utils.context import log_file_var
-from gtotree.utils.messaging import report_message, color_text
+from gtotree.utils.misc.context import log_file_var
+from gtotree.utils.misc.general import GENOME_SOURCE_FIELDS
+from gtotree.utils.misc.messaging import report_message, color_text
 
 DATA_PKG = "gtotree.tests.data"
 AA_FILES = ["mock-1.faa", "mock-2.faa", "mock-3.faa", "mock-4.faa"]
@@ -36,7 +37,9 @@ def _verify(output_dir):
         report_message(f"Smoke test FAILED: could not read run-data.json: {e}", "red")
         return False
 
-    genomes = run_data.get("all_input_genomes") or []
+    # all_input_genomes is derived and not serialized; rebuild it the same way
+    # read_run_data does, from the four input-source lists
+    genomes = [gd for name in GENOME_SOURCE_FIELDS for gd in (run_data.get(name) or [])]
     if len(genomes) != EXPECTED_GENOMES:
         report_message(
             f"Smoke test FAILED: expected {EXPECTED_GENOMES} genomes, "

@@ -16,7 +16,7 @@ import time
 
 import pytest # type: ignore
 
-from gtotree.utils.general import run_pooled_stage
+from gtotree.utils.misc.general import run_pooled_stage
 
 
 def _args(num_jobs):
@@ -181,7 +181,7 @@ def test_submission_is_windowed_not_all_up_front():
     O(window) rather than growing with the number of items.
     """
     import concurrent.futures as cf
-    from gtotree.utils.general import WORKER_QUEUE_DEPTH
+    from gtotree.utils.misc.general import WORKER_QUEUE_DEPTH
 
     workers = 2
     items = 500
@@ -256,7 +256,7 @@ def test_workers_see_the_callers_contextvars():
     and a worker seeing the relative default would send any reporter output to the
     user's cwd instead.
     """
-    from gtotree.utils.context import log_file_var
+    from gtotree.utils.misc.context import log_file_var
 
     wanted = "/tmp/some-output-dir/gtotree-runlog.txt"
     token = log_file_var.set(wanted)
@@ -275,7 +275,7 @@ def test_workers_see_the_callers_contextvars():
 
 def test_worker_contextvar_writes_do_not_leak_back_to_the_caller():
     """Each worker gets its own copy, so a stray set() inside one stays contained."""
-    from gtotree.utils.context import log_file_var
+    from gtotree.utils.misc.context import log_file_var
 
     token = log_file_var.set("caller-value")
     try:

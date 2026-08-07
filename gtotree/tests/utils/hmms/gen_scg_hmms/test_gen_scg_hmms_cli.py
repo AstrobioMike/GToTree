@@ -227,7 +227,7 @@ def test_phase_one_fetches_both_tables_for_a_gtdb_wanted_ref_tax(reference_data_
 def test_phase_one_fetches_nothing_for_a_local_files_only_run(reference_data_fetches,
                                                               monkeypatch):
     """Local genome files never touch either table, so neither should be fetched."""
-    from gtotree.utils.general import GenomeData
+    from gtotree.utils.misc.general import GenomeData
 
     gd = GenomeData.from_path("/tmp/g1.faa", "amino-acid")
     monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([gd], []))

@@ -1,7 +1,7 @@
 import subprocess
 import pytest # type: ignore
 
-from gtotree.utils.general import GenomeData
+from gtotree.utils.misc.general import GenomeData
 
 
 def run_cli(cmd, **kwargs):

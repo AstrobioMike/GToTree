@@ -19,7 +19,7 @@ import pyarrow as pa  # type: ignore
 import pyarrow.compute as pc  # type: ignore
 import pyarrow.parquet as pq  # type: ignore
 
-from gtotree.utils.general import run_pooled_stage
+from gtotree.utils.misc.general import run_pooled_stage
 from gtotree.utils.ncbi.get_ncbi_assembly_data import ncbi_data_table_path
 from gtotree.utils.ncbi.parse_ncbi_assembly_summary import resolve_base_link
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError, _remove_quietly
@@ -49,7 +49,7 @@ def _download_and_unzip():
     download behavior itself (atomic write, retry/backoff, fast-fail on 404) is
     deliberately shared rather than reimplemented.
     """
-    from gtotree.utils.preprocessing_genomes import download_and_unzip_accession
+    from gtotree.utils.misc.preprocessing_genomes import download_and_unzip_accession
     return download_and_unzip_accession
 
 

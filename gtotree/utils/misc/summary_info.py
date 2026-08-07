@@ -14,12 +14,7 @@ def generate_primary_summary_table(args, run_data):
 
     rows = []
     for g in run_data.all_input_genomes:
-        label = (
-            m.get(g.id)
-            or m.get(g.full_path)
-            or m.get(g.provided_path)
-            or g.id
-        )
+        label = m.get(g.id) or g.id
 
         # lookup taxid only if an NCBI sub-table was produced
         taxid = taxid_map.get(g.id, "NA") if run_data.ncbi_sub_table_path else "NA"

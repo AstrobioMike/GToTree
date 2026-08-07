@@ -5,9 +5,10 @@ import time
 import pandas as pd # type: ignore
 import tempfile
 from collections import Counter
-from gtotree.utils.messaging import (color_text,
+from gtotree.utils.misc.messaging import (color_text,
                                      report_message,
                                      report_very_early_exit,
+                                     report_run_already_complete,
                                      report_missing_input_genomes_file,
                                      report_missing_pfam_targets_file,
                                      report_missing_ko_targets_file,
@@ -29,13 +30,13 @@ from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import AmbiguousTaxon, TaxonNotFound
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
                                                    WantedRefTaxError)
-from gtotree.utils.general import (ToolsUsed,
+from gtotree.utils.misc.general import (ToolsUsed,
                                    CorruptRunData,
                                    populate_run_data,
                                    read_run_data)
-from gtotree.utils.resume_state import (ResumeProfile, hash_file_contents,
+from gtotree.utils.misc.resume_state import (ResumeProfile, hash_file_contents,
                                         STATE_VERSION)
-from gtotree.utils.context import log_file_var
+from gtotree.utils.misc.context import log_file_var
 
 
 def preflight_checks(args):
@@ -344,6 +345,9 @@ def check_input_files(args):
                     "force-overwrite the previous outputs or specify a new output dir.")
                 report_very_early_exit()
 
+            if run_data.run_complete:
+                report_run_already_complete(args.output_dir)
+
     if run_data is None:
         run_data = populate_run_data(args)
         run_data.fingerprint = build_fingerprint(args)
@@ -514,12 +518,49 @@ def check_mapping_file(args, run_data, flag = "-m"):
 
         check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data)
 
-        run_data.mapping_dict = mapping_dict
-
-        # storing this so we are sure not to change any of these if we are adding taxonomic info later
-        run_data.initial_mapping_IDs_from_user = list(mapping_dict.keys())
+        # rekeyed to genome ids here, at the one place the dict is built, so every
+        # consumer downstream can just look up by id
+        run_data.mapping_dict = normalize_mapping_dict_keys(mapping_dict, run_data)
 
     return args, run_data
+
+
+def build_mapping_key_lookup(run_data):
+    """
+    {form the user may legitimately write in column 1 -> genome id}
+
+    Both the validator and the key normalization work off this one dict, so what
+    gets accepted and what can be resolved can't drift apart.
+
+    Accepted forms are the path as provided (which is what a user copying their
+    `-g`/`-f`/`-A` listing file will naturally write) and the genome id itself
+    (which is what an NCBI accession from `-a` already is, and is also the form
+    that shows up in the alignment headers and the summary table).
+    """
+    lookup = {}
+    for gd in run_data.all_input_genomes:
+        if gd.provided_path:
+            lookup.setdefault(gd.provided_path, gd.id)
+        lookup.setdefault(gd.id, gd.id)
+    return lookup
+
+
+def normalize_mapping_dict_keys(mapping_dict, run_data):
+    """
+    Rekey the user's mapping dict from whatever they wrote in column 1 to the
+    genome id.
+
+    Without this, `mapping_dict` ends up with two key spaces in it: the user's
+    entries keyed by the raw column-1 string (a path like "genome-1.faa" for
+    file-based input) and the entries the GTDB/NCBI taxonomy handlers add later,
+    keyed by genome id. Nothing that consumes the dict can then look anything up
+    with one form of key.
+
+    Key order is preserved, so a later duplicate-label check or report still sees
+    the user's file order.
+    """
+    lookup = build_mapping_key_lookup(run_data)
+    return {lookup.get(key, key): value for key, value in mapping_dict.items()}
 
 
 def check_mapping_file_problem_chars_and_fields(path):
@@ -610,9 +651,8 @@ def make_mapping_dict(path):
 
 def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
     entries_in_mapping_file = set(mapping_dict.keys())
-    # taking the basenames here because some inputs might have full/rel paths, but the mapping file shouldn't
-    entries_in_input_genomes = set(run_data.get_all_input_genome_provided_paths()) | set(run_data.get_input_ncbi_accs())
-    missing_keys = entries_in_mapping_file - entries_in_input_genomes
+    accepted_entries = set(build_mapping_key_lookup(run_data))
+    missing_keys = entries_in_mapping_file - accepted_entries
     if missing_keys:
         report_message(
             f'The mapping file "{run_data.mapping_file_path}" (passed to `-m`) specifies some input genomes that are not found in any of the the input-genome sources.\n\n'

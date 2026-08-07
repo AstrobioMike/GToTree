@@ -1,6 +1,6 @@
 import tempfile
 
-from gtotree.utils.messaging import (report_processing_stage,
+from gtotree.utils.misc.messaging import (report_processing_stage,
                                      report_ncbi_update,
                                      report_genbank_update,
                                      report_fasta_update,
@@ -9,14 +9,14 @@ from gtotree.utils.messaging import (report_processing_stage,
                                      report_pfam_searching_update,
                                      report_ko_searching_update,
                                      report_hmm_search_update)
-from gtotree.utils import phase_stats
-from gtotree.utils.general import write_run_data, run_pooled_stage, remove_file_if_exists
-from gtotree.utils.seqs import check_target_SCGs_have_seqs
+from gtotree.utils.misc import phase_stats
+from gtotree.utils.misc.general import write_run_data, run_pooled_stage, remove_file_if_exists
+from gtotree.utils.misc.seqs import check_target_SCGs_have_seqs
 from gtotree.utils.pfam.pfam_handling import get_additional_pfam_targets
 from gtotree.utils.ko.ko_handling import parse_kofamscan_targets
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 
-from gtotree.utils.preprocessing_genomes import (
+from gtotree.utils.misc.preprocessing_genomes import (
     build_base_link_map,
     capture_ncbi_failed_downloads,
     capture_failed_genbank_files,

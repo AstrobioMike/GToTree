@@ -1,6 +1,6 @@
 import pytest  # type: ignore
 from gtotree.tests.paths import DATA_DIR, MOCK_PFAM_HMM, MOCK_PFAM_INFO
-from gtotree.utils.context import log_file_var
+from gtotree.utils.misc.context import log_file_var
 
 RUN_LOG_NAME = "gtotree-runlog.txt"
 

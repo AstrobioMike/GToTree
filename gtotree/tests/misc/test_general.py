@@ -1,10 +1,13 @@
+import dataclasses
+import json
 import socket
 import urllib.error
 import urllib.request
+from pathlib import Path
 import pytest # type: ignore
 
-from gtotree.utils import general
-from gtotree.utils.general import download_with_tqdm
+from gtotree.utils.misc import general
+from gtotree.utils.misc.general import download_with_tqdm
 
 
 # --------------------------------------------------------------------------- #
@@ -406,6 +409,73 @@ class TestRunDataPersistence:
 
     def test_reading_a_missing_file_returns_none(self, tmp_path):
         assert general.read_run_data(str(tmp_path / "nope.json")) is None
+
+    def test_derived_fields_are_not_written(self, tmp_path):
+        """
+        all_input_genomes aliases the source lists, so writing it would put every
+        genome in the file twice.
+        """
+        rd = self._run_data(tmp_path)
+        general.write_run_data(rd)
+        on_disk = json.loads(Path(rd.run_data_path).read_text())
+        for name in general.DERIVED_RUN_DATA_FIELDS:
+            assert name not in on_disk
+        assert [gd["id"] for gd in on_disk["ncbi_accs"]] == ["GCF_000000001.1"]
+
+    def test_every_non_derived_field_is_written(self, tmp_path):
+        """Skipping derived fields must not silently drop anything else."""
+        rd = self._run_data(tmp_path)
+        general.write_run_data(rd)
+        on_disk = json.loads(Path(rd.run_data_path).read_text())
+        expected = {f.name for f in dataclasses.fields(rd)} - general.DERIVED_RUN_DATA_FIELDS
+        assert set(on_disk) == expected
+
+    def test_all_input_genomes_is_rebuilt_on_read(self, tmp_path):
+        rd = self._run_data(tmp_path)
+        rd.amino_acid_files = [general.GenomeData.from_path("/in/mock.faa", "aa-fasta-file")]
+        rd.update_all_input_genomes()
+        general.write_run_data(rd)
+
+        back = general.read_run_data(rd.run_data_path)
+        assert [gd.id for gd in back.all_input_genomes] == ["GCF_000000001.1", "mock"]
+
+    def test_rebuilt_all_input_genomes_aliases_the_source_lists(self, tmp_path):
+        """
+        Mutating a genome through either view has to be visible through the other,
+        or per-genome progress recorded by a stage wouldn't reach the next write.
+        """
+        rd = self._run_data(tmp_path)
+        general.write_run_data(rd)
+
+        back = general.read_run_data(rd.run_data_path)
+        assert back.all_input_genomes[0] is back.ncbi_accs[0]
+
+        back.all_input_genomes[0].mark_hmm_search_done()
+        assert back.ncbi_accs[0].hmm_search_done is True
+
+    def test_a_legacy_file_carrying_derived_fields_still_loads(self, tmp_path):
+        """run-data.json written before derived fields were dropped must still resume."""
+        rd = self._run_data(tmp_path)
+        general.write_run_data(rd)
+
+        on_disk = json.loads(Path(rd.run_data_path).read_text())
+        # a stale duplicate, deliberately disagreeing with the source list
+        on_disk["all_input_genomes"] = [
+            {"id": "STALE", "source": "accession", "full_path": None,
+             "provided_path": None, "basename": "STALE"}
+        ]
+        Path(rd.run_data_path).write_text(json.dumps(on_disk))
+
+        back = general.read_run_data(rd.run_data_path)
+        assert [gd.id for gd in back.all_input_genomes] == ["GCF_000000001.1"]
+
+    def test_writing_does_not_mutate_the_run_data(self, tmp_path):
+        """run_data_as_dict references rather than deep-copies; it must stay read-only."""
+        rd = self._run_data(tmp_path)
+        rd.tax_info_dict = {"GCF_000000001.1": {"domain": "Bacteria"}}
+        general.write_run_data(rd)
+        assert rd.tax_info_dict == {"GCF_000000001.1": {"domain": "Bacteria"}}
+        assert rd.all_input_genomes[0] is rd.ncbi_accs[0]
 
     def test_reading_a_damaged_file_raises_corrupt_run_data(self, tmp_path):
         path = tmp_path / "run-data.json"

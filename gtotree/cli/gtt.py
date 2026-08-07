@@ -95,7 +95,7 @@ def print_overview():
 
     from rich.console import Console  # type: ignore
     from rich.table import Table  # type: ignore
-    from gtotree.utils.messaging import get_version
+    from gtotree.utils.misc.messaging import get_version
     from datetime import datetime
 
     console = Console(highlight=False)

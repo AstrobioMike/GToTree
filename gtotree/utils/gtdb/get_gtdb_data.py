@@ -17,9 +17,9 @@ import socket
 import urllib
 import urllib.error
 
-from gtotree.utils.messaging import (wprint, color_text, report_message,
+from gtotree.utils.misc.messaging import (wprint, color_text, report_message,
                                      report_early_exit)
-from gtotree.utils.general import download_with_tqdm
+from gtotree.utils.misc.general import download_with_tqdm
 
 
 # bit hosts the prepared GTDB assets on a rolling "-latest" GitHub release. GToTree

@@ -10,7 +10,7 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
                                                                  read_hmm_accessions,
                                                                  write_filtered_pfam_hmms,
                                                                  )
-from gtotree.utils.general import decode_pyhmmer_text
+from gtotree.utils.misc.general import decode_pyhmmer_text
 from gtotree.tests.paths import DATA_DIR
 
 MOCK_PFAM_INFO = DATA_DIR / "mock-pfamA.txt"

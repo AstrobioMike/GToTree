@@ -1,4 +1,4 @@
-from gtotree.utils.messaging import color_text, gtotree_header
+from gtotree.utils.misc.messaging import color_text, gtotree_header
 
 helpmenu = gtotree_header()
 

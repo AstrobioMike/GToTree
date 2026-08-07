@@ -1,6 +1,6 @@
-from gtotree.utils.messaging import report_processing_stage
-from gtotree.utils.tree_program_handling import run_tree_building
-from gtotree.utils.general import file_is_usable_else_clear, write_run_data
+from gtotree.utils.misc.messaging import report_processing_stage
+from gtotree.utils.misc.tree_program_handling import run_tree_building
+from gtotree.utils.misc.general import file_is_usable_else_clear, write_run_data
 
 def make_tree(args, run_data):
 

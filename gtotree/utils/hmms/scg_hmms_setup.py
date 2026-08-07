@@ -1,8 +1,8 @@
 import os
 import sys
-from gtotree.utils.messaging import wprint, color_text, report_message, report_early_exit
+from gtotree.utils.misc.messaging import wprint, color_text, report_message, report_early_exit
 import pandas as pd # type: ignore
-from gtotree.utils.general import download_with_tqdm, SCGset, decode_pyhmmer_text
+from gtotree.utils.misc.general import download_with_tqdm, SCGset, decode_pyhmmer_text
 from gtotree.utils.hmms.hmm_searching_engine import profiles_missing_gathering_cutoffs
 import pyhmmer #type: ignore
 

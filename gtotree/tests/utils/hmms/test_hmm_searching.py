@@ -3,7 +3,7 @@
 
 from gtotree.utils.hmms.hmm_searching import (parse_hmmer_results,
                                                 rebuild_combined_SCG_outputs)
-from gtotree.utils.general import RunData, SCGset
+from gtotree.utils.misc.general import RunData, SCGset
 
 
 def _run_data(targets, best_hit_mode=False):
@@ -121,7 +121,7 @@ def test_worker_reports_failure_instead_of_raising(monkeypatch):
     problems in its status dict rather than propagating them.
     """
     from gtotree.utils.hmms import hmm_searching
-    from gtotree.utils.general import GenomeData
+    from gtotree.utils.misc.general import GenomeData
 
     def exploding(*a, **k):
         raise MemoryError("blow-up inside the worker")
@@ -147,7 +147,7 @@ class TestRebuildCombinedSCGOutputs:
 
     def _setup(self, tmp_path, genome_ids, scg_ids=("SCG_A", "SCG_B")):
         import os
-        from gtotree.utils.general import RunData, GenomeData, SCGset
+        from gtotree.utils.misc.general import RunData, GenomeData, SCGset
 
         rd = RunData()
         rd.output_dir = str(tmp_path / "out")
@@ -210,7 +210,7 @@ class TestRebuildCombinedSCGOutputs:
         assert content.count(">G1") == 1
 
     def test_skips_genomes_with_no_artifacts_and_removed_genomes(self, tmp_path):
-        from gtotree.utils.general import GenomeData
+        from gtotree.utils.misc.general import GenomeData
         rd = self._setup(tmp_path, ["G1", "G2"])
         ghost = GenomeData.from_acc("G_missing")
         ghost.preprocessing_done = ghost.hmm_search_done = True

@@ -6,13 +6,13 @@ import shutil
 import json
 import time
 import argparse
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, fields, is_dataclass
 from typing import List
 from tqdm import tqdm # type: ignore
 import urllib.request
 import urllib.error
 from datetime import datetime
-from gtotree.utils.messaging import (report_message, color_text, wprint)
+from gtotree.utils.misc.messaging import (report_message, color_text, wprint)
 
 
 def atomic_write_text(path, write_fn, encoding="utf-8"):
@@ -224,6 +224,10 @@ def download_and_gunzip(url, target):
     except:
         return False
 
+GENOME_SOURCE_FIELDS = ("ncbi_accs", "genbank_files", "fasta_files", "amino_acid_files")
+
+DERIVED_RUN_DATA_FIELDS = frozenset({"all_input_genomes"})
+
 
 @dataclass
 class GenomeData:
@@ -402,8 +406,10 @@ class RunData:
     SCG_hits_filtered: bool = False
     genomes_filtered_for_min_SCG_hits: bool = False
     all_SCG_sets_aligned: bool = False
+    SCG_sets_concatenated: bool = False
     updating_headers: bool = False
     headers_updated: bool = False
+    run_complete: bool = False
     use_muscle_super5: bool = False
     num_muscle_threads: int = 5
     nucleotide_mode: bool = False
@@ -475,11 +481,12 @@ class RunData:
         return [scg for scg in self.SCG_targets if scg.ready_for_cat and not scg.removed]
 
     def update_all_input_genomes(self):
+        """
+        Build `all_input_genomes` from the four source lists
+        """
         self.all_input_genomes = []
-        self.all_input_genomes.extend(self.ncbi_accs)
-        self.all_input_genomes.extend(self.genbank_files)
-        self.all_input_genomes.extend(self.fasta_files)
-        self.all_input_genomes.extend(self.amino_acid_files)
+        for name in GENOME_SOURCE_FIELDS:
+            self.all_input_genomes.extend(getattr(self, name))
 
     def get_all_input_genome_ids(self) -> List[str]:
         return [gd.id for gd in self.all_input_genomes]
@@ -679,8 +686,25 @@ def read_args(args_path):
     return args
 
 
+def run_data_as_dict(run_data):
+    """
+    Build the JSON-serializable view of a RunData, skipping DERIVED_RUN_DATA_FIELDS
+    """
+    run_data_dict = {}
+    for f in fields(run_data):
+        if f.name in DERIVED_RUN_DATA_FIELDS:
+            continue
+        value = getattr(run_data, f.name)
+        if is_dataclass(value):
+            value = asdict(value)
+        elif isinstance(value, list):
+            value = [asdict(item) if is_dataclass(item) else item for item in value]
+        run_data_dict[f.name] = value
+    return run_data_dict
+
+
 def write_run_data(run_data):
-    run_data_dict = asdict(run_data)
+    run_data_dict = run_data_as_dict(run_data)
     if isinstance(run_data.start_time, datetime):
         run_data_dict['start_time'] = run_data.start_time.isoformat()
     atomic_write_text(run_data.run_data_path,
@@ -699,16 +723,13 @@ def read_run_data(path):
         with open(path) as f:
             run_data_dict = json.load(f)
 
-        if "ncbi_accs" in run_data_dict:
-            run_data_dict["ncbi_accs"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["ncbi_accs"]]
-        if "genbank_files" in run_data_dict:
-            run_data_dict["genbank_files"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["genbank_files"]]
-        if "fasta_files" in run_data_dict:
-            run_data_dict["fasta_files"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["fasta_files"]]
-        if "amino_acid_files" in run_data_dict:
-            run_data_dict["amino_acid_files"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["amino_acid_files"]]
-        if "all_input_genomes" in run_data_dict:
-            run_data_dict["all_input_genomes"] = [GenomeData(**gd) if isinstance(gd, dict) else gd for gd in run_data_dict["all_input_genomes"]]
+        for name in DERIVED_RUN_DATA_FIELDS:
+            run_data_dict.pop(name, None)
+
+        for name in GENOME_SOURCE_FIELDS:
+            if name in run_data_dict:
+                run_data_dict[name] = [GenomeData(**gd) if isinstance(gd, dict) else gd
+                                       for gd in run_data_dict[name]]
 
         if "tools_used" in run_data_dict and run_data_dict["tools_used"] is not None:
             run_data_dict["tools_used"] = ToolsUsed(**run_data_dict["tools_used"])
@@ -916,3 +937,4 @@ def concat_files(file_list, output_file):
 def cleanup(args, run_data):
     if not args.debug:
         shutil.rmtree(run_data.tmp_dir, ignore_errors=True)
+        run_data.tmp_dir = ""

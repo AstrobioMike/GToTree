@@ -2,7 +2,7 @@ import os
 import shlex
 import shutil
 import subprocess
-from gtotree.utils.messaging import report_early_exit, report_notice, color_text, spinner
+from gtotree.utils.misc.messaging import report_early_exit, report_notice, color_text, spinner
 from gtotree.utils.helper_scripts.gtt_midpoint_root_tree import midpoint_root_tree
 
 

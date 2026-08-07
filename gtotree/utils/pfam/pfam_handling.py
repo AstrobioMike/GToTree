@@ -1,7 +1,7 @@
 import os
 import sys
-from gtotree.utils.general import concat_files, decode_pyhmmer_text
-from gtotree.utils.messaging import wprint, color_text, spinner
+from gtotree.utils.misc.general import concat_files, decode_pyhmmer_text
+from gtotree.utils.misc.messaging import wprint, color_text, spinner
 from gtotree.utils.pfam.get_pfam_data import HMM_FILENAME, INFO_FILENAME
 import pyhmmer  # type: ignore
 

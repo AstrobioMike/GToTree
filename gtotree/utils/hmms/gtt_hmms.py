@@ -4,7 +4,7 @@ import os
 import sys
 import argparse
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
-from gtotree.utils.messaging import color_text, report_message
+from gtotree.utils.misc.messaging import color_text, report_message
 from gtotree.utils.hmms.scg_hmms_setup import (check_hmm_location_var_is_set,
                                               read_in_hmm_summary_table)
 

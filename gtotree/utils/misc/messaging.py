@@ -8,7 +8,7 @@ import itertools
 import threading
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
-from gtotree.utils.context import log_file_var
+from gtotree.utils.misc.context import log_file_var
 
 
 tty_colors = {
@@ -253,6 +253,18 @@ def report_early_exit(run_data, message = None, color = "red", suggest_help = Fa
     sys.exit(1)
 
 
+def report_run_already_complete(output_dir):
+    print("")
+    wprint(color_text(
+        "This run has already finished! Its "
+        f'outputs are all in "{output_dir}".', "green"))
+    wprint(color_text(
+        "If you meant to run it over again from scratch, use `-F` to overwrite "
+        "those outputs, or point `-o` at a new directory.", "yellow"))
+    print("")
+    sys.exit(0)
+
+
 def report_very_early_exit(message = None, color = "red", suggest_help = False):
     print("")
     if message:
@@ -303,7 +315,7 @@ def stdout_and_log(*args, log_file="gtotree-runlog.txt", sep=" ", end="\n\n", fl
 def display_initial_run_info(args, run_data):
 
     # this is here instead of above to prevent circular import problems (in other words, i suck at this)
-    from gtotree.utils.preflight_checks import check_input_genomes_amount
+    from gtotree.utils.misc.preflight_checks import check_input_genomes_amount
 
     # time.sleep(1)
 

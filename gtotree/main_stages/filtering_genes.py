@@ -1,10 +1,10 @@
-from gtotree.utils.general import (write_run_data,
+from gtotree.utils.misc.general import (write_run_data,
                                    required_count,
                                    run_pooled_stage)
-from gtotree.utils.messaging import (report_message,
+from gtotree.utils.misc.messaging import (report_message,
                                      report_processing_stage,
                                      report_SCG_set_filtering_update)
-from gtotree.utils.seqs import check_target_SCGs_have_seqs, filter_seqs_by_length
+from gtotree.utils.misc.seqs import check_target_SCGs_have_seqs, filter_seqs_by_length
 
 def filter_genes(args, run_data):
 

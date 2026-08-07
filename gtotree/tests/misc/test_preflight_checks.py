@@ -2,7 +2,7 @@
 
 import pytest  # type: ignore
 
-from gtotree.utils.preflight_checks import (check_for_duplicates,
+from gtotree.utils.misc.preflight_checks import (check_for_duplicates,
                                             check_for_whitespace,
                                             check_mapping_file_problem_chars_and_fields)
 
@@ -42,7 +42,7 @@ class TestMappingFileValidation:
 
 def test_duplicate_entries_are_removed_in_input_order(tmp_path, monkeypatch):
     """De-duplication must be order-preserving; genome order flows into the alignment."""
-    import gtotree.utils.preflight_checks as pc
+    import gtotree.utils.misc.preflight_checks as pc
     monkeypatch.setattr(pc.time, "sleep", lambda *_a: None)
 
     src = tmp_path / "accs.txt"

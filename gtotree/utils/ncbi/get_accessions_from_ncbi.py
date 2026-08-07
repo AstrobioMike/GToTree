@@ -5,7 +5,7 @@ from collections import namedtuple
 import pyarrow.compute as pc # type: ignore
 import pyarrow.parquet as pq # type: ignore
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
-from gtotree.utils.messaging import report_message, wprint, color_text, spinner
+from gtotree.utils.misc.messaging import report_message, wprint, color_text, spinner
 from gtotree.utils.ncbi.get_ncbi_assembly_data import (get_ncbi_assembly_data,
                                                        ncbi_data_table_path,
                                                        read_date_retrieved)

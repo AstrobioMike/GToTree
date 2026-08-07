@@ -1,7 +1,7 @@
 import importlib
 import os
 import pytest # type: ignore
-from gtotree.utils import phase_stats
+from gtotree.utils.misc import phase_stats
 
 
 @pytest.fixture

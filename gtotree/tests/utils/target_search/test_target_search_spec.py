@@ -11,7 +11,7 @@ import dataclasses
 
 import pytest  # type: ignore
 
-from gtotree.utils.general import RunData, GenomeData
+from gtotree.utils.misc.general import RunData, GenomeData
 from gtotree.utils.target_search.target_search_spec import get_spec, TargetSearchSpec
 
 

@@ -13,7 +13,7 @@ import shutil
 import pytest  # type: ignore
 
 from gtotree.tests.paths import DATA_DIR
-from gtotree.utils.general import GenomeData
+from gtotree.utils.misc.general import GenomeData
 from gtotree.main_stages.processing_genomes import (SearchPlan,
                                                     genomes_needing_processing)
 
@@ -61,9 +61,9 @@ class TestGenomesNeedingProcessing:
 
 def _process(tmp_path, source_flag, listing_paths, hmm, extra=()):
     from gtotree.cli.parser import parser
-    from gtotree.utils.preflight_checks import preflight_checks
+    from gtotree.utils.misc.preflight_checks import preflight_checks
     from gtotree.main_stages.processing_genomes import process_genomes
-    from gtotree.utils.context import log_file_var
+    from gtotree.utils.misc.context import log_file_var
 
     listing = tmp_path / "inputs.txt"
     listing.write_text("\n".join(str(p) for p in listing_paths) + "\n")

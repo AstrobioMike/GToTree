@@ -16,7 +16,7 @@ from collections import Counter
 
 import pyhmmer  # type: ignore
 
-from gtotree.utils.general import decode_pyhmmer_text
+from gtotree.utils.misc.general import decode_pyhmmer_text
 from gtotree.utils.pfam.get_pfam_data import HMM_FILENAME, INFO_FILENAME
 
 

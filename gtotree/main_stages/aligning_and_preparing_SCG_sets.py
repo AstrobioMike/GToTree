@@ -1,11 +1,11 @@
 import os
-from gtotree.utils.general import (write_run_data,
+from gtotree.utils.misc.general import (write_run_data,
                                    run_pooled_stage,
                                    remove_file_if_exists,
                                    file_is_usable_else_clear)
-from gtotree.utils.messaging import (report_processing_stage,
+from gtotree.utils.misc.messaging import (report_processing_stage,
                                      report_no_SCGs_remaining)
-from gtotree.utils.seqs import (copy_gene_alignments,
+from gtotree.utils.misc.seqs import (copy_gene_alignments,
                                 run_muscle,
                                 run_trimal,
                                 add_needed_gap_seqs,

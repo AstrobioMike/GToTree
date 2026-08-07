@@ -1,7 +1,7 @@
 import re
 import pyarrow.compute as pc # type: ignore
 import pyarrow.dataset as ds # type: ignore
-from gtotree.utils.messaging import report_ncbi_accs_not_found
+from gtotree.utils.misc.messaging import report_ncbi_accs_not_found
 
 
 # columns read from the NCBI Parquet asset for the per-accession info sub-table

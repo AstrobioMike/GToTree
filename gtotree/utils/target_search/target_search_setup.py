@@ -22,8 +22,8 @@ import os
 import shutil
 import argparse
 
-from gtotree.utils.general import GenomeData, RunData, ToolsUsed
-from gtotree.utils.messaging import report_message
+from gtotree.utils.misc.general import GenomeData, RunData, ToolsUsed
+from gtotree.utils.misc.messaging import report_message
 
 
 class TargetSearchError(Exception):
@@ -298,7 +298,7 @@ def ensure_reference_data(args, spec):
     """
     Fetch the managed reference datasets this run will read
     """
-    from gtotree.utils.data_locations import ensure_reference_data as _ensure
+    from gtotree.utils.misc.data_locations import ensure_reference_data as _ensure
 
     _ensure(has_ncbi_accessions=bool(args.ncbi_accessions),
             wanted_ref_tax=args.wanted_ref_tax,
@@ -429,7 +429,7 @@ def validate_input_files(args, spec):
     duplicate entries, and (for the file-listing flags) that every listed genome file
     actually exists
     """
-    from gtotree.utils.preflight_checks import check_expected_single_column_input
+    from gtotree.utils.misc.preflight_checks import check_expected_single_column_input
 
     for dest, flag in (("ncbi_accessions", "-a"),
                        ("genbank_files", "-g"),

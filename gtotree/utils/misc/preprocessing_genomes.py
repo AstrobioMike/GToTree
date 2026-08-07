@@ -13,10 +13,10 @@ import time
 import random
 import subprocess
 import threading
-from gtotree.utils.seqs import (filter_and_rename_fasta,
+from gtotree.utils.misc.seqs import (filter_and_rename_fasta,
                                 extract_filter_and_rename_cds_amino_acids_from_gb,
                                 extract_fasta_from_gb)
-from gtotree.utils.general import (gunzip_if_needed,
+from gtotree.utils.misc.general import (gunzip_if_needed,
                                    remove_file_if_exists)
 
 

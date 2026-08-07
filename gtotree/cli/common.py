@@ -44,7 +44,7 @@ class VersionAction(argparse.Action):
         super().__init__(option_strings, dest, nargs=0, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        from gtotree.utils.messaging import get_version
+        from gtotree.utils.misc.messaging import get_version
         print(f"GToTree v{get_version()}")
         parser.exit()
 

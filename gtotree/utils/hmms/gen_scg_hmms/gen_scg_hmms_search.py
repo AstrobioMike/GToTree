@@ -25,7 +25,7 @@ import tempfile
 import pyhmmer  # type: ignore
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import genome_id_from_protein_name
-from gtotree.utils.general import decode_pyhmmer_text
+from gtotree.utils.misc.general import decode_pyhmmer_text
 
 
 class HmmSearchError(GenSCGHMMsError):

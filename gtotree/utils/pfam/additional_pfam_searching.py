@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import pandas as pd # type: ignore
 from Bio import SeqIO # type: ignore
-from gtotree.utils.general import (search_threads_per_genome,
+from gtotree.utils.misc.general import (search_threads_per_genome,
                                    atomic_write_text)
 from gtotree.utils.hmms.hmm_searching_engine import search_one_genome
 

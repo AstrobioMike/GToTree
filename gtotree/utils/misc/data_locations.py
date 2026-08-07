@@ -3,7 +3,7 @@
 import sys
 import os
 import shutil
-from gtotree.utils.messaging import report_message, color_text, wprint
+from gtotree.utils.misc.messaging import report_message, color_text, wprint
 
 
 ENV_VARIABLES = [

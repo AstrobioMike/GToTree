@@ -5,7 +5,7 @@ import statistics
 import pytest  # type: ignore
 from Bio import SeqIO  # type: ignore
 
-from gtotree.utils.seqs import (_fasta_seq_lengths,
+from gtotree.utils.misc.seqs import (_fasta_seq_lengths,
                                 add_needed_gap_seqs,
                                 filter_seqs_by_genome_ids,
                                 filter_seqs_by_length)

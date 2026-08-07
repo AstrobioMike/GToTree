@@ -15,7 +15,7 @@ run with `-p`/`-K` would have produced.
 
 import os
 
-from gtotree.utils.general import atomic_write_text
+from gtotree.utils.misc.general import atomic_write_text
 
 
 SUMMARY_FILENAME = "genomes-summary-info.tsv"

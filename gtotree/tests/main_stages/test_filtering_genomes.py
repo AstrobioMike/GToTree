@@ -2,7 +2,7 @@
 
 import pytest  # type: ignore
 
-from gtotree.utils.general import GenomeData, RunData, SCGset
+from gtotree.utils.misc.general import GenomeData, RunData, SCGset
 from gtotree.main_stages.filtering_genomes import capture_removed_genomes
 
 
@@ -80,7 +80,7 @@ def test_uncounted_genome_is_filtered_out_rather_than_crashing():
     A genome whose hits were never counted (num_SCG_hits_after_filtering is None) must
     compare as zero. Comparing None against the threshold directly raises TypeError.
     """
-    from gtotree.utils.general import required_count
+    from gtotree.utils.misc.general import required_count
 
     threshold = required_count(4, 0.5)
     uncounted = None

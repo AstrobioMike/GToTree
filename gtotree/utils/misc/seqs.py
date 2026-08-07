@@ -3,8 +3,9 @@ import shutil
 import statistics
 from Bio import SeqIO # type: ignore
 import subprocess
-from gtotree.utils.general import (remove_file_if_exists,
-                                   file_is_usable_else_clear)
+from gtotree.utils.misc.general import (remove_file_if_exists,
+                                   file_is_usable_else_clear,
+                                   atomic_write_text)
 
 
 def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_length = 99999):
@@ -270,10 +271,12 @@ def concatenate_alignments(run_data):
         output_path = os.path.join(run_data.output_dir, "aligned-SCGs.fasta")
         spacer = "NNNNNN"
 
-    with open(output_path, "w") as out:
+    def _write_concatenated(out):
         for header, seqs in dict_of_genomes.items():
             out.write(">" + header + "\n")
             out.write(spacer.join(seqs) + "\n")
+
+    atomic_write_text(output_path, _write_concatenated)
 
     run_data.concatenated_alignment_path = output_path
 
@@ -292,37 +295,50 @@ def gen_partitions_file(run_data, SCG_IDs, dict_of_genomes):
     mol_type = "AA" if not run_data.nucleotide_mode else "DNA"
     spacer_addition = 6 if not run_data.nucleotide_mode else 7
 
-    # writing out a partitions.txt and a partitions.nex
-    with open(run_data.run_files_dir + "/partitions.txt", "w") as txt_out:
+    txt_lines = []
+    nex_lines = ["#NEXUS\n", "begin sets;\n"]
 
-        with open(run_data.run_files_dir + "/partitions.nex", "w") as nex_out:
+    for i in range(0, len(SCG_IDs)):
 
-            nex_out.write("#NEXUS\n")
-            nex_out.write("begin sets;\n")
+        curr_stop = curr_start + alignment_lengths_list[i] - 1
 
-            for i in range(0,len(SCG_IDs)):
+        txt_lines.append(f"{mol_type}, {SCG_IDs[i]} = {curr_start}-{curr_stop}\n")
+        nex_lines.append(f"  charset {SCG_IDs[i]} = {curr_start}-{curr_stop};\n")
 
-                curr_stop = curr_start + alignment_lengths_list[i] - 1
+        curr_start = curr_stop + spacer_addition
 
-                txt_out.write(f"{mol_type}, {SCG_IDs[i]} = {curr_start}-{curr_stop}\n")
-                nex_out.write(f"  charset {SCG_IDs[i]} = {curr_start}-{curr_stop};\n")
+    nex_lines.append("end;\n")
 
-                curr_start = curr_stop + spacer_addition
-
-            nex_out.write("end;\n")
+    atomic_write_text(run_data.run_files_dir + "/partitions.txt",
+                      lambda f: f.writelines(txt_lines))
+    atomic_write_text(run_data.run_files_dir + "/partitions.nex",
+                      lambda f: f.writelines(nex_lines))
 
 
 def swap_labels_in_alignment(run_data):
-    orig_alignment_path = os.path.join(run_data.output_dir, f"aligned-SCGs{run_data.general_ext}")
-    backup_alignment_path = os.path.join(run_data.run_files_dir, f"aligned-SCGs{run_data.general_ext}")
-    new_alignment_path = os.path.join(run_data.output_dir, f"aligned-SCGs-mod-names{run_data.general_ext}")
+    ext = run_data.general_ext
+    orig_alignment_path = os.path.join(run_data.output_dir, f"aligned-SCGs{ext}")
+    backup_alignment_path = os.path.join(run_data.run_files_dir, f"aligned-SCGs{ext}")
+    new_alignment_path = os.path.join(run_data.output_dir, f"aligned-SCGs-mod-names{ext}")
 
-    with open(new_alignment_path, "w") as fh:
-        for seq in SeqIO.parse(orig_alignment_path, "fasta"):
+    if file_is_usable_else_clear(orig_alignment_path):
+        source_path = orig_alignment_path
+    elif file_is_usable_else_clear(backup_alignment_path):
+        source_path = backup_alignment_path
+    else:
+        raise FileNotFoundError(
+            "the concatenated alignment couldn't be found at either "
+            f'"{orig_alignment_path}" or "{backup_alignment_path}"')
+
+    def _write_relabeled(fh):
+        for seq in SeqIO.parse(source_path, "fasta"):
             label = run_data.mapping_dict.get(seq.id, seq.id)
             fh.write(f">{label}\n{seq.seq}\n")
 
-    shutil.move(orig_alignment_path, backup_alignment_path)
+    atomic_write_text(new_alignment_path, _write_relabeled)
+
+    if source_path == orig_alignment_path:
+        os.replace(orig_alignment_path, backup_alignment_path)
 
     run_data.final_alignment_path = new_alignment_path
 

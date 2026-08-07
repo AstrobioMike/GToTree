@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 import pytest  # type: ignore
 
-import gtotree.utils.preprocessing_genomes as P
-from gtotree.utils.preprocessing_genomes import (
+import gtotree.utils.misc.preprocessing_genomes as P
+from gtotree.utils.misc.preprocessing_genomes import (
     _sleep_backoff,
     download_and_unzip_accession,
     NCBI_MAX_BACKOFF,

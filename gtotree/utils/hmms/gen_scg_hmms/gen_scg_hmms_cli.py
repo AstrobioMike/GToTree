@@ -21,13 +21,13 @@ import argparse
 from tqdm import tqdm  # type: ignore
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
-from gtotree.utils.general import (run_pooled_stage,
+from gtotree.utils.misc.general import (run_pooled_stage,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED,
                                    GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED)
-from gtotree.utils import phase_stats
-from gtotree.utils.messaging import (report_message, color_text, spinner,
+from gtotree.utils.misc import phase_stats
+from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
                                      report_very_early_exit)
-from gtotree.utils.data_locations import ensure_reference_data
+from gtotree.utils.misc.data_locations import ensure_reference_data
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
@@ -41,7 +41,7 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
     read_hmm_accessions,
     write_filtered_pfam_hmms,
 )
-from gtotree.utils.resume_state import ResumeProfile, hash_strings, hash_local_genomes, STATE_VERSION
+from gtotree.utils.misc.resume_state import ResumeProfile, hash_strings, hash_local_genomes, STATE_VERSION
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (TargetGenomeError,
                                                                   read_accessions_file,
                                                                   resolve_download_info,
