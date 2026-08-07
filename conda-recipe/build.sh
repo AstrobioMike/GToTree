@@ -34,7 +34,7 @@ echo 'export LC_ALL="en_US.UTF-8"' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 echo 'export LANG="en_US.UTF-8"' >> ${PREFIX}/etc/conda/activate.d/gtotree.sh
 
 # cp -r bin/ ${PREFIX}/bin/
-cp hmm_sets/* ${PREFIX}/share/gtotree/hmm_sets/
+cp hmm_sets/*.tsv ${PREFIX}/share/gtotree/hmm_sets/
 cp LICENSE ${PREFIX}
 
 ## this is intended to help with users who don't have write access in the conda environment location
