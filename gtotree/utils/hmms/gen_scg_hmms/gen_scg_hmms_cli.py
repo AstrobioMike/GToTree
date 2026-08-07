@@ -91,6 +91,8 @@ RESUME = ResumeProfile(
         "wanted_ref_tax": "--wanted-ref-tax",
         "target_rank": "--target-rank",
         "derep_rank": "--derep-rank",
+        "min_completeness": "--min-completeness",
+        "max_contamination": "--max-contamination",
         "pfam_version": "the Pfam version",
     },
     # the Pfam version isn't resolved until the Pfam stage runs, so a run interrupted
@@ -120,9 +122,12 @@ def build_fingerprint(accessions, args, pfam_version=None, local_genomes=None):
         "percent_single_copy": args.percent_single_copy,
         "min_pfam_coverage": args.min_pfam_coverage,
         "source": (args.source or "").upper(),
-        "wanted_ref_tax": args.wanted_ref_tax,
+        "wanted_ref_tax": (sorted(args.wanted_ref_tax)
+                           if args.wanted_ref_tax else None),
         "target_rank": args.target_rank,
         "derep_rank": args.derep_rank,
+        "min_completeness": args.min_completeness,
+        "max_contamination": args.max_contamination,
         "pfam_version": pfam_version,
     }
 
@@ -135,9 +140,9 @@ def build_parser(parent_subparsers=None):
 
     desc = ("This is a helper program to generate a new single-copy gene (SCG) HMM set "
             "for use with GToTree. It takes a set of target genomes as various possible inputs "
-            "and/or selected by taxonomy with `--wanted-ref-tax`, finds "
-            "which Pfam profiles are present in exactly one copy in most of them, and "
-            "writes those profiles out as a new SCG-HMM set. See the wiki for "
+            "and/or selected by taxonomy with `--wanted-ref-tax`, finds which Pfam "
+            "profiles are present in exactly one copy in a specified percentage of them, "
+            "and writes those profiles out as a new SCG-HMM set. See the wiki for "
             "details on the process: github.com/AstrobioMike/GToTree/wiki/SCG-sets")
 
     if parent_subparsers is not None:
@@ -192,9 +197,11 @@ def build_parser(parent_subparsers=None):
     required.add_argument(
         "-w", "--wanted-ref-tax",
         metavar="<STR>",
-        help=("A target taxon whose reference genomes should be used (e.g. "
-              "'Nitrospirota')."),
-        action="store",
+        help=("A target taxon whose reference genomes should be used (e.g., "
+              "'Nitrospirota'). May be given more than once to pool several taxa into "
+              "one set (e.g. `-w Bacteria -w Archaea`); each is resolved and "
+              "dereplicated on its own, then merged."),
+        action="append",
     )
 
     optional.add_argument(
@@ -220,6 +227,26 @@ def build_parser(parent_subparsers=None):
         choices=["auto", "off"] + list(RANKS),
         help=("Dereplicate the selected genomes down to one per unique value of this "
               "rank (default: off). Use 'auto' for two ranks finer than the target."),
+        action="store",
+    )
+
+    optional.add_argument(
+        "--min-completeness",
+        metavar="<FLOAT>",
+        default=None,
+        type=float,
+        help=("Minimum estimated completeness for a `--wanted-ref-tax` genome to be "
+              "eligible, between 0 and 100 (default: None)."),
+        action="store",
+    )
+
+    optional.add_argument(
+        "--max-contamination",
+        metavar="<FLOAT>",
+        default=None,
+        type=float,
+        help=("Maximum estimated contamination for a `--wanted-ref-tax` genome to be "
+              "eligible (default: None)."),
         action="store",
     )
 
@@ -346,6 +373,21 @@ def check_args(args):
     if args.num_jobs < 1:
         raise GenSCGHMMsError("The `--num-jobs` (-n) parameter needs to be at least 1.")
 
+    if args.min_completeness is not None and not 0 <= args.min_completeness <= 100:
+        raise GenSCGHMMsError(
+            "The `--min-completeness` parameter needs to be between 0 and 100.")
+
+    if args.max_contamination is not None and args.max_contamination < 0:
+        raise GenSCGHMMsError(
+            "The `--max-contamination` parameter can't be negative.")
+
+    if (args.min_completeness is not None or args.max_contamination is not None) \
+            and not args.wanted_ref_tax:
+        raise GenSCGHMMsError(
+            "`--min-completeness` / `--max-contamination` filter the genomes selected "
+            "by `--wanted-ref-tax` (-w), so they need `-w` to act on. Genomes given "
+            "directly with `-a`, `-g`, `-f`, or `-A` are always used as provided.")
+
     return args
 
 
@@ -434,31 +476,45 @@ def phase_resolve_genomes(args):
         if source_desc:
             print(f"      Genome source being used: {color_text(source_desc, 'green')}\n")
 
-        with spinner(f"Selecting reference genomes for '{args.wanted_ref_tax}'...",
-                     "Selected reference genomes"):
-            selected, selection = resolve_wanted_ref_tax_accessions(
-                args.source, args.wanted_ref_tax,
-                target_rank=args.target_rank,
-                derep_rank=args.derep_rank)
+        # -w is repeatable (action="append" -> a list). Normalise a lone string too, so
+        # a programmatic caller passing "Bacteria" isn't silently iterated into its
+        # characters. Each taxon is resolved and dereplicated independently, then its
+        # genomes are merged into the shared pool -- per-taxon rather than over the
+        # union so a derep rank means the same thing it would for a single -w (one
+        # genome per group WITHIN each taxon), and so two taxa sharing a genus each keep
+        # a representative.
+        wanted_list = ([args.wanted_ref_tax] if isinstance(args.wanted_ref_tax, str)
+                       else list(args.wanted_ref_tax))
+        for wanted in wanted_list:
+            with spinner(f"Selecting reference genomes for '{wanted}'...",
+                         "Selected reference genomes"):
+                selected, selection = resolve_wanted_ref_tax_accessions(
+                    args.source, wanted,
+                    target_rank=args.target_rank,
+                    derep_rank=args.derep_rank,
+                    min_completeness=args.min_completeness,
+                    max_contamination=args.max_contamination)
 
-        added = 0
-        for acc in selected:
-            if acc not in sources:
-                accessions.append(acc)
-                sources[acc] = f"{args.source.upper()}:{selection.canonical}"
-                added += 1
+            added = 0
+            for acc in selected:
+                if acc not in sources:
+                    accessions.append(acc)
+                    sources[acc] = f"{args.source.upper()}:{selection.canonical}"
+                    added += 1
 
-        detail = f"        {len(selected):,} genome(s) selected"
-        if selection.resolved_rank:
-            detail += f" ({selection.canonical} at rank {selection.resolved_rank})"
-        print(detail)
-        if selection.effective_derep_rank:
-            print(f"        dereplicated to one genome per {selection.effective_derep_rank}")
-        if added != len(selected):
-            print(f"        {len(selected) - added:,} already present from `-a`")
+            detail = f"        {len(selected):,} genome(s) selected"
+            if selection.resolved_rank:
+                detail += f" ({selection.canonical} at rank {selection.resolved_rank})"
+            print(detail)
+            if selection.effective_derep_rank:
+                print("        dereplicated to one genome per "
+                      f"{selection.effective_derep_rank}")
+            if added != len(selected):
+                # already present from -a, or overlapping a previously-resolved -w taxon
+                print(f"        {len(selected) - added:,} already counted")
 
-        for warning in selection.warnings:
-            report_message(warning, "orange", ii="        ", si="        ")
+            for warning in selection.warnings:
+                report_message(warning, "orange", ii="        ", si="        ")
 
     local_genomes, local_missing = build_local_genomes(args)
     if local_genomes or local_missing:

@@ -1,0 +1,146 @@
+SCG-HMM set plan
+============================================================================
+generated:     2026-08-07
+GTDB release:  v232
+parquet:       /Users/michael.lee/miniconda3/envs/gtotree-dev/share/gtotree/gtdb_tax_info/gtdb-data.parquet
+config:        /Users/michael.lee/Documents/github/gtotree/hmm_sets/creation/scg-sets.toml
+quality floor: completeness >= 90.0, contamination <= 5.0
+
+45 sets planned, 43,251 genome selections in total.
+
+PLANNED SETS
+----------------------------------------------------------------------------
+taxon                     rank    derep      genomes  selected by
+Bacteria                  domain  family       5,148  domain-set
+Archaea                   domain  family         492  domain-set
+Bacteria-and-Archaea      multi-domainfamily       5,640  domain-set
+Nanobdellota              phylum  genus          421  genera>=100+genomes>=1000
+Thermoproteota            phylum  genus          338  genera>=100+genomes>=1000
+Halobacteriota            phylum  genus          225  genera>=100+genomes>=1000
+Methanobacteriota         phylum  species        224  genomes>=1000+include
+Thermoplasmatota          phylum  genus          180  genera>=100+genomes>=1000
+Micrarchaeota             phylum  genus           93  genomes>=1000
+Asgardarchaeota           phylum  species         90  include
+Pseudomonadota            phylum  genus        4,932  genera>=100+genomes>=1000
+Patescibacteriota         phylum  genus        3,454  genera>=100+genomes>=1000
+Bacillota                 phylum  genus        3,257  genera>=100+genomes>=1000
+Bacteroidota              phylum  genus        2,462  genera>=100+genomes>=1000
+Actinomycetota            phylum  genus        1,993  genera>=100+genomes>=1000
+Planctomycetota           phylum  genus        1,186  genera>=100+genomes>=1000
+Chloroflexota             phylum  genus        1,062  genera>=100+genomes>=1000
+Acidobacteriota           phylum  genus          985  genera>=100+genomes>=1000
+Desulfobacterota          phylum  genus          918  genera>=100+genomes>=1000
+Verrucomicrobiota         phylum  genus          694  genera>=100+genomes>=1000
+Cyanobacteriota           phylum  genus          526  genera>=100+genomes>=1000
+Bacillota_I               phylum  genus          513  genera>=100+genomes>=1000
+Myxococcota_A             phylum  genus          406  genera>=100+genomes>=1000
+Omnitrophota              phylum  genus          366  genera>=100+genomes>=1000
+Spirochaetota             phylum  genus          338  genera>=100+genomes>=1000
+Gemmatimonadota           phylum  genus          267  genera>=100+genomes>=1000
+Bdellovibrionota          phylum  genus          245  genera>=100+genomes>=1000
+Nitrospirota              phylum  genus          244  genera>=100+genomes>=1000
+Armatimonadota            phylum  genus          202  genera>=100+genomes>=1000
+Chlamydiota               phylum  genus          189  genera>=100+genomes>=1000
+Fusobacteriota            phylum  species        142  genomes>=1000+include
+Myxococcota               phylum  genus          129  genera>=100
+Campylobacterota          phylum  genus          120  genera>=100+genomes>=1000
+Thermotogota              phylum  species        117  include
+Aquificota                phylum  species        114  include
+Babelota                  phylum  genus          112  genera>=100
+Elusimicrobiota           phylum  genus          112  genera>=100+genomes>=1000
+Zixibacteria              phylum  genus          107  genera>=100
+Fidelibacterota           phylum  genus           89  genomes>=1000
+Synergistota              phylum  genus           62  include
+Nitrospinota              phylum  species         57  include
+Deinococcota              phylum  genus           55  include
+Fibrobacterota            phylum  genus           52  include
+Gammaproteobacteria       class   genus        2,550  include
+Alphaproteobacteria       class   genus        2,343  include
+
+NEEDS A LOOK
+----------------------------------------------------------------------------
+  Methanobacteriota (phylum):
+      - stepped genus -> species for enough genomes
+  Asgardarchaeota (phylum):
+      - stepped genus -> species for enough genomes
+  Fusobacteriota (phylum):
+      - stepped genus -> species for enough genomes
+  Thermotogota (phylum):
+      - stepped genus -> species for enough genomes
+  Aquificota (phylum):
+      - stepped genus -> species for enough genomes
+  Nitrospinota (phylum):
+      - stepped genus -> species for enough genomes
+
+NOT IN THE PUBLISHED TABLE YET
+----------------------------------------------------------------------------
+  Bacteria (domain) -- 5,148 genomes
+  Archaea (domain) -- 492 genomes
+  Bacteria-and-Archaea (multi-domain) -- 5,640 genomes
+  Nanobdellota (phylum) -- 421 genomes
+  Thermoproteota (phylum) -- 338 genomes
+  Halobacteriota (phylum) -- 225 genomes
+  Methanobacteriota (phylum) -- 224 genomes
+  Thermoplasmatota (phylum) -- 180 genomes
+  Micrarchaeota (phylum) -- 93 genomes
+  Asgardarchaeota (phylum) -- 90 genomes
+  Pseudomonadota (phylum) -- 4,932 genomes
+  Patescibacteriota (phylum) -- 3,454 genomes
+  Bacillota (phylum) -- 3,257 genomes
+  Bacteroidota (phylum) -- 2,462 genomes
+  Actinomycetota (phylum) -- 1,993 genomes
+  Planctomycetota (phylum) -- 1,186 genomes
+  Chloroflexota (phylum) -- 1,062 genomes
+  Acidobacteriota (phylum) -- 985 genomes
+  Desulfobacterota (phylum) -- 918 genomes
+  Verrucomicrobiota (phylum) -- 694 genomes
+  Cyanobacteriota (phylum) -- 526 genomes
+  Bacillota_I (phylum) -- 513 genomes
+  Myxococcota_A (phylum) -- 406 genomes
+  Omnitrophota (phylum) -- 366 genomes
+  Spirochaetota (phylum) -- 338 genomes
+  Gemmatimonadota (phylum) -- 267 genomes
+  Bdellovibrionota (phylum) -- 245 genomes
+  Nitrospirota (phylum) -- 244 genomes
+  Armatimonadota (phylum) -- 202 genomes
+  Chlamydiota (phylum) -- 189 genomes
+  Fusobacteriota (phylum) -- 142 genomes
+  Myxococcota (phylum) -- 129 genomes
+  Campylobacterota (phylum) -- 120 genomes
+  Thermotogota (phylum) -- 117 genomes
+  Aquificota (phylum) -- 114 genomes
+  Babelota (phylum) -- 112 genomes
+  Elusimicrobiota (phylum) -- 112 genomes
+  Zixibacteria (phylum) -- 107 genomes
+  Fidelibacterota (phylum) -- 89 genomes
+  Synergistota (phylum) -- 62 genomes
+  Nitrospinota (phylum) -- 57 genomes
+  Deinococcota (phylum) -- 55 genomes
+  Fibrobacterota (phylum) -- 52 genomes
+  Gammaproteobacteria (class) -- 2,550 genomes
+  Alphaproteobacteria (class) -- 2,343 genomes
+
+PUBLISHED BUT NOT IN THIS PLAN
+----------------------------------------------------------------------------
+  Advisory only. Older releases stay hosted, so nothing breaks by leaving
+  these alone -- but if a name changed upstream you'd want to know.
+  (none)
+
+APPROACHING THE THRESHOLDS
+----------------------------------------------------------------------------
+  Unselected phyla with the most genera, for next release's review.
+  Hydrothermota             Bac  genera=   89  genomes=     535
+  Vulcanimicrobiota         Bac  genera=   86  genomes=     700
+  Zhuqueibacterota          Bac  genera=   69  genomes=     270
+  Aenigmatarchaeota         Arc  genera=   67  genomes=     497
+  Krumholzibacteriota       Bac  genera=   63  genomes=     274
+  Margulisbacteria          Bac  genera=   62  genomes=     229
+  Eisenbacteria             Bac  genera=   61  genomes=     233
+  Cloacimonadota            Bac  genera=   54  genomes=     592
+  UBA10199                  Bac  genera=   51  genomes=     127
+  Hydrogenedentota          Bac  genera=   49  genomes=     227
+  Methylomirabilota         Bac  genera=   45  genomes=     364
+  Bdellovibrionota_C        Bac  genera=   44  genomes=     157
+  Oederibacteriota          Bac  genera=   42  genomes=     150
+  Bdellovibrionota_B        Bac  genera=   40  genomes=     167
+  Calditrichota             Bac  genera=   39  genomes=     110

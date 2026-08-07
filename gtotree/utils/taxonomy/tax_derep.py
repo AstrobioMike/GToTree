@@ -208,9 +208,80 @@ def quality_key(row, spec):
 
 PICKERS["quality"] = quality_key
 
+
+def apply_quality_floor(rows, spec, min_completeness=None, max_contamination=None):
+    """
+    Drop genomes that fall outside an explicit checkm quality floor.
+
+    This is DIFFERENT in kind from quality_key(), which only ORDERS a group and always
+    returns something (the best genome in a genus even if that genome is 55% complete).
+    This floor removes candidates outright, so a group whose every member is below the bar
+    contributes nothing at all rather than contributing its least-bad member.
+
+    I added this for gen-scg-hmms
+
+    Must be applied BEFORE grouping so the best-per-group pick happens within the
+    floored pool.
+
+    Missing values: when a floor is requested, a genome with no value for that metric
+    is excluded, because "unknown quality" can't be shown to clear the bar. Those are
+    counted separately from genomes that have a value and failed it -- GTDB's checkm2
+    columns are fully populated, but NCBI's checkm columns are sparse, and a caller
+    setting a floor against NCBI will be told that's why the pool emptied.
+
+    Returns (kept_rows, n_below_floor, n_missing_values).
+    """
+    if min_completeness is None and max_contamination is None:
+        return rows, 0, 0
+
+    comp_col, cont_col = spec.quality_cols
+    kept = []
+    n_below = 0
+    n_missing = 0
+
+    for row in rows:
+        comp = _num(row.get(comp_col)) if min_completeness is not None else None
+        cont = _num(row.get(cont_col)) if max_contamination is not None else None
+
+        if (min_completeness is not None and comp is None) or \
+           (max_contamination is not None and cont is None):
+            n_missing += 1
+            continue
+
+        if min_completeness is not None and comp < min_completeness:
+            n_below += 1
+            continue
+        if max_contamination is not None and cont > max_contamination:
+            n_below += 1
+            continue
+
+        kept.append(row)
+
+    return kept, n_below, n_missing
+
+
+def _quality_floor_warnings(n_below, n_missing, min_completeness, max_contamination):
+    """Human-facing lines describing what a quality floor removed."""
+    warnings = []
+    if n_below:
+        bits = []
+        if min_completeness is not None:
+            bits.append(f"completeness >= {min_completeness:g}")
+        if max_contamination is not None:
+            bits.append(f"contamination <= {max_contamination:g}")
+        warnings.append(
+            f"{n_below:,} candidate genome(s) didn't meet the quality floor "
+            f"({', '.join(bits)}) and were excluded before selection.")
+    if n_missing:
+        warnings.append(
+            f"{n_missing:,} candidate genome(s) have no completeness/contamination "
+            f"values recorded and were excluded by the quality floor.")
+    return warnings
+
+
 def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
           reps_only=None, pick="quality", screen_against=None,
-          accession_prefixes=None):
+          accession_prefixes=None, min_completeness=None, max_contamination=None):
     """
     One genome per unique value of `derep_rank`, within `wanted_taxon`
 
@@ -235,6 +306,12 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
     screen_against:
         Path to the NCBI Parquet asset. When given, the candidate pool is
         pre-filtered to assemblies that still exist at NCBI BEFORE grouping.
+
+    min_completeness / max_contamination:
+        Optional checkm quality floor (see apply_quality_floor). Both default to None
+        (off), which means the best genome in every group is kept regardless of its
+        quality. Applied before grouping, so a group with no genome clearing the
+        floor drops out entirely.
 
     Returns (accessions, groups_seen, warnings).
     """
@@ -288,6 +365,11 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
 
     if accession_prefixes:
         rows = _restrict_by_prefix(rows, spec.acc_col, accession_prefixes)
+
+    rows, n_below, n_missing = apply_quality_floor(
+        rows, spec, min_completeness, max_contamination)
+    warnings.extend(_quality_floor_warnings(
+        n_below, n_missing, min_completeness, max_contamination))
 
     if not rows:
         warnings.append(f"No genomes found under {wanted_rank} '{wanted_taxon}'"
@@ -345,7 +427,8 @@ class RefGenomeSelection:
 
 def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                        reps_only=None, pick="quality", screen_against=None,
-                       accession_prefixes=None):
+                       accession_prefixes=None, min_completeness=None,
+                       max_contamination=None):
     """
     The one selection entry point shared by every surface that adds reference genomes
     by taxonomy: the standalone get-accessions helpers and the main GToTree driver's
@@ -362,6 +445,12 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
         for GenBank) restricting the candidate pool BEFORE selection/dereplication. This
         is applied up front so a best-per-rank pick is made within the requested pool,
         not dropped after the fact
+
+    min_completeness / max_contamination:
+        Optional checkm quality floor, applied to the candidate pool before any
+        selection (see apply_quality_floor). Both default to None (off). Honored on
+        both paths below. With derep on it constrains what each group can be
+        represented BY, and with derep off it constrains the kept set directly.
 
     Returns a RefGenomeSelection
     """
@@ -399,6 +488,11 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                     f"{n_dead:,} candidate genome(s) are no longer available at NCBI "
                     f"(suppressed/removed) and were excluded.")
 
+        rows, n_below, n_missing = apply_quality_floor(
+            rows, spec, min_completeness, max_contamination)
+        warnings.extend(_quality_floor_warnings(
+            n_below, n_missing, min_completeness, max_contamination))
+
         accessions = [r.get(spec.acc_col) for r in rows if r.get(spec.acc_col)]
         return RefGenomeSelection(accessions, rows, canonical, resolved_rank,
                                   None, warnings)
@@ -409,7 +503,8 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
     accessions, _groups, derep_warnings = derep(
         path, source, resolved_rank, canonical, effective_derep_rank,
         reps_only=reps_only, pick=pick, screen_against=screen_against,
-        accession_prefixes=accession_prefixes)
+        accession_prefixes=accession_prefixes,
+        min_completeness=min_completeness, max_contamination=max_contamination)
     warnings.extend(derep_warnings)
 
     rows = _rows_for_accessions(path, source, resolved_rank, canonical,

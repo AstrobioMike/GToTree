@@ -11,7 +11,8 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli import RESUME
 def _args(**kw):
     base = dict(percent_single_copy=90, min_pfam_coverage=50.0, source="GTDB",
                 wanted_ref_tax="Nitrospirota", target_rank=None, derep_rank="off",
-                genbank_files=None, fasta_files=None, amino_acid_files=None)
+                genbank_files=None, fasta_files=None, amino_acid_files=None,
+                min_completeness=None, max_contamination=None)
     base.update(kw)
     return argparse.Namespace(**base)
 

@@ -62,7 +62,8 @@ def describe_source_version(source):
 
 
 def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
-                                      derep_rank="auto"):
+                                      derep_rank="auto", min_completeness=None,
+                                      max_contamination=None):
     """
     Resolve `-w <taxon>` to a list of assembly accessions plus the RefGenomeSelection
     it came from (for warnings / provenance the caller may want to surface).
@@ -77,6 +78,12 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
         --target-rank; disambiguates a name that lives at multiple ranks.
     derep_rank : str
         --derep-rank ('auto' | 'off' | a rank name).
+    min_completeness : float or None
+        --min-completeness; drops candidates below this checkm completeness before
+        selection. None (the default) means no floor.
+    max_contamination : float or None
+        --max-contamination; drops candidates above this checkm contamination before
+        selection. None (the default) means no ceiling.
 
     Returns
     -------
@@ -104,12 +111,18 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
     selection = select_ref_genomes(
         table_path, core_source, taxon,
         target_rank=target_rank, derep_rank=derep_rank,
-        screen_against=screen_against)
+        screen_against=screen_against,
+        min_completeness=min_completeness,
+        max_contamination=max_contamination)
 
     if not selection.accessions:
+        detail = ""
+        if min_completeness is not None or max_contamination is not None:
+            detail = (" No genomes cleared the requested quality floor, so you may "
+                      "want to relax `--min-completeness` / `--max-contamination`.")
         raise WantedRefTaxError(
             f"No accessions were found for the --wanted-ref-tax target "
-            f"'{selection.canonical}'.")
+            f"'{selection.canonical}'.{detail}")
 
     selection.warnings.extend(
         size_advice(len(selection.accessions),

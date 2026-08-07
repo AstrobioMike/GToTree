@@ -39,7 +39,7 @@ def test_input_sources_can_be_combined():
                   "-g", "gb.txt", "-f", "fa.txt", "-A", "aa.txt")
     check_args(args)
     assert args.target_accessions == "accs.txt"
-    assert args.wanted_ref_tax == "Nitrospirota"
+    assert args.wanted_ref_tax == ["Nitrospirota"]
     assert args.genbank_files == "gb.txt"
     assert args.fasta_files == "fa.txt"
     assert args.amino_acid_files == "aa.txt"
@@ -172,11 +172,21 @@ def test_derep_rank_accepts_auto():
 ################################################################################
 
 def _resolve_args(**overrides):
+    """
+    An args namespace for phase_resolve_genomes tests.
+
+    Defaults are taken from the real parser so that adding a CLI flag can't silently
+    break these with an AttributeError -- phase_resolve_genomes reads args attributes
+    directly, and a hand-maintained dict here is exactly the kind of parallel list that
+    drifts out of sync.
+    """
     import argparse
 
-    base = dict(target_accessions=None, wanted_ref_tax=None, source="gtdb",
-                target_rank=None, derep_rank="off", genbank_files=None,
-                fasta_files=None, amino_acid_files=None)
+    base = vars(cli.build_parser().parse_args([]))
+    # these tests drive phase 1 directly and set their own inputs, so start from
+    # "nothing requested" rather than the parser's placeholder values
+    base.update(target_accessions=None, wanted_ref_tax=None, source="gtdb",
+                derep_rank="off")
     base.update(overrides)
     return argparse.Namespace(**base)
 
@@ -222,6 +232,64 @@ def test_phase_one_fetches_both_tables_for_a_gtdb_wanted_ref_tax(reference_data_
                                             source="gtdb"))
 
     assert sorted(reference_data_fetches) == ["gtdb", "ncbi"]
+
+
+def test_repeated_wanted_ref_tax_pools_every_taxon(reference_data_fetches, monkeypatch):
+    """`-w Bacteria -w Archaea` resolves each taxon and merges their genomes."""
+    monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([], []))
+    monkeypatch.setattr(cli, "describe_source_version", lambda source: None)
+
+    class _Sel:
+        def __init__(self, canonical):
+            self.canonical = canonical
+            self.resolved_rank = "domain"
+            self.effective_derep_rank = "family"
+            self.warnings = []
+
+    by_taxon = {
+        "Bacteria": (["GCF_000000001.1", "GCF_000000002.1"], _Sel("Bacteria")),
+        "Archaea": (["GCF_000000003.1"], _Sel("Archaea")),
+    }
+    monkeypatch.setattr(cli, "resolve_wanted_ref_tax_accessions",
+                        lambda source, taxon, **kw: by_taxon[taxon])
+
+    accessions, sources, _, _ = cli.phase_resolve_genomes(
+        _resolve_args(wanted_ref_tax=["Bacteria", "Archaea"], source="gtdb"))
+
+    assert sorted(accessions) == ["GCF_000000001.1", "GCF_000000002.1",
+                                  "GCF_000000003.1"]
+    # provenance records which taxon each genome came from
+    assert sources["GCF_000000003.1"] == "GTDB:Archaea"
+    assert sources["GCF_000000001.1"] == "GTDB:Bacteria"
+
+
+def test_repeated_wanted_ref_tax_dedups_overlap(reference_data_fetches, monkeypatch):
+    """A genome selected by two overlapping taxa is kept once, attributed to the
+    first taxon that introduced it."""
+    monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([], []))
+    monkeypatch.setattr(cli, "describe_source_version", lambda source: None)
+
+    class _Sel:
+        def __init__(self, canonical):
+            self.canonical = canonical
+            self.resolved_rank = "phylum"
+            self.effective_derep_rank = None
+            self.warnings = []
+
+    shared = "GCF_000000009.1"
+    by_taxon = {
+        "TaxonA": ([shared, "GCF_000000010.1"], _Sel("TaxonA")),
+        "TaxonB": ([shared, "GCF_000000011.1"], _Sel("TaxonB")),
+    }
+    monkeypatch.setattr(cli, "resolve_wanted_ref_tax_accessions",
+                        lambda source, taxon, **kw: by_taxon[taxon])
+
+    accessions, sources, _, _ = cli.phase_resolve_genomes(
+        _resolve_args(wanted_ref_tax=["TaxonA", "TaxonB"], source="gtdb"))
+
+    assert accessions.count(shared) == 1
+    assert sources[shared] == "GTDB:TaxonA"
+    assert len(accessions) == 3
 
 
 def test_phase_one_fetches_nothing_for_a_local_files_only_run(reference_data_fetches,

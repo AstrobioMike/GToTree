@@ -1,0 +1,183 @@
+# Which SCG-HMM sets to pre-build for GToTree, and how.
+#
+# This file is the record of WHY each hosted set exists. `plan-scg-sets.py` reads it
+# plus the GTDB parquet and works out the concrete `gtt gen-scg-hmms` commands.
+#
+# Nothing here is inferred at runtime -- if a set is published, it is either matched by
+# [criteria] below or named in [[include]]. Re-running the planner against a new GTDB
+# release re-derives everything from the same rules, and the report tells you what
+# moved.
+#
+#    python plan-scg-sets.py                      # uses ./scg-sets.toml, writes ./plan/
+#    python plan-scg-sets.py -c other.toml -o out/
+#    python plan-scg-sets.py --gtdb-parquet /path/to/gtdb-data.parquet
+
+
+################################################################################
+# quality floor
+################################################################################
+# Applied to the candidate pool before any per-group pick, so a genus whose only
+# genomes are fragmentary drops out rather than contributing its least-bad member.
+#
+# These are passed straight through to `gen-scg-hmms` as --min-completeness /
+# --max-contamination, and are also what the counts below are computed against.
+
+[quality]
+min_completeness = 90.0
+max_contamination = 5.0
+
+
+################################################################################
+# automatic selection
+################################################################################
+# A phylum is selected if it clears EITHER bar. The two measure different things and
+# both are worth having:
+#
+#   min_genera:  phylogenetic breadth
+#   min_genomes: sequencing effort, which is a decent proxy for how much people
+#                care. Catches well-studied clades that are narrow but heavily
+#                sequenced, which a genus-count rule alone might miss
+#
+# Counts are taken AFTER the quality floor above, so a phylum can't clear the bar on
+# paper and then build from far fewer genomes than planned.
+#
+# Automatic selection runs at phylum level only. Classes and anything finer come in
+# through explicit [[include]] blocks below
+
+[criteria]
+rank = "phylum"
+min_genera = 100
+min_genomes = 1000
+
+
+################################################################################
+# dereplication
+################################################################################
+# One genome per `preferred_rank` group is the default input: it gives even breadth
+# and avoids, e.g., stacking 900 near-identical clinical isolates
+#
+# For small-but-well-studied clades that isn't enough genomes to make a meaningful
+# single-copy call, e.g., at my initial time doing this Methanobacteriota had only
+# 28 genera, which wouldn't clear the min_input_genomes default. In those cases the
+# preferred rank steps down to a finer rank (e.g., genus -> species). Species-level
+# derep is still one genome per GTDB species cluster, so the redundancy problem stays
+# somewhat in check.
+#
+# above_this_wants_review is advisory only: it flags large inputs in the report so you
+# can decide whether to coarsen by hand. Coarsening past genus loses a lot of breadth
+# and shouldn't happen silently.
+
+[derep]
+preferred_rank = "genus"
+min_input_genomes = 50
+above_this_wants_review = 6000
+
+
+################################################################################
+# explicit inclusions
+################################################################################
+# Taxa built regardless of whether they clear [criteria]. Likely added for one of
+# the following:
+#
+#   1. below the numeric bars but of broad interest
+#   2. finer than phylum, which automatic selection never reaches
+
+[[include]]
+rank = "class"
+name = "Gammaproteobacteria"
+
+[[include]]
+rank = "class"
+name = "Alphaproteobacteria"
+
+[[include]]
+rank = "phylum"
+name = "Methanobacteriota"
+
+[[include]]
+rank = "phylum"
+name = "Asgardarchaeota"
+
+[[include]]
+rank = "phylum"
+name = "Deinococcota"
+
+[[include]]
+rank = "phylum"
+name = "Thermotogota"
+
+[[include]]
+rank = "phylum"
+name = "Aquificota"
+
+[[include]]
+rank = "phylum"
+name = "Fusobacteriota"
+
+[[include]]
+rank = "phylum"
+name = "Synergistota"
+
+[[include]]
+rank = "phylum"
+name = "Fibrobacterota"
+
+[[include]]
+rank = "phylum"
+name = "Nitrospinota"
+
+
+################################################################################
+# explicit exclusions
+################################################################################
+# Taxa that clear [criteria] but i don't want built for some reason
+
+# [[exclude]]
+# rank = "phylum"
+# name = "Some_placeholder_phylum"
+
+
+################################################################################
+# comparison against what's already published
+################################################################################
+# The planner diffs its plan against this table and reports what's new, what's no
+# longer selected, and what's below the input floor. This is just informative,
+# nothing is added or removed automatically. Older releases stay hosted on GitHub
+# regardless.
+
+[published]
+info_table = "hmm_sets/hmm-sources-and-info.tsv"
+
+
+################################################################################
+# domain-spanning sets
+################################################################################
+# The broad sets: one per domain, plus a combined Bacteria+Archaea. These don't fit
+# [criteria] -- their "taxon" is a whole domain (or two), not a phylum -- so each is
+# listed explicitly here with its own derep rank.
+#
+# derep_rank is deliberately COARSER than the phylum sets use: a domain set looks for
+# genes conserved across everything in it, so it doesn't need genus-level sampling.
+#
+# taxa is a list: a single-domain set names one, and the combined set names both, which
+# the build turns into repeated `-w` (each domain resolved and dereplicated on its own,
+# then merged).
+#
+# NB: this is NOT the Hug et al. universal set (Universal-Hug-et-al.hmm) -- that's a
+# published external asset carried forward unchanged, not rebuilt from GTDB.
+
+[[domain_sets]]
+name = "Bacteria"
+taxa = ["Bacteria"]
+derep_rank = "family"
+# percent_single_copy omitted -> inherits the top-level default (same as phylum sets)
+
+[[domain_sets]]
+name = "Archaea"
+taxa = ["Archaea"]
+derep_rank = "family"
+
+[[domain_sets]]
+name = "Bacteria-and-Archaea"
+taxa = ["Bacteria", "Archaea"]
+derep_rank = "family"
