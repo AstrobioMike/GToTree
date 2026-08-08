@@ -261,7 +261,7 @@ def test_configured_taxon_absent_from_gtdb_is_reported(planner, stats):
 def _domain_config(**overrides):
     config = {
         "quality": {"min_completeness": 90.0, "max_contamination": 5.0},
-        "domain_set": [
+        "domain_sets": [
             {"name": "Bacteria", "taxa": ["Bacteria"], "derep_rank": "family"},
             {"name": "Archaea", "taxa": ["Archaea"], "derep_rank": "family"},
             {"name": "Bacteria-and-Archaea", "taxa": ["Bacteria", "Archaea"],
@@ -321,7 +321,7 @@ def test_domain_set_predicted_count_matches_selector_union(planner, mock_gtdb):
 
 def test_percent_single_copy_override_is_carried(planner, mock_gtdb):
     plan = planner.plan_domain_sets(
-        _domain_config(**{"domain_set": [
+        _domain_config(**{"domain_sets": [
             {"name": "Bacteria", "taxa": ["Bacteria"], "derep_rank": "family",
              "percent_single_copy": 75}]}),
         mock_gtdb, {"min_completeness": 90.0, "max_contamination": 5.0}, None)
