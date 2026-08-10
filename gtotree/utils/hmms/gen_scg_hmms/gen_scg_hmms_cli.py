@@ -708,16 +708,22 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
     return filtered_hmm_path, pfam_info, filtered_accs, pfam_version
 
 
-def phase_search(filtered_hmm_path, combined_path, num_genomes, args):
+def phase_search(filtered_hmm_path, combined_path, num_genomes, args,
+                 work_dir=None, resuming=False):
     """
     Run the hmmsearch stage with a progress bar over genomes
     """
+    checkpoint_path = (os.path.join(work_dir, SEARCH_CHECKPOINT_FILENAME)
+                       if work_dir else None)
+
     with tqdm(total=num_genomes, desc="    Progress", ncols=78,
               unit=" genome") as pbar:
         hits_by_genome = search_profiles(
             filtered_hmm_path, combined_path,
             threads=args.num_threads,
-            progress_callback=pbar.update)
+            progress_callback=pbar.update,
+            checkpoint_path=checkpoint_path,
+            resume=resuming)
     return hits_by_genome
 
 
@@ -790,6 +796,21 @@ def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_versio
 
 GENOME_STAGE_SIDECAR = "genome-stage.json"
 SEARCH_STAGE_SIDECAR = "search-hits.json"
+
+# within-stage crash recovery for the search, appended to per finished chunk. Distinct
+# from SEARCH_STAGE_SIDECAR, which only appears once the whole stage is done: the
+# sidecar says "skip this stage entirely", the checkpoint says "pick the stage back up
+# partway". A resumed run consults the sidecar first, so the checkpoint only ever comes
+# into play when the stage didn't finish.
+SEARCH_CHECKPOINT_FILENAME = "search-checkpoint.jsonl"
+
+
+def _remove_quietly(path):
+    """Delete a work-dir file if it's there; its absence is never a problem."""
+    try:
+        os.remove(path)
+    except OSError:
+        pass
 
 
 def _save_json(work_dir, filename, payload):
@@ -910,13 +931,18 @@ def gen_scg_hmms(args):  # pragma: no cover
         with spinner("Reusing previous search results...", "Reused previous search results"):
             hits_by_genome = cached_hits
     else:
-        hits_by_genome = phase_search(filtered_hmm_path, combined_path, len(kept_ids), args)
+        hits_by_genome = phase_search(filtered_hmm_path, combined_path, len(kept_ids),
+                                      args, work_dir=work_dir, resuming=resuming)
         _save_json(work_dir, SEARCH_STAGE_SIDECAR, hits_by_genome)
         RESUME.mark_complete(
             state, STAGE_SEARCH,
             [os.path.join(work_dir, SEARCH_STAGE_SIDECAR)],
             work_dir=work_dir)
         RESUME.save(work_dir, state)
+        # the sidecar now covers everything the checkpoint did, and the checkpoint runs
+        # to a couple of hundred MB on a large run, so we're dropping it rather than leaving it
+        # behind under `--keep-working-dir`. Only after the sidecar is safely written.
+        _remove_quietly(os.path.join(work_dir, SEARCH_CHECKPOINT_FILENAME))
 
     section(f"Phase {n()}: Determining single-copy genes and writing outputs...")
     final_hmm_path, num_targets, missed_path = phase_determine_and_write(

@@ -70,7 +70,7 @@ def resolve_derep_rank(wanted_rank, derep_rank="auto"):
                 f"Dereplication is off by default for a target at '{w_rank}' rank: the "
                 f"default derep rank would be '{w_rank}' itself, which returns a single "
                 f"genome. For this run, all genomes under the taxon will be used. If you do want a "
-                f"single best representative (e.g., as an outgroup), pass "
+                f"single best representative, pass "
                 f"--derep-rank {w_rank} explicitly.")
         return eff, warnings
 
@@ -89,6 +89,18 @@ def size_advice(n_selected, wanted_rank, derep_rank):
       - an explicit fine derep on a broad taxon can explode (e.g., Bacteria + species -> ~190k)
       - and derep OFF can explode, e.g., `--wanted-ref-tax "Escherichia coli"`
         defaults to derep off and can return tens of thousands of genomes
+
+    TREE-SPECIFIC. Every message here is framed around the selection becoming the
+    tree, which is only true for the main GToTree driver. The other surfaces that share
+    this selection core (`gtt gen-scg-hmms`, `gtt search-pfams`, `gtt search-kos`) use
+    the genomes as a search set, where a large selection is a long run rather than an
+    unwieldy tree, and where "only N genomes selected" duplicates advice they already
+    give in their own terms.
+
+    So this isn't called unconditionally: `resolve_wanted_ref_tax_accessions` only folds
+    it in when the caller says it's building a tree. If a size nudge is ever wanted for
+    the search surfaces it belongs in a sibling function with its own wording, not in
+    a flag threaded through this one.
     """
     if derep_rank is None:
         if n_selected > SANE_HIGH:
@@ -324,15 +336,19 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
     if rank_index(derep_rank) == rank_index(wanted_rank):
         # Sometimes may be wanted, as in "the single best genome for taxon X" is
         # how you could pick an outgroup. But it is also an easy mis-type for
-        # someone who wanted a tree spanning the taxon, and the difference is 1 genome
-        # vs hundreds. So mentioning either way
+        # someone who wanted to span the taxon, and the difference is 1 genome
+        # vs hundreds. So mentioning either way.
+        #
+        # Worded without reference to a tree on purpose: this warning reaches
+        # gen-scg-hmms and the search subcommands too, and for them the selection is a
+        # search set rather than a tree (see the note on size_advice).
         finer = RANKS[rank_index(derep_rank) + 1] \
             if rank_index(derep_rank) < len(RANKS) - 1 else None
         msg = (f"--derep-rank '{derep_rank}' is the SAME rank as the target taxon, so "
                f"exactly ONE genome will be selected (the single best genome for "
-               f"'{wanted_taxon}', which maybe you want for an outgroup or something.")
+               f"'{wanted_taxon}', which maybe you want as a single representative.")
         if finer:
-            msg += (f" But if you wanted a tree spanning '{wanted_taxon}', use a finer "
+            msg += (f" But if you wanted genomes spanning '{wanted_taxon}', use a finer "
                     f"--derep-rank (e.g. '{finer}').")
         warnings.append(msg)
 

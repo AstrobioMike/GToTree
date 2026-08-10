@@ -1,3 +1,4 @@
+import json
 import pytest # type: ignore
 import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search as mod
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import count_single_copy_hits
@@ -7,9 +8,9 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search import (
     CHUNK_ENV_VAR,
     DEFAULT_MAX_RESIDUES_PER_CHUNK,
     ChunkSizeError,
+    CheckpointError,
     resolve_residue_budget,
     estimated_chunk_bytes,
-    TARGET_CHUNKS,
     _estimate_total_residues,
     _read_env_override,
 )
@@ -220,6 +221,138 @@ def test_search_progress_reaches_total_even_in_one_chunk(tmp_path):
     assert sum(counts) == 2
 
 
+def test_search_progress_is_reported_during_a_chunk_not_just_after(tmp_path):
+    """
+    The bar has to move *while* a chunk is being searched. Reporting only at chunk
+    boundaries is what made a multi-hour phase look hung, since a large run is only a
+    handful of chunks.
+
+    Asserted by relative ordering: with one chunk covering many genomes, the callback
+    must fire before the search of that chunk has finished, i.e. interleaved with the
+    per-profile passes rather than all afterwards.
+    """
+    faa = _write_proteome(tmp_path / "t.faa",
+                          {f"g{i}": list(MOTIFS) for i in range(12)})
+
+    events = []
+    real_search_one_chunk = mod._search_one_chunk
+
+    def tracking_search(pressed_base, seq_block, threads, hits_by_genome,
+                        on_profile=None):
+        def wrapped():
+            events.append("profile")
+            if on_profile is not None:
+                on_profile()
+        real_search_one_chunk(pressed_base, seq_block, threads, hits_by_genome,
+                              on_profile=wrapped)
+        events.append("chunk_searched")
+
+    monkeypatch_target = mod
+    original = monkeypatch_target._search_one_chunk
+    monkeypatch_target._search_one_chunk = tracking_search
+    try:
+        search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=10 ** 9,
+                        progress_callback=lambda n: events.append("progress"))
+    finally:
+        monkeypatch_target._search_one_chunk = original
+
+    assert "progress" in events
+    assert events.index("progress") < events.index("chunk_searched")
+
+
+def test_search_progress_updates_more_than_once_per_chunk(tmp_path):
+    """
+    A single chunk covering many genomes should produce many updates, not one. This is
+    the actual user-visible complaint -- a bar that ticks once per chunk.
+    """
+    faa = _write_proteome(tmp_path / "t.faa",
+                          {f"g{i}": list(MOTIFS) for i in range(12)})
+    counts = []
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=10 ** 9,
+                    progress_callback=lambda n: counts.append(n))
+
+    assert sum(counts) == 12
+    assert len(counts) > 1
+
+
+def test_press_profiles_reports_the_profile_count(tmp_path):
+    """The count is the denominator for spreading progress across a chunk."""
+    base, n = mod._press_profiles(str(MOCK_PFAM_HMM), str(tmp_path))
+    assert n == len(MOTIFS)
+    assert base.startswith(str(tmp_path))
+
+
+################################################################################
+# _ChunkProgress
+################################################################################
+
+def test_chunk_progress_awards_whole_genomes_only():
+    """
+    The callback contract is whole genomes; fractions are accumulated internally so a
+    caller driving an integer-unit bar never sees a partial genome.
+    """
+    seen = []
+    p = mod._ChunkProgress(seen.append, genomes_pending=3, num_profiles=10)
+    for _ in range(10):
+        p.on_profile()
+    p.finish()
+    assert all(isinstance(n, int) and n >= 1 for n in seen)
+    assert sum(seen) == 3
+
+
+def test_chunk_progress_spreads_credit_across_profiles():
+    """Credit arrives gradually rather than all at the end."""
+    seen = []
+    p = mod._ChunkProgress(seen.append, genomes_pending=100, num_profiles=100)
+    for _ in range(50):
+        p.on_profile()
+    assert sum(seen) == 50, "half the profiles done should mean about half the credit"
+
+
+def test_chunk_progress_finish_settles_rounding():
+    """
+    Rounding down at each step would leave the bar permanently short of its total, so
+    finish() has to hand over the remainder.
+    """
+    seen = []
+    p = mod._ChunkProgress(seen.append, genomes_pending=7, num_profiles=3)
+    for _ in range(3):
+        p.on_profile()
+    p.finish()
+    assert sum(seen) == 7
+    assert p.awarded == 7
+
+
+def test_chunk_progress_never_overshoots():
+    """Extra profile callbacks must not award more than the chunk actually earned."""
+    seen = []
+    p = mod._ChunkProgress(seen.append, genomes_pending=2, num_profiles=4)
+    for _ in range(40):
+        p.on_profile()
+    p.finish()
+    assert sum(seen) == 2
+
+
+def test_chunk_progress_is_inert_with_no_callback():
+    p = mod._ChunkProgress(None, genomes_pending=5, num_profiles=5)
+    p.on_profile()
+    p.finish()
+    assert p.awarded == 0
+
+
+def test_chunk_progress_handles_a_chunk_that_completes_nothing():
+    """
+    A single genome spanning several chunks earns no credit until it ends; those chunks
+    must report nothing rather than dividing by zero or awarding phantom genomes.
+    """
+    seen = []
+    p = mod._ChunkProgress(seen.append, genomes_pending=0, num_profiles=10)
+    for _ in range(10):
+        p.on_profile()
+    p.finish()
+    assert seen == []
+
+
 def test_search_wraps_lazy_iteration_errors(tmp_path, monkeypatch):
     """
     pyhmmer.hmmsearch returns a LAZY generator -- the pipeline is only built (and its
@@ -404,41 +537,22 @@ def test_resolve_prefers_override():
     assert resolve_residue_budget(env={CHUNK_ENV_VAR: "500"}) == 500
 
 
-def test_override_beats_the_granularity_rule():
-    """An explicit override must not be second-guessed by the chunk-count targeting."""
-    assert resolve_residue_budget(
-        env={CHUNK_ENV_VAR: "777"}, total_residues=38_000_000) == 777
-
-
-def test_granularity_splits_a_small_run_into_several_chunks():
+def test_budget_does_not_depend_on_run_size():
     """
-    A run smaller than the memory cap would otherwise be a single chunk, which makes the
-    progress bar jump straight from 0 to 100%. The budget should tighten so the run is
-    split into roughly TARGET_CHUNKS pieces instead.
+    The budget is a flat cap, deliberately independent of how big the run is. Chunk
+    boundaries have to be reproducible between a run and its `--resume`, so the budget
+    must not vary with anything that could differ between the two.
     """
-    total = 38_000_000          # well under the memory cap
-    budget = resolve_residue_budget(env={}, total_residues=total)
-    assert budget < DEFAULT_MAX_RESIDUES_PER_CHUNK
-    chunks = -(-total // budget)
-    assert chunks >= TARGET_CHUNKS
+    assert resolve_residue_budget(env={}) == DEFAULT_MAX_RESIDUES_PER_CHUNK
 
 
-def test_granularity_never_raises_the_memory_cap():
+def test_budget_leaves_room_for_the_pressed_profile_set():
     """
-    The granularity rule may only tighten the budget. On a run far larger than the cap,
-    total/TARGET_CHUNKS exceeds the cap, and the cap must win -- yielding more chunks,
-    not a bigger one.
+    The chunk is sized so the ~1.4 GB pressed profile set -- re-read every chunk -- can
+    stay in page cache alongside it. A block big enough to evict it turns every chunk's
+    profile read into real disk I/O.
     """
-    total = 4_000_000_000
-    budget = resolve_residue_budget(env={}, total_residues=total)
-    assert budget == DEFAULT_MAX_RESIDUES_PER_CHUNK
-    assert -(-total // budget) > TARGET_CHUNKS
-
-
-def test_unknown_total_falls_back_to_the_cap():
-    """With no size estimate available the plain memory-capped budget is used."""
-    assert resolve_residue_budget(env={}, total_residues=None) == \
-        DEFAULT_MAX_RESIDUES_PER_CHUNK
+    assert estimated_chunk_bytes(DEFAULT_MAX_RESIDUES_PER_CHUNK) < 300_000_000
 
 
 def test_estimate_total_residues_is_roughly_right(tmp_path):
@@ -490,3 +604,215 @@ def test_estimated_bytes_is_in_a_sane_range():
     """
     est = estimated_chunk_bytes(10_000_000)
     assert 10 * 1024 ** 2 < est < 200 * 1024 ** 2
+
+
+################################################################################
+# chunk-level checkpointing
+################################################################################
+
+def _five_genome_proteome(tmp_path, name="t.faa"):
+    """A proteome big enough to span several chunks at a small budget."""
+    return _write_proteome(tmp_path / name, {
+        "g1": list(MOTIFS),
+        "g2": list(MOTIFS),
+        "g3": list(MOTIFS),
+        "g4": list(MOTIFS),
+        "g5": list(MOTIFS),
+    })
+
+
+def test_checkpoint_is_written_per_chunk(tmp_path):
+    """
+    One record per finished chunk, not one at the end -- an all-at-the-end write would
+    be worthless for the crash it's meant to survive.
+    """
+    faa = _five_genome_proteome(tmp_path)
+    ckpt = tmp_path / "ckpt.jsonl"
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                    checkpoint_path=str(ckpt))
+
+    lines = [l for l in ckpt.read_text().splitlines() if l.strip()]
+    header = json.loads(lines[0])
+    assert header["budget"] == 32
+    assert header["num_profiles"] == len(MOTIFS)
+    records = [json.loads(l) for l in lines[1:]]
+    assert len(records) > 1
+    assert [r["chunk"] for r in records] == list(range(len(records)))
+
+
+def test_resume_reproduces_the_uninterrupted_result(tmp_path):
+    """
+    The invariant that matters: resuming from a partial checkpoint must give exactly
+    what an uninterrupted run gives. Simulated by truncating a complete checkpoint to
+    its first chunk, which is indistinguishable from having died after that chunk.
+    """
+    faa = _five_genome_proteome(tmp_path)
+    expected = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32)
+
+    ckpt = tmp_path / "ckpt.jsonl"
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                    checkpoint_path=str(ckpt))
+    lines = [l for l in ckpt.read_text().splitlines() if l.strip()]
+    assert len(lines) > 2, "need more than one chunk for this to be a real test"
+    ckpt.write_text("\n".join(lines[:2]) + "\n")
+
+    resumed = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                              checkpoint_path=str(ckpt), resume=True)
+    assert resumed == expected
+
+
+def test_resume_from_a_complete_checkpoint_searches_nothing(tmp_path):
+    """
+    Every chunk already recorded means no chunk needs searching again -- that's the
+    whole point. Result must still be complete.
+    """
+    faa = _five_genome_proteome(tmp_path)
+    ckpt = tmp_path / "ckpt.jsonl"
+    expected = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                               checkpoint_path=str(ckpt))
+
+    searched = {"n": 0}
+    real = mod._search_one_chunk
+
+    def counting(*a, **kw):
+        searched["n"] += 1
+        return real(*a, **kw)
+
+    mod._search_one_chunk = counting
+    try:
+        resumed = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                                  checkpoint_path=str(ckpt), resume=True)
+    finally:
+        mod._search_one_chunk = real
+
+    assert searched["n"] == 0
+    assert resumed == expected
+
+
+def test_resume_reports_every_genome_on_the_progress_bar(tmp_path):
+    """
+    The bar has to refill over the replayed chunks, otherwise a resumed run finishes
+    showing a fraction of the genomes it actually processed.
+    """
+    faa = _five_genome_proteome(tmp_path)
+    ckpt = tmp_path / "ckpt.jsonl"
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                    checkpoint_path=str(ckpt))
+
+    counts = []
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                    checkpoint_path=str(ckpt), resume=True,
+                    progress_callback=lambda n: counts.append(n))
+    assert sum(counts) == 5
+
+
+def test_torn_trailing_record_costs_only_that_chunk(tmp_path):
+    """
+    A process killed mid-write leaves a half-written last line. Replay must stop there
+    and redo that chunk, not refuse the whole checkpoint and not ingest garbage.
+    """
+    faa = _five_genome_proteome(tmp_path)
+    expected = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32)
+
+    ckpt = tmp_path / "ckpt.jsonl"
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                    checkpoint_path=str(ckpt))
+    lines = [l for l in ckpt.read_text().splitlines() if l.strip()]
+    truncated = lines[1][: len(lines[1]) // 2]
+    ckpt.write_text("\n".join(lines[:2]) + "\n" + truncated + "\n")
+
+    resumed = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                              checkpoint_path=str(ckpt), resume=True)
+    assert resumed == expected
+
+
+def test_checkpoint_from_a_different_budget_is_discarded(tmp_path):
+    """
+    Chunk boundaries are a function of the budget, so replaying a checkpoint written
+    under a different one would double-count or drop hits. It must be ignored and the
+    work redone rather than trusted.
+    """
+    faa = _five_genome_proteome(tmp_path)
+    expected = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32)
+
+    ckpt = tmp_path / "ckpt.jsonl"
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                    checkpoint_path=str(ckpt))
+
+    resumed = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=24,
+                              checkpoint_path=str(ckpt), resume=True)
+    assert resumed == expected
+
+
+def test_checkpoint_from_a_different_fasta_is_discarded(tmp_path):
+    """Same reasoning: different targets means different boundaries."""
+    faa = _five_genome_proteome(tmp_path)
+    ckpt = tmp_path / "ckpt.jsonl"
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                    checkpoint_path=str(ckpt))
+
+    other = _write_proteome(tmp_path / "other.faa", {
+        "h1": list(MOTIFS), "h2": list(MOTIFS),
+    })
+    resumed = search_profiles(str(MOCK_PFAM_HMM), other, threads=1, residue_budget=32,
+                              checkpoint_path=str(ckpt), resume=True)
+    assert set(resumed) == {"h1", "h2"}, "stale genomes must not leak in from the old run"
+
+
+def test_missing_checkpoint_just_starts_over(tmp_path):
+    """Resuming with nothing to resume from is a full run, not an error."""
+    faa = _five_genome_proteome(tmp_path)
+    expected = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32)
+    resumed = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                              checkpoint_path=str(tmp_path / "nope.jsonl"), resume=True)
+    assert resumed == expected
+
+
+def test_resume_does_not_truncate_the_checkpoint_it_read(tmp_path):
+    """
+    A resumed run appends to the existing checkpoint. Starting a fresh one would throw
+    away the replayed chunks, so a second crash would restart from zero.
+    """
+    faa = _five_genome_proteome(tmp_path)
+    ckpt = tmp_path / "ckpt.jsonl"
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                    checkpoint_path=str(ckpt))
+    lines = [l for l in ckpt.read_text().splitlines() if l.strip()]
+    ckpt.write_text("\n".join(lines[:2]) + "\n")
+
+    search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                    checkpoint_path=str(ckpt), resume=True)
+
+    after = [json.loads(l) for l in ckpt.read_text().splitlines() if l.strip()][1:]
+    assert [r["chunk"] for r in after] == list(range(len(lines) - 1))
+
+
+def test_no_checkpoint_path_means_no_checkpointing(tmp_path):
+    """The stage must work unchanged when no checkpoint location is supplied."""
+    faa = _five_genome_proteome(tmp_path)
+    hits = search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                           checkpoint_path=None)
+    assert set(hits) == {"g1", "g2", "g3", "g4", "g5"}
+    assert not list(tmp_path.glob("*.jsonl"))
+
+
+def test_unwritable_checkpoint_surfaces_as_a_named_error(tmp_path):
+    """
+    Library code raises a named exception for the CLI to translate, rather than letting
+    a raw OSError escape the seam.
+    """
+    faa = _five_genome_proteome(tmp_path)
+    unwritable = tmp_path / "missing-dir" / "ckpt.jsonl"
+    with pytest.raises(CheckpointError):
+        search_profiles(str(MOCK_PFAM_HMM), faa, threads=1, residue_budget=32,
+                        checkpoint_path=str(unwritable))
+
+
+def test_merge_hits_sums_across_chunks():
+    """
+    A genome straddling a chunk boundary contributes to two deltas; replay has to add
+    them, not let the later one win.
+    """
+    target = {"g1": {"PF90001.3": 1}}
+    mod._merge_hits(target, {"g1": {"PF90001.3": 2, "PF90002.7": 1}, "g2": {}})
+    assert target == {"g1": {"PF90001.3": 3, "PF90002.7": 1}, "g2": {}}

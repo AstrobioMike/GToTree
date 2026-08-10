@@ -63,7 +63,7 @@ def describe_source_version(source):
 
 def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
                                       derep_rank="auto", min_completeness=None,
-                                      max_contamination=None):
+                                      max_contamination=None, building_tree=False):
     """
     Resolve `-w <taxon>` to a list of assembly accessions plus the RefGenomeSelection
     it came from (for warnings / provenance the caller may want to surface).
@@ -84,6 +84,11 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
     max_contamination : float or None
         --max-contamination; drops candidates above this checkm contamination before
         selection. None (the default) means no ceiling.
+    building_tree : bool
+        Whether the selected genomes become a tree. Only the main GToTree driver sets
+        this; `gtt gen-scg-hmms`, `gtt search-pfams` and `gtt search-kos` share this
+        entry point but use the genomes as a search set, so tree-framed advice ("that
+        is a very large tree", "consider a coarser --derep-rank") is wrong for them.
 
     Returns
     -------
@@ -124,9 +129,10 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
             f"No accessions were found for the --wanted-ref-tax target "
             f"'{selection.canonical}'.{detail}")
 
-    selection.warnings.extend(
-        size_advice(len(selection.accessions),
-                    selection.resolved_rank,
-                    selection.effective_derep_rank))
+    if building_tree:
+        selection.warnings.extend(
+            size_advice(len(selection.accessions),
+                        selection.resolved_rank,
+                        selection.effective_derep_rank))
 
     return selection.accessions, selection

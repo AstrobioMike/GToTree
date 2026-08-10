@@ -290,3 +290,48 @@ def test_phase_search_returns_hit_counts(tmp_path):
 
     assert hits["g1"]["PF90001.3"] == 1
     assert hits["g1"]["PF90002.7"] == 1
+
+
+def test_phase_search_checkpoints_into_the_work_dir(tmp_path):
+    """
+    The phase has to actually place a checkpoint where a resumed run will look for it;
+    the library-level machinery is useless if the CLI never wires a path into it.
+    """
+    genome_dir = tmp_path / "genomes"
+    genome_dir.mkdir()
+    (genome_dir / "g1.faa").write_text(
+        ">p1\n" + MOTIFS["PF90001.3"] + "\n>p2\n" + MOTIFS["PF90002.7"] + "\n")
+
+    args = _phase_args(amino_acid_files=_listing(
+        tmp_path, "aa.txt", [genome_dir / "g1.faa"]))
+    _, _, local, missing = cli.phase_resolve_genomes(args)
+
+    work = tmp_path / "work"
+    work.mkdir()
+    combined, kept, _, _, _ = cli.phase_get_amino_acids(
+        [], local, missing, str(work), args)
+
+    cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined, len(kept), args,
+                     work_dir=str(work))
+
+    assert (work / cli.SEARCH_CHECKPOINT_FILENAME).is_file()
+
+
+def test_phase_search_without_a_work_dir_writes_no_checkpoint(tmp_path):
+    """Checkpointing is opt-in on a work dir being supplied, and must degrade quietly."""
+    genome_dir = tmp_path / "genomes"
+    genome_dir.mkdir()
+    (genome_dir / "g1.faa").write_text(">p1\n" + MOTIFS["PF90001.3"] + "\n")
+
+    args = _phase_args(amino_acid_files=_listing(
+        tmp_path, "aa.txt", [genome_dir / "g1.faa"]))
+    _, _, local, missing = cli.phase_resolve_genomes(args)
+
+    work = tmp_path / "work"
+    work.mkdir()
+    combined, kept, _, _, _ = cli.phase_get_amino_acids(
+        [], local, missing, str(work), args)
+
+    hits = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined, len(kept), args)
+    assert hits["g1"]["PF90001.3"] == 1
+    assert not (work / cli.SEARCH_CHECKPOINT_FILENAME).exists()

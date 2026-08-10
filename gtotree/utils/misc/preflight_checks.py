@@ -288,7 +288,8 @@ def resolve_wanted_ref_tax(args, run_data):
         with spinner("Gathering references...", "", clear_on_done=True):
             accessions, selection = resolve_wanted_ref_tax_accessions(
                 args.source, args.wanted_ref_tax,
-                target_rank=args.target_rank, derep_rank=args.derep_rank)
+                target_rank=args.target_rank, derep_rank=args.derep_rank,
+                building_tree=True)
     except AmbiguousTaxon:
         report_message(f"Since the `-w` taxon '{args.wanted_ref_tax}' occurs at more than "
                        "one rank, you'll need to specify which rank is wanted with "
