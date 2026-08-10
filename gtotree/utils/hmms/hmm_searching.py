@@ -6,6 +6,7 @@ import pyhmmer.easel as easel #type: ignore
 from gtotree.utils.misc.general import (search_threads_per_genome,
                                    atomic_write_text)
 from gtotree.utils.hmms.hmm_searching_engine import search_one_genome
+from gtotree.utils.misc.stages import GenomeRemovalStage
 
 
 def _hmm_search_worker(genome, run_data, aa_path=None, nt_path=None, pressed_base=None):
@@ -97,13 +98,14 @@ def _apply_hmm_search_result(genome, status, run_data):
 
     if hmm_search_failed:
         genome.mark_hmm_search_failed()
-        genome.mark_removed("HMM search failed")
+        genome.mark_removed("HMM search failed", GenomeRemovalStage.HMM_SEARCH)
         genome.num_SCG_hits = 0
     else:
         if extract_seqs_failed:
             genome.mark_extract_seqs_failed()
             genome.num_SCG_hits = 0
-            genome.mark_removed("extracting sequences after HMM search failed")
+            genome.mark_removed("extracting sequences after HMM search failed",
+                                GenomeRemovalStage.HMM_SEARCH)
         else:
             genome.mark_hmm_search_done()
             genome.num_SCG_hits = int(status.get("num_SCG_hits", 0))

@@ -5,6 +5,7 @@ from gtotree.main_stages import concatenating_SCG_sets
 from gtotree.main_stages.concatenating_SCG_sets import (concatenate_SCG_sets,
                                                         _concatenation_can_be_skipped)
 from gtotree.utils.misc.general import GenomeData, RunData, SCGset, read_run_data
+from gtotree.utils.misc.stages import PipelineStage
 
 
 SCG_IDS = ("A", "B")
@@ -74,7 +75,7 @@ class TestConcatenation:
 
         back = read_run_data(rd.run_data_path)
         assert back is not None
-        assert back.SCG_sets_concatenated is True
+        assert back.stage_is_complete(PipelineStage.CONCATENATE_SCG_SETS)
         assert back.concatenated_alignment_path == rd.concatenated_alignment_path
         assert back.final_alignment_length == rd.final_alignment_length
 
@@ -136,7 +137,7 @@ class TestResumeSkip:
         moved_to = os.path.join(rd.run_files_dir,
                                 os.path.basename(rd.concatenated_alignment_path))
         os.replace(rd.concatenated_alignment_path, moved_to)
-        rd.headers_updated = True
+        rd.mark_stage_complete(PipelineStage.UPDATE_HEADERS)
 
         assert _concatenation_can_be_skipped(rd) is True
 
@@ -147,7 +148,7 @@ class TestResumeSkip:
         rd = _run_data(tmp_path)
         rd = concatenate_SCG_sets(rd)
         os.remove(rd.concatenated_alignment_path)
-        rd.headers_updated = True
+        rd.mark_stage_complete(PipelineStage.UPDATE_HEADERS)
 
         assert _concatenation_can_be_skipped(rd) is False
 
@@ -157,7 +158,7 @@ class TestResumeSkip:
         itself, which getsize() would happily report as non-empty.
         """
         rd = _run_data(tmp_path)
-        rd.SCG_sets_concatenated = True
+        rd.mark_stage_complete(PipelineStage.CONCATENATE_SCG_SETS)
         rd.concatenated_alignment_path = ""
 
         assert _concatenation_can_be_skipped(rd) is False
@@ -165,7 +166,7 @@ class TestResumeSkip:
     def test_headers_updated_alone_does_not_skip_an_unconcatenated_run(self, tmp_path):
         """The flag gates everything; file presence alone is never enough."""
         rd = _run_data(tmp_path)
-        rd.headers_updated = True
+        rd.mark_stage_complete(PipelineStage.UPDATE_HEADERS)
         assert _concatenation_can_be_skipped(rd) is False
 
 
@@ -196,7 +197,7 @@ class TestAtomicity:
 
         monkeypatch.undo()
 
-        assert rd.SCG_sets_concatenated is False
+        assert not rd.stage_is_complete(PipelineStage.CONCATENATE_SCG_SETS)
         assert list(tmp_path.rglob("*.part")) == []
         assert _concatenation_can_be_skipped(rd) is False
 

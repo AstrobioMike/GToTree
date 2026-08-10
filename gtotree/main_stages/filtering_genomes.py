@@ -5,18 +5,19 @@ from gtotree.utils.misc.seqs import check_target_SCGs_have_seqs, filter_seqs_by_
 from gtotree.utils.misc.general import (write_run_data,
                                    required_count,
                                    run_pooled_stage)
+from gtotree.utils.misc.stages import PipelineStage, GenomeRemovalStage, SCGRemovalStage
 
 def filter_genomes(args, run_data):
 
     report_processing_stage("filter-genomes", run_data)
     cutoff = f"{args.genome_hits_cutoff * 100:.0f}"
     if not args.best_hit_mode:
-        message = f"Keeping genomes with single hits to at least {cutoff}% of the remaining target-SCGs."
+        message = f"Keeping genomes with single hits to at least {cutoff}% of the remaining target-SCGs (controlled by `-G`)."
     else:
-        message = f"Keeping genomes with hits to at least {cutoff}% of the remaining target-SCGs."
+        message = f"Keeping genomes with hits to at least {cutoff}% of the remaining target-SCGs (controlled by `-G`)."
     report_message(message, ii="    ", si="    ", width=80)
 
-    if not run_data.genomes_filtered_for_min_SCG_hits:
+    if not run_data.stage_is_complete(PipelineStage.FILTER_GENOMES):
 
         genomes = run_data.get_all_input_genomes_for_filtering()
         num_remaining_SCG_targets = len([SCG.id for SCG in run_data.get_all_SCG_targets_remaining()])
@@ -31,7 +32,7 @@ def filter_genomes(args, run_data):
         for genome in genomes:
             if genome.id in genome_ids_to_filter_out:
                 reason = "too few SCG hits" if args.best_hit_mode else "too few unique SCG hits"
-                genome.mark_removed(reason)
+                genome.mark_removed(reason, GenomeRemovalStage.SCG_HIT_FILTER)
 
         genome_ids_to_remove = {gd.id for gd in run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering()}
         scgs = run_data.get_all_SCG_targets_remaining()
@@ -51,11 +52,13 @@ def filter_genomes(args, run_data):
 
         run_data = run_pooled_stage(scgs, worker, apply_result, args, run_data)
 
-        run_data.genomes_filtered_for_min_SCG_hits = True
+        run_data.mark_stage_complete(PipelineStage.FILTER_GENOMES)
         write_run_data(run_data)
         capture_removed_genomes(run_data)
 
-        run_data = check_target_SCGs_have_seqs(run_data, f"-genome-filtered{run_data.general_ext}")
+        run_data = check_target_SCGs_have_seqs(
+            run_data, f"-genome-filtered{run_data.general_ext}",
+            SCGRemovalStage.GENOME_FILTER)
 
     report_genome_filtering_update(run_data)
 

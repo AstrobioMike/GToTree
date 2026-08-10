@@ -3,6 +3,7 @@ from gtotree.utils.gtdb.handle_gtdb_tax_info import update_mapping_dict_with_gtd
 from gtotree.utils.ncbi.handle_ncbi_tax_info import update_mapping_dict_with_ncbi_tax_info
 from gtotree.utils.misc.seqs import swap_labels_in_alignment
 from gtotree.utils.misc.general import write_run_data
+from gtotree.utils.misc.stages import PipelineStage
 
 def update_headers(args, run_data):
 
@@ -12,7 +13,7 @@ def update_headers(args, run_data):
 
     report_processing_stage("updating-headers", run_data)
 
-    if not run_data.headers_updated:
+    if not run_data.stage_is_complete(PipelineStage.UPDATE_HEADERS):
 
         if args.add_gtdb_tax:
             run_data = update_mapping_dict_with_gtdb_tax_info(args, run_data)
@@ -29,7 +30,7 @@ def update_headers(args, run_data):
                 f"reason. If the output directory was modified since the previous "
                 "run, your best bet is to start fresh with `-F`.")
 
-        run_data.headers_updated = True
+        run_data.mark_stage_complete(PipelineStage.UPDATE_HEADERS)
         write_run_data(run_data)
 
     return run_data

@@ -11,6 +11,15 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 from gtotree.utils.misc.messaging import (report_message, color_text, wprint)
+from gtotree.utils.misc.resume_state import invalidate_completed_from
+from gtotree.utils.misc.stages import (GenomeRemovalStage,
+                                  GENOME_REMOVAL_STAGE_ORDER,
+                                  NCBI_REMOVAL_STAGES,
+                                  PREPROCESSING_REMOVAL_STAGES,
+                                  SCG_REMOVAL_STAGE_ORDER,
+                                  PIPELINE_STAGES,
+                                  stages_through,
+                                  validate_stage)
 
 
 def atomic_write_text(path, write_fn, encoding="utf-8"):
@@ -215,8 +224,7 @@ class GenomeData:
     provided_path: str
     basename: str
     taxid: str = None
-    preprocessing_done: bool = False
-    preprocessing_failed: bool = False
+    processing_done: bool = False
     final_AA_path: str = ""
     final_nt_path: str = ""
     prodigal_used: bool = False
@@ -237,10 +245,17 @@ class GenomeData:
     num_unique_SCG_hits: int = None
     num_SCG_hits_after_filtering: int = None
     reason_removed: str = None
-    removed: bool = False
+    removed_at: str = None
+
+    @property
+    def removed(self):
+        """
+        Whether this genome is out of the run
+        """
+        return self.removed_at is not None
 
     @classmethod
-    def from_path(cls, path: str, source: str):
+    def from_path(cls, path, source):
         full_path = os.path.abspath(path)
         provided_path = path
         basename = os.path.basename(full_path)
@@ -263,7 +278,7 @@ class GenomeData:
                    basename=basename)
 
     @classmethod
-    def from_acc(cls, acc: str):
+    def from_acc(cls, acc):
         full_path = None
         provided_path = None
         basename = acc
@@ -276,11 +291,18 @@ class GenomeData:
                    provided_path=provided_path,
                    basename=basename)
 
-    def mark_preprocessing_done(self, value=True):
-        self.preprocessing_done = value
+    def mark_processing_done(self, value=True):
+        self.processing_done = value
 
-    def mark_removed(self, reason, value=True):
-        self.removed = value
+    def mark_removed(self, reason, stage):
+        """
+        Drop this genome from the run
+
+        `stage` is required and validated: a new removal site has to state where in the
+        pipeline it sits, because every report about that stage is counted from it
+        """
+        validate_stage(stage, GENOME_REMOVAL_STAGE_ORDER, "genome-removal stage")
+        self.removed_at = stage
         self.reason_removed = reason
         self.final_AA_path = None
 
@@ -325,14 +347,19 @@ class SCGset:
     trimmed: bool = None
     ready_for_cat: bool = None
     reason_removed: str = None
-    removed: bool = None
+    removed_at: str = None
+
+    @property
+    def removed(self):
+        return self.removed_at is not None
 
     @classmethod
-    def from_id(cls, id: str):
-        return cls(id, remaining=True, gene_length_filtered=False, removed=False)
+    def from_id(cls, id):
+        return cls(id, remaining=True, gene_length_filtered=False)
 
-    def mark_removed(self, reason, value=True):
-        self.removed = value
+    def mark_removed(self, reason, stage):
+        validate_stage(stage, SCG_REMOVAL_STAGE_ORDER, "SCG-removal stage")
+        self.removed_at = stage
         self.reason_removed = reason
         self.remaining = False
 
@@ -363,14 +390,11 @@ class RunData:
     hmm_path: str = ""
     mapping_file_path: str = ""
     mapping_dict: dict = field(default_factory=dict)
-    # input_acc -> {rank: value for the 7 ranks (+ 'strain' for NCBI)}; populated by
-    # the gtdb/ncbi tax handlers and consumed by the summary-table builder
     tax_info_dict: dict = field(default_factory=dict)
     initial_mapping_IDs_from_user: List[str] = field(default_factory=list)
     ready_genome_files_dir: str = ""
     hmm_results_dir: str = ""
     found_SCG_seqs_dir: str = ""
-    num_SCG_targets_removed: int = 0
     tmp_dir: str = ""
     log_file: str = ""
     logs_dir: str = ""
@@ -378,13 +402,8 @@ class RunData:
     gtotree_logs_dir: str = ""
     best_hit_mode: bool = False
     seq_length_cutoff: float = None
-    SCG_hits_filtered: bool = False
-    genomes_filtered_for_min_SCG_hits: bool = False
-    all_SCG_sets_aligned: bool = False
-    SCG_sets_concatenated: bool = False
+    completed_stages: dict = field(default_factory=dict)
     updating_headers: bool = False
-    headers_updated: bool = False
-    run_complete: bool = False
     use_muscle_super5: bool = False
     num_muscle_threads: int = 5
     nucleotide_mode: bool = False
@@ -424,6 +443,62 @@ class RunData:
     # dict of the run parameters that affect what this run produces; compared on -R
     # to decide whether resuming is safe. See preflight_checks.build_fingerprint
     fingerprint: dict = field(default_factory=dict)
+
+    # --- pipeline-stage completion --------------------------------------------
+
+    def mark_stage_complete(self, stage):
+        validate_stage(stage, PIPELINE_STAGES, "pipeline stage")
+        self.completed_stages[stage] = datetime.now().isoformat(timespec="seconds")
+
+    def stage_is_complete(self, stage) -> bool:
+        validate_stage(stage, PIPELINE_STAGES, "pipeline stage")
+        return stage in self.completed_stages
+
+    def invalidate_stages_from(self, stage):
+        """
+        Forget `stage` and everything downstream of it
+
+        Anything computed from a stage's output stops being trustworthy the moment that
+        stage has to be redone, even if it was marked complete
+        """
+        validate_stage(stage, PIPELINE_STAGES, "pipeline stage")
+        invalidate_completed_from(self.completed_stages, stage, PIPELINE_STAGES)
+
+    # --- stage-scoped removals ------------------------------------------------
+
+    def genomes_removed_at(self, *stages, source=None) -> List[GenomeData]:
+        """
+        Input genomes dropped at any of `stages`
+
+        `source` optionally narrows to one of GENOME_SOURCE_FIELDS, so a per-source
+        report doesn't count another source's failures
+        """
+        for stage in stages:
+            validate_stage(stage, GENOME_REMOVAL_STAGE_ORDER, "genome-removal stage")
+        wanted = frozenset(stages)
+        pool = getattr(self, source) if source else self.all_input_genomes
+        return [gd for gd in pool if gd.removed_at in wanted]
+
+    def genomes_alive_through(self, stage, source=None) -> List[GenomeData]:
+        """
+        Input genomes that were still in the run as of the end of `stage`
+
+        This is the count a stage's report wants. `get_all_remaining_input_genomes()`
+        answers the different question "who's left *now*?" (which wasn't helpful for resuming counts)
+        """
+        by_now = stages_through(stage, GENOME_REMOVAL_STAGE_ORDER)
+        pool = getattr(self, source) if source else self.all_input_genomes
+        return [gd for gd in pool if gd.removed_at not in by_now]
+
+    def SCG_targets_removed_at(self, *stages) -> List[SCGset]:
+        for stage in stages:
+            validate_stage(stage, SCG_REMOVAL_STAGE_ORDER, "SCG-removal stage")
+        wanted = frozenset(stages)
+        return [scg for scg in self.SCG_targets if scg.removed_at in wanted]
+
+    def SCG_targets_alive_through(self, stage) -> List[SCGset]:
+        by_now = stages_through(stage, SCG_REMOVAL_STAGE_ORDER)
+        return [scg for scg in self.SCG_targets if scg.removed_at not in by_now]
 
     def get_all_SCG_targets(self) -> List[SCGset]:
         return list(self.SCG_targets)
@@ -470,14 +545,16 @@ class RunData:
             self.update_all_input_genomes()
         return added
 
-    def get_all_preprocessed_genomes(self) -> List[GenomeData]:
-        return [gd for gd in self.all_input_genomes if gd.preprocessing_done]
+    def get_all_processed_genomes(self) -> List[GenomeData]:
+        return [gd for gd in self.all_input_genomes if gd.processing_done]
 
     def get_all_input_genomes_for_filtering(self) -> List[GenomeData]:
-        return [gd for gd in self.all_input_genomes if gd.preprocessing_done and gd.hmm_search_done and not gd.removed]
+        return [gd for gd in self.all_input_genomes if gd.processing_done and gd.hmm_search_done and not gd.removed]
 
     def get_all_input_genomes_due_for_SCG_min_hit_filtering(self) -> List[GenomeData]:
-        return [gd for gd in self.all_input_genomes if gd.reason_removed == "too few SCG hits" or gd.reason_removed == "too few unique SCG hits"]
+        # was a match against two literal `reason_removed` strings, which would have
+        # silently started returning [] the moment either bit of wording was edited
+        return self.genomes_removed_at(GenomeRemovalStage.SCG_HIT_FILTER)
 
     def get_input_ncbi_accs(self) -> List[str]:
         return [gd.id for gd in self.ncbi_accs]
@@ -507,7 +584,12 @@ class RunData:
         return [gd.id for gd in self.ncbi_accs if gd.acc_was_found is False]
 
     def get_removed_ncbi_accs(self) -> List[str]:
-        return [gd.id for gd in self.ncbi_accs if gd.removed]
+        """Accessions dropped *during NCBI handling*"""
+        return [gd.id for gd in
+                self.genomes_removed_at(*NCBI_REMOVAL_STAGES, source="ncbi_accs")]
+
+    def get_genomes_removed_during_processing(self) -> List[GenomeData]:
+        return self.genomes_removed_at(*PREPROCESSING_REMOVAL_STAGES)
 
     def get_all_removed_input_genomes(self) -> List[str]:
         return [gd.id for gd in self.all_input_genomes if gd.removed]
@@ -519,28 +601,37 @@ class RunData:
         return [gd.id for gd in self.all_input_genomes if not gd.removed]
 
     def get_done_ncbi_accs(self) -> List[GenomeData]:
-        return [gd for gd in self.ncbi_accs if gd.preprocessing_done]
+        return [gd for gd in self.ncbi_accs if gd.processing_done]
+
+    def _failed_at(self, stage, source) -> List[GenomeData]:
+        return self.genomes_removed_at(stage, source=source)
 
     def get_failed_genbank_ids(self) -> List[str]:
-        return [gd.id for gd in self.genbank_files if gd.removed]
+        return [gd.id for gd in
+                self._failed_at(GenomeRemovalStage.GENBANK_PREP, "genbank_files")]
 
     def get_failed_genbank_paths(self) -> List[str]:
-        return [gd.provided_path for gd in self.genbank_files if gd.removed]
+        return [gd.provided_path for gd in
+                self._failed_at(GenomeRemovalStage.GENBANK_PREP, "genbank_files")]
 
     def get_failed_fasta_ids(self) -> List[str]:
-        return [gd.id for gd in self.fasta_files if gd.removed]
+        return [gd.id for gd in
+                self._failed_at(GenomeRemovalStage.FASTA_PREP, "fasta_files")]
 
     def get_failed_fasta_paths(self) -> List[str]:
-        return [gd.provided_path for gd in self.fasta_files if gd.removed]
+        return [gd.provided_path for gd in
+                self._failed_at(GenomeRemovalStage.FASTA_PREP, "fasta_files")]
 
     def get_failed_amino_acid_ids(self) -> List[str]:
-        return [gd.id for gd in self.amino_acid_files if gd.removed and gd.preprocessing_failed]
+        return [gd.id for gd in
+                self._failed_at(GenomeRemovalStage.AMINO_ACID_PREP, "amino_acid_files")]
 
     def get_failed_amino_acid_paths(self) -> List[str]:
-        return [gd.provided_path for gd in self.amino_acid_files if gd.removed and gd.preprocessing_failed]
+        return [gd.provided_path for gd in
+                self._failed_at(GenomeRemovalStage.AMINO_ACID_PREP, "amino_acid_files")]
 
     def get_failed_hmm_search_paths(self) -> List[str]:
-        return [(gd.provided_path or gd.id) for gd in self.all_input_genomes if gd.preprocessing_done and not gd.hmm_search_done]
+        return [(gd.provided_path or gd.id) for gd in self.all_input_genomes if gd.processing_done and not gd.hmm_search_done]
 
     def get_prodigal_used_genbank_ids(self) -> List[str]:
         return [gd.id for gd in self.genbank_files if gd.prodigal_used]
@@ -608,6 +699,20 @@ class CorruptRunData(Exception):
     """The saved run-data.json exists but can't be parsed back into a RunData."""
 
 
+def _known_fields_only(cls, values):
+    """
+    Drop keys that aren't fields of `cls`
+
+    A run-data.json written by an older GToTree can carry fields that no longer exist
+    (`processing_failed`, `run_complete`, ...). Without this, loading one raises
+    TypeError and surfaces as "corrupt run data". Letting it instead load means the
+    fingerprint's `state_version` gets to do its job and refuse the resume with an
+    explanation instead.
+    """
+    allowed = {f.name for f in fields(cls)}
+    return {k: v for k, v in values.items() if k in allowed}
+
+
 def read_run_data(path):
     """
     Load a saved RunData, or return None if there isn't one at `path`
@@ -621,11 +726,14 @@ def read_run_data(path):
 
         for name in GENOME_SOURCE_FIELDS:
             if name in run_data_dict:
-                run_data_dict[name] = [GenomeData(**gd) if isinstance(gd, dict) else gd
-                                       for gd in run_data_dict[name]]
+                run_data_dict[name] = [
+                    GenomeData(**_known_fields_only(GenomeData, gd))
+                    if isinstance(gd, dict) else gd
+                    for gd in run_data_dict[name]]
 
         if "tools_used" in run_data_dict and run_data_dict["tools_used"] is not None:
-            run_data_dict["tools_used"] = ToolsUsed(**run_data_dict["tools_used"])
+            run_data_dict["tools_used"] = ToolsUsed(
+                **_known_fields_only(ToolsUsed, run_data_dict["tools_used"]))
         else:
             run_data_dict["tools_used"] = ToolsUsed()
 
@@ -633,8 +741,12 @@ def read_run_data(path):
             run_data_dict["start_time"] = datetime.fromisoformat(run_data_dict["start_time"])
 
         if "SCG_targets" in run_data_dict:
-            run_data_dict["SCG_targets"] = [SCGset(**scg) if isinstance(scg, dict) else scg for scg in run_data_dict["SCG_targets"]]
-        run_data = RunData(**run_data_dict)
+            run_data_dict["SCG_targets"] = [
+                SCGset(**_known_fields_only(SCGset, scg))
+                if isinstance(scg, dict) else scg
+                for scg in run_data_dict["SCG_targets"]]
+
+        run_data = RunData(**_known_fields_only(RunData, run_data_dict))
         run_data.update_all_input_genomes()
 
         return run_data
@@ -766,7 +878,7 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
     propagates out of `future.result()` here and aborts the whole stage partway
     through, with some items applied and some not. Workers should wrap their body in
     `try/except BaseException` and return a status object describing the failure, so
-    `apply_result` can record it and the stage can carry on. All the preprocessing and
+    `apply_result` can record it and the stage can carry on. All the processing and
     search workers follow this.
 
     On KeyboardInterrupt, queued-but-not-yet-started work is cancelled rather than

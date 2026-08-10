@@ -5,18 +5,19 @@ from gtotree.utils.misc.messaging import (report_processing_stage,
                                      report_genbank_update,
                                      report_fasta_update,
                                      report_AA_update,
-                                     report_genome_preprocessing_update,
+                                     report_genome_processing_update,
                                      report_pfam_searching_update,
                                      report_ko_searching_update,
                                      report_hmm_search_update)
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.general import write_run_data, run_pooled_stage, remove_file_if_exists
 from gtotree.utils.misc.seqs import check_target_SCGs_have_seqs
+from gtotree.utils.misc.stages import PipelineStage, SCGRemovalStage
 from gtotree.utils.pfam.pfam_handling import get_additional_pfam_targets
 from gtotree.utils.ko.ko_handling import parse_kofamscan_targets
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 
-from gtotree.utils.misc.preprocessing_genomes import (
+from gtotree.utils.misc.processing_genomes import (
     build_base_link_map,
     capture_ncbi_failed_downloads,
     capture_failed_genbank_files,
@@ -103,7 +104,7 @@ def genome_is_fully_processed(gd, plan):
     """
     True when nothing more needs doing for this genome
     """
-    if not gd.preprocessing_done:
+    if not gd.processing_done:
         return False
     if plan.do_scg and not gd.hmm_search_done:
         return False
@@ -177,7 +178,7 @@ def _apply_searches(genome, searches, run_data, plan):
 
 def _fused(preprocess_worker, preprocess_apply, plan):
     """
-    Wrap a source-specific preprocessing worker/apply pair into a fused pair that also
+    Wrap a source-specific processing worker/apply pair into a fused pair that also
     searches the genome and then drops its FASTAs
     """
     def worker(gd, run_data):
@@ -189,7 +190,7 @@ def _fused(preprocess_worker, preprocess_apply, plan):
                     _drop_genome_files(status, run_data)
             return status
         except BaseException as e:
-            # belt and braces: the preprocessing workers already swallow everything,
+            # belt and braces: the processing workers already swallow everything,
             # but a raise here would abort the whole stage with some genomes applied
             # and some not
             return {"done": False, "num_genes": 0, "prodigal_used": False,
@@ -322,13 +323,13 @@ def _finalize(args, run_data, plan):
     Build every combined output from the per-genome artifacts, then report
     """
     phase_stats.begin("processing genomes: combining outputs")
-    report_processing_stage("preprocessing-update", run_data)
+    report_processing_stage("processing-update", run_data)
     run_data.update_all_input_genomes()
-    report_genome_preprocessing_update(run_data)
+    report_genome_processing_update(run_data)
 
     if plan.do_pfam:
         write_pfam_counts_table(run_data)
-        print("") ; print("Combining Pfam search results...".center(82))
+        print("") ; print("    Combining Pfam search results...")
         combine_all_pfam_hits(run_data.found_pfam_targets,
                               run_data.tmp_pfam_results_dir,
                               run_data.pfam_results_dir + "/pfam-hit-seqs")
@@ -338,7 +339,7 @@ def _finalize(args, run_data, plan):
 
     if plan.do_ko:
         write_ko_counts_table(run_data)
-        print("") ; print("Combining KO search results...".center(82))
+        print("") ; print("    Combining KO search results...")
         combine_all_ko_hits(run_data.found_ko_targets,
                             run_data.tmp_ko_results_dir,
                             run_data.ko_results_dir + "/ko-hit-seqs")
@@ -353,8 +354,10 @@ def _finalize(args, run_data, plan):
         phase_stats.checkpoint("combining: after SCG rebuild")
         report_hmm_search_update(run_data)
 
-        run_data = check_target_SCGs_have_seqs(run_data, run_data.general_ext)
+        run_data = check_target_SCGs_have_seqs(run_data, run_data.general_ext,
+                                              SCGRemovalStage.NO_HITS)
 
+    run_data.mark_stage_complete(PipelineStage.PROCESS_GENOMES)
     write_run_data(run_data)
 
     return run_data

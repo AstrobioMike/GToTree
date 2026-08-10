@@ -330,7 +330,7 @@ def test_adopt_genome_progress_carries_flags_by_id(built, spec):
     `genomes_needing_processing` filters on exactly those.
     """
     args, run_data, out_dir, work_dir = built
-    run_data.all_input_genomes[0].mark_preprocessing_done()
+    run_data.all_input_genomes[0].mark_processing_done()
     run_data.all_input_genomes[0].mark_pfam_search_done()
     run_data.all_input_genomes[0].num_genes = 42
 
@@ -348,7 +348,7 @@ def test_adopt_genome_progress_leaves_new_genomes_untouched(built, spec, listing
     """A genome that wasn't in the previous run keeps its fresh flags and gets done."""
     args, run_data, out_dir, work_dir = built
     for gd in run_data.all_input_genomes:
-        gd.mark_preprocessing_done()
+        gd.mark_processing_done()
         gd.mark_pfam_search_done()
 
     extra = write_genome("g3", ["PF90001"])

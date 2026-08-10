@@ -5,7 +5,7 @@ The main GToTree driver accepts four genome sources: NCBI accessions (`-a`), Gen
 files (`-g`), nucleotide fastas (`-f`), and amino-acid fastas (`-A`). This module brings
 the three local-file types to gen-scg-hmms so it can accept the same inputs.
 
-Rather than reimplement the parsing, I'm re-using the main run's actual preprocessing
+Rather than reimplement the parsing, I'm re-using the main run's actual processing
 logic from `gtotree.utils.seqs`:
 
     extract_filter_and_rename_cds_amino_acids_from_gb   GenBank CDS translations

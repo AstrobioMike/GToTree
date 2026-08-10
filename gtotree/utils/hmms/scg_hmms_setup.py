@@ -66,26 +66,53 @@ def canonicalize_hmm_arg(hmm_arg):
     return hmm_arg
 
 
-def check_hmm_file(args, run_data):
-    # a real path wins outright
+def resolve_hmm_arg(args):
+    """
+    Settle `-H` on the official spelling of the requested set
+    """
+    if find_local_hmm_file(args.hmm) is None:
+        args.hmm = canonicalize_hmm_arg(args.hmm)
+    return args
+
+
+def resolve_hmm_source(args, run_data):
+    """
+    Point run_data at the HMM file and validate it. Runs on every invocation.
+
+    Cheap on a resume: the packaged set is already in GToTree_HMM_dir, so `get_hmm_path`
+    is a stat rather than a download.
+    """
     local_path = find_local_hmm_file(args.hmm)
 
     if local_path is not None:
-        hmm_arg = args.hmm
         run_data.hmm_path = local_path
     else:
-        # rewritten in place so downstream reporting, the tools_used check in
-        # preflight_checks, and the on-disk filename all see the "official" spelling
-        args.hmm = canonicalize_hmm_arg(args.hmm)
-        hmm_arg = args.hmm
-        run_data.hmm_path = get_hmm_path(with_hmm_suffix(hmm_arg), hmm_arg)
+        run_data.hmm_path = get_hmm_path(with_hmm_suffix(args.hmm), args.hmm)
 
-    check_gathering_cutoffs(run_data.hmm_path, hmm_arg)
+    check_gathering_cutoffs(run_data.hmm_path, args.hmm)
 
+    return run_data
+
+
+def populate_SCG_targets(run_data):
+    """
+    Build the initial SCG-target list. Fresh runs only, a resume reads its targets,
+    with all their accumulated per-SCG state, back out of run-data.json.
+    """
     initial_SCG_targets = get_SCG_hmm_targets(run_data.hmm_path)
     run_data.SCG_targets = [SCGset.from_id(target) for target in initial_SCG_targets]
 
     return run_data
+
+
+def check_hmm_file(args, run_data):
+    """
+    The whole fresh-run HMM setup: resolve the name, resolve the file, list the targets
+    """
+    args = resolve_hmm_arg(args)
+    run_data = resolve_hmm_source(args, run_data)
+
+    return populate_SCG_targets(run_data)
 
 
 def check_gathering_cutoffs(hmm_path, hmm_arg):

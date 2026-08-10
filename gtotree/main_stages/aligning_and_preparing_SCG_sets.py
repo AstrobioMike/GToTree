@@ -1,10 +1,14 @@
 import os
+import shutil
 from gtotree.utils.misc.general import (write_run_data,
                                    run_pooled_stage,
                                    remove_file_if_exists,
                                    file_is_usable_else_clear)
 from gtotree.utils.misc.messaging import (report_processing_stage,
-                                     report_no_SCGs_remaining)
+                                     report_no_SCGs_remaining,
+                                     report_SCG_alignment_update)
+from gtotree.utils.misc.summary_info import write_out_removed_SCG_targets
+from gtotree.utils.misc.stages import PipelineStage, SCGRemovalStage
 from gtotree.utils.misc.seqs import (copy_gene_alignments,
                                 run_muscle,
                                 run_trimal,
@@ -16,7 +20,7 @@ def align_and_prepare_SCG_sets(args, run_data):
 
     report_processing_stage("align-and-prepare-SCG-sets", run_data)
 
-    if not run_data.all_SCG_sets_aligned:
+    if not run_data.stage_is_complete(PipelineStage.ALIGN_SCG_SETS):
 
         scgs_to_align = run_data.get_all_SCG_targets_remaining()
 
@@ -25,8 +29,11 @@ def align_and_prepare_SCG_sets(args, run_data):
                                         _align_one_SCG,
                                         _apply_alignment_status,
                                         args, run_data)
-            run_data.all_SCG_sets_aligned = True
+            run_data.mark_stage_complete(PipelineStage.ALIGN_SCG_SETS)
             write_run_data(run_data)
+
+            capture_failed_alignment_logs(run_data)
+            write_out_removed_SCG_targets(run_data)
 
         else:
             report_no_SCGs_remaining(run_data)
@@ -34,7 +41,28 @@ def align_and_prepare_SCG_sets(args, run_data):
         if args.keep_gene_alignments:
             copy_gene_alignments(run_data)
 
+    report_SCG_alignment_update(run_data)
+
     return run_data
+
+
+def capture_failed_alignment_logs(run_data):
+    """
+    Keep the muscle/trimal logs for SCG-sets that failed to align
+    """
+    failed = run_data.SCG_targets_removed_at(SCGRemovalStage.ALIGNMENT)
+    if not failed:
+        return
+
+    dest_dir = os.path.join(run_data.logs_dir, "failed-SCG-alignments")
+    os.makedirs(dest_dir, exist_ok=True)
+
+    for scg in failed:
+        paths = _scg_paths(scg.id, run_data)
+        for key in ("align_log", "trimal_log"):
+            src = paths[key]
+            if os.path.isfile(src):
+                shutil.copy(src, os.path.join(dest_dir, os.path.basename(src)))
 
 
 def _scg_paths(scg_id, run_data):
@@ -129,10 +157,10 @@ def _apply_alignment_status(scg, status, run_data):
         return
 
     if status.get("align_failed"):
-        scg.mark_removed("alignment failed")
+        scg.mark_removed("alignment failed", SCGRemovalStage.ALIGNMENT)
         scg.aligned = False
     elif status.get("trimal_failed"):
-        scg.mark_removed("trimal failed")
+        scg.mark_removed("trimal failed", SCGRemovalStage.ALIGNMENT)
         scg.trimmed = False
     else:
         scg.aligned = True

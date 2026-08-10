@@ -4,6 +4,7 @@ import pytest  # type: ignore
 
 from gtotree.utils.misc.general import GenomeData, RunData, SCGset
 from gtotree.main_stages.filtering_genomes import capture_removed_genomes
+from gtotree.utils.misc.stages import GenomeRemovalStage
 
 
 def _run_data(tmp_path, hit_counts):
@@ -13,7 +14,7 @@ def _run_data(tmp_path, hit_counts):
     rd.SCG_targets = [SCGset.from_id(s) for s in ("A", "B", "C", "D")]
     for gid, hits in hit_counts.items():
         gd = GenomeData.from_acc(gid)
-        gd.preprocessing_done = True
+        gd.processing_done = True
         gd.hmm_search_done = True
         gd.num_SCG_hits = hits
         gd.num_unique_SCG_hits = hits
@@ -33,7 +34,8 @@ class TestCaptureRemovedGenomes:
 
     def test_records_each_removed_genome_with_its_counts(self, tmp_path):
         rd = _run_data(tmp_path, {"G1": 4, "G2": 1})
-        rd.all_input_genomes[1].mark_removed("too few unique SCG hits")
+        rd.all_input_genomes[1].mark_removed("too few unique SCG hits",
+                                            GenomeRemovalStage.SCG_HIT_FILTER)
 
         capture_removed_genomes(rd)
 
@@ -47,8 +49,10 @@ class TestCaptureRemovedGenomes:
     def test_genomes_removed_for_other_reasons_are_not_listed(self, tmp_path):
         """This file is specifically the too-few-hits report."""
         rd = _run_data(tmp_path, {"G1": 4, "G2": 1})
-        rd.all_input_genomes[0].mark_removed("HMM search failed")
-        rd.all_input_genomes[1].mark_removed("too few unique SCG hits")
+        rd.all_input_genomes[0].mark_removed("HMM search failed",
+                                            GenomeRemovalStage.HMM_SEARCH)
+        rd.all_input_genomes[1].mark_removed("too few unique SCG hits",
+                                            GenomeRemovalStage.SCG_HIT_FILTER)
 
         capture_removed_genomes(rd)
 
@@ -66,7 +70,8 @@ class TestCaptureRemovedGenomes:
         gd.num_SCG_hits_after_filtering = None
         gd.num_SCG_hits = None
         gd.num_unique_SCG_hits = None
-        gd.mark_removed("too few unique SCG hits")
+        gd.mark_removed("too few unique SCG hits",
+                        GenomeRemovalStage.SCG_HIT_FILTER)
 
         capture_removed_genomes(rd)
 

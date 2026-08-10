@@ -2,6 +2,7 @@ import os
 
 from gtotree.utils.misc.general import file_is_usable_else_clear, write_run_data
 from gtotree.utils.misc.messaging import report_processing_stage
+from gtotree.utils.misc.stages import PipelineStage
 from gtotree.utils.misc.seqs import (concatenate_alignments,
                                 gen_partitions_file,
                                 get_alignment_length)
@@ -19,7 +20,7 @@ def concatenate_SCG_sets(run_data):
 
         gen_partitions_file(run_data, SCG_IDs, dict_of_genomes)
 
-        run_data.SCG_sets_concatenated = True
+        run_data.mark_stage_complete(PipelineStage.CONCATENATE_SCG_SETS)
         write_run_data(run_data)
 
     return run_data
@@ -29,7 +30,7 @@ def _concatenation_can_be_skipped(run_data):
     """
     True when a previous run finished concatenating and its output is still there
     """
-    if not run_data.SCG_sets_concatenated:
+    if not run_data.stage_is_complete(PipelineStage.CONCATENATE_SCG_SETS):
         return False
     return _concatenated_alignment_is_present(run_data)
 

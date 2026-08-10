@@ -97,7 +97,7 @@ def test_hit_seqs_are_combined_per_target(basic_run, pfam_spec):
                if line.startswith(">")]
     # four hits total: one each from g1 and g2, two from g3
     assert len(headers) == 4
-    # headers are genome-prefixed by the shared preprocessing, so hits stay traceable
+    # headers are genome-prefixed by the shared processing, so hits stay traceable
     assert sum(h.startswith(">g3_") for h in headers) == 2
 
 

@@ -521,8 +521,8 @@ def phase_resolve_genomes(args):
 
 def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, args):
     """
-    Get amino acids for every target genome -- downloading NCBI accessions and
-    preprocessing any local files -- and combine them into a single fasta with
+    Get amino acids for every target genome, downloading NCBI accessions and
+    processing any local files, and combine them into a single fasta with
     genome-traceable headers.
 
     Returns (combined_path, kept_ids, missed, organism_names, sources_extra).

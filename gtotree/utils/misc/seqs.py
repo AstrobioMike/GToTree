@@ -98,24 +98,19 @@ def extract_fasta_from_gb(prefix, input_gb, run_data):
             outfile.write(f">{prefix}_{num}\n{rec.seq}\n")
 
 
-def check_target_SCGs_have_seqs(run_data, ext):
+def check_target_SCGs_have_seqs(run_data, ext, stage):
+    """
+    Drop any SCG-set with no usable sequences at `ext`
+    """
+    for SCG_obj in run_data.get_all_SCG_targets():
 
-    SCG_targets_present_at_start = run_data.get_all_SCG_targets()
-    SCG_targets_missing = []
-
-    for SCG_obj in SCG_targets_present_at_start:
-
-        if getattr(SCG_obj, 'removed', False):
+        if SCG_obj.removed:
             continue
 
-        SCG = SCG_obj.id
-        path = run_data.found_SCG_seqs_dir + f"/{SCG}{ext}"
-        present = file_is_usable_else_clear(path)
-        if not present:
-            SCG_obj.mark_removed("no seqs found or no seqs remaining after length-filtering")
-            SCG_targets_missing.append(SCG)
-
-    run_data.num_SCG_targets_removed = len(SCG_targets_missing)
+        path = run_data.found_SCG_seqs_dir + f"/{SCG_obj.id}{ext}"
+        if not file_is_usable_else_clear(path):
+            SCG_obj.mark_removed(
+                "no seqs found or no seqs remaining after length-filtering", stage)
 
     return run_data
 

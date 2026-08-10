@@ -436,7 +436,7 @@ def fill_in_shared_args(args):
     for.
 
     `run_pooled_stage` reads `num_jobs`; `build_search_plan` reads `debug`; the
-    preprocessing helpers reach `nucleotide_mode` through run_data but a couple of
+    processing helpers reach `nucleotide_mode` through run_data but a couple of
     shared paths still check args. Setting them explicitly here (rather than letting an
     AttributeError surface from inside a worker thread) keeps the shim in one visible
     place.

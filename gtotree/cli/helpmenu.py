@@ -122,9 +122,10 @@ helpmenu += f"""
                   value of 0.2 for this parameter.
 
                   Note: This is calculated based on the total number of genomes remaining
-                  after preprocessing steps, but before genome filtering based on the '-G'
-                  parameter, and it is not revisited after genome-level filtering. This is
-                  to avoid iterative pruning effects between the '-g' and '-G' parameters.
+                  after the primary genome retrieval and processing steps, but before genome
+                  filtering based on the '-G' parameter, and it is not revisited after
+                  genome-level filtering. This is to avoid iterative pruning effects between
+                  the '-g' and '-G' parameters.
 
         - [{color_text("-G <float>", "teal", bold = True)}] genome-hits cutoff; default: 0.5
                   A float between 0-1 (inclusive) specifying the minimum proportion

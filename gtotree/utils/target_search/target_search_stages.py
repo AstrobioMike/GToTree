@@ -28,7 +28,7 @@ from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 from gtotree.main_stages.processing_genomes import (SearchPlan,
                                                     _fused,
                                                     genomes_needing_processing)
-from gtotree.utils.misc.preprocessing_genomes import (
+from gtotree.utils.misc.processing_genomes import (
     build_base_link_map,
     capture_ncbi_failed_downloads,
     capture_failed_genbank_files,
@@ -184,7 +184,7 @@ def phase_collect_targets(run_data, spec, out_dir, resuming=False):
 
 
 ################################################################################
-# phase 3: preprocessing + searching
+# phase 3: processing + searching
 ################################################################################
 
 def build_plan(args, spec):
@@ -208,7 +208,7 @@ def phase_search_genomes(args, run_data, spec, plan):
     Preprocess and search every genome that isn't already done.
 
     Each source gets its own labelled progress bar. Genomes already carrying both
-    `preprocessing_done` and this target type's search flag are skipped, which is what
+    `processing_done` and this target type's search flag are skipped, which is what
     makes `-R` resume at genome granularity without any extra bookkeeping.
     """
     press_dir_cm = (tempfile.TemporaryDirectory(prefix="gtt-press-")

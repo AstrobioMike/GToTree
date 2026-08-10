@@ -88,7 +88,7 @@ def build_fingerprint(run_data, args, spec, data_version=None):
 
       * this fingerprint guards the run as a whole, refusing a `-R` whose parameters
         changed in a way that would mix results from two different runs
-      * the per-genome flags on GenomeData (`preprocessing_done`, `pfam_search_done`,
+      * the per-genome flags on GenomeData (`processing_done`, `pfam_search_done`,
         `ko_search_done`) give genome-level resume, since `genomes_needing_processing`
         filters on exactly those
 

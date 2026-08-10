@@ -79,7 +79,7 @@ class TargetSearchSpec:
     describe_data_version: Optional[Callable] = None
 
     # --- environment -----------------------------------------------------------
-    # external binaries this target type needs on PATH, beyond genome preprocessing
+    # external binaries this target type needs on PATH, beyond genome processing
     required_binaries: List[str] = field(default_factory=list)
     # environment variables that must be set for this target type
     required_env_vars: List[str] = field(default_factory=list)

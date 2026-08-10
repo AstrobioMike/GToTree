@@ -4,6 +4,7 @@
 from gtotree.utils.hmms.hmm_searching import (parse_hmmer_results,
                                                 rebuild_combined_SCG_outputs)
 from gtotree.utils.misc.general import RunData, SCGset
+from gtotree.utils.misc.stages import GenomeRemovalStage
 
 
 def _run_data(targets, best_hit_mode=False):
@@ -160,7 +161,7 @@ class TestRebuildCombinedSCGOutputs:
 
         for gid in genome_ids:
             gd = GenomeData.from_acc(gid)
-            gd.preprocessing_done = True
+            gd.processing_done = True
             gd.hmm_search_done = True
             rd.ncbi_accs.append(gd)
             gdir = os.path.join(rd.hmm_results_dir, gid)
@@ -213,10 +214,11 @@ class TestRebuildCombinedSCGOutputs:
         from gtotree.utils.misc.general import GenomeData
         rd = self._setup(tmp_path, ["G1", "G2"])
         ghost = GenomeData.from_acc("G_missing")
-        ghost.preprocessing_done = ghost.hmm_search_done = True
+        ghost.processing_done = ghost.hmm_search_done = True
         rd.ncbi_accs.append(ghost)
         rd.update_all_input_genomes()
-        rd.all_input_genomes[1].mark_removed("too few SCG hits")
+        rd.all_input_genomes[1].mark_removed("too few SCG hits",
+                                         GenomeRemovalStage.SCG_HIT_FILTER)
 
         rebuild_combined_SCG_outputs(rd)
         _, rows = self._rows(rd)

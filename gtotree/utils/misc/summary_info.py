@@ -1,6 +1,26 @@
 import pandas as pd # type: ignore
 
 from gtotree.utils.taxonomy.tax_ranks import RANKS
+from gtotree.utils.misc.general import atomic_write_text
+
+
+def write_out_removed_SCG_targets(run_data):
+    """
+    Record every SCG-set that has left the run so far, and why
+    """
+    removed = [scg for scg in run_data.SCG_targets if scg.removed]
+    if not removed:
+        return
+
+    out_path = run_data.run_files_dir + "/target-SCGs-dropped-from-analysis.tsv"
+
+    def _write(f):
+        f.write("target_SCG\tstage_removed\treason_removed\n")
+        for scg in removed:
+            f.write(f"{scg.id}\t{scg.removed_at or ''}\t{scg.reason_removed or ''}\n")
+
+    atomic_write_text(out_path, _write)
+
 
 def generate_primary_summary_table(args, run_data):
 

@@ -5,6 +5,8 @@ from gtotree.utils.misc.messaging import (report_message,
                                      report_processing_stage,
                                      report_SCG_set_filtering_update)
 from gtotree.utils.misc.seqs import check_target_SCGs_have_seqs, filter_seqs_by_length
+from gtotree.utils.misc.stages import PipelineStage, SCGRemovalStage
+from gtotree.utils.misc.summary_info import write_out_removed_SCG_targets
 
 def filter_genes(args, run_data):
 
@@ -12,9 +14,9 @@ def filter_genes(args, run_data):
     cutoff = f"{run_data.seq_length_cutoff * 100:.0f}"
     in_genomes_cutoff_for_report = f"{args.gene_representation_cutoff * 100:.0f}"
 
-    message = (f"Keeping genes with lengths within {cutoff}% of the median for each gene set, "
+    message = (f"Keeping genes with lengths within {cutoff}% of the median for each gene set (controlled by `-c`), "
                f"and keeping gene sets with hits in at least {in_genomes_cutoff_for_report}% of "
-               f"the currently retained genomes.")
+               f"the currently retained genomes (controlled by `-r`).")
     report_message(message, ii="    ", si="    ", width=80)
 
     scgs_to_filter = run_data.get_all_SCG_targets_remaining_but_not_filtered()
@@ -46,7 +48,9 @@ def filter_genes(args, run_data):
 
         write_run_data(run_data)
 
-    run_data = check_target_SCGs_have_seqs(run_data, f"-gene-filtered{run_data.general_ext}")
+    run_data = check_target_SCGs_have_seqs(run_data,
+                                          f"-gene-filtered{run_data.general_ext}",
+                                          SCGRemovalStage.GENE_FILTER)
 
     total_genomes_remaining = len(run_data.get_all_input_genomes_for_filtering())
     min_genomes_required = required_count(total_genomes_remaining,
@@ -56,7 +60,9 @@ def filter_genes(args, run_data):
     for scg in run_data.get_all_SCG_targets_remaining():
         count = getattr(scg, 'num_genomes_with_hits_after_len_filtering', 0)
         if count < min_genomes_required:
-            scg.mark_removed(f"too few genomes with hits ({count} < {min_genomes_required} required)")
+            scg.mark_removed(
+                f"too few genomes with hits ({count} < {min_genomes_required} required)",
+                SCGRemovalStage.GENE_FILTER)
             removed_any = True
 
     if removed_any:
@@ -64,19 +70,9 @@ def filter_genes(args, run_data):
 
     write_out_removed_SCG_targets(run_data)
 
+    run_data.mark_stage_complete(PipelineStage.FILTER_GENES)
+    write_run_data(run_data)
+
     report_SCG_set_filtering_update(run_data)
 
     return run_data
-
-
-def write_out_removed_SCG_targets(run_data):
-
-    removed_scg_objs = [scg for scg in run_data.SCG_targets if getattr(scg, 'removed', False)]
-    if len(removed_scg_objs) > 0:
-        out_path = run_data.run_files_dir + "/target-SCGs-dropped-from-analysis.tsv"
-        with open(out_path, "w") as fail_file:
-            # header
-            fail_file.write("target_SCG\treason_removed\n")
-            for scg in removed_scg_objs:
-                reason = scg.reason_removed or ""
-                fail_file.write(f"{scg.id}\t{reason}\n")

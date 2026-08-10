@@ -41,15 +41,15 @@ class TargetGenomeError(GenSCGHMMsError):
 
 def _download_and_unzip():
     """
-    Lazily grab the shared atomic downloader from the preprocessing stage.
+    Lazily grab the shared atomic downloader from the processing stage.
 
     Imported on first use rather than at module scope because
-    `main_stages.preprocessing_genomes` pulls in a bunch of other crap,
+    `main_stages.processing_genomes` pulls in a bunch of other crap,
     none of which this standalone helper otherwise needs. The
     download behavior itself (atomic write, retry/backoff, fast-fail on 404) is
     deliberately shared rather than reimplemented.
     """
-    from gtotree.utils.misc.preprocessing_genomes import download_and_unzip_accession
+    from gtotree.utils.misc.processing_genomes import download_and_unzip_accession
     return download_and_unzip_accession
 
 

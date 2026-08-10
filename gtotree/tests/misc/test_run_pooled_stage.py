@@ -1,7 +1,7 @@
 """
 Tests for the shared `run_pooled_stage` helper.
 
-All four preprocessing stages (genbank, fasta, amino-acid, NCBI accessions) and
+All four processing stages (genbank, fasta, amino-acid, NCBI accessions) and
 gen-scg-hmms route through this
 
   * `worker` runs concurrently and must not raise

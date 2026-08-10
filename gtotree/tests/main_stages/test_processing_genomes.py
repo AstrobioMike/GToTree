@@ -16,6 +16,7 @@ from gtotree.tests.paths import DATA_DIR
 from gtotree.utils.misc.general import GenomeData
 from gtotree.main_stages.processing_genomes import (SearchPlan,
                                                     genomes_needing_processing)
+from gtotree.utils.misc.stages import GenomeRemovalStage
 
 REQUIRED = ["prodigal"]
 _missing = [b for b in REQUIRED if shutil.which(b) is None]
@@ -35,21 +36,22 @@ def _genome(gid, **flags):
 class TestGenomesNeedingProcessing:
     """
     A genome's sequence files are deleted once its worker returns, so only fully
-    processed genomes can be skipped -- a preprocessed-but-unsearched genome has nothing
+    processed genomes can be skipped, a processed-but-unsearched genome has nothing
     left on disk to search and is redone from the top.
     """
 
     def test_selects_unprocessed_and_partially_processed_genomes(self):
-        done = _genome("G1", preprocessing_done=True, hmm_search_done=True)
-        partial = _genome("G2", preprocessing_done=True, hmm_search_done=False)
+        done = _genome("G1", processing_done=True, hmm_search_done=True)
+        partial = _genome("G2", processing_done=True, hmm_search_done=False)
         fresh = _genome("G3")
-        removed = _genome("G4", removed=True)
+        removed = _genome("G4")
+        removed.mark_removed("HMM search failed", GenomeRemovalStage.HMM_SEARCH)
 
         assert genomes_needing_processing([done, partial, fresh, removed], _plan()) == \
             [partial, fresh]
 
     def test_extra_searches_are_required_only_when_planned(self):
-        gd = _genome("G1", preprocessing_done=True, hmm_search_done=True,
+        gd = _genome("G1", processing_done=True, hmm_search_done=True,
                      pfam_search_done=False)
         assert genomes_needing_processing([gd], _plan(do_pfam=True)) == [gd]
         assert genomes_needing_processing([gd], _plan(do_pfam=False)) == []
@@ -179,13 +181,13 @@ def test_do_scg_false_is_carried_on_the_plan():
 def test_genome_is_fully_processed_ignores_the_hmm_search_when_do_scg_is_off():
     """
     The gate that decides whether a genome still needs work. With do_scg off, a
-    preprocessed-and-pfam-searched genome is done; if the flag were ignored here, every
+    processed-and-pfam-searched genome is done; if the flag were ignored here, every
     genome would be re-processed on every run because hmm_search_done never becomes
     True.
     """
     from gtotree.main_stages.processing_genomes import genome_is_fully_processed
 
-    gd = _genome("g1", preprocessing_done=True, pfam_search_done=True)
+    gd = _genome("g1", processing_done=True, pfam_search_done=True)
 
     scg_plan = SearchPlan(do_pfam=True, do_ko=False, keep_genome_files=False)
     no_scg_plan = SearchPlan(do_pfam=True, do_ko=False, keep_genome_files=False,
@@ -199,8 +201,8 @@ def test_genomes_needing_processing_respects_do_scg():
     no_scg_plan = SearchPlan(do_pfam=True, do_ko=False, keep_genome_files=False,
                              do_scg=False)
 
-    done = _genome("done", preprocessing_done=True, pfam_search_done=True)
-    needs_search = _genome("needs", preprocessing_done=True, pfam_search_done=False)
+    done = _genome("done", processing_done=True, pfam_search_done=True)
+    needs_search = _genome("needs", processing_done=True, pfam_search_done=False)
 
     remaining = genomes_needing_processing([done, needs_search], no_scg_plan)
     assert [gd.id for gd in remaining] == ["needs"]

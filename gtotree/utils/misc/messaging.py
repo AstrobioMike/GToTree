@@ -9,6 +9,9 @@ import threading
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
 from gtotree.utils.misc.context import log_file_var
+from gtotree.utils.misc.stages import (GenomeRemovalStage,
+                                  SCGRemovalStage,
+                                  SCG_GENE_FILTERING_STAGES)
 
 
 tty_colors = {
@@ -385,6 +388,15 @@ def report_update(message, color = "green"):
     print(color_text("  ******************************************************************************  ", color))
 
 
+@capture_stdout_to_log(lambda: log_file_var.get())
+def report_section_info(message):
+    """
+    Print an informational block with no banner around it
+    """
+    print("")
+    print(message)
+
+
 ### specific notices
 def check_and_report_any_changed_default_behavior(args, run_data):
 
@@ -533,7 +545,7 @@ def report_processing_stage(stage, run_data):
         "genbank":                     "PROCESSING THE GENOMES PROVIDED AS GENBANK FILES",
         "fasta":                       "PROCESSING THE GENOMES PROVIDED AS FASTA FILES",
         "amino-acid":                  "PROCESSING THE GENOMES PROVIDED AS AMINO-ACID FILES",
-        "preprocessing-update":        "OVERALL SUMMARY OF INPUT-GENOME PROCESSING",
+        "processing-update":           "OVERALL SUMMARY OF INPUT-GENOME PROCESSING",
         "additional-pfam-searching":   "SUMMARY OF THE SPECIFIED PFAM-TARGET SEARCH",
         "additional-ko-searching":     "SUMMARY OF THE SPECIFIED KO-TARGET SEARCH",
         "hmm-search":                  "SUMMARY OF THE TARGET SINGLE-COPY-GENE SEARCH",
@@ -588,8 +600,8 @@ def report_ncbi_update(run_data):
     num_input = len(run_data.ncbi_accs)
     num_not_found_at_ncbi = len(run_data.get_ncbi_accs_not_found())
     num_not_downloaded = len(run_data.get_ncbi_accs_not_downloaded())
-    num_prepared = len(run_data.get_done_ncbi_accs())
     num_removed = len(run_data.get_removed_ncbi_accs())
+    num_prepared = num_input - num_removed
 
     if num_removed == 0:
         message = (f"{color_text(f"All {num_input} input accessions were successfully downloaded and prepared!".center(82), "green")}")
@@ -639,9 +651,9 @@ def report_fasta_update(run_data):
         message = (f"{color_text(f"All {num_input} input fasta files were successfully prepared!".center(82), "green")}")
     else:
         message = f"    Of the input genomes provided as {color_text("fasta files", "yellow")}:\n\n"
-        message += (f"      {color_text(f"{num_failed} failed to be successfully preprocessed", "yellow")}, reported in:\n"
+        message += (f"      {color_text(f"{num_failed} failed to be successfully processed", "yellow")}, reported in:\n"
                     f"        {run_data.run_files_dir_rel}/failed-fasta-files.txt\n\n")
-        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} fasta files were successfully preprocessed.", "yellow")}")
+        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} fasta files were successfully processed.", "yellow")}")
 
     report_update(message)
 
@@ -653,30 +665,29 @@ def report_AA_update(run_data):
         message = (f"{color_text(f"All {num_input} input amino-acid files were successfully prepared!".center(82), "green")}")
     else:
         message = f"    Of the input genomes provided as {color_text("amino-acid files", "yellow")}:\n\n"
-        message += (f"      {color_text(f"{num_failed} failed to be successfully preprocessed", "yellow")}, reported in:\n"
+        message += (f"      {color_text(f"{num_failed} failed to be successfully processed", "yellow")}, reported in:\n"
                     f"        {run_data.run_files_dir_rel}/failed-amino-acid-files.txt\n\n")
-        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} amino-acid files were successfully preprocessed.", "yellow")}")
+        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} amino-acid files were successfully processed.", "yellow")}")
 
     report_update(message)
 
 
-def report_genome_preprocessing_update(run_data):
+def report_genome_processing_update(run_data):
     num_input = len(run_data.all_input_genomes)
-    num_removed = len(run_data.get_all_removed_input_genomes())
+    num_removed = len(run_data.get_genomes_removed_during_processing())
     num_remaining = num_input - num_removed
 
     if num_input == num_remaining:
-        message = (f"{color_text(f"All {num_input} input genomes were successfully preprocessed!".center(82), "green")}")
+        message = f"    {color_text(f"All {num_input} input genomes were successfully processed.", "green")}"
     else:
-        message = "    Of all the input genomes provided:\n\n"
-        message += (f"      {color_text(f"{num_removed} failed preprocessing", "yellow")} as described above.\n\n")
-        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully preprocessed.", "yellow")}")
+        message = "    Of all the input genomes provided:\n"
+        message += f"      {color_text(f"{num_removed} failed processing", "yellow")} as described above.\n\n"
+        message += f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully processed.", "yellow")}"
 
         if num_remaining >= 4:
-            message += "\n\n"
-            message += "Moving forward with those :)".center(82)
+            message += "\n    Moving forward with those :)"
 
-    report_update(message)
+    report_section_info(message)
 
     if num_remaining < 4:
         report_too_few_genomes(run_data)
@@ -689,17 +700,17 @@ def report_pfam_searching_update(run_data):
     num_pfams_failed = len(run_data.failed_pfam_targets)
 
     if num_pfams_found == num_pfam_targets:
-        message = (f"{color_text(f"Genomes were searched for all {num_pfam_targets} input Pfam targets!".center(82), 'green')}")
+        message = f"    {color_text(f"Genomes were searched for all {num_pfam_targets} input Pfam targets.", 'green')}"
     elif num_pfams_found == 0:
         message = f"    {color_text("None of the input Pfam targets were found in the Pfam database", 'yellow')}, reported in:\n"
-        message += (f"      {run_data.run_files_dir_rel}/failed-pfam-targets.txt\n\n")
-        message += (f"{color_text("So the input genomes were not searched for any Pfams :(".center(82), 'yellow')}")
+        message += f"      {run_data.run_files_dir_rel}/failed-pfam-targets.txt\n\n"
+        message += f"    {color_text("So the input genomes were not searched for any Pfams :(", 'yellow')}"
     else:
         message = f"    {color_text(f"{num_pfams_failed} target Pfam(s) failed to be found in the Pfam database", "yellow")}, reported in:\n"
-        message += (f"      {run_data.run_files_dir_rel}/failed-pfam-targets.txt\n\n")
-        message += (f"{color_text(f"Genomes were searched for the remaining {num_pfams_found} specified Pfams.".center(82), 'yellow')}")
+        message += f"      {run_data.run_files_dir_rel}/failed-pfam-targets.txt\n\n"
+        message += f"    {color_text(f"Genomes were searched for the remaining {num_pfams_found} specified Pfams.", 'yellow')}"
 
-    report_update(message)
+    report_section_info(message)
 
 
 def report_ko_searching_update(run_data):
@@ -709,17 +720,17 @@ def report_ko_searching_update(run_data):
     num_kos_failed = len(run_data.failed_ko_targets)
 
     if num_kos_found == num_ko_targets:
-        message = (f"{color_text(f"Genomes were searched for all {num_ko_targets} input KO targets!".center(82), 'green')}")
+        message = f"    {color_text(f"Genomes were searched for all {num_ko_targets} input KO targets.", 'green')}"
     elif num_kos_found == 0:
         message = f"    {color_text("None of the input KO targets were found in the KO database", 'yellow')}, reported in:\n"
-        message += (f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n")
-        message += (f"{color_text("So the input genomes were not searched for any KOs :(".center(82), 'yellow')}")
+        message += f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n"
+        message += f"    {color_text("So the input genomes were not searched for any KOs :(", 'yellow')}"
     else:
         message = f"    {color_text(f"{num_kos_failed} target KO(s) failed to be found in the KO database", "yellow")}, reported in:\n"
-        message += (f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n")
-        message += (f"{color_text(f"Genomes were searched for the remaining {num_kos_found} specified KOs.".center(82), 'yellow')}")
+        message += f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n"
+        message += f"    {color_text(f"Genomes were searched for the remaining {num_kos_found} specified KOs.", 'yellow')}"
 
-    report_update(message)
+    report_section_info(message)
 
 
 def report_too_few_genomes(run_data):
@@ -728,24 +739,52 @@ def report_too_few_genomes(run_data):
     report_early_exit(run_data)
 
 def report_hmm_search_update(run_data):
-    num_searched = len(run_data.get_all_preprocessed_genomes())
-    num_failed = len(run_data.get_failed_hmm_search_paths())
-    num_successful = num_searched - num_failed
+    num_searched = len(run_data.genomes_alive_through(GenomeRemovalStage.AMINO_ACID_PREP))
+    num_successful = len(run_data.genomes_alive_through(GenomeRemovalStage.HMM_SEARCH))
+    num_failed = num_searched - num_successful
 
     if num_failed == 0:
-        message = (f"{color_text(f"All {num_searched} genomes were successfully searched for target genes!".center(82), "green")}")
+        message = f"    {color_text(f"All {num_searched} genomes were successfully searched for target genes.", "green")}"
     else:
-        message = f"    Of the {num_searched} input genomes, {num_successful} were successfully searched for the target genes."
+        message = f"    {color_text(f"Of the {num_searched} input genomes, {num_successful} were successfully searched for the target genes.", "yellow")}"
 
-    report_update(message)
+    report_section_info(message)
 
     if num_successful < 4:
         report_too_few_genomes(run_data)
 
 
+def report_SCG_alignment_update(run_data):
+    """
+    Report SCG-sets lost during alignment
+    """
+    num_failed = len(run_data.SCG_targets_removed_at(SCGRemovalStage.ALIGNMENT))
+    num_remaining = len(run_data.get_all_SCG_targets_remaining())
+
+    if num_failed == 0:
+        message = (f"{color_text(f"All {num_remaining} SCG-sets were successfully aligned and trimmed!".center(82), "green")}")
+        report_update(message)
+        return
+
+    plural = "" if num_failed == 1 else "s"
+    message = f"    {color_text(f"{num_failed} SCG-set{plural} failed to align or trim", "yellow")}, reported in:\n"
+    message += f"      {run_data.run_files_dir_rel}/target-SCGs-dropped-from-analysis.tsv\n\n"
+    message += ("    This means muscle or trimal returned an error on those sets, not that\n"
+                "    they were filtered out. Their logs were kept in:\n")
+    message += f"      {run_data.logs_dir_rel}/failed-SCG-alignments/\n\n"
+    message += (f"    {color_text(f"Moving forward with the remaining {num_remaining} target gene(s).", "yellow")}")
+
+    report_update(message, "yellow")
+
+    if num_remaining == 0:
+        report_no_SCGs_remaining(run_data)
+
+
 def report_genome_filtering_update(run_data):
-    num_removed_due_to_hit_cutoff = len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering())
-    num_remaining = len(run_data.get_all_remaining_input_genomes())
+    num_removed_due_to_hit_cutoff = len(
+        run_data.genomes_removed_at(GenomeRemovalStage.SCG_HIT_FILTER))
+    num_remaining = len(
+        run_data.genomes_alive_through(GenomeRemovalStage.SCG_HIT_FILTER))
     num_input = len(run_data.all_input_genomes)
 
     if num_removed_due_to_hit_cutoff == 0:
@@ -779,8 +818,9 @@ def report_genome_filtering_update(run_data):
 
 def report_SCG_set_filtering_update(run_data):
     total_SCG_targets = len(run_data.get_all_SCG_targets())
-    num_SCG_targets_remaining = len(run_data.get_all_SCG_targets_remaining())
-    num_SCG_targets_dropped = total_SCG_targets - num_SCG_targets_remaining
+    num_SCG_targets_dropped = len(
+        run_data.SCG_targets_removed_at(*SCG_GENE_FILTERING_STAGES))
+    num_SCG_targets_remaining = total_SCG_targets - num_SCG_targets_dropped
 
     if num_SCG_targets_dropped == 0:
         message = f"{color_text(f"All {total_SCG_targets} SCG-targets were successfully aligned and prepared!".center(82), 'green')}"
@@ -863,13 +903,13 @@ def summarize_results(args, run_data):
 
         num_failed_fasta_files = len(run_data.get_failed_fasta_ids())
         if num_failed_fasta_files > 0:
-            print(f"        {num_failed_fasta_files} fasta file(s) failed to be preprocessed")
+            print(f"        {num_failed_fasta_files} fasta file(s) failed to be processed")
         num_failed_genbank_files = len(run_data.get_failed_genbank_ids())
         if num_failed_genbank_files > 0:
-            print(f"        {num_failed_genbank_files} genbank file(s) failed to be preprocessed")
+            print(f"        {num_failed_genbank_files} genbank file(s) failed to be processed")
         num_failed_amino_acid_files = len(run_data.get_failed_amino_acid_ids())
         if num_failed_amino_acid_files > 0:
-            print(f"        {num_failed_amino_acid_files} amino-acid file(s) failed to be preprocessed")
+            print(f"        {num_failed_amino_acid_files} amino-acid file(s) failed to be processed")
 
         num_genomes_filtered_for_too_few_hits = len(run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering())
         if num_genomes_filtered_for_too_few_hits > 0:

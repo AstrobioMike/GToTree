@@ -2,6 +2,7 @@ import re
 import pyarrow.compute as pc # type: ignore
 import pyarrow.dataset as ds # type: ignore
 from gtotree.utils.misc.messaging import report_ncbi_accs_not_found
+from gtotree.utils.misc.stages import GenomeRemovalStage
 
 
 # columns read from the NCBI Parquet asset for the per-accession info sub-table
@@ -66,7 +67,7 @@ def parse_assembly_summary(assembly_summary_file, run_data):
         input_accession, found_accession, assembly_name, taxid, organism_name,
         infraspecific_name, version_status, assembly_level, http_base_link
 
-    (input_accession and http_base_link are the two columns preprocessing's
+    (input_accession and http_base_link are the two columns processing's
     get_base_link depends on -- their names/semantics are held stable.)
 
     Accessions not found are recorded (ncbi-accessions-not-found.txt) and their
@@ -147,7 +148,8 @@ def parse_assembly_summary(assembly_summary_file, run_data):
     for acc_gd in run_data.ncbi_accs:
         if acc_gd.id in not_found:
             acc_gd.acc_was_found = False
-            acc_gd.mark_removed("accession not found at NCBI")
+            acc_gd.mark_removed("accession not found at NCBI",
+                                GenomeRemovalStage.NCBI_LOOKUP)
         else:
             acc_gd.acc_was_found = True
 

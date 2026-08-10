@@ -21,7 +21,9 @@ from gtotree.utils.misc.messaging import (color_text,
                                      gtotree_header,
                                      stdout_and_log,
                                      spinner)
-from gtotree.utils.hmms.scg_hmms_setup import check_hmm_file
+from gtotree.utils.hmms.scg_hmms_setup import (resolve_hmm_arg,
+                                          resolve_hmm_source,
+                                          populate_SCG_targets)
 from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data
@@ -34,6 +36,7 @@ from gtotree.utils.misc.general import (ToolsUsed,
                                    CorruptRunData,
                                    populate_run_data,
                                    read_run_data)
+from gtotree.utils.misc.stages import PipelineStage
 from gtotree.utils.misc.resume_state import (ResumeProfile, hash_file_contents,
                                         STATE_VERSION)
 from gtotree.utils.misc.context import log_file_var
@@ -52,9 +55,9 @@ def preflight_checks(args):
 
 
 # The main driver has no stage list: it already records its progress inside
-# run-data.json (per-genome flags, SCG_hits_filtered, all_SCG_sets_aligned,
-# headers_updated, and so on). Adding a parallel run-state.json would duplicate that
-# and give two records that could disagree. So this profile is fingerprint-only.
+# run-data.json (per-genome flags plus its own `completed_stages` map, keyed by
+# stages.py::PipelineStage). Adding a parallel run-state.json would duplicate that and
+# give two records that could disagree. So this profile is fingerprint-only.
 RESUME = ResumeProfile(
     name="GToTree",
     field_labels={
@@ -321,6 +324,11 @@ def check_input_files(args):
     if args.amino_acid_files:
         args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
 
+    # before the fingerprint is built or compared, so `-H universal` and
+    # `-H Universal-Hug-et-al` are the same run as far as resuming is concerned, and so
+    # a resumed run reports and cites the set the same way a fresh one does
+    args = resolve_hmm_arg(args)
+
     run_data = None
 
     if args.resume and os.path.exists(args.run_files_dir + "/run-data.json"):
@@ -346,13 +354,21 @@ def check_input_files(args):
                     "force-overwrite the previous outputs or specify a new output dir.")
                 report_very_early_exit()
 
-            if run_data.run_complete:
+            if run_data.stage_is_complete(PipelineStage.FINALIZE):
                 report_run_already_complete(args.output_dir)
 
-    if run_data is None:
+    fresh_run = run_data is None
+
+    if fresh_run:
         run_data = populate_run_data(args)
         run_data.fingerprint = build_fingerprint(args)
-        run_data = check_hmm_file(args, run_data)
+
+    # always: a resume needs hmm_path resolved and the file validated too, it just
+    # keeps the SCG_targets (and their accumulated per-SCG state) it already has
+    run_data = resolve_hmm_source(args, run_data)
+
+    if fresh_run:
+        run_data = populate_SCG_targets(run_data)
 
     if args.mapping_file:
         args, run_data = check_mapping_file(args, run_data)

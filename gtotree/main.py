@@ -18,6 +18,7 @@ from gtotree.utils.misc.summary_info import generate_primary_summary_table
 from gtotree.utils.misc.itol import generate_all_search_itol_files
 from gtotree.utils.misc.general import cleanup, write_run_data
 from gtotree.utils.misc import phase_stats
+from gtotree.utils.misc.stages import PipelineStage
 
 def main(args = None):
     if args is None:
@@ -70,7 +71,7 @@ def main(args = None):
 
         cleanup(args, run_data)
 
-        run_data.run_complete = True
+        run_data.mark_stage_complete(PipelineStage.FINALIZE)
 
         write_run_data(run_data)
 

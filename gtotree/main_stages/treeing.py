@@ -1,6 +1,7 @@
 from gtotree.utils.misc.messaging import report_processing_stage
 from gtotree.utils.misc.tree_program_handling import run_tree_building
 from gtotree.utils.misc.general import file_is_usable_else_clear, write_run_data
+from gtotree.utils.misc.stages import PipelineStage
 
 def make_tree(args, run_data):
 
@@ -15,7 +16,8 @@ def make_tree(args, run_data):
 
     else:
         run_data = run_tree_building(args, run_data)
-        write_run_data(run_data)
 
+    run_data.mark_stage_complete(PipelineStage.BUILD_TREE)
+    write_run_data(run_data)
 
     return run_data

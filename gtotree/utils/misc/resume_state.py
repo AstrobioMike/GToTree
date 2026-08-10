@@ -20,9 +20,10 @@ The contract in every case is the same: if the fingerprint matches, completed wo
 reused; if it doesn't, resume is refused with an explanation of what changed.
 
 Not every program needs stage tracking. The main GToTree driver already records its
-progress inside run-data.json (per-genome flags, `SCG_hits_filtered`,
-`all_SCG_sets_aligned`, and so on), so it uses a profile with no stages -- just the
-fingerprint half. Programs that do track stages get the `run-state.json` machinery too.
+progress inside run-data.json (per-genome flags plus its own `completed_stages` map,
+keyed by `utils/misc/stages.py::PipelineStage`), so it uses a profile with no stages --
+just the fingerprint half. It reuses `invalidate_completed_from` from here so the
+"redoing a stage invalidates everything downstream" rule has one definition. Programs that do track stages get the `run-state.json` machinery too.
 
 Stage state is a JSON file written atomically after each stage, so a run killed
 mid-write never leaves a half-parsed state behind.
@@ -272,6 +273,18 @@ def stage_is_reusable(state, stage, work_dir=None):
     return True
 
 
+def invalidate_completed_from(completed, stage, stage_order):
+    """
+    Drop `stage` and everything downstream of it from a completed-stages mapping
+    """
+    if stage not in stage_order:
+        return completed
+
+    for name in list(stage_order)[list(stage_order).index(stage):]:
+        completed.pop(name, None)
+    return completed
+
+
 def invalidate_from(state, stage, stage_order):
     """
     Drop the given stage and everything downstream of it.
@@ -282,10 +295,7 @@ def invalidate_from(state, stage, stage_order):
     if stage not in stage_order:
         return state
 
-    start = stage_order.index(stage)
-    completed = state.setdefault("completed", {})
-    for name in stage_order[start:]:
-        completed.pop(name, None)
+    invalidate_completed_from(state.setdefault("completed", {}), stage, stage_order)
     return state
 
 

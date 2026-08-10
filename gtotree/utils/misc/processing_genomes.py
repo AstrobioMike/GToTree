@@ -1,5 +1,5 @@
 """
-Per-source genome preprocessing: turn each kind of input into a filtered, renamed
+Per-source genome processing: turn each kind of input into a filtered, renamed
 amino-acid FASTA (plus nucleotides in nucleotide mode).
 """
 
@@ -18,6 +18,7 @@ from gtotree.utils.misc.seqs import (filter_and_rename_fasta,
                                 extract_fasta_from_gb)
 from gtotree.utils.misc.general import (gunzip_if_needed,
                                    remove_file_if_exists)
+from gtotree.utils.misc.stages import GenomeRemovalStage
 
 
 # Concurrent NCBI downloads are capped for politeness toward NCBI, NOT because of
@@ -125,7 +126,7 @@ def _apply_ncbi_accession_status(acc_gd, status, run_data):
     acc_gd.num_genes = int(status.get("num_genes", 0) or 0)
 
     if done:
-        acc_gd.mark_preprocessing_done()
+        acc_gd.mark_processing_done()
         acc_gd.final_AA_path = status.get("final_AA_path")
         acc_gd.final_nt_path = status.get("final_nt_path")
         acc_gd.acc_was_downloaded = downloaded
@@ -139,7 +140,8 @@ def _apply_ncbi_accession_status(acc_gd, status, run_data):
             reason = "acc download failed"
         # the reason lands in the summary table, so an unexpected failure says what it
         # was instead of being indistinguishable from a genuinely missing assembly
-        acc_gd.mark_removed(f"{reason} ({error})" if error else reason)
+        acc_gd.mark_removed(f"{reason} ({error})" if error else reason,
+                            GenomeRemovalStage.NCBI_DOWNLOAD)
 
     acc_gd.prodigal_used = prodigal_used
     if prodigal_used:
@@ -427,12 +429,12 @@ def _apply_genbank_status(gb, status, run_data):
     if status.get("done"):
         if status.get("was_gzipped"):
             gb.mark_was_gzipped()
-        gb.mark_preprocessing_done()
+        gb.mark_processing_done()
         gb.final_AA_path = status.get("final_AA_path")
         gb.final_nt_path = status.get("final_nt_path")
     else:
-        gb.mark_removed("genbank-file processing failed")
-        gb.preprocessing_failed = True
+        gb.mark_removed("genbank-file processing failed",
+                        GenomeRemovalStage.GENBANK_PREP)
 
     if status.get("prodigal_used"):
         gb.mark_prodigal_used()
@@ -496,12 +498,12 @@ def _apply_fasta_status(fasta, status, run_data):
     if status.get("done"):
         if status.get("was_gzipped"):
             fasta.mark_was_gzipped()
-        fasta.mark_preprocessing_done()
+        fasta.mark_processing_done()
         fasta.final_AA_path = status.get("final_AA_path")
         fasta.final_nt_path = status.get("final_nt_path")
     else:
-        fasta.mark_removed("fasta-file processing failed")
-        fasta.preprocessing_failed = True
+        fasta.mark_removed("fasta-file processing failed",
+                           GenomeRemovalStage.FASTA_PREP)
 
     if status.get("prodigal_used"):
         run_data.tools_used.prodigal_used = True
@@ -555,12 +557,12 @@ def _apply_amino_acid_status(AA, status, run_data):
     if status.get("done"):
         if status.get("was_gzipped"):
             AA.mark_was_gzipped()
-        AA.mark_preprocessing_done()
+        AA.mark_processing_done()
         AA.final_AA_path = status.get("final_AA_path")
         AA.final_nt_path = status.get("final_nt_path")
     else:
-        AA.mark_removed("amino-acid-file processing failed")
-        AA.preprocessing_failed = True
+        AA.mark_removed("amino-acid-file processing failed",
+                        GenomeRemovalStage.AMINO_ACID_PREP)
 
 
 def capture_failed_amino_acid_files(run_data):

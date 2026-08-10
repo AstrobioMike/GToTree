@@ -4,7 +4,7 @@ Output tables for `gtt search-pfams` / `gtt search-kos`.
 The main driver's `generate_primary_summary_table` can't be reused: its columns are
 SCG-hit counts and `in_final_tree`, neither of which exists without a tree. What a
 search-only run can say about each genome is what it was, whether it made it through
-preprocessing, how many genes it had, and whether its search finished -- so that's the
+processing, how many genes it had, and whether its search finished -- so that's the
 table.
 
 The counts matrix and per-target hit fastas are written by the main driver's own
