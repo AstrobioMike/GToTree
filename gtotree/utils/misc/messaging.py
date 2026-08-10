@@ -265,8 +265,9 @@ def report_run_already_complete(output_dir):
     sys.exit(0)
 
 
-def report_very_early_exit(message = None, color = "red", suggest_help = False):
-    print("")
+def report_very_early_exit(message = None, color = "red", suggest_help = False, leading_newline = True):
+    if leading_newline:
+        print("")
     if message:
         print("")
         wprint(color_text(message, color))
@@ -764,7 +765,7 @@ def report_genome_filtering_update(run_data):
         else:
             message += ("    If this is a problem for the genomes you're working with, you could\n")
             message += ("    consider adjusting the `-G` parameter. See the help menu for more info.\n\n")
-        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} made it through the preprocessing gauntlet.", "yellow")}")
+        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} made it through the processing gauntlet.", "yellow")}")
 
         if num_remaining >= 4:
             message += "\n\n"

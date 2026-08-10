@@ -480,7 +480,7 @@ def main(spec):  # pragma: no cover
     except (TaxonNotFound, AmbiguousTaxon, WantedRefTaxError) as e:
         report_very_early_exit(str(e))
     except OutputDirExistsError as e:
-        report_very_early_exit(str(e), "yellow")
+        report_very_early_exit(str(e), "yellow", leading_newline=False)
     except TargetSearchError as e:
         report_very_early_exit(str(e))
     finally:

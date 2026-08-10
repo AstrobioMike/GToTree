@@ -956,13 +956,10 @@ def main():  # pragma: no cover
     except (TaxonNotFound, AmbiguousTaxon, WantedRefTaxError) as e:
         report_very_early_exit(str(e))
     except OutputDirExistsError as e:
-        # advisory, not a failure -- there's a clear next step, so it's not red
-        report_very_early_exit(str(e), "yellow")
+        report_very_early_exit(str(e), "yellow", leading_newline=False)
     except GenSCGHMMsError as e:
         report_very_early_exit(str(e))
     finally:
-        # a run that died partway is exactly when the phase table is most useful,
-        # and the handlers above exit the process, so this can't live in them
         phase_stats.report()
 
 
