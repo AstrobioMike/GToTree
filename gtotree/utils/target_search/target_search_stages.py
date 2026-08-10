@@ -21,7 +21,8 @@ from tqdm import tqdm  # type: ignore
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.general import (run_pooled_stage,
                                    write_run_data,
-                                   GTT_PROGRESS_BAR_FORMAT_INDENTED)
+                                   GTT_PROGRESS_BAR_FORMAT_INDENTED,
+                                   GTT_PROGRESS_SMOOTHING)
 from gtotree.utils.misc.messaging import report_message, color_text, spinner
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 from gtotree.main_stages.processing_genomes import (SearchPlan,
@@ -359,7 +360,7 @@ def phase_write_outputs(run_data, spec, out_dir):
 
     print("\n      Combining per-genome hit sequences:")
     with tqdm(total=len(found), bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED,
-              ncols=76) as pbar:
+              ncols=76, smoothing=GTT_PROGRESS_SMOOTHING) as pbar:
         # combine_hits takes the whole target list, so it's driven one target at a
         # time here purely to give the bar something to advance on
         for target in found:

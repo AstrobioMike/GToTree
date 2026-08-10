@@ -23,7 +23,8 @@ from tqdm import tqdm  # type: ignore
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.misc.general import (run_pooled_stage,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED,
-                                   GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED)
+                                   GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED,
+                                   GTT_PROGRESS_SMOOTHING)
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
                                      report_very_early_exit)
@@ -305,6 +306,7 @@ def build_parser(parent_subparsers=None):
     )
 
     optional.add_argument(
+        "-R",
         "--resume",
         action="store_true",
         help=("Resume a previous run in the same output directory, reusing any stages "
@@ -427,8 +429,8 @@ def setup_output_dir(args):
 
         if not args.force_overwrite:
             raise GenSCGHMMsError(
-                f"The output directory '{out_dir}' already exists, and we don't want to "
-                "overwrite anything accidentally. Use `--resume` to continue that run, "
+                f"The output directory '{out_dir}' already exists, and we don't want "
+                "to overwrite anything accidentally. Use `-R` to resume that run, "
                 "`-F` to overwrite it, or specify a different directory with `-o`.")
         shutil.rmtree(out_dir)
 
@@ -697,7 +699,7 @@ def phase_filter_pfams(work_dir, args, state=None, resuming=False):
         print("\n      Extracting target profiles:")
         with tqdm(total=total_profiles,
                   bar_format=GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED,
-                  ncols=76) as pbar:
+                  ncols=76, smoothing=GTT_PROGRESS_SMOOTHING) as pbar:
             found = write_filtered_pfam_hmms(
                 master_hmm_path, set(pfam_info), filtered_hmm_path,
                 progress_callback=pbar.update)
@@ -716,8 +718,8 @@ def phase_search(filtered_hmm_path, combined_path, num_genomes, args,
     checkpoint_path = (os.path.join(work_dir, SEARCH_CHECKPOINT_FILENAME)
                        if work_dir else None)
 
-    with tqdm(total=num_genomes, desc="    Progress", ncols=78,
-              unit=" genome") as pbar:
+    with tqdm(total=num_genomes, desc="      Progress", ncols=74,
+              unit=" genome", smoothing=GTT_PROGRESS_SMOOTHING) as pbar:
         hits_by_genome = search_profiles(
             filtered_hmm_path, combined_path,
             threads=args.num_threads,

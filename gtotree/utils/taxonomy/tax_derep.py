@@ -283,7 +283,7 @@ def _quality_floor_warnings(n_below, n_missing, min_completeness, max_contaminat
             bits.append(f"contamination <= {max_contamination:g}")
         warnings.append(
             f"{n_below:,} candidate genome(s) didn't meet the quality floor "
-            f"({', '.join(bits)}) and were excluded before selection.")
+            f"({', '.join(bits)}) and were excluded.")
     if n_missing:
         warnings.append(
             f"{n_missing:,} candidate genome(s) have no completeness/contamination "

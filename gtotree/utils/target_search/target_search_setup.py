@@ -175,7 +175,7 @@ def setup_output_dir(args, spec):
         if not args.force_overwrite:
             raise TargetSearchError(
                 f"The output directory '{out_dir}' already exists, and we don't want "
-                "to overwrite anything accidentally. Use `-R` to continue that run, "
+                "to overwrite anything accidentally. Use `-R` to resume that run, "
                 "`-F` to overwrite it, or specify a different directory with `-o`.")
         shutil.rmtree(out_dir)
 

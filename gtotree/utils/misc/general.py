@@ -668,6 +668,10 @@ GTT_PROGRESS_BAR_FORMAT_INDENTED = (
     "[time elapsed: {elapsed} | est. remaining: {remaining}]"
 )
 
+# `smoothing=0` makes tqdm use a plain cumulative average (n / elapsed) instead, which is
+# what i want in almost everything
+GTT_PROGRESS_SMOOTHING = 0
+
 
 # How many items to keep queued per worker thread in run_pooled_stage. Enough that a
 # thread finishing early always has work waiting, small enough that the queued futures
@@ -693,7 +697,8 @@ def search_threads_per_genome(args):
 
 
 def run_pooled_stage(items, worker, apply_result, args, run_data,
-                     max_workers_cap=None, bar_format=None, lead_newline=True):
+                     max_workers_cap=None, bar_format=None, lead_newline=True,
+                     smoothing=GTT_PROGRESS_SMOOTHING):
     """
     Dispatches `worker(item, run_data)` across a ThreadPoolExecutor and, as each
     future completes, calls `apply_result(item, result, run_data)` on the MAIN
@@ -713,6 +718,9 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
 
     `lead_newline` prints a blank line before the bar (the default). I needed to add this
     after i started formatting differently in some uses
+
+    `smoothing` is handed straight to tqdm and defaults to GTT_PROGRESS_SMOOTHING (0,
+    i.e., a whole-run average), so it's more informative in this situation
 
     NOTE ON WORKERS AND EXCEPTIONS: `worker` must not raise. A worker exception
     propagates out of `future.result()` here and aborts the whole stage partway
@@ -762,7 +770,8 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
     in_flight = {}
     try:
         with tqdm(total=len(items),
-                  bar_format=bar_format or GTT_PROGRESS_BAR_FORMAT, ncols=76) as pbar:
+                  bar_format=bar_format or GTT_PROGRESS_BAR_FORMAT, ncols=76,
+                  smoothing=smoothing) as pbar:
 
             for item in islice(remaining, window):
                 in_flight[submit(item)] = item
