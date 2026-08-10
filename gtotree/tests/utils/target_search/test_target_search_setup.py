@@ -31,6 +31,7 @@ from gtotree.utils.target_search.target_search_setup import (
     RUN_DATA_FILENAME,
 )
 from gtotree.utils.target_search.target_search_spec import get_spec
+from gtotree.utils.misc.general import OutputDirExistsError
 
 
 @pytest.fixture
@@ -200,7 +201,7 @@ def test_refuses_an_existing_output_dir(spec, tmp_path):
     out = tmp_path / "out"
     out.mkdir()
     args = make_args(output_dir=str(out))
-    with pytest.raises(TargetSearchError, match="already exists"):
+    with pytest.raises(OutputDirExistsError, match="already exists"):
         setup_output_dir(args, spec)
 
 

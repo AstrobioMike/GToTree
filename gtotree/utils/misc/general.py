@@ -651,6 +651,46 @@ def touch(path):
         os.utime(path, None)
 
 
+class OutputDirExistsError(Exception):
+    """
+    The output directory already exists and neither `-R` nor `-F` was given
+    """
+
+
+def prepare_output_dir(out_dir, resume, force_overwrite,
+                       work_dir_name="working-dir", ii="  ", si="  "):
+    """
+    Create the output dir and its working dir, honoring `-F` and `-R`
+    """
+    out_dir = out_dir.rstrip("/")
+    work_dir = os.path.join(out_dir, work_dir_name)
+
+    if os.path.exists(out_dir):
+        if resume:
+            if not os.path.isdir(work_dir):
+                report_message(
+                    f"There's no working directory in '{out_dir}' from a previous run "
+                    "to resume from, so we'll start fresh.", "yellow", ii=ii, si=si)
+            os.makedirs(work_dir, exist_ok=True)
+            return out_dir, work_dir
+
+        if not force_overwrite:
+            raise OutputDirExistsError(
+                f"The output directory '{out_dir}' already exists, and we don't want "
+                "to overwrite anything accidentally. Use `-R` to resume that run, "
+                "`-F` to overwrite it, or specify a different directory with `-o`.")
+        shutil.rmtree(out_dir)
+
+    elif resume:
+        report_message(
+            f"`-R`/`--resume` was specified, but '{out_dir}' doesn't exist yet, so "
+            "we'll just start fresh.", "yellow", ii=ii, si=si)
+
+    os.makedirs(work_dir, exist_ok=True)
+
+    return out_dir, work_dir
+
+
 GTT_PROGRESS_BAR_FORMAT = (
     "      {percentage:3.0f}%|{bar}| "
     "{n_fmt}/{total_fmt} "

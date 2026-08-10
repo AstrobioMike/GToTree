@@ -17,7 +17,8 @@ import argparse
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.misc import phase_stats
-from gtotree.utils.misc.general import read_run_data, write_run_data, CorruptRunData
+from gtotree.utils.misc.general import (read_run_data, write_run_data, CorruptRunData,
+                                        OutputDirExistsError)
 from gtotree.utils.misc.resume_state import (ResumeProfile, hash_strings,
                                         hash_local_genomes, hash_file_contents,
                                         STATE_VERSION)
@@ -478,9 +479,9 @@ def main(spec):  # pragma: no cover
         report_very_early_exit("Interrupted by user.", "yellow")
     except (TaxonNotFound, AmbiguousTaxon, WantedRefTaxError) as e:
         report_very_early_exit(str(e))
+    except OutputDirExistsError as e:
+        report_very_early_exit(str(e), "yellow")
     except TargetSearchError as e:
         report_very_early_exit(str(e))
     finally:
-        # a run that died partway is exactly when the phase table is most useful,
-        # and the handlers above exit the process, so this can't live in them
         phase_stats.report()

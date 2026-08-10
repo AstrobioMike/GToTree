@@ -22,7 +22,8 @@ import os
 import shutil
 import argparse
 
-from gtotree.utils.misc.general import GenomeData, RunData, ToolsUsed
+from gtotree.utils.misc.general import (GenomeData, RunData, ToolsUsed,
+                                        prepare_output_dir)
 from gtotree.utils.misc.messaging import report_message
 
 
@@ -156,35 +157,11 @@ def setup_output_dir(args, spec):
     """
     Create the output dir and its working dir, honoring -F and -R
     """
-    out_dir = args.output_dir.rstrip("/")
-    work_dir = os.path.join(out_dir, WORKING_DIR_NAME)
-
-    if os.path.exists(out_dir):
-        if args.resume:
-            if not os.path.isdir(work_dir):
-                # an output dir with no working dir is a run that never got far enough
-                # to leave anything resumable, so start fresh rather than refusing
-                report_message(
-                    f"There's no working directory in '{out_dir}' from a previous run "
-                    "to resume from, so we'll start fresh.", "yellow",
-                    ii="      ", si="      ")
-            os.makedirs(work_dir, exist_ok=True)
-            _make_result_dirs(out_dir, spec)
-            return out_dir, work_dir
-
-        if not args.force_overwrite:
-            raise TargetSearchError(
-                f"The output directory '{out_dir}' already exists, and we don't want "
-                "to overwrite anything accidentally. Use `-R` to resume that run, "
-                "`-F` to overwrite it, or specify a different directory with `-o`.")
-        shutil.rmtree(out_dir)
-
-    elif args.resume:
-        report_message(
-            f"`-R`/`--resume` was specified, but '{out_dir}' doesn't exist yet, so "
-            "we'll just start fresh.", "yellow", ii="      ", si="      ")
-
-    os.makedirs(work_dir, exist_ok=True)
+    out_dir, work_dir = prepare_output_dir(args.output_dir,
+                                           resume=args.resume,
+                                           force_overwrite=args.force_overwrite,
+                                           work_dir_name=WORKING_DIR_NAME,
+                                           ii="      ", si="      ")
     _make_result_dirs(out_dir, spec)
 
     return out_dir, work_dir

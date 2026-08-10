@@ -22,6 +22,8 @@ from tqdm import tqdm  # type: ignore
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.misc.general import (run_pooled_stage,
+                                   prepare_output_dir,
+                                   OutputDirExistsError,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED,
                                    GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED,
                                    GTT_PROGRESS_SMOOTHING)
@@ -395,53 +397,28 @@ def check_args(args):
 
 def setup_output_dir(args):
     """
-    Create the output dir and working dir, honoring -F and --resume.
+    Create the output dir and working dir, honoring -F and -R.
 
-    -F and --resume are mutually exclusive: one throws the previous run away, the other
+    -F and -R are mutually exclusive: one throws the previous run away, the other
     depends on it being intact.
     """
     out_dir = args.output_dir.rstrip("/")
-    work_dir = os.path.join(out_dir, "working-dir")
+    resume = getattr(args, "resume", False)
 
-    if getattr(args, "resume", False) and args.force_overwrite:
+    if resume and args.force_overwrite:
         raise GenSCGHMMsError(
             "`--resume` and `-F`/`--force-overwrite` can't be used together, one "
             "reuses the previous run and the other deletes it.")
 
-    if os.path.exists(out_dir):
-        if getattr(args, "resume", False):
-            completed_marker = os.path.join(out_dir, outputs.HMM_INFO_FILENAME)
-            if os.path.isfile(completed_marker):
-                report_message(
-                    f"The run in '{out_dir}' already finished, so there's nothing to "
-                    "resume. Use `-F` to rebuild it from scratch, or `-o` to write a "
-                    "new run to a different directory.\n", "yellow")
-                exit(0)
-
-            if not os.path.isdir(work_dir):
-                # output dir exists but no final table and no working dir: a run that
-                # never got far enough to leave resumable state, so start fresh.
-                report_message(
-                    f"There's no working directory in '{out_dir}' from a previous run "
-                    "to resume from, so we'll start fresh.", "yellow")
-            os.makedirs(work_dir, exist_ok=True)
-            return out_dir, work_dir
-
-        if not args.force_overwrite:
-            raise GenSCGHMMsError(
-                f"The output directory '{out_dir}' already exists, and we don't want "
-                "to overwrite anything accidentally. Use `-R` to resume that run, "
-                "`-F` to overwrite it, or specify a different directory with `-o`.")
-        shutil.rmtree(out_dir)
-
-    elif getattr(args, "resume", False):
+    if resume and os.path.isfile(os.path.join(out_dir, outputs.HMM_INFO_FILENAME)):
         report_message(
-            f"`--resume` was specified, but '{out_dir}' doesn't exist yet, so we'll "
-            "just start fresh.", "yellow")
+            f"The run in '{out_dir}' already finished, so there's nothing to "
+            "resume. Use `-F` to rebuild it from scratch, or `-o` to write a "
+            "new run to a different directory.\n", "yellow")
+        exit(0)
 
-    os.makedirs(work_dir, exist_ok=True)
-
-    return out_dir, work_dir
+    return prepare_output_dir(out_dir, resume=resume,
+                              force_overwrite=args.force_overwrite)
 
 
 ################################################################################
@@ -978,6 +955,9 @@ def main():  # pragma: no cover
         report_very_early_exit("Interrupted by user.", "yellow")
     except (TaxonNotFound, AmbiguousTaxon, WantedRefTaxError) as e:
         report_very_early_exit(str(e))
+    except OutputDirExistsError as e:
+        # advisory, not a failure -- there's a clear next step, so it's not red
+        report_very_early_exit(str(e), "yellow")
     except GenSCGHMMsError as e:
         report_very_early_exit(str(e))
     finally:

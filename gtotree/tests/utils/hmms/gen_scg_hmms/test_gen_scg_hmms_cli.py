@@ -2,6 +2,7 @@ import os
 import pytest # type: ignore
 from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_cli as cli
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError
+from gtotree.utils.misc.general import OutputDirExistsError
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli import (
     build_parser,
     check_args,
@@ -89,7 +90,7 @@ def test_refuses_existing_dir_without_flags(tmp_path):
     args = _parse("-a", "x.txt", "-o", str(out))
     setup_output_dir(args)
 
-    with pytest.raises(GenSCGHMMsError, match="already exists"):
+    with pytest.raises(OutputDirExistsError, match="already exists"):
         setup_output_dir(_parse("-a", "x.txt", "-o", str(out)))
 
 
