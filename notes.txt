@@ -67,7 +67,7 @@
 ########################################
 ### Overview of change from v1 to v2 ###
 ########################################
-# The codebase has been virtually entirely rewritten from an 5,000 line bash runner and X disparate
+# The codebase has been virtually entirely rewritten from an ~5,000 line bash runner and X disparate
 # python scripts that was a total of XX,XXX lines of code into a python package now with XXX modules
 # and XX,XXX lines of code.
 

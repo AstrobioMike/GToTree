@@ -672,17 +672,33 @@ def report_AA_update(run_data):
     report_update(message)
 
 
-def report_genome_processing_update(run_data):
+def report_genome_processing_update(run_data, searched=False):
+    """
+    The one place the input-genome funnel is reported
+    """
     num_input = len(run_data.all_input_genomes)
-    num_removed = len(run_data.get_genomes_removed_during_processing())
-    num_remaining = num_input - num_removed
+    num_failed_processing = len(run_data.get_genomes_removed_during_processing())
+    num_failed_search = len(run_data.genomes_removed_at(GenomeRemovalStage.HMM_SEARCH)) \
+        if searched else 0
+
+    # counted as of the last stage folded in here, so removals further downstream
+    # (e.g. the SCG-hit filter, already recorded on a resume) don't land in this count
+    last_stage = (GenomeRemovalStage.HMM_SEARCH if searched
+                  else GenomeRemovalStage.AMINO_ACID_PREP)
+    num_remaining = len(run_data.genomes_alive_through(last_stage))
+
+    verb = "processed and searched" if searched else "processed"
 
     if num_input == num_remaining:
-        message = f"    {color_text(f"All {num_input} input genomes were successfully processed.", "green")}"
+        message = f"    {color_text(f"All {num_input} input genomes were successfully {verb}.", "green")}"
     else:
         message = "    Of all the input genomes provided:\n"
-        message += f"      {color_text(f"{num_removed} failed processing", "yellow")} as described above.\n\n"
-        message += f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully processed.", "yellow")}"
+        if num_failed_processing > 0:
+            message += f"      {color_text(f"{num_failed_processing} failed processing", "yellow")} as described above.\n\n"
+        if num_failed_search > 0:
+            message += (f"      {color_text(f"{num_failed_search} failed the target-gene search", "yellow")}, reported in:\n"
+                        f"        {run_data.run_files_dir_rel}/inputs-that-failed-at-the-hmm-search.txt\n\n")
+        message += f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully {verb}.", "yellow")}"
 
         if num_remaining >= 4:
             message += "\n    Moving forward with those :)"
@@ -738,21 +754,6 @@ def report_too_few_genomes(run_data):
     print(message)
     report_early_exit(run_data)
 
-def report_hmm_search_update(run_data):
-    num_searched = len(run_data.genomes_alive_through(GenomeRemovalStage.AMINO_ACID_PREP))
-    num_successful = len(run_data.genomes_alive_through(GenomeRemovalStage.HMM_SEARCH))
-    num_failed = num_searched - num_successful
-
-    if num_failed == 0:
-        message = f"    {color_text(f"All {num_searched} genomes were successfully searched for target genes.", "green")}"
-    else:
-        message = f"    {color_text(f"Of the {num_searched} input genomes, {num_successful} were successfully searched for the target genes.", "yellow")}"
-
-    report_section_info(message)
-
-    if num_successful < 4:
-        report_too_few_genomes(run_data)
-
 
 def report_SCG_alignment_update(run_data):
     """
@@ -804,7 +805,7 @@ def report_genome_filtering_update(run_data):
         else:
             message += ("    If this is a problem for the genomes you're working with, you could\n")
             message += ("    consider adjusting the `-G` parameter. See the help menu for more info.\n\n")
-        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} made it through the processing gauntlet.", "yellow")}")
+        message += (f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes are moving onto the treeing stage.", "yellow")}")
 
         if num_remaining >= 4:
             message += "\n\n"

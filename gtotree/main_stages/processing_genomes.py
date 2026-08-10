@@ -7,8 +7,7 @@ from gtotree.utils.misc.messaging import (report_processing_stage,
                                      report_AA_update,
                                      report_genome_processing_update,
                                      report_pfam_searching_update,
-                                     report_ko_searching_update,
-                                     report_hmm_search_update)
+                                     report_ko_searching_update)
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.general import write_run_data, run_pooled_stage, remove_file_if_exists
 from gtotree.utils.misc.seqs import check_target_SCGs_have_seqs
@@ -325,7 +324,10 @@ def _finalize(args, run_data, plan):
     phase_stats.begin("processing genomes: combining outputs")
     report_processing_stage("processing-update", run_data)
     run_data.update_all_input_genomes()
-    report_genome_processing_update(run_data)
+
+    if plan.do_scg:
+        capture_hmm_search_failures(run_data)
+    report_genome_processing_update(run_data, searched=plan.do_scg)
 
     if plan.do_pfam:
         write_pfam_counts_table(run_data)
@@ -348,11 +350,9 @@ def _finalize(args, run_data, plan):
         report_ko_searching_update(run_data)
 
     if plan.do_scg:
-        capture_hmm_search_failures(run_data)
         phase_stats.checkpoint("combining: before SCG rebuild")
         run_data = rebuild_combined_SCG_outputs(run_data)
         phase_stats.checkpoint("combining: after SCG rebuild")
-        report_hmm_search_update(run_data)
 
         run_data = check_target_SCGs_have_seqs(run_data, run_data.general_ext,
                                               SCGRemovalStage.NO_HITS)

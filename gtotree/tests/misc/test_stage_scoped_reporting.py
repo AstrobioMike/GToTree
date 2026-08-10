@@ -52,6 +52,11 @@ def _render(report_fn, run_data):
     return buf.getvalue()
 
 
+def _searched(report_fn):
+    """The summary as the main run calls it, with the SCG search folded in."""
+    return lambda run_data: report_fn(run_data, searched=True)
+
+
 @pytest.fixture(autouse=True)
 def _no_early_exit(monkeypatch):
     """
@@ -188,7 +193,7 @@ class TestTranscriptEquivalence:
         assert "1 failed processing" in out
         assert "4 of the input 5" in out
 
-    def test_hmm_search_update_is_unchanged_by_later_removals(self, _no_early_exit):
+    def test_searched_summary_is_unchanged_by_later_removals(self, _no_early_exit):
         fresh, resumed = self._fresh_and_resumed(
             lambda rd: rd.ncbi_accs[4].mark_removed(
                 "HMM search failed", GenomeRemovalStage.HMM_SEARCH),
@@ -196,9 +201,11 @@ class TestTranscriptEquivalence:
                 "too few unique SCG hits", GenomeRemovalStage.SCG_HIT_FILTER)
                 for i in (0, 1)])
 
-        out = _render(messaging.report_hmm_search_update, fresh)
-        assert out == _render(messaging.report_hmm_search_update, resumed)
-        assert "4 were successfully searched" in out
+        out = _render(_searched(messaging.report_genome_processing_update), fresh)
+        assert out == _render(_searched(messaging.report_genome_processing_update),
+                              resumed)
+        assert "1 failed the target-gene search" in out
+        assert "4 of the input 5" in out
 
     def test_genome_filtering_update_reports_only_its_own_stage(self, _no_early_exit):
         rd = _run_data()
@@ -387,3 +394,71 @@ class TestFailedAlignmentLogCapture:
         capture_failed_alignment_logs(rd)
 
         assert not (tmp_path / "logs" / "failed-SCG-alignments").exists()
+
+
+class TestProcessingSummaryWording:
+    """
+    One count for the whole input-genome funnel.
+
+    Two reports used to share this section, so a run that lost a genome during
+    processing printed "5 of the input 6 ..." and then "All 5 genomes were
+    successfully searched ..." right under it -- a second, smaller total that read
+    like it was the number of genomes the user handed in.
+    """
+
+    def test_the_search_is_folded_into_the_one_overall_count(self, _no_early_exit):
+        rd = _run_data(n_accs=6)
+        rd.ncbi_accs[0].mark_removed("acc download failed",
+                                     GenomeRemovalStage.NCBI_DOWNLOAD)
+
+        out = _render(_searched(messaging.report_genome_processing_update), rd)
+
+        assert "1 failed processing" in out
+        assert "5 of the input 6 genomes were successfully processed and searched" in out
+        assert "Moving forward with those :)" in out
+        # no second total underneath
+        assert "successfully searched for target genes" not in out
+
+    def test_search_failures_get_their_own_line_and_the_file_they_are_in(
+            self, _no_early_exit):
+        rd = _run_data(n_accs=6)
+        rd.ncbi_accs[0].mark_removed("acc download failed",
+                                     GenomeRemovalStage.NCBI_DOWNLOAD)
+        rd.ncbi_accs[1].mark_removed("HMM search failed",
+                                     GenomeRemovalStage.HMM_SEARCH)
+
+        out = _render(_searched(messaging.report_genome_processing_update), rd)
+
+        assert "1 failed processing" in out
+        assert "1 failed the target-gene search" in out
+        assert "inputs-that-failed-at-the-hmm-search.txt" in out
+        assert "4 of the input 6 genomes were successfully processed and searched" in out
+
+    def test_a_clean_run_says_so_once(self, _no_early_exit):
+        out = _render(_searched(messaging.report_genome_processing_update),
+                      _run_data(n_accs=6))
+
+        assert "All 6 input genomes were successfully processed and searched." in out
+        assert "Of all the input genomes provided" not in out
+
+    def test_without_a_search_the_wording_does_not_claim_one(self, _no_early_exit):
+        """`gtt search-pfams` / `search-kos` run this stage with do_scg False."""
+        rd = _run_data(n_accs=6)
+        rd.ncbi_accs[0].mark_removed("acc download failed",
+                                     GenomeRemovalStage.NCBI_DOWNLOAD)
+
+        out = _render(messaging.report_genome_processing_update, rd)
+
+        assert "5 of the input 6 genomes were successfully processed." in out
+        assert "searched" not in out
+
+    def test_it_bails_out_on_the_post_search_count(self, _no_early_exit):
+        """Losing genomes to the search can drop the run under the threshold too."""
+        rd = _run_data(n_accs=6)
+        for i in (0, 1, 2):
+            rd.ncbi_accs[i].mark_removed("HMM search failed",
+                                         GenomeRemovalStage.HMM_SEARCH)
+
+        _render(_searched(messaging.report_genome_processing_update), rd)
+
+        assert len(_no_early_exit) == 1
