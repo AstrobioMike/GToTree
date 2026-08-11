@@ -90,8 +90,8 @@ def build_parser(parent_subparsers=None):
     )
 
     optional.add_argument(
-        "-s",
         "--source",
+        type=str.lower,
         default="refseq",
         choices=["refseq", "genbank", "both"],
         help=("Specify which section of NCBI to pull from (default: refseq)"),

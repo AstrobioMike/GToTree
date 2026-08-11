@@ -208,7 +208,8 @@ def build_parser(parent_subparsers=None):
     )
 
     optional.add_argument(
-        "-S", "--source",
+        "--source",
+        type=str.lower,
         default="gtdb",
         choices=["gtdb", "ncbi"],
         help=("Which taxonomy source to select `--wanted-ref-tax` genomes from "

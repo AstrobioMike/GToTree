@@ -73,7 +73,7 @@ RESUME = ResumeProfile(
         "wanted_ref_tax": "-w/--wanted-ref-tax",
         "target_rank": "--target-rank",
         "derep_rank": "--derep-rank",
-        "source": "-S/--source",
+        "source": "--source",
         "add_gtdb_tax": "-D/--add-gtdb-tax",
         "add_ncbi_tax": "-t/--add-ncbi-tax",
         "lineage": "-L/--lineage",
@@ -192,16 +192,16 @@ def check_set_values(args):
 
 
 def check_lineage(args):
-    accepted_ranks = ["Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species", "Strain"]
+    accepted_ranks = ["domain", "phylum", "class", "order", "family", "genus", "species", "strain"]
     lineage_list = args.lineage.split(",")
 
     for rank in lineage_list:
-        if rank.capitalize() not in accepted_ranks:
+        if rank.lower() not in accepted_ranks:
             report_message(f'You specified "{args.lineage}" to the `-L` argument, but "{rank}" is not an accepted taxonomic rank.')
             print(f"\n  Accepted ranks are any combination of the below entered as a comma-delimited list:\n\n        {'\n        '.join(accepted_ranks)}")
             report_very_early_exit()
 
-    if args.lineage != "Domain,Phylum,Class,Genus,Species" and not args.add_ncbi_tax and not args.add_gtdb_tax:
+    if args.lineage != "domain,phylum,class,genus,species" and not args.add_ncbi_tax and not args.add_gtdb_tax:
         report_message("You've specified a custom lineage (`-L`), but neither the "
                        "`-t` nor `-D` flags were provided to indicate which taxonomy to use.")
         report_very_early_exit(suggest_help=True)

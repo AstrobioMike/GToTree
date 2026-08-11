@@ -1,16 +1,6 @@
-"""
-The help menu is hand-written, so it can drift from the parser. These tests are
-what make that safe: they fail if a flag exists in one place and not the other.
-
-This is the failure mode the v1 menu actually had -- 20 long flags were defined in
-the parser and documented nowhere, and `-r`'s stated default had fallen out of sync
-with the real one.
-"""
-
 import argparse
 import re
-
-import pytest
+import pytest # type: ignore
 
 from gtotree.cli import helpmenu as hm
 from gtotree.cli.parser import parser

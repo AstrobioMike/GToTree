@@ -63,15 +63,15 @@ def parser():
     opt.add_argument("-m", "--mapping-file", metavar="<file>", type=str)
 
     # --- Adding Reference Genomes by Taxonomy ---
-    opt.add_argument("--source", metavar="<str>", type=str,
-                     choices=["GTDB", "NCBI"], default="GTDB")
+    opt.add_argument("--source", metavar="<str>", type=str.lower,
+                     choices=["gtdb", "ncbi"], default="gtdb")
     opt.add_argument("--target-rank", metavar="<str>", type=str, default=None)
     opt.add_argument("--derep-rank", metavar="<str>", type=str, default="auto")
 
     # --- Taxonomy Options ---
     opt.add_argument("-D", "--add-gtdb-tax", action="store_true")
     opt.add_argument("-t", "--add-ncbi-tax", action="store_true")
-    opt.add_argument("-L", "--lineage-ranks", metavar="<str>", type=str, dest="lineage", default="Domain,Phylum,Class,Genus,Species")
+    opt.add_argument("-L", "--lineage-ranks", metavar="<str>", type=str, dest="lineage", default="domain,phylum,class,genus,species")
 
     # --- Filtering Settings ---
     opt.add_argument("-c", "--seq-length-cutoff", metavar="<float>", type=float, default=0.2)

@@ -4,21 +4,12 @@
 
 ### TO DO STILL ###
 
-    # make gtotree take lower-case gtdb/ncbi for --source
-
-
     # create new SCG-sets for all main phyla (and proteos/pseudomonadota) of gtdb (and archaea/bacteria)
         # continue hosting them as github assets
 
         # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can auto-pick based on the --wanted-ref-tax for them
             # find lowest rank in the associated taxonomy that has a pre-built SCG-set and use that one
             # this may require checking GTDB first (as that's what the pre-built hmms will be from, and then checking ncbi and linking back to gtdb if they provided an ncbi tax...)
-
-
-    # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
-        # same for pfam, that they start with PF, and a note that says
-        # something like "these don't match the expected format (e.g., ...). Are you sure you passed the right file to the right parameter?"
-        # also, doublecheck how it handles if a target KO/PFam isn't found
 
 
     # when 0 accessions are found/make it through, at that stage summary the message is like "0 of total found...", it should probably explicitly check and say None
@@ -43,6 +34,12 @@
         # gtt search-pfams
         # gtt search-kos
         # gtt gen-scg-hmms
+
+
+    # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
+        # same for pfam, that they start with PF, and a note that says
+        # something like "these don't match the expected format (e.g., ...). Are you sure you passed the right file to the right parameter?"
+        # also, doublecheck how it handles if a target KO/PFam isn't found
 
 
     # main subcommand printouts may still need some formatting tweaks if i'm feeling neurotic

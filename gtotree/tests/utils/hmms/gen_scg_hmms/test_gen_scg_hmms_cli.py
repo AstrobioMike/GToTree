@@ -161,7 +161,7 @@ def test_parser_sets_func_default():
 
 
 def test_source_accepts_lowercase():
-    assert _parse("-w", "X", "-S", "ncbi").source == "ncbi"
+    assert _parse("-w", "X", "--source", "ncbi").source == "ncbi"
 
 
 def test_derep_rank_accepts_auto():

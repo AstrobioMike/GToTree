@@ -158,10 +158,10 @@ ENTRIES = [
          FULL),
 
         ("--source <str>",
-         "where to pull reference genomes from; default: GTDB",
+         "where to pull reference genomes from; default: gtdb",
          """
          Which database the `-w` taxon and its genomes are drawn from. One of
-         "GTDB" or "NCBI".
+         "gtdb" or "ncbi".
          """,
          FULL),
 
@@ -427,7 +427,8 @@ REQUIRED_INPUTS = [
 HMM_INPUT = (
     "-H <file>",
     ("target single-copy gene HMMs to use (can be a path or the name of one of "
-    "the pre-packaged sets; run 'gtt hmms' to view available gene-sets)"),
+    "the pre-packaged sets; run 'gtt hmms' to view available gene-sets; will "
+    "be auto-selected if not specified AND the `-w` parameter was used)"),
 )
 
 HMM_LEAD = "      2)  "
