@@ -10,3 +10,4 @@ htmlcov/
 .coverage*
 .pytest_cache/
 tmp-testing*
+scg-set-builds/
