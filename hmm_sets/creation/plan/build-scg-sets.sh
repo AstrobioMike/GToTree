@@ -11,136 +11,136 @@ OUT_ROOT="${1:-scg-set-builds}"
 mkdir -p "$OUT_ROOT"
 
 # Bacteria (domain) -- 5,148 genomes, selected by domain-set
-gtt gen-scg-hmms -w "Bacteria" --derep-rank family --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bacteria"
+gtt gen-scg-hmms -w "Bacteria" --derep-rank family --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bacteria" -j 20 -t 16
 
 # Archaea (domain) -- 492 genomes, selected by domain-set
-gtt gen-scg-hmms -w "Archaea" --derep-rank family --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Archaea"
+gtt gen-scg-hmms -w "Archaea" --derep-rank family --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Archaea" -j 20 -t 16
 
 # Bacteria-and-Archaea (multi-domain) -- 5,640 genomes, selected by domain-set
-gtt gen-scg-hmms -w "Bacteria" -w "Archaea" --derep-rank family --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bacteria-and-Archaea"
+gtt gen-scg-hmms -w "Bacteria" -w "Archaea" --derep-rank family --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bacteria-and-Archaea" -j 20 -t 16
 
 # Nanobdellota (phylum) -- 421 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Nanobdellota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Nanobdellota"
+gtt gen-scg-hmms -w "Nanobdellota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Nanobdellota" -j 20 -t 16
 
 # Thermoproteota (phylum) -- 338 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Thermoproteota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Thermoproteota"
+gtt gen-scg-hmms -w "Thermoproteota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Thermoproteota" -j 20 -t 16
 
 # Halobacteriota (phylum) -- 225 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Halobacteriota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Halobacteriota"
+gtt gen-scg-hmms -w "Halobacteriota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Halobacteriota" -j 20 -t 16
 
 # Methanobacteriota (phylum) -- 224 genomes, selected by genomes>=1000+include
-gtt gen-scg-hmms -w "Methanobacteriota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Methanobacteriota"
+gtt gen-scg-hmms -w "Methanobacteriota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Methanobacteriota" -j 20 -t 16
 
 # Thermoplasmatota (phylum) -- 180 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Thermoplasmatota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Thermoplasmatota"
+gtt gen-scg-hmms -w "Thermoplasmatota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Thermoplasmatota" -j 20 -t 16
 
 # Micrarchaeota (phylum) -- 93 genomes, selected by genomes>=1000
-gtt gen-scg-hmms -w "Micrarchaeota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Micrarchaeota"
+gtt gen-scg-hmms -w "Micrarchaeota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Micrarchaeota" -j 20 -t 16
 
 # Asgardarchaeota (phylum) -- 90 genomes, selected by include
-gtt gen-scg-hmms -w "Asgardarchaeota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Asgardarchaeota"
+gtt gen-scg-hmms -w "Asgardarchaeota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Asgardarchaeota" -j 20 -t 16
 
 # Pseudomonadota (phylum) -- 4,932 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Pseudomonadota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Pseudomonadota"
+gtt gen-scg-hmms -w "Pseudomonadota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Pseudomonadota" -j 20 -t 16
 
 # Patescibacteriota (phylum) -- 3,454 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Patescibacteriota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Patescibacteriota"
+gtt gen-scg-hmms -w "Patescibacteriota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Patescibacteriota" -j 20 -t 16
 
 # Bacillota (phylum) -- 3,257 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Bacillota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bacillota"
+gtt gen-scg-hmms -w "Bacillota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bacillota" -j 20 -t 16
 
 # Bacteroidota (phylum) -- 2,462 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Bacteroidota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bacteroidota"
+gtt gen-scg-hmms -w "Bacteroidota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bacteroidota" -j 20 -t 16
 
 # Actinomycetota (phylum) -- 1,993 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Actinomycetota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Actinomycetota"
+gtt gen-scg-hmms -w "Actinomycetota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Actinomycetota" -j 20 -t 16
 
 # Planctomycetota (phylum) -- 1,186 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Planctomycetota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Planctomycetota"
+gtt gen-scg-hmms -w "Planctomycetota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Planctomycetota" -j 20 -t 16
 
 # Chloroflexota (phylum) -- 1,062 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Chloroflexota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Chloroflexota"
+gtt gen-scg-hmms -w "Chloroflexota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Chloroflexota" -j 20 -t 16
 
 # Acidobacteriota (phylum) -- 985 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Acidobacteriota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Acidobacteriota"
+gtt gen-scg-hmms -w "Acidobacteriota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Acidobacteriota" -j 20 -t 16
 
 # Desulfobacterota (phylum) -- 918 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Desulfobacterota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Desulfobacterota"
+gtt gen-scg-hmms -w "Desulfobacterota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Desulfobacterota" -j 20 -t 16
 
 # Verrucomicrobiota (phylum) -- 694 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Verrucomicrobiota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Verrucomicrobiota"
+gtt gen-scg-hmms -w "Verrucomicrobiota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Verrucomicrobiota" -j 20 -t 16
 
 # Cyanobacteriota (phylum) -- 526 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Cyanobacteriota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Cyanobacteriota"
+gtt gen-scg-hmms -w "Cyanobacteriota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Cyanobacteriota" -j 20 -t 16
 
 # Bacillota_I (phylum) -- 513 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Bacillota_I" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bacillota_I"
+gtt gen-scg-hmms -w "Bacillota_I" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bacillota_I" -j 20 -t 16
 
 # Myxococcota_A (phylum) -- 406 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Myxococcota_A" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Myxococcota_A"
+gtt gen-scg-hmms -w "Myxococcota_A" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Myxococcota_A" -j 20 -t 16
 
 # Omnitrophota (phylum) -- 366 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Omnitrophota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Omnitrophota"
+gtt gen-scg-hmms -w "Omnitrophota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Omnitrophota" -j 20 -t 16
 
 # Spirochaetota (phylum) -- 338 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Spirochaetota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Spirochaetota"
+gtt gen-scg-hmms -w "Spirochaetota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Spirochaetota" -j 20 -t 16
 
 # Gemmatimonadota (phylum) -- 267 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Gemmatimonadota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Gemmatimonadota"
+gtt gen-scg-hmms -w "Gemmatimonadota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Gemmatimonadota" -j 20 -t 16
 
 # Bdellovibrionota (phylum) -- 245 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Bdellovibrionota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bdellovibrionota"
+gtt gen-scg-hmms -w "Bdellovibrionota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Bdellovibrionota" -j 20 -t 16
 
 # Nitrospirota (phylum) -- 244 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Nitrospirota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Nitrospirota"
+gtt gen-scg-hmms -w "Nitrospirota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Nitrospirota" -j 20 -t 16
 
 # Armatimonadota (phylum) -- 202 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Armatimonadota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Armatimonadota"
+gtt gen-scg-hmms -w "Armatimonadota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Armatimonadota" -j 20 -t 16
 
 # Chlamydiota (phylum) -- 189 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Chlamydiota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Chlamydiota"
+gtt gen-scg-hmms -w "Chlamydiota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Chlamydiota" -j 20 -t 16
 
 # Fusobacteriota (phylum) -- 142 genomes, selected by genomes>=1000+include
-gtt gen-scg-hmms -w "Fusobacteriota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Fusobacteriota"
+gtt gen-scg-hmms -w "Fusobacteriota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Fusobacteriota" -j 20 -t 16
 
 # Myxococcota (phylum) -- 129 genomes, selected by genera>=100
-gtt gen-scg-hmms -w "Myxococcota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Myxococcota"
+gtt gen-scg-hmms -w "Myxococcota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Myxococcota" -j 20 -t 16
 
 # Campylobacterota (phylum) -- 120 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Campylobacterota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Campylobacterota"
+gtt gen-scg-hmms -w "Campylobacterota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Campylobacterota" -j 20 -t 16
 
 # Thermotogota (phylum) -- 117 genomes, selected by include
-gtt gen-scg-hmms -w "Thermotogota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Thermotogota"
+gtt gen-scg-hmms -w "Thermotogota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Thermotogota" -j 20 -t 16
 
 # Aquificota (phylum) -- 114 genomes, selected by include
-gtt gen-scg-hmms -w "Aquificota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Aquificota"
+gtt gen-scg-hmms -w "Aquificota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Aquificota" -j 20 -t 16
 
 # Babelota (phylum) -- 112 genomes, selected by genera>=100
-gtt gen-scg-hmms -w "Babelota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Babelota"
+gtt gen-scg-hmms -w "Babelota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Babelota" -j 20 -t 16
 
 # Elusimicrobiota (phylum) -- 112 genomes, selected by genera>=100+genomes>=1000
-gtt gen-scg-hmms -w "Elusimicrobiota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Elusimicrobiota"
+gtt gen-scg-hmms -w "Elusimicrobiota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Elusimicrobiota" -j 20 -t 16"
 
 # Zixibacteria (phylum) -- 107 genomes, selected by genera>=100
-gtt gen-scg-hmms -w "Zixibacteria" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Zixibacteria"
+gtt gen-scg-hmms -w "Zixibacteria" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Zixibacteria" -j 20 -t 16
 
 # Fidelibacterota (phylum) -- 89 genomes, selected by genomes>=1000
-gtt gen-scg-hmms -w "Fidelibacterota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Fidelibacterota"
+gtt gen-scg-hmms -w "Fidelibacterota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Fidelibacterota" -j 20 -t 16
 
 # Synergistota (phylum) -- 62 genomes, selected by include
-gtt gen-scg-hmms -w "Synergistota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Synergistota"
+gtt gen-scg-hmms -w "Synergistota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Synergistota" -j 20 -t 16
 
 # Nitrospinota (phylum) -- 57 genomes, selected by include
-gtt gen-scg-hmms -w "Nitrospinota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Nitrospinota"
+gtt gen-scg-hmms -w "Nitrospinota" --target-rank phylum --derep-rank species --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Nitrospinota" -j 20 -t 16
 
 # Deinococcota (phylum) -- 55 genomes, selected by include
-gtt gen-scg-hmms -w "Deinococcota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Deinococcota"
+gtt gen-scg-hmms -w "Deinococcota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Deinococcota" -j 20 -t 16
 
 # Fibrobacterota (phylum) -- 52 genomes, selected by include
-gtt gen-scg-hmms -w "Fibrobacterota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Fibrobacterota"
+gtt gen-scg-hmms -w "Fibrobacterota" --target-rank phylum --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Fibrobacterota" -j 20 -t 16
 
 # Gammaproteobacteria (class) -- 2,550 genomes, selected by include
-gtt gen-scg-hmms -w "Gammaproteobacteria" --target-rank class --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Gammaproteobacteria"
+gtt gen-scg-hmms -w "Gammaproteobacteria" --target-rank class --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Gammaproteobacteria" -j 20 -t 16
 
 # Alphaproteobacteria (class) -- 2,343 genomes, selected by include
-gtt gen-scg-hmms -w "Alphaproteobacteria" --target-rank class --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Alphaproteobacteria"
+gtt gen-scg-hmms -w "Alphaproteobacteria" --target-rank class --derep-rank genus --min-completeness 90 --max-contamination 5 -o "$OUT_ROOT/Alphaproteobacteria" -j 20 -t 16

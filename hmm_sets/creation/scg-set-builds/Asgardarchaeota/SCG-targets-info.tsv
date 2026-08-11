@@ -1,0 +1,88 @@
+pfam_id	name	description	average_coverage
+PF18859.7	acVLRF1	Actinobacteria/chloroflexi VLRF1 release factor	54.78
+PF01871.23	AMMECR1	AMMECR1	60.75
+PF01951.22	Archease	Archease protein family (MTH1598/TM1083)	74.55
+PF01256.23	Carb_kinase	NAD(P)H-hydrate dehydratase	57.1
+PF08617.16	CGI-121	Kinase binding protein CGI-121	80.26
+PF01874.23	CitG	ATP:dephospho-CoA triphosphoribosyl transferase	89.34
+PF01982.23	CTP-dep_RFKase	Domain of unknown function DUF120	57.93
+PF13189.13	Cytidylate_kin2	Cytidylate kinase-like family	75.32
+PF04127.23	DFP	DNA/pantothenate metabolism flavoprotein C-terminal domain	52.41
+PF09868.15	DUF2095	Uncharacterized protein conserved in archaea (DUF2095)	91.74
+PF02680.21	DUF211	Uncharacterized ArCR, COG1888	93.06
+PF04019.18	DUF359	Protein of unknown function (DUF359)	67.68
+PF04027.19	DUF371	Domain of unknown function (DUF371)	80.6
+PF04242.19	DUF424	Protein of unknown function (DUF424)	89.6
+PF04919.19	DUF655	Protein of unknown function (DUF655)	86.29
+PF01912.25	eIF-6	eIF-6 family	80.69
+PF03587.20	EMG1	EMG1/NEP1 methyltransferase	72.2
+PF01949.24	Endo_dU	Endonuclease dU	92.18
+PF00113.29	Enolase_C	Enolase, C-terminal TIM barrel domain	64.38
+PF05871.19	ESCRT-II	ESCRT-II complex subunit	61.18
+PF01725.22	Ham1p_like	Ham1 family	87.67
+PF00368.24	HMG-CoA_red	Hydroxymethylglutaryl-coenzyme A reductase	52.97
+PF22794.2	jr-ZPR1	ZPR1 jelly-roll domain	51.86
+PF01875.24	Memo	Memo-like protein	85.42
+PF03205.21	MobB	Molybdopterin guanine dinucleotide synthesis protein B	63.26
+PF05833.17	NFACT_N	NFACT N-terminal and middle domains	53.87
+PF02594.22	PF1765-like	PF1765 protein family	56.77
+PF18477.8	PIN_9	PIN like domain	88.14
+PF02006.24	PPS_PS	Phosphopantothenate/pantothenate synthetase	75.16
+PF01920.26	Prefoldin_2	Prefoldin subunit	70.85
+PF01255.25	Prenyltransf	Putative undecaprenyl diphosphate synthase	79.26
+PF01981.22	PTH2	Peptidyl-tRNA hydrolase PTH2	54.41
+PF01948.24	PyrI	Aspartate carbamoyltransferase regulatory chain, allosteric domain	57.72
+PF11469.14	Ribonucleas_3_2	Ribonuclease III	84.56
+PF00687.27	Ribosomal_L1	Ribosomal protein L1p/L10e family	69.67
+PF00572.25	Ribosomal_L13	Ribosomal protein L13	65.13
+PF00238.25	Ribosomal_L14	Ribosomal protein L14p/L23e	87.58
+PF00827.23	Ribosomal_L15e	Ribosomal L15	76.25
+PF00252.25	Ribosomal_L16	Ribosomal protein L16p/L10e	73.46
+PF17135.10	Ribosomal_L18	Ribosomal protein 60S L18 and 50S L18e	80.27
+PF01775.23	Ribosomal_L18A	Ribosomal proteins 50S-L18Ae/60S-L20/60S-L18A	60.91
+PF01157.25	Ribosomal_L21e	Ribosomal protein L21e	58.42
+PF00237.25	Ribosomal_L22	Ribosomal protein L22p/L17e	64.44
+PF00276.26	Ribosomal_L23	Ribosomal protein L23	60.17
+PF16906.12	Ribosomal_L26	Ribosomal proteins L26 eukaryotic, L24P archaeal	69.76
+PF00831.29	Ribosomal_L29	Ribosomal L29 protein	59.98
+PF00297.29	Ribosomal_L3	Ribosomal protein L3	65.82
+PF01198.25	Ribosomal_L31e	Ribosomal protein L31e	54.33
+PF01655.24	Ribosomal_L32e	Ribosomal protein L32	62.62
+PF01199.24	Ribosomal_L34e	Ribosomal protein L34e	69.98
+PF01780.26	Ribosomal_L37ae	Ribosomal L37ae protein family	70.22
+PF00573.28	Ribosomal_L4	Ribosomal protein L4/L1 family	72.55
+PF00935.26	Ribosomal_L44	Ribosomal protein L44	53.68
+PF17144.10	Ribosomal_L5e	Ribosomal large subunit proteins 60S L5, and 50S L18	51.59
+PF00347.29	Ribosomal_L6	Ribosomal protein L6	74.5
+PF00338.28	Ribosomal_S10	Ribosomal protein S10p/S20e	65.64
+PF00416.28	Ribosomal_S13	Ribosomal protein S13/S18	77.11
+PF00312.28	Ribosomal_S15	Ribosomal protein S15	54.49
+PF00366.27	Ribosomal_S17	Ribosomal protein S17	54.93
+PF00833.24	Ribosomal_S17e	Ribosomal S17	72.68
+PF00203.27	Ribosomal_S19	Ribosomal protein S19	70.0
+PF01090.26	Ribosomal_S19e	Ribosomal protein S19e	75.0
+PF00318.26	Ribosomal_S2	Ribosomal protein S2	66.3
+PF01282.26	Ribosomal_S24e	Ribosomal protein S24e	60.08
+PF01667.24	Ribosomal_S27e	Ribosomal protein S27	51.76
+PF01200.25	Ribosomal_S28e	Ribosomal protein S28e	54.54
+PF01015.24	Ribosomal_S3Ae	Ribosomal S3Ae family	73.05
+PF00177.28	Ribosomal_S7	Ribosomal protein S7p/S5e	78.21
+PF00410.25	Ribosomal_S8	Ribosomal protein S8	90.46
+PF01201.28	Ribosomal_S8e	Ribosomal protein S8e	81.82
+PF00380.26	Ribosomal_S9	Ribosomal protein S9/S16	64.83
+PF00164.32	Ribosom_S12_S23	Ribosomal protein S12/S23	72.85
+PF06026.21	Rib_5-P_isom_A	Ribose 5-phosphate isomerase A (phosphoriboisomerase A)	67.27
+PF01876.24	RNase_P_p30	RNase P subunit p30	66.43
+PF01900.25	RNase_P_Rpp14	Rpp14/Pop5 family	59.15
+PF03874.22	RNA_pol_Rpb4	RNA polymerase Rpb4	63.62
+PF01137.27	RTC	RNA 3'-terminal phosphate cyclase	84.76
+PF00344.26	SecY	SecY	76.9
+PF06093.20	Spt4	Spt4/RpoE2 zinc finger	58.71
+PF02516.21	STT3	Oligosaccharyl transferase STT3, N-terminal	50.86
+PF00121.25	TIM	Triosephosphate isomerase	90.48
+PF01997.22	Translin	Translin family	73.66
+PF02005.23	TRM	N2,N2-dimethylguanosine tRNA methyltransferase	72.55
+PF00750.26	tRNA-synt_1d	tRNA synthetases class I (R), catalytic domain	54.16
+PF04414.19	tRNA_deacylase	D-aminoacyl-tRNA deacylase	64.25
+PF01142.24	TruD	tRNA pseudouridine synthase D (TruD)	60.48
+PF03685.20	UPF0147	Uncharacterised protein family (UPF0147)	93.79

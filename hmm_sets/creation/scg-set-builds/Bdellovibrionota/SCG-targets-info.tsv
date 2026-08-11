@@ -1,0 +1,94 @@
+pfam_id	name	description	average_coverage
+PF00709.28	Adenylsucc_synt	Adenylosuccinate synthetase	93.8
+PF00406.30	ADK	Adenylate kinase	60.95
+PF05221.24	AdoHcyase	S-adenosyl-L-homocysteine hydrolase	91.86
+PF00231.25	ATP-synt	ATP synthase	93.93
+PF00119.26	ATP-synt_A	ATP synthase A chain	78.53
+PF00137.27	ATP-synt_C	ATP synthase subunit C	60.09
+PF02823.23	ATP-synt_DE_N	ATP synthase, Delta/Epsilon chain, beta-sandwich domain	56.21
+PF21095.4	CarD_C	CarD, C-terminal domain	50.36
+PF02464.24	CinA	CinA C-terminal domain	60.39
+PF01121.27	CoaE	Dephospho-CoA kinase	70.11
+PF02599.22	CsrA	Global regulator protein family	66.77
+PF02224.25	Cytidylate_kin	Cytidylate kinase	82.43
+PF01678.25	DAP_epimerase	Diaminopimelate epimerase	81.27
+PF05258.18	DciA	Dna[CI] antecedent, DciA	55.43
+PF00889.26	EF_TS	Elongation factor TS	62.63
+PF00113.29	Enolase_C	Enolase, C-terminal TIM barrel domain	64.38
+PF02601.21	Exonuc_VII_L	Exonuclease VII, large subunit	71.07
+PF02609.22	Exonuc_VII_S	Exonuclease VII small subunit	62.87
+PF04316.20	FlgM	Anti-sigma-28 factor, FlgM	54.33
+PF01025.25	GrpE	GrpE	76.95
+PF01715.24	IPPT	IPP transferase	68.38
+PF02502.24	LacAB_rpiB	Ribose/Galactose Isomerase	83.27
+PF02606.21	LpxK	Tetraacyldisaccharide-1-P 4'-kinase	91.22
+PF01795.26	Methyltransf_5	MraW methylase family	91.09
+PF12631.13	MnmE_helical	MnmE helical domain	68.95
+PF00334.25	NDK	Nucleoside diphosphate kinase	66.35
+PF02357.25	NusG	Transcription termination factor nusG	51.26
+PF00215.31	OMPdecase	Orotidine 5'-phosphate decarboxylase / HUMPS family	77.18
+PF03938.20	OmpH	Outer membrane protein (OmpH-like)	72.21
+PF00213.24	OSCP	ATP synthase delta (OSCP) subunit	76.81
+PF01195.27	Pept_tRNA_hydro	Peptidyl-tRNA hydrolase	87.12
+PF00342.25	PGI	Phosphoglucose isomerase	80.84
+PF00162.25	PGK	Phosphoglycerate kinase	89.82
+PF04608.19	PgpA	Phosphatidylglycerophosphatase A	84.47
+PF01255.25	Prenyltransf	Putative undecaprenyl diphosphate synthase	79.26
+PF02547.21	Queuosine_synth	Queuosine biosynthesis protein	96.55
+PF02033.24	RBFA	Ribosome-binding factor A	67.87
+PF00687.27	Ribosomal_L1	Ribosomal protein L1p/L10e family	69.67
+PF00572.25	Ribosomal_L13	Ribosomal protein L13	65.13
+PF00238.25	Ribosomal_L14	Ribosomal protein L14p/L23e	87.58
+PF00252.25	Ribosomal_L16	Ribosomal protein L16p/L10e	73.46
+PF01196.25	Ribosomal_L17	Ribosomal protein L17	59.62
+PF00861.28	Ribosomal_L18p	Ribosomal L18 of archaea, bacteria, mitoch. and chloroplast	82.4
+PF01245.27	Ribosomal_L19	Ribosomal protein L19	69.06
+PF00453.24	Ribosomal_L20	Ribosomal protein L20	82.75
+PF00829.27	Ribosomal_L21p	Ribosomal prokaryotic L21 protein	69.69
+PF00237.25	Ribosomal_L22	Ribosomal protein L22p/L17e	64.44
+PF00276.26	Ribosomal_L23	Ribosomal protein L23	60.17
+PF01016.25	Ribosomal_L27	Ribosomal L27 protein	65.74
+PF00830.25	Ribosomal_L28	Ribosomal L28 family	56.55
+PF00831.29	Ribosomal_L29	Ribosomal L29 protein	59.98
+PF00297.29	Ribosomal_L3	Ribosomal protein L3	65.82
+PF01197.24	Ribosomal_L31	Ribosomal protein L31	87.31
+PF01632.25	Ribosomal_L35p	Ribosomal protein L35	71.92
+PF00573.28	Ribosomal_L4	Ribosomal protein L4/L1 family	72.55
+PF00347.29	Ribosomal_L6	Ribosomal protein L6	74.5
+PF03948.20	Ribosomal_L9_C	Ribosomal protein L9, C-terminal domain	51.16
+PF00338.28	Ribosomal_S10	Ribosomal protein S10p/S20e	65.64
+PF00411.25	Ribosomal_S11	Ribosomal protein S11	70.5
+PF00416.28	Ribosomal_S13	Ribosomal protein S13/S18	77.11
+PF00312.28	Ribosomal_S15	Ribosomal protein S15	54.49
+PF00366.27	Ribosomal_S17	Ribosomal protein S17	54.93
+PF00203.27	Ribosomal_S19	Ribosomal protein S19	70.0
+PF00318.26	Ribosomal_S2	Ribosomal protein S2	66.3
+PF01649.24	Ribosomal_S20p	Ribosomal protein S20	88.82
+PF01250.23	Ribosomal_S6	Ribosomal protein S6	67.81
+PF00177.28	Ribosomal_S7	Ribosomal protein S7p/S5e	78.21
+PF00410.25	Ribosomal_S8	Ribosomal protein S8	90.46
+PF00380.26	Ribosomal_S9	Ribosomal protein S9/S16	64.83
+PF00164.32	Ribosom_S12_S23	Ribosomal protein S12/S23	72.85
+PF00834.26	Ribul_P_3_epim	Ribulose-phosphate 3 epimerase family	83.81
+PF01351.26	RNase_HII	Ribonuclease HII	73.28
+PF01193.30	RNA_pol_L	RNA polymerase Rpb3/Rpb11 dimerisation domain	65.44
+PF01192.28	RNA_pol_Rpb6	RNA polymerase Rpb6	50.93
+PF01765.25	RRF	Ribosome recycling factor	76.38
+PF02075.24	RuvC	Crossover junction endodeoxyribonuclease RuvC	82.4
+PF00584.26	SecE	SecE/Sec61-gamma subunits of protein translocation complex	60.85
+PF03840.21	SecG	Preprotein translocase SecG subunit	77.76
+PF00344.26	SecY	SecY	76.9
+PF00464.26	SHMT	Serine hydroxymethyltransferase	82.94
+PF02616.20	SMC_ScpA	Segregation and condensation protein ScpA	77.01
+PF04079.23	SMC_ScpB	Segregation and condensation complex subunit ScpB	70.39
+PF01668.24	SmpB	SmpB protein	90.65
+PF00902.24	TatC	Sec-independent protein translocase protein (TatC)	76.99
+PF00121.25	TIM	Triosephosphate isomerase	90.48
+PF00750.26	tRNA-synt_1d	tRNA synthetases class I (R), catalytic domain	54.16
+PF01411.25	tRNA-synt_2c	tRNA synthetases class II (A)	60.17
+PF13393.12	tRNA-synt_His	Histidyl-tRNA synthetase	52.82
+PF01746.27	tRNA_m1G_MT	tRNA (Guanine-1)-methyltransferase TrmD	89.12
+PF02699.22	YajC	Preprotein translocase subunit	67.28
+PF02130.25	YbeY	Endoribonuclease YbeY	77.01
+PF02618.22	YceG	YceG-like family	76.13
+PF09424.16	YqeY	Yqey-like protein	91.45

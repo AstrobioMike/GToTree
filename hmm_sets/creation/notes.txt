@@ -7,7 +7,7 @@
 python plan-scg-sets.py
 
 # this builds them all, produced by above
-# bash plan/build-scg-sets.sh
+bash plan/build-scg-sets.sh
 
 # this creates the hmm-sources-and-info.tsv and commands to upload them to my premade github release that will hold them
 # python publish-scg-sets.py --build-root scg-set-builds --release-tag gtdb-scg-sets-r232 --gtdb-release r232
