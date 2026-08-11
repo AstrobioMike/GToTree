@@ -77,14 +77,29 @@ def test_cross_domain_sets_lead_broadest_first(small_table):
     assert [s["name"] for s in cross] == ["Universal-Hug-et-al", "Bacteria-and-Archaea"]
 
 
-def test_domains_are_ordered_smallest_first(small_table):
+def test_bacteria_is_leftmost(small_table):
     _, domains = G.group_sets(G.parse_sets(small_table))
-    assert [d[0] for d in domains] == ["Archaea", "Bacteria"]
+    assert [d[0] for d in domains] == ["Bacteria", "Archaea"]
+
+
+def test_domain_order_holds_when_the_domains_are_the_same_size():
+    """Mid-build the two can tie, and an alphabetical tie-break would put Bacteria on
+    the right with nothing to its left."""
+    rows = [entry("Bdellovibrionota"), entry("Asgardarchaeota", domain="Archaea")]
+    _, domains = G.group_sets(G.parse_sets(make_df(rows)))
+    assert [d[0] for d in domains] == ["Bacteria", "Archaea"]
+
+
+def test_an_unrecognized_domain_sorts_after_the_known_ones_by_size():
+    rows = [entry("Bdellovibrionota"), entry("Asgardarchaeota", domain="Archaea"),
+            entry("Somethingelse", domain="Eukarya")]
+    _, domains = G.group_sets(G.parse_sets(make_df(rows)))
+    assert [d[0] for d in domains] == ["Bacteria", "Archaea", "Eukarya"]
 
 
 def test_the_domain_level_set_becomes_the_heading(small_table):
     _, domains = G.group_sets(G.parse_sets(small_table))
-    _, domain_set, blocks = domains[1]
+    _, domain_set, blocks = domains[0]
     assert domain_set["name"] == "Bacteria"
     assert "Bacteria" not in [parent["name"] for parent, _ in blocks]
 
@@ -92,7 +107,7 @@ def test_the_domain_level_set_becomes_the_heading(small_table):
 def test_a_class_nests_under_its_parent_phylum(small_table):
     _, domains = G.group_sets(G.parse_sets(small_table))
     blocks = dict((parent["name"], [k["name"] for k in kids])
-                  for parent, kids in domains[1][2])
+                  for parent, kids in domains[0][2])
     assert blocks["Pseudomonadota"] == ["Gammaproteobacteria"]
     assert blocks["Bacteroidota"] == []
 
@@ -113,34 +128,6 @@ def test_phyla_within_a_domain_are_alphabetical():
         "Acidobacteriota", "Myxococcota", "Zixibacteria"]
 
 
-def test_a_domain_with_no_domain_level_set_still_renders(small_table):
-    rows = [entry("Bacteroidota"), entry("Zixibacteria")]
-    _, domains = G.group_sets(G.parse_sets(make_df(rows)))
-    assert domains[0][1] is None
-    assert any("Bacteria" in line for line in G.layout_lines([], domains, 100))
-
-
-################################################################################
-# column packing
-################################################################################
-
-def test_pack_blocks_never_splits_a_block_across_columns():
-    blocks = [["a1", "a2", "a3"], ["b1"], ["c1", "c2"], ["d1"], ["e1"]]
-    columns = G.pack_blocks(blocks, 2)
-    joined = ["".join(column) for column in columns]
-    for block in blocks:
-        assert sum("".join(block) in column for column in joined) == 1
-
-
-def test_pack_blocks_preserves_order_reading_down_then_across():
-    blocks = [[str(i)] for i in range(6)]
-    assert G.pack_blocks(blocks, 2) == [["0", "1", "2"], ["3", "4", "5"]]
-
-
-def test_pack_blocks_always_returns_the_requested_number_of_columns():
-    assert len(G.pack_blocks([["a"]], 3)) == 3
-
-
 ################################################################################
 # layout
 ################################################################################
@@ -155,63 +142,65 @@ def domains_for(n_bacterial_phyla, n_archaeal_phyla=7):
     return domains
 
 
-def test_a_wide_terminal_puts_the_domains_side_by_side():
-    lines = G.layout_lines([], domains_for(36), 160)
-    heading = next(line for line in lines if "Archaea" in line)
-    assert "Bacteria" in heading
+def test_the_domains_sit_side_by_side():
+    lines = G.layout_lines([], domains_for(36))
+    heading = next(line for line in lines if "Bacteria" in line)
+    assert "Archaea" in heading
 
 
-def test_every_set_appears_exactly_once_however_it_is_arranged():
-    domains = domains_for(36)
-    names = [f"Bacterialphylum{i:02d}" for i in range(36)]
-    for width in (60, 80, 100, 120, 160, 200):
-        text = "\n".join(G.layout_lines([], domains_for(36), width))
-        for name in names:
-            assert text.count(name) == 1, f"{name} at width {width}"
+def test_every_set_appears_exactly_once():
+    text = "\n".join(G.layout_lines([], domains_for(36)))
+    for i in range(36):
+        assert text.count(f"Bacterialphylum{i:02d}") == 1
 
 
-def test_the_chosen_arrangement_is_never_the_taller_one():
-    """The point of the layout is to stay on screen, so whichever arrangement is
-    shorter has to win -- including on a narrow terminal, where side by side leaves
-    Bacteria stuck in a single tall column."""
-    for width in (60, 80, 100, 120, 160):
-        domains = domains_for(36)
-        chosen = len(G.layout_lines([], domains, width))
-        side = G._side_by_side([G.build_section(*d) for d in domains], width)
-        stacked = G._stacked([G.build_section(*d) for d in domains], width)
-        alternatives = [len(stacked)] + ([len(side)] if side is not None else [])
-        assert chosen <= min(alternatives)
+def test_each_domain_gets_one_entry_per_line():
+    """No reflowing into extra columns -- one column per domain, always."""
+    lines = G.layout_lines([], domains_for(36))
+    assert all(line.count("Bacterialphylum") <= 1 for line in lines)
 
 
-def test_a_narrow_terminal_stacks_the_domains():
-    lines = G.layout_lines([], domains_for(36), 70)
-    heading = next(line for line in lines if "Archaea" in line)
-    assert "Bacteria" not in heading
+def test_the_listing_is_as_tall_as_the_biggest_domain():
+    domains = domains_for(36, n_archaeal_phyla=7)
+    lines = [line for line in G.layout_lines([], domains) if line.strip()]
+    assert len(lines) == 37  # the Bacteria heading plus its 36 phyla
+
+
+def test_a_domain_that_runs_out_leaves_the_short_side_on_the_right():
+    """Bacteria stays at the margin once Archaea has run out of entries, rather than
+    the surviving column being stranded off to the right."""
+    lines = G.layout_lines([], domains_for(36, n_archaeal_phyla=2))
+    tail = [line for line in lines if "Bacterialphylum" in line][-1]
+    assert "Archaealphylum" not in tail
+    assert tail.index("Bacterialphylum") == G.LEFT_MARGIN + 2
 
 
 def test_columns_stay_aligned_when_a_domain_runs_out_of_entries():
-    lines = G.layout_lines([], domains_for(36, n_archaeal_phyla=2), 160)
-    body = [line for line in lines if "Bacterialphylum" in line]
-    starts = {line.index("Bacterialphylum") for line in body}
-    assert len(starts) <= 2  # one per column of the Bacteria strip
-
-
-def test_a_short_list_is_not_split_into_columns():
-    """Four sets side by side is harder to read than four stacked, so a domain only
-    earns a second column once it has enough entries to fill one."""
-    lines = G.layout_lines([], domains_for(4, n_archaeal_phyla=3), 200)
-    assert all(line.count("Bacterialphylum") <= 1 for line in lines)
+    lines = G.layout_lines([], domains_for(36, n_archaeal_phyla=2))
+    body = [line for line in lines if "Archaealphylum" in line]
+    assert len({line.index("Archaealphylum") for line in body}) == 1
 
 
 def test_cross_domain_sets_are_rendered_above_the_domains(small_table):
     cross, domains = G.group_sets(G.parse_sets(small_table))
-    lines = G.layout_lines(cross, domains, 160)
-    text = "\n".join(lines)
+    text = "\n".join(G.layout_lines(cross, domains))
     assert text.index("Universal-Hug-et-al") < text.index("Halobacteriota")
 
 
+def test_a_domain_with_no_domain_level_set_still_gets_a_heading():
+    rows = [entry("Bacteroidota"), entry("Zixibacteria")]
+    _, domains = G.group_sets(G.parse_sets(make_df(rows)))
+    assert domains[0][1] is None
+    assert any("Bacteria" in line for line in G.layout_lines([], domains))
+
+
 def test_layout_is_empty_when_there_is_nothing_to_lay_out():
-    assert G.layout_lines([], [], 80) == []
+    assert G.layout_lines([], []) == []
+
+
+def test_no_line_has_trailing_whitespace(small_table):
+    cross, domains = G.group_sets(G.parse_sets(small_table))
+    assert all(line == line.rstrip() for line in G.layout_lines(cross, domains))
 
 
 ################################################################################
@@ -229,3 +218,48 @@ def test_flat_listing_does_not_need_the_layout_columns(capsys, small_table, tmp_
     v1 = make_df(small_table.to_dict("records"), V1_COLUMNS)
     G.report_available_scg_sets(str(tmp_path), v1)
     assert "Pseudomonadota" in capsys.readouterr().out
+
+
+################################################################################
+# alignment
+################################################################################
+
+def count_columns(lines):
+    """Where each `(n)` sits on each line."""
+    positions = set()
+    for line in lines:
+        start = 0
+        while True:
+            start = line.find("(", start)
+            if start < 0:
+                break
+            end = line.find(")", start)
+            positions.add(end)
+            start = end + 1
+    return positions
+
+
+def test_counts_line_up_across_the_whole_listing(small_table):
+    """A count in the top block that doesn't line up with a count in a domain strip
+    below it reads as a mistake, so everything is measured once, together."""
+    cross, domains = G.group_sets(G.parse_sets(small_table))
+    lines = G.layout_lines(cross, domains)
+    positions = sorted(count_columns(lines))
+    # one position per column of the widest strip, and the top block shares the first
+    assert positions[0] == min(positions)
+    spacings = {b - a for a, b in zip(positions, positions[1:])}
+    assert len(spacings) <= 1
+
+
+def test_the_top_block_shares_the_left_margin_with_the_domains(small_table):
+    cross, domains = G.group_sets(G.parse_sets(small_table))
+    lines = [line for line in G.layout_lines(cross, domains) if line.strip()]
+    indents = {len(line) - len(line.lstrip()) for line in lines}
+    assert min(indents) == G.LEFT_MARGIN
+
+
+def test_domain_headings_are_not_singled_out_with_colour(small_table):
+    """They're ordinary selectable sets once they're built, so nothing should imply
+    otherwise."""
+    cross, domains = G.group_sets(G.parse_sets(small_table))
+    assert not any("\033[" in line for line in G.layout_lines(cross, domains))
