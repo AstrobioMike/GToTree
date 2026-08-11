@@ -53,6 +53,11 @@ EMPTY = {None, "", "NA", "na", "none", "None"}
 
 PARQUET_FILENAME = "gtdb-data.parquet"
 
+# `rank` values in the published table that mean "not built from GTDB by this
+# toolchain". Currently just the Hug et al. universal set, which is carried forward
+# from a published external asset (see publish-scg-sets.py's carried-forward table).
+EXTERNAL_RANKS = {"universal"}
+
 
 ################################################################################
 # locating the asset
@@ -105,10 +110,14 @@ def gtdb_version(parquet_path):
 class TaxonStats:
     """Everything the plan needs to know about one candidate taxon."""
 
-    def __init__(self, rank, name, domain):
+    def __init__(self, rank, name, domain, parent="NA"):
         self.rank = rank
         self.name = name
         self.domain = domain
+        # the next-coarser taxon (class -> its phylum, phylum -> its domain). Carried
+        # through to the published info table so `gtt hmms` can nest a class set under
+        # the phylum set it sits inside without re-reading GTDB at display time.
+        self.parent = parent
         self.genomes = 0            # all genomes, no filtering
         self.reps = 0               # GTDB species representatives
         self.hq_reps = 0            # representatives clearing the quality floor
@@ -163,7 +172,10 @@ def gather_stats(parquet_path, min_completeness, max_contamination, ranks=("phyl
                 continue
             key = (rank, name)
             if key not in stats:
-                stats[key] = TaxonStats(rank, name, domain)
+                rank_index = RANKS.index(rank)
+                parent = cols[RANKS[rank_index - 1]][i] if rank_index > 0 else "NA"
+                stats[key] = TaxonStats(rank, name, domain,
+                                        "NA" if parent in EMPTY else parent)
             entry = stats[key]
             entry.genomes += 1
             if is_rep:
@@ -364,7 +376,13 @@ def build_plan(config, stats):
 ################################################################################
 
 def read_published(path):
-    """(taxon_lower, rank) -> row, from the hosted-sets info table."""
+    """
+    (taxon_lower, rank) -> row, from the hosted-sets info table.
+
+    Rows at an EXTERNAL_RANK are skipped: they're carried-forward external assets that
+    this planner never plans, so including them would report them as "published but not
+    in this plan" on every single run, forever.
+    """
     if not os.path.isfile(path):
         return {}
     out = {}
@@ -372,7 +390,7 @@ def read_published(path):
         for row in csv.DictReader(f, delimiter="\t"):
             taxa = (row.get("target_taxa") or "").strip().lower()
             rank = (row.get("rank") or "NA").strip()
-            if taxa:
+            if taxa and rank not in EXTERNAL_RANKS:
                 out[(taxa, rank)] = row
     return out
 
@@ -399,20 +417,24 @@ def diff_against_published(plan, published):
 def write_plan_table(path, plan):
     with open(path, "w", newline="") as f:
         w = csv.writer(f, delimiter="\t", lineterminator="\n")
-        w.writerow(["set_name", "rank", "taxon", "domain", "selected_by", "derep_rank",
-                    "n_input_genomes", "total_genomes", "species_clusters", "hq_reps",
-                    "n_genera_hq", "n_species_hq", "flags"])
+        w.writerow(["set_name", "rank", "taxon", "domain", "parent", "selected_by",
+                    "derep_rank", "n_input_genomes", "total_genomes",
+                    "species_clusters", "hq_reps", "n_genera_hq", "n_species_hq",
+                    "flags"])
         for p in plan:
             if p.stats is None:
-                # domain-spanning set: no single-taxon stats row behind it
-                w.writerow([p.name, p.rank, "+".join(p.taxa), "NA", p.reason,
+                # domain-spanning set: no single-taxon stats row behind it. A
+                # single-domain set still names its domain, so the published table can
+                # file it under that domain; a set spanning several has no one domain.
+                domain = p.taxa[0] if len(p.taxa) == 1 else "NA"
+                w.writerow([p.name, p.rank, "+".join(p.taxa), domain, "NA", p.reason,
                             p.derep_rank, p.n_input, "NA", "NA", "NA", "NA", "NA",
                             "; ".join(p.flags)])
             else:
-                w.writerow([p.name, p.rank, p.name, p.stats.domain, p.reason,
-                            p.derep_rank, p.n_input, p.stats.genomes, p.stats.reps,
-                            p.stats.hq_reps, p.stats.n("genus"), p.stats.n("species"),
-                            "; ".join(p.flags)])
+                w.writerow([p.name, p.rank, p.name, p.stats.domain, p.stats.parent,
+                            p.reason, p.derep_rank, p.n_input, p.stats.genomes,
+                            p.stats.reps, p.stats.hq_reps, p.stats.n("genus"),
+                            p.stats.n("species"), "; ".join(p.flags)])
 
 
 def write_counts_table(path, stats):
@@ -435,7 +457,7 @@ def write_counts_table(path, stats):
                         s.n("genus"), s.n("species")])
 
 
-def write_build_script(path, plan, quality, out_root):
+def write_build_script(path, plan, quality, out_root, num_jobs=20, num_threads=16):
     """
     The build stage, as a plain shell script rather than a second program.
 
@@ -476,6 +498,7 @@ def write_build_script(path, plan, quality, out_root):
         lines.append(
             f'gtt gen-scg-hmms {w_flags}{target_rank} '
             f'--derep-rank {p.derep_rank}{floor_str}{psc} '
+            f'-j {num_jobs} -t {num_threads} '
             f'-o "$OUT_ROOT/{p.name}"')
         lines.append("")
 
@@ -571,6 +594,10 @@ def main():
     parser = argparse.ArgumentParser(
         description="Plan which SCG-HMM sets to pre-build for GToTree from GTDB.")
     here = os.path.dirname(os.path.abspath(__file__))
+    parser.add_argument("-j", "--num-jobs", type=int, default=20,
+                        help="number of jobs passed to `gtt gen-scg-hmms` (default: 20)")
+    parser.add_argument("-t", "--num-threads", type=int, default=16,
+                        help="number of threads passed to `gtt gen-scg-hmms` (default: 16)")
     parser.add_argument("-c", "--config", default=os.path.join(here, "scg-sets.toml"),
                         help="TOML config (default: scg-sets.toml beside this script)")
     parser.add_argument("-o", "--output-dir", default=os.path.join(here, "plan"),
@@ -589,6 +616,8 @@ def main():
     quality = config.get("quality", {})
     min_completeness = quality.get("min_completeness")
     max_contamination = quality.get("max_contamination")
+    num_jobs = args.num_jobs
+    num_threads = args.num_threads
 
     parquet = find_gtdb_parquet(args.gtdb_parquet)
     version = gtdb_version(parquet)
@@ -628,7 +657,7 @@ def main():
 
     write_plan_table(plan_tsv, plan)
     write_counts_table(counts_tsv, stats)
-    write_build_script(build_sh, plan, quality, "scg-set-builds")
+    write_build_script(build_sh, plan, quality, "scg-set-builds", num_jobs=num_jobs, num_threads=num_threads)
     write_report(report_txt, plan, stats, new, gone, missing, {
         "date": date.today().isoformat(),
         "gtdb_version": version,

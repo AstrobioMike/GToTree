@@ -43,9 +43,19 @@ from datetime import date
 # anyone will have a year later.
 BASE_COLUMNS = ["file", "source", "target_taxa", "rank", "num_genes", "link",
                 "pfam_names", "pfam_accessions", "md5"]
-ADDED_COLUMNS = ["gtdb_release", "pfam_version", "num_genomes",
+# `domain` and `parent` are display columns: they're what lets `gtt hmms` lay the sets
+# out as a taxonomy instead of one flat alphabetical list, without shipping GTDB itself
+# or hardcoding "Gammaproteobacteria goes under Pseudomonadota" in the CLI. Both come
+# from the plan table, which got them from the parquet.
+ADDED_COLUMNS = ["domain", "parent", "gtdb_release", "pfam_version", "num_genomes",
                  "derep_rank", "date_built"]
 ALL_COLUMNS = BASE_COLUMNS + ADDED_COLUMNS
+
+# Sets that aren't built from GTDB and so have no build directory to scan. Their rows
+# are copied verbatim into the published table. Right now that's just the Hug et al.
+# universal set, a published external asset carried forward unchanged; keeping it as a
+# file rather than a literal means updating it doesn't mean editing this script.
+CARRIED_FORWARD = "carried-forward-sets.tsv"
 
 DEFAULT_SOURCE = "https://doi.org/10.1093/bioinformatics/btz188"
 
@@ -67,12 +77,40 @@ def md5sum(path, chunk_size=1 << 20):
 
 
 def read_plan(path):
-    """(taxon_lower, rank) -> plan row, for the metadata the build doesn't record."""
+    """
+    set_name_lower -> plan row, for the metadata the build doesn't record.
+
+    Keyed on `set_name` rather than `taxon` because that's what the build directories
+    are named (`-o "$OUT_ROOT/<set_name>"`). They're the same string for a phylum or
+    class set, but a domain-spanning set has taxon `Bacteria+Archaea` and set_name
+    `Bacteria-and-Archaea`, so keying on taxon silently missed those rows and published
+    them with rank/derep_rank of NA.
+    """
     if not path or not os.path.isfile(path):
         return {}
     with open(path) as f:
-        return {(r["taxon"].lower(), r["rank"]): r
-                for r in csv.DictReader(f, delimiter="\t")}
+        return {r["set_name"].lower(): r for r in csv.DictReader(f, delimiter="\t")}
+
+
+def read_carried_forward(path):
+    """
+    Rows for sets that have no build directory, copied through as-is.
+
+    Returned as full info-table rows, not build outputs, because there's nothing to
+    derive: the .hmm already exists on an old release and its md5 and gene list are
+    whatever they were. Unknown columns are dropped and missing ones default to NA, so
+    the file only has to carry what's actually known about the set.
+    """
+    if not path or not os.path.isfile(path):
+        return []
+    rows = []
+    with open(path) as f:
+        for row in csv.DictReader(f, delimiter="\t"):
+            if not (row.get("file") or "").strip():
+                continue
+            rows.append({column: (row.get(column) or "NA").strip()
+                         for column in ALL_COLUMNS})
+    return rows
 
 
 def write_table(path, rows):
@@ -163,12 +201,17 @@ def scan_build_dir(build_dir):
 
 
 def build_row(info, plan_row, release_url, gtdb_release, source, built_on):
-    rank = plan_row.get("rank", "NA") if plan_row else "NA"
+    def from_plan(column):
+        value = (plan_row or {}).get(column) or "NA"
+        return value.strip() or "NA"
+
     return {
         "file": info["hmm_file"],
         "source": source,
         "target_taxa": info["name"].lower(),
-        "rank": rank,
+        "rank": from_plan("rank"),
+        "domain": from_plan("domain"),
+        "parent": from_plan("parent"),
         "num_genes": str(info["num_genes"]),
         "link": f"{release_url}/{info['hmm_file']}",
         "pfam_names": info["pfam_names"],
@@ -177,7 +220,7 @@ def build_row(info, plan_row, release_url, gtdb_release, source, built_on):
         "gtdb_release": gtdb_release,
         "pfam_version": info["pfam_version"],
         "num_genomes": info["num_genomes"],
-        "derep_rank": (plan_row.get("derep_rank", "NA") if plan_row else "NA"),
+        "derep_rank": from_plan("derep_rank"),
         "date_built": built_on,
     }
 
@@ -223,7 +266,11 @@ def main():
     parser.add_argument("--repo", default="AstrobioMike/GToTree",
                         help="owner/repo for the release (default: %(default)s)")
     parser.add_argument("--plan", default=os.path.join(here, "plan", "scg-set-plan.tsv"),
-                        help="the plan table, for rank/derep_rank")
+                        help="the plan table, for rank/domain/parent/derep_rank")
+    parser.add_argument("--carried-forward",
+                        default=os.path.join(here, CARRIED_FORWARD),
+                        help="rows for sets with no build directory, copied verbatim "
+                             "into the table (default: %(default)s)")
     parser.add_argument("--info-table", default=None,
                         help="info table to write (default: "
                              "<repo-root>/hmm_sets/hmm-sources-and-info.tsv). This is "
@@ -258,10 +305,7 @@ def main():
         if info is None:
             skipped.append((os.path.basename(subdir), problem))
             continue
-        plan_row = plan.get((info["name"].lower(), "phylum")) or \
-            plan.get((info["name"].lower(), "class")) or \
-            next((r for (taxon, _), r in plan.items()
-                  if taxon == info["name"].lower()), None)
+        plan_row = plan.get(info["name"].lower())
         infos.append(info)
         new_rows.append(build_row(info, plan_row, release_url, args.gtdb_release,
                                   args.source, built_on))
@@ -282,13 +326,21 @@ def main():
         print(f"{len(new_rows)}. If the build isn't finished, stop here. Continuing writes")
         print("the table anyway; the upload script only touches the built .hmm files.\n")
 
+    # Rows for sets with no build directory. Appended after the built ones so a name
+    # collision resolves in favour of the freshly built set rather than a stale copy.
+    carried = [row for row in read_carried_forward(args.carried_forward)
+               if row["file"].lower() not in {r["file"].lower() for r in new_rows}]
+
     os.makedirs(args.output_dir, exist_ok=True)
-    write_table(info_table, new_rows)
+    write_table(info_table, new_rows + carried)
     upload_script = os.path.join(args.output_dir, "upload-scg-sets.sh")
     write_upload_script(upload_script, infos, args.release_tag, args.repo)
 
     print(f"scanned {len(subdirs)} build director(ies)")
     print(f"  wrote {len(new_rows)} set(s) to the info table (overwritten fresh)")
+    if carried:
+        print(f"  plus {len(carried)} carried-forward set(s): "
+              f"{', '.join(r['file'] for r in carried)}")
     if skipped:
         print(f"\n  SKIPPED {len(skipped)} incomplete build(s):")
         for name, problem in skipped:

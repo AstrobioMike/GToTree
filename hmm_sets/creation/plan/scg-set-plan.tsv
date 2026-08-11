@@ -1,46 +1,46 @@
-set_name	rank	taxon	domain	selected_by	derep_rank	n_input_genomes	total_genomes	species_clusters	hq_reps	n_genera_hq	n_species_hq	flags
-Bacteria	domain	Bacteria	NA	domain-set	family	5148	NA	NA	NA	NA	NA	
-Archaea	domain	Archaea	NA	domain-set	family	492	NA	NA	NA	NA	NA	
-Bacteria-and-Archaea	multi-domain	Bacteria+Archaea	NA	domain-set	family	5640	NA	NA	NA	NA	NA	
-Nanobdellota	phylum	Nanobdellota	Archaea	genera>=100+genomes>=1000	genus	421	2673	1861	702	421	702	
-Thermoproteota	phylum	Thermoproteota	Archaea	genera>=100+genomes>=1000	genus	338	6060	2306	1145	338	1145	
-Halobacteriota	phylum	Halobacteriota	Archaea	genera>=100+genomes>=1000	genus	225	3795	1879	1106	225	1106	
-Methanobacteriota	phylum	Methanobacteriota	Archaea	genomes>=1000+include	species	224	1130	330	224	28	224	stepped genus -> species for enough genomes
-Thermoplasmatota	phylum	Thermoplasmatota	Archaea	genera>=100+genomes>=1000	genus	180	4961	1647	546	180	546	
-Micrarchaeota	phylum	Micrarchaeota	Archaea	genomes>=1000	genus	93	1358	540	190	93	190	
-Asgardarchaeota	phylum	Asgardarchaeota	Archaea	include	species	90	622	400	90	41	90	stepped genus -> species for enough genomes
-Pseudomonadota	phylum	Pseudomonadota	Bacteria	genera>=100+genomes>=1000	genus	4932	324613	46828	32273	4932	32273	
-Patescibacteriota	phylum	Patescibacteriota	Bacteria	genera>=100+genomes>=1000	genus	3454	16000	10945	7929	3454	7929	
-Bacillota	phylum	Bacillota	Bacteria	genera>=100+genomes>=1000	genus	3257	228026	27167	16863	3257	16863	
-Bacteroidota	phylum	Bacteroidota	Bacteria	genera>=100+genomes>=1000	genus	2462	107378	23901	15468	2462	15468	
-Actinomycetota	phylum	Actinomycetota	Bacteria	genera>=100+genomes>=1000	genus	1993	80926	24968	16115	1993	16115	
-Planctomycetota	phylum	Planctomycetota	Bacteria	genera>=100+genomes>=1000	genus	1186	7556	4995	2625	1186	2625	
-Chloroflexota	phylum	Chloroflexota	Bacteria	genera>=100+genomes>=1000	genus	1062	10423	6831	2951	1062	2951	
-Acidobacteriota	phylum	Acidobacteriota	Bacteria	genera>=100+genomes>=1000	genus	985	10449	7453	4332	985	4332	
-Desulfobacterota	phylum	Desulfobacterota	Bacteria	genera>=100+genomes>=1000	genus	918	8888	4552	2702	918	2702	
-Verrucomicrobiota	phylum	Verrucomicrobiota	Bacteria	genera>=100+genomes>=1000	genus	694	10795	4825	2572	694	2572	
-Cyanobacteriota	phylum	Cyanobacteriota	Bacteria	genera>=100+genomes>=1000	genus	526	8830	3330	2263	526	2263	
-Bacillota_I	phylum	Bacillota_I	Bacteria	genera>=100+genomes>=1000	genus	513	14528	3799	2187	513	2187	
-Myxococcota_A	phylum	Myxococcota_A	Bacteria	genera>=100+genomes>=1000	genus	406	2374	1658	887	406	887	
-Omnitrophota	phylum	Omnitrophota	Bacteria	genera>=100+genomes>=1000	genus	366	1392	1030	527	366	527	
-Spirochaetota	phylum	Spirochaetota	Bacteria	genera>=100+genomes>=1000	genus	338	6259	2013	1113	338	1113	
-Gemmatimonadota	phylum	Gemmatimonadota	Bacteria	genera>=100+genomes>=1000	genus	267	3148	2020	1018	267	1018	
-Bdellovibrionota	phylum	Bdellovibrionota	Bacteria	genera>=100+genomes>=1000	genus	245	1177	851	560	245	560	
-Nitrospirota	phylum	Nitrospirota	Bacteria	genera>=100+genomes>=1000	genus	244	2007	1106	697	244	697	
-Armatimonadota	phylum	Armatimonadota	Bacteria	genera>=100+genomes>=1000	genus	202	1003	638	423	202	423	
-Chlamydiota	phylum	Chlamydiota	Bacteria	genera>=100+genomes>=1000	genus	189	1289	560	349	189	349	
-Fusobacteriota	phylum	Fusobacteriota	Bacteria	genomes>=1000+include	species	142	1384	194	142	29	142	stepped genus -> species for enough genomes
-Myxococcota	phylum	Myxococcota	Bacteria	genera>=100	genus	129	745	486	326	129	326	
-Campylobacterota	phylum	Campylobacterota	Bacteria	genera>=100+genomes>=1000	genus	120	14392	1516	1070	120	1070	
-Thermotogota	phylum	Thermotogota	Bacteria	include	species	117	598	151	117	44	117	stepped genus -> species for enough genomes
-Aquificota	phylum	Aquificota	Bacteria	include	species	114	379	178	114	32	114	stepped genus -> species for enough genomes
-Babelota	phylum	Babelota	Bacteria	genera>=100	genus	112	315	261	189	112	189	
-Elusimicrobiota	phylum	Elusimicrobiota	Bacteria	genera>=100+genomes>=1000	genus	112	1004	534	321	112	321	
-Zixibacteria	phylum	Zixibacteria	Bacteria	genera>=100	genus	107	351	285	198	107	198	
-Fidelibacterota	phylum	Fidelibacterota	Bacteria	genomes>=1000	genus	89	1115	425	190	89	190	
-Synergistota	phylum	Synergistota	Bacteria	include	genus	62	760	268	176	62	176	
-Nitrospinota	phylum	Nitrospinota	Bacteria	include	species	57	236	120	57	22	57	stepped genus -> species for enough genomes
-Deinococcota	phylum	Deinococcota	Bacteria	include	genus	55	756	367	266	55	266	
-Fibrobacterota	phylum	Fibrobacterota	Bacteria	include	genus	52	553	296	172	52	172	
-Gammaproteobacteria	class	Gammaproteobacteria	Bacteria	include	genus	2550	273004	25165	17794	2550	17794	
-Alphaproteobacteria	class	Alphaproteobacteria	Bacteria	include	genus	2343	51346	21473	14380	2343	14380	
+set_name	rank	taxon	domain	parent	selected_by	derep_rank	n_input_genomes	total_genomes	species_clusters	hq_reps	n_genera_hq	n_species_hq	flags
+Bacteria	domain	Bacteria	Bacteria	NA	domain-set	family	5148	NA	NA	NA	NA	NA	
+Archaea	domain	Archaea	Archaea	NA	domain-set	family	492	NA	NA	NA	NA	NA	
+Bacteria-and-Archaea	multi-domain	Bacteria+Archaea	NA	NA	domain-set	family	5640	NA	NA	NA	NA	NA	
+Nanobdellota	phylum	Nanobdellota	Archaea	Archaea	genera>=100+genomes>=1000	genus	421	2673	1861	702	421	702	
+Thermoproteota	phylum	Thermoproteota	Archaea	Archaea	genera>=100+genomes>=1000	genus	338	6060	2306	1145	338	1145	
+Halobacteriota	phylum	Halobacteriota	Archaea	Archaea	genera>=100+genomes>=1000	genus	225	3795	1879	1106	225	1106	
+Methanobacteriota	phylum	Methanobacteriota	Archaea	Archaea	genomes>=1000+include	species	224	1130	330	224	28	224	stepped genus -> species for enough genomes
+Thermoplasmatota	phylum	Thermoplasmatota	Archaea	Archaea	genera>=100+genomes>=1000	genus	180	4961	1647	546	180	546	
+Micrarchaeota	phylum	Micrarchaeota	Archaea	Archaea	genomes>=1000	genus	93	1358	540	190	93	190	
+Asgardarchaeota	phylum	Asgardarchaeota	Archaea	Archaea	include	species	90	622	400	90	41	90	stepped genus -> species for enough genomes
+Pseudomonadota	phylum	Pseudomonadota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	4932	324613	46828	32273	4932	32273	
+Patescibacteriota	phylum	Patescibacteriota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	3454	16000	10945	7929	3454	7929	
+Bacillota	phylum	Bacillota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	3257	228026	27167	16863	3257	16863	
+Bacteroidota	phylum	Bacteroidota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	2462	107378	23901	15468	2462	15468	
+Actinomycetota	phylum	Actinomycetota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	1993	80926	24968	16115	1993	16115	
+Planctomycetota	phylum	Planctomycetota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	1186	7556	4995	2625	1186	2625	
+Chloroflexota	phylum	Chloroflexota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	1062	10423	6831	2951	1062	2951	
+Acidobacteriota	phylum	Acidobacteriota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	985	10449	7453	4332	985	4332	
+Desulfobacterota	phylum	Desulfobacterota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	918	8888	4552	2702	918	2702	
+Verrucomicrobiota	phylum	Verrucomicrobiota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	694	10795	4825	2572	694	2572	
+Cyanobacteriota	phylum	Cyanobacteriota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	526	8830	3330	2263	526	2263	
+Bacillota_I	phylum	Bacillota_I	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	513	14528	3799	2187	513	2187	
+Myxococcota_A	phylum	Myxococcota_A	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	406	2374	1658	887	406	887	
+Omnitrophota	phylum	Omnitrophota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	366	1392	1030	527	366	527	
+Spirochaetota	phylum	Spirochaetota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	338	6259	2013	1113	338	1113	
+Gemmatimonadota	phylum	Gemmatimonadota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	267	3148	2020	1018	267	1018	
+Bdellovibrionota	phylum	Bdellovibrionota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	245	1177	851	560	245	560	
+Nitrospirota	phylum	Nitrospirota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	244	2007	1106	697	244	697	
+Armatimonadota	phylum	Armatimonadota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	202	1003	638	423	202	423	
+Chlamydiota	phylum	Chlamydiota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	189	1289	560	349	189	349	
+Fusobacteriota	phylum	Fusobacteriota	Bacteria	Bacteria	genomes>=1000+include	species	142	1384	194	142	29	142	stepped genus -> species for enough genomes
+Myxococcota	phylum	Myxococcota	Bacteria	Bacteria	genera>=100	genus	129	745	486	326	129	326	
+Campylobacterota	phylum	Campylobacterota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	120	14392	1516	1070	120	1070	
+Thermotogota	phylum	Thermotogota	Bacteria	Bacteria	include	species	117	598	151	117	44	117	stepped genus -> species for enough genomes
+Aquificota	phylum	Aquificota	Bacteria	Bacteria	include	species	114	379	178	114	32	114	stepped genus -> species for enough genomes
+Babelota	phylum	Babelota	Bacteria	Bacteria	genera>=100	genus	112	315	261	189	112	189	
+Elusimicrobiota	phylum	Elusimicrobiota	Bacteria	Bacteria	genera>=100+genomes>=1000	genus	112	1004	534	321	112	321	
+Zixibacteria	phylum	Zixibacteria	Bacteria	Bacteria	genera>=100	genus	107	351	285	198	107	198	
+Fidelibacterota	phylum	Fidelibacterota	Bacteria	Bacteria	genomes>=1000	genus	89	1115	425	190	89	190	
+Synergistota	phylum	Synergistota	Bacteria	Bacteria	include	genus	62	760	268	176	62	176	
+Nitrospinota	phylum	Nitrospinota	Bacteria	Bacteria	include	species	57	236	120	57	22	57	stepped genus -> species for enough genomes
+Deinococcota	phylum	Deinococcota	Bacteria	Bacteria	include	genus	55	756	367	266	55	266	
+Fibrobacterota	phylum	Fibrobacterota	Bacteria	Bacteria	include	genus	52	553	296	172	52	172	
+Gammaproteobacteria	class	Gammaproteobacteria	Bacteria	Pseudomonadota	include	genus	2550	273004	25165	17794	2550	17794	
+Alphaproteobacteria	class	Alphaproteobacteria	Bacteria	Pseudomonadota	include	genus	2343	51346	21473	14380	2343	14380	

@@ -1,6 +1,6 @@
 SCG-HMM set plan
 ============================================================================
-generated:     2026-08-07
+generated:     2026-08-11
 GTDB release:  v232
 parquet:       /Users/michael.lee/miniconda3/envs/gtotree-dev/share/gtotree/gtdb_tax_info/gtdb-data.parquet
 config:        /Users/michael.lee/Documents/github/gtotree/hmm_sets/creation/scg-sets.toml
@@ -122,9 +122,22 @@ NOT IN THE PUBLISHED TABLE YET
 
 PUBLISHED BUT NOT IN THIS PLAN
 ----------------------------------------------------------------------------
-  Advisory only. Older releases stay hosted, so nothing breaks by leaving
-  these alone -- but if a name changed upstream you'd want to know.
-  (none)
+  Advisory only. Older releases stay hosted anyway.
+  Actinobacteria.hmm (target_taxa=actinobacteria, rank=None)
+  Alphaproteobacteria.hmm (target_taxa=alphaproteobacteria, rank=None)
+  Archaea.hmm (target_taxa=archaea, rank=None)
+  Bacteria.hmm (target_taxa=bacteria, rank=None)
+  Universal-Hug-et-al.hmm (target_taxa=bacteria,archaea,eukarya, rank=None)
+  Bacteria_and_Archaea.hmm (target_taxa=bacteria-and-archaea, rank=None)
+  Bacteroidetes.hmm (target_taxa=bacteroidetes, rank=None)
+  Betaproteobacteria.hmm (target_taxa=betaproteobacteria, rank=None)
+  Chlamydiae.hmm (target_taxa=chlamydiae, rank=None)
+  Cyanobacteria.hmm (target_taxa=cyanobacteria, rank=None)
+  Epsilonproteobacteria.hmm (target_taxa=epsilonproteobacteria, rank=None)
+  Firmicutes.hmm (target_taxa=firmicutes, rank=None)
+  Gammaproteobacteria.hmm (target_taxa=gammaproteobacteria, rank=None)
+  Proteobacteria.hmm (target_taxa=proteobacteria, rank=None)
+  Tenericutes.hmm (target_taxa=tenericutes, rank=None)
 
 APPROACHING THE THRESHOLDS
 ----------------------------------------------------------------------------
