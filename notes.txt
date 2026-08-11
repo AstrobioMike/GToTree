@@ -4,8 +4,7 @@
 
 ### TO DO STILL ###
 
-    # consider richargparse for the main gtotree parser, instead of my manual one that i've stuck to for legacy reasons...
-        # either way, make a condensed standard help and a --show-detailed-help for the full help (so it's less overwhelming at first glance)
+    # make gtotree take lower-case gtdb/ncbi for --source
 
 
     # create new SCG-sets for all main phyla (and proteos/pseudomonadota) of gtdb (and archaea/bacteria)

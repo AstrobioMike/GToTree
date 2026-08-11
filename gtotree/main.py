@@ -1,5 +1,5 @@
 import sys
-from gtotree.cli.helpmenu import helpmenu
+from gtotree.cli.helpmenu import print_helpmenu
 from gtotree.cli.parser import parser
 from gtotree.utils.misc.preflight_checks import preflight_checks
 from gtotree.utils.misc.messaging import (gtotree_header,
@@ -23,7 +23,7 @@ from gtotree.utils.misc.stages import PipelineStage
 def main(args = None):
     if args is None:
         if len(sys.argv) == 1:
-            sys.stdout.write(helpmenu)
+            print_helpmenu()
             sys.exit()
 
         args = parser().parse_args()
