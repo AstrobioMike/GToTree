@@ -4,17 +4,16 @@
 
 ### TO DO STILL ###
 
+    # consider richargparse for the main gtotree parser, instead of my manual one that i've stuck to for legacy reasons...
+        # either way, make a condensed standard help and a --show-detailed-help for the full help (so it's less overwhelming at first glance)
+
+
     # create new SCG-sets for all main phyla (and proteos/pseudomonadota) of gtdb (and archaea/bacteria)
         # continue hosting them as github assets
-        # make an organized output for gtt-hmms that breaks down by domain for easier reading and selection
 
         # if the user provides a --wanted-ref-tax argument, and they DON'T specify an HMM, maybe we can auto-pick based on the --wanted-ref-tax for them
             # find lowest rank in the associated taxonomy that has a pre-built SCG-set and use that one
             # this may require checking GTDB first (as that's what the pre-built hmms will be from, and then checking ncbi and linking back to gtdb if they provided an ncbi tax...)
-
-
-    # consider richargparse for the main gtotree parser, instead of my manual one that i've stuck to for legacy reasons...
-        # either way, make a condensed standard help and a --show-detailed-help for the full help (so it's less overwhelming at first glance)
 
 
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K

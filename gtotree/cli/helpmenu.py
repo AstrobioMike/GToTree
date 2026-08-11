@@ -14,17 +14,15 @@ helpmenu += f"""
  -------------------------------  {color_text("REQUIRED INPUTS", "yellow")}  -------------------------------
 
       1) Input genomes in one or any combination of the following formats:
-        - [{color_text("-a <file>", "teal", bold = True)}] single-column file of NCBI assembly accessions
-        - [{color_text("-g <file>", "teal", bold = True)}] single-column file with the paths to each GenBank file
-        - [{color_text("-f <file>", "teal", bold = True)}] single-column file with the paths to each fasta file
-        - [{color_text("-A <file>", "teal", bold = True)}] single-column file with the paths to each amino-acid file
         - [{color_text("-w  <str>", "teal", bold = True)}] wanted ref tax to be included (see more details below)
+        - [{color_text("-a <file>", "teal", bold = True)}] single-column file of NCBI assembly accessions
+        - [{color_text("-f <file>", "teal", bold = True)}] single-column file with the paths to each fasta file
+        - [{color_text("-g <file>", "teal", bold = True)}] single-column file with the paths to each genbank file
+        - [{color_text("-A <file>", "teal", bold = True)}] single-column file with the paths to each amino-acid file
 
-      2)  [{color_text("-H <file>", "teal", bold = True)}] location of the uncompressed target SCGs HMM file being
-                      used, or just the HMM name if the 'GToTree_HMM_dir'
-                      environment variable is set (which is typically handled
-                      by the conda installation), run 'gtt hmms' to view
-                      available gene-sets
+      2)  [{color_text("-H <file>", "teal", bold = True)}] target single-copy gene HMMs to use, can be a path or
+                      the name of one of the pre-packaged sets (run 'gtt hmms'
+                      to view available gene-sets)
 
 
  ------------------------------  {color_text("OPTIONAL SETTINGS", "yellow")}  ------------------------------
