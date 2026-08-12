@@ -40,7 +40,7 @@ def parser():
         help="Show the condensed help menu and exit"
     )
     parser.add_argument(
-        "-S", "--show-detailed-help", action=DetailedHelpAction,
+        "-s", "--show-detailed-help", action=DetailedHelpAction,
         help="Show the detailed help menu and exit"
     )
     parser.add_argument("-v", "--version", action="version", version=f"GToTree v{get_version()}")

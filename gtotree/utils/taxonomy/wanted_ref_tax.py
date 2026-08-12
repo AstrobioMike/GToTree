@@ -2,7 +2,7 @@
 Driver-side --wanted-ref-tax (-w) resolution.
 
 This is the GToTree driver's counterpart to the standalone get-accs-from-*
-helpers: it turns a `-w <taxon>` request (scoped by `-S {gtdb,ncbi}`, and honouring
+helpers: it turns a `-w <taxon>` request (scoped by `--source {gtdb,ncbi}`, and honouring
 `--target-rank` / `--derep-rank`) into a list of assembly accessions to fold into the
 user's other input genomes
 
@@ -21,8 +21,8 @@ from gtotree.utils.ncbi.get_ncbi_assembly_data import (ncbi_data_table_path,
                                                        read_date_retrieved)
 
 
-# source-of-taxonomy (-S) -> (core source name, table-path resolver). The driver's
-# -S is GTDB/NCBI (which asset supplies the reference genomes), distinct from the NCBI
+# source-of-taxonomy (--source) -> (core source name, table-path resolver). The driver's
+# --source is gtdb/ncbi (which asset supplies the reference genomes), distinct from the NCBI
 # helper's --source (refseq/genbank accession-prefix scoping).
 _SOURCE_ASSETS = {
     "gtdb": ("gtdb", gtdb_data_table_path),
@@ -71,7 +71,7 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
     Parameters
     ----------
     source : str
-        The driver's -S value ('GTDB' or 'NCBI'; case-insensitive here).
+        The driver's --source value ('gtdb' or 'ncbi'; case-insensitive here).
     taxon : str
         The -w taxon name.
     target_rank : str or None

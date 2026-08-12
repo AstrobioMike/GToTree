@@ -7,6 +7,7 @@ from Bio import SeqIO  # type: ignore
 
 from gtotree.utils.misc.seqs import (_fasta_seq_lengths,
                                 add_needed_gap_seqs,
+                                count_fasta_records,
                                 filter_seqs_by_genome_ids,
                                 filter_seqs_by_length)
 
@@ -135,3 +136,51 @@ class TestAddNeededGapSeqs:
         with pytest.raises(ValueError):
             add_needed_gap_seqs(_RunData(["g1"]), str(tmp_path / "empty.faa"),
                                 str(tmp_path / "o.faa"))
+
+
+class TestGenomeFilterCounts:
+    """
+    The post-`-G` representation figure that lands in SCG-info.tsv is counted while the
+    filtered file is being written, rather than by reading it back -- so it can't drift
+    from what was actually kept.
+    """
+
+    def test_filtering_returns_how_many_survived(self, tmp_path):
+        path = _write_fasta(tmp_path / "a.faa",
+                            [("g1", "AAA"), ("g2", "CCC"), ("g3", "DDD")])
+        out = str(tmp_path / "out.faa")
+
+        kept = filter_seqs_by_genome_ids(path, {"g2"}, out)
+
+        assert kept == 2
+        assert [r.id for r in SeqIO.parse(out, "fasta")] == ["g1", "g3"]
+
+    def test_removing_everything_returns_zero(self, tmp_path):
+        """
+        Zero is what makes the file empty, which is what the GENOME_FILTER check keys
+        off to drop the set -- so the two have to agree.
+        """
+        path = _write_fasta(tmp_path / "a.faa", [("g1", "AAA"), ("g2", "CCC")])
+        out = str(tmp_path / "out.faa")
+
+        assert filter_seqs_by_genome_ids(path, {"g1", "g2"}, out) == 0
+        assert open(out).read() == ""
+
+    def test_counting_records_matches_the_filter_path(self, tmp_path):
+        """
+        The no-removals fast path copies the file instead of filtering it, so the count
+        has to come from somewhere else and still mean the same thing.
+        """
+        path = _write_fasta(tmp_path / "a.faa",
+                            [("g1", "AAA"), ("g2", "CCC"), ("g3", "DDD")])
+        out = str(tmp_path / "out.faa")
+
+        assert count_fasta_records(path) == filter_seqs_by_genome_ids(path, set(), out)
+
+    def test_counting_a_wrapped_fasta_counts_records_not_lines(self, tmp_path):
+        path = _write_fasta(tmp_path / "a.faa",
+                            [("g1", "A" * 200), ("g2", "C" * 200)], wrap=60)
+        assert count_fasta_records(path) == 2
+
+    def test_counting_a_missing_file_is_zero_not_an_error(self, tmp_path):
+        assert count_fasta_records(str(tmp_path / "nope.faa")) == 0

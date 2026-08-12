@@ -6,7 +6,7 @@ from gtotree.utils.misc.messaging import (report_message,
                                      report_SCG_set_filtering_update)
 from gtotree.utils.misc.seqs import check_target_SCGs_have_seqs, filter_seqs_by_length
 from gtotree.utils.misc.stages import PipelineStage, SCGRemovalStage
-from gtotree.utils.misc.summary_info import write_out_removed_SCG_targets
+from gtotree.utils.misc.summary_info import write_SCG_info_table
 
 def filter_genes(args, run_data):
 
@@ -18,6 +18,11 @@ def filter_genes(args, run_data):
                f"and keeping gene sets with hits in at least {in_genomes_cutoff_for_report}% of "
                f"the currently retained genomes (controlled by `-r`).")
     report_message(message, ii="    ", si="    ", width=80)
+
+    if run_data.stage_is_complete(PipelineStage.FILTER_GENES):
+        write_SCG_info_table(run_data)
+        report_SCG_set_filtering_update(run_data)
+        return run_data
 
     scgs_to_filter = run_data.get_all_SCG_targets_remaining_but_not_filtered()
 
@@ -68,7 +73,7 @@ def filter_genes(args, run_data):
     if removed_any:
         write_run_data(run_data)
 
-    write_out_removed_SCG_targets(run_data)
+    write_SCG_info_table(run_data)
 
     run_data.mark_stage_complete(PipelineStage.FILTER_GENES)
     write_run_data(run_data)

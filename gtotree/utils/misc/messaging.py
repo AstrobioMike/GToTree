@@ -330,17 +330,17 @@ def display_initial_run_info(args, run_data):
 
     report_message("  Input-genome sources include:")
 
-    if args.ncbi_accessions:
-        print(f"      - NCBI accessions listed in {args.ncbi_accessions} ({len(run_data.get_user_provided_ncbi_accs())} genomes)", flush=True)
     if args.wanted_ref_tax:
         num_wanted_ref_tax = len(run_data.get_wanted_ref_tax_accs())
         print(f"      - NCBI accessions selected for --wanted-ref-tax '{args.wanted_ref_tax}' ({num_wanted_ref_tax} genomes)", flush=True)
-    if args.genbank_files:
-        print(f"      - Genbank files listed in {args.genbank_files} ({len(run_data.get_input_genbank_ids())} genomes)", flush=True)
+    if args.ncbi_accessions:
+        print(f"      - NCBI accessions listed in {args.ncbi_accessions} ({len(run_data.get_user_provided_ncbi_accs())} genomes)", flush=True)
     if args.fasta_files:
         print(f"      - Fasta files listed in {args.fasta_files} ({len(run_data.get_input_fasta_ids())} genomes)", flush=True)
     if args.amino_acid_files:
         print(f"      - Amino-acid files listed in {args.amino_acid_files} ({len(run_data.get_input_amino_acid_ids())} genomes)", flush=True)
+    if args.genbank_files:
+        print(f"      - Genbank files listed in {args.genbank_files} ({len(run_data.get_input_genbank_ids())} genomes)", flush=True)
 
     report_message(f"                           Total input genomes: {len(run_data.all_input_genomes)}", "green")
     # time.sleep(1)
@@ -694,7 +694,7 @@ def report_genome_processing_update(run_data, searched=False):
     if num_input == num_remaining:
         message = f"{color_text(f"All {num_input} input genomes were successfully {verb}.".center(82), "green")}"
     else:
-        message = "    Of all the input genomes provided:\n"
+        message = "    Of the input genomes provided:\n"
         if num_failed_processing > 0:
             message += f"      {color_text(f"{num_failed_processing} failed processing", "yellow")} as described above.\n\n"
         if num_failed_search > 0:
@@ -771,7 +771,7 @@ def report_SCG_alignment_update(run_data):
 
     plural = "" if num_failed == 1 else "s"
     message = f"    {color_text(f"{num_failed} SCG-set{plural} failed to align or trim", "yellow")}, reported in:\n"
-    message += f"      {run_data.run_files_dir_rel}/target-SCGs-dropped-from-analysis.tsv\n\n"
+    message += f"      {run_data.run_files_dir_rel}/SCG-info.tsv\n\n"
     message += ("    This means muscle or trimal returned an error on those sets, not that\n"
                 "    they were filtered out. Their logs were kept in:\n")
     message += f"      {run_data.logs_dir_rel}/failed-SCG-alignments/\n\n"
@@ -819,6 +819,58 @@ def report_genome_filtering_update(run_data):
         report_too_few_genomes(run_data)
 
 
+def report_SCG_genome_filtering_update(run_data):
+    """
+    Report what genome filtering (`-G`) did to the SCG-sets.
+
+    Two separate things, both previously invisible: sets that lost every one of their
+    genomes and left the run entirely, and sets that survived but whose representation
+    dropped below the `-r` the user asked for. The second isn't filtered on -- `-r` is
+    evaluated once, before `-G` runs, and re-applying it afterwards would change the
+    gene set out from under the user -- so it's surfaced here instead and left as their
+    call. This is also where a total wipeout has to exit, since by the time the align
+    stage notices, nothing has said why.
+    """
+    from gtotree.utils.misc.summary_info import (SCG_sets_below_representation_cutoff,
+                                                 scg_info_denominators)
+
+    num_removed = len(run_data.SCG_targets_removed_at(SCGRemovalStage.GENOME_FILTER))
+    num_remaining = len(run_data.get_all_SCG_targets_remaining())
+    below_cutoff = SCG_sets_below_representation_cutoff(run_data)
+
+    if num_removed == 0 and not below_cutoff:
+        return
+
+    lines = []
+
+    if num_removed:
+        plural = "" if num_removed == 1 else "s"
+        lines.append(
+            f"      {color_text(f"{num_removed} SCG-set{plural} lost every genome with a hit", "yellow")}"
+            " and left the run.")
+
+    if below_cutoff:
+        cutoff = f"{run_data.gene_representation_cutoff * 100:.0f}"
+        _searched, retained = scg_info_denominators(run_data)
+        num_below = len(below_cutoff)
+        # the noun agrees with the total it's being drawn from, the verb with the subset
+        verb = "is" if num_below == 1 else "are"
+        plural = "" if num_remaining == 1 else "s"
+        lines.append(
+            f"      {color_text(f"{num_below} of the {num_remaining} remaining SCG-set{plural}", "yellow")} "
+            f"{verb} now represented in fewer than\n      {cutoff}% of the {retained} retained "
+            f"genomes (the `-r` cutoff, which is applied before\n      `-G` and not re-checked "
+            "after it). They're kept, but contribute mostly gaps.")
+
+    message = "    Of the SCG-sets that made it this far:\n\n" + "\n\n".join(lines)
+    message += f"\n\n    Per-SCG details are in:\n      {run_data.run_files_dir_rel}/SCG-info.tsv"
+
+    report_section_info(message)
+
+    if num_remaining == 0:
+        report_no_SCGs_remaining(run_data)
+
+
 def report_SCG_set_filtering_update(run_data):
     total_SCG_targets = len(run_data.get_all_SCG_targets())
     num_SCG_targets_dropped = len(
@@ -830,7 +882,7 @@ def report_SCG_set_filtering_update(run_data):
     else:
         message = (f"    Of the initial {total_SCG_targets} SCG-targets:\n\n")
         message += (f"        {color_text(f"{num_SCG_targets_dropped} had no hits or were filtered out", 'yellow')}, reported in:\n")
-        message += (f"          {run_data.run_files_dir_rel}/target-SCGs-dropped-from-analysis.tsv")
+        message += (f"          {run_data.run_files_dir_rel}/SCG-info.tsv")
 
         if num_SCG_targets_remaining != 0:
             message += "\n\n"

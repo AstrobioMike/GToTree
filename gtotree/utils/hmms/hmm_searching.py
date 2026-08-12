@@ -54,13 +54,7 @@ def _hmm_search_worker_inner(genome, run_data, aa_path=None, nt_path=None, press
 
         # These per-genome files are the source of truth the combined outputs are
         # rebuilt from at the end of the stage, so they're written atomically
-        def _write_counts(f):
-            f.write(f"{ID}")
-            for count in dict_of_hit_counts.values():
-                f.write(f"\t{count}")
-            f.write("\n")
-
-        atomic_write_text(f"{out_dir}/SCG-hit-counts.txt", _write_counts)
+        write_genome_hit_counts(f"{out_dir}/SCG-hit-counts.txt", dict_of_hit_counts)
 
         AA_hit_seqs_dict, extract_seqs_failed = get_seqs(dict_of_hit_gene_ids, AA_path)
 
@@ -200,6 +194,57 @@ def get_seqs(dict_of_hit_gene_ids, path):
     return hit_seqs_dict, extract_seqs_failed
 
 
+GENOME_HIT_COUNTS_HEADER = "target_SCG\tnum_hits"
+
+
+def write_genome_hit_counts(path, dict_of_hit_counts):
+    """
+    Write one genome's per-SCG hit counts, keyed by target name
+    """
+    def _write(f):
+        f.write(GENOME_HIT_COUNTS_HEADER + "\n")
+        for scg, count in dict_of_hit_counts.items():
+            f.write(f"{scg}\t{count}\n")
+
+    atomic_write_text(path, _write)
+
+
+def read_genome_hit_counts(path, target_SCG_ids):
+    """
+    One genome's {target SCG id -> hit count}, or None if it can't be trusted
+    """
+    try:
+        with open(path) as f:
+            lines = [line.rstrip("\n") for line in f if line.strip()]
+    except OSError:
+        return None
+
+    if not lines:
+        return None
+
+    if lines[0] == GENOME_HIT_COUNTS_HEADER:
+        counts = {}
+        for line in lines[1:]:
+            name, _tab, value = line.partition("\t")
+            try:
+                counts[name] = int(value)
+            except ValueError:
+                continue
+        return counts
+
+    fields = lines[0].split("\t")[1:]  # [0] was the assembly id
+    if len(fields) != len(target_SCG_ids):
+        return None
+
+    counts = {}
+    for scg_id, field in zip(target_SCG_ids, fields):
+        try:
+            counts[scg_id] = int(field)
+        except ValueError:
+            continue
+    return counts
+
+
 def rebuild_combined_SCG_outputs(run_data):
     """
     Rebuild the combined SCG outputs from the per-genome artifacts
@@ -207,21 +252,30 @@ def rebuild_combined_SCG_outputs(run_data):
     genomes = [gd for gd in run_data.all_input_genomes
                if gd.hmm_search_done and not gd.removed]
 
-    target_SCG_ids = [SCG.id for SCG in run_data.get_all_SCG_targets_remaining()]
+    scgs = run_data.get_all_SCG_targets_remaining()
+    target_SCG_ids = [SCG.id for SCG in scgs]
+
+    genomes_with_any_hit = dict.fromkeys(target_SCG_ids, 0)
+    genomes_with_usable_seq = dict.fromkeys(target_SCG_ids, 0)
 
     # --- the combined per-genome hit-count table ---
     def _write_table(out):
         out.write("assembly_id\t" + "\t".join(target_SCG_ids) + "\n")
         for gd in genomes:
-            row_path = f"{run_data.hmm_results_dir}/{gd.id}/SCG-hit-counts.txt"
-            try:
-                with open(row_path) as row_file:
-                    contents = row_file.read()
-            except OSError:
+            counts = read_genome_hit_counts(
+                f"{run_data.hmm_results_dir}/{gd.id}/SCG-hit-counts.txt",
+                target_SCG_ids)
+            if counts is None:
                 continue
-            if contents and not contents.endswith("\n"):
-                contents += "\n"
-            out.write(contents)
+
+            row = []
+            for scg_id in target_SCG_ids:
+                count = counts.get(scg_id, 0)
+                if count > 0:
+                    genomes_with_any_hit[scg_id] += 1
+                row.append(str(count))
+
+            out.write(gd.id + "\t" + "\t".join(row) + "\n")
 
     atomic_write_text(f"{run_data.output_dir}/SCG-hit-counts.tsv", _write_table)
 
@@ -242,11 +296,35 @@ def rebuild_combined_SCG_outputs(run_data):
                     handle = handles.get(record.id)
                     if handle is not None:
                         handle.write(f">{gd.id}\n{record.seq}\n")
+                        genomes_with_usable_seq[record.id] += 1
 
     for path in out_paths.values():
         os.replace(f"{path}.part", path)
 
+    for scg in scgs:
+        scg.num_genomes_with_any_hit = genomes_with_any_hit[scg.id]
+        scg.num_genomes_with_hits = genomes_with_usable_seq[scg.id]
+
     return run_data
+
+
+def no_hits_reason(scg, best_hit_mode):
+    """
+    Why an SCG-set came out of the search with no usable sequences
+    """
+    num_with_hits = scg.num_genomes_with_any_hit or 0
+
+    if not num_with_hits:
+        return "no hits in any genome"
+
+    plural = "" if num_with_hits == 1 else "s"
+
+    if not best_hit_mode:
+        return (f"hits in {num_with_hits} genome{plural}, but never as a single copy "
+                "(`-B`/`--best-hit-mode` would retain it)")
+
+    return (f"hits in {num_with_hits} genome{plural}, but no sequences could be "
+            "extracted for them")
 
 
 def capture_hmm_search_failures(run_data):

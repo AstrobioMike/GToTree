@@ -4,19 +4,13 @@
 
 ### TO DO STILL ###
 
-    # does a resume need to re-do the taxonomy resolving for -w like it currently does at the start?
+
+    # make things like "gtotree-output/run-files/failed-fasta-files.txt" be a tsv instead with a reason in second column
+        # in fact our genomes-summary-info.tsv already has a reason_removed column, is that all i need? Should we be pointing to those instead and not be producing
+        # the individual files like failed-fasta-files.txt? Maybe only downside is if that genomes-summary-info.tsv file exists throughout the whole run?
 
 
-    # if genome-filtering drops all genes of a given SCG-set, things might break
-        # build some guard for that
-
-
-    # do i want to modify 'reason-removed' for SCGs to delineate bewteen 'no/multiple hits found'
-        # and dropped due to length filtering?
-        # yes, i do, figure out if that's still needed and do it if so
-
-
-    # run the following with all 4 input types and make sure all messages make sense
+    # run the following with all 5 input types and make sure all messages make sense
         # main gtotree
             # do some mapping-file tests, and make sure that's covered by unit tests
         # gtt search-pfams

@@ -2,24 +2,109 @@ import pandas as pd # type: ignore
 
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.misc.general import atomic_write_text
+from gtotree.utils.misc.stages import GenomeRemovalStage
 
 
-def write_out_removed_SCG_targets(run_data):
+SCG_INFO_FILENAME = "SCG-info.tsv"
+
+SCG_INFO_COLUMNS = (
+    "target_SCG",
+    "num_genomes_with_any_hit",
+    "num_genomes_with_hits",
+    "perc_genomes_with_hits",
+    "num_genomes_after_length_filtering",
+    "perc_genomes_after_length_filtering",
+    "num_genomes_after_genome_filtering",
+    "perc_genomes_after_genome_filtering",
+    "retained",
+    "stage_removed",
+    "reason_removed",
+)
+
+
+def _perc(count, total):
+    if count is None or not total:
+        return "NA"
+    return f"{count / total * 100:.1f}"
+
+
+def _na(value):
+    return "NA" if value is None else str(value)
+
+
+def scg_info_denominators(run_data):
     """
-    Record every SCG-set that has left the run so far, and why
+    The two genome pools the representation percentages are against
+
+    `searched` is the pool alive coming out of the HMM search, which is also exactly the
+    pool `filter_genes` evaluates `-r` against. So perc_genomes_after_length_filtering
+    is directly comparable to the user's `-r` value. `retained` is the pool left after
+    `-G`, making perc_genomes_after_genome_filtering the same quantity afterwards. Both
+    derive from `removed_at` rather than being stored, which is what keeps them right
+    on a resume.
     """
-    removed = [scg for scg in run_data.SCG_targets if scg.removed]
-    if not removed:
+    searched = len(run_data.genomes_alive_through(GenomeRemovalStage.HMM_SEARCH))
+    retained = len(run_data.genomes_alive_through(GenomeRemovalStage.SCG_HIT_FILTER))
+    return searched, retained
+
+
+def write_SCG_info_table(run_data):
+    """
+    Record every target SCG-set, how well represented it was at each filtering stage,
+    and whether (and why) it left the run
+    """
+    if not run_data.SCG_targets:
         return
 
-    out_path = run_data.run_files_dir + "/target-SCGs-dropped-from-analysis.tsv"
+    searched, retained = scg_info_denominators(run_data)
+    out_path = f"{run_data.run_files_dir}/{SCG_INFO_FILENAME}"
 
     def _write(f):
-        f.write("target_SCG\tstage_removed\treason_removed\n")
-        for scg in removed:
-            f.write(f"{scg.id}\t{scg.removed_at or ''}\t{scg.reason_removed or ''}\n")
+        f.write("\t".join(SCG_INFO_COLUMNS) + "\n")
+        for scg in run_data.SCG_targets:
+            after_len = scg.num_genomes_with_hits_after_len_filtering
+            after_genome = scg.num_genomes_with_hits_after_genome_filtering
+            f.write("\t".join([
+                scg.id,
+                _na(scg.num_genomes_with_any_hit),
+                _na(scg.num_genomes_with_hits),
+                _perc(scg.num_genomes_with_hits, searched),
+                _na(after_len),
+                _perc(after_len, searched),
+                _na(after_genome),
+                _perc(after_genome, retained),
+                "no" if scg.removed else "yes",
+                scg.removed_at or "NA",
+                scg.reason_removed or "NA",
+            ]) + "\n")
 
     atomic_write_text(out_path, _write)
+
+
+def SCG_sets_below_representation_cutoff(run_data):
+    """
+    Retained SCG-sets whose representation fell below `-r` once `-G` had run
+
+    `-r` is applied in `filter_genes` against the genomes alive at that point, and never
+    re-checked afterwards, so a set can pass it and then lose most of its genomes to
+    `-G`
+    """
+    cutoff = run_data.gene_representation_cutoff
+    if not cutoff:
+        return []
+
+    _searched, retained = scg_info_denominators(run_data)
+    if not retained:
+        return []
+
+    below = []
+    for scg in run_data.get_all_SCG_targets_remaining():
+        after_genome = scg.num_genomes_with_hits_after_genome_filtering
+        if after_genome is None:
+            continue
+        if after_genome / retained < cutoff:
+            below.append(scg)
+    return below
 
 
 def generate_primary_summary_table(args, run_data):

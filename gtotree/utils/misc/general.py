@@ -357,7 +357,10 @@ class SCGset:
     id: str
     remaining: bool = None
     gene_length_filtered: bool = None
+    num_genomes_with_any_hit: int = None            # incl. multi-copy hits
+    num_genomes_with_hits: int = None               # contributing a usable seq
     num_genomes_with_hits_after_len_filtering: int = 0
+    num_genomes_with_hits_after_genome_filtering: int = None
     aligned: bool = None
     trimmed: bool = None
     ready_for_cat: bool = None
@@ -417,6 +420,7 @@ class RunData:
     gtotree_logs_dir: str = ""
     best_hit_mode: bool = False
     seq_length_cutoff: float = None
+    gene_representation_cutoff: float = None
     completed_stages: dict = field(default_factory=dict)
     updating_headers: bool = False
     use_muscle_super5: bool = False

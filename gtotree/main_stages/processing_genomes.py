@@ -35,6 +35,7 @@ from gtotree.utils.hmms.hmm_searching import (
     _hmm_search_worker,
     _apply_hmm_search_result,
     capture_hmm_search_failures,
+    no_hits_reason,
     rebuild_combined_SCG_outputs,
 )
 from gtotree.utils.pfam.additional_pfam_searching import (
@@ -354,8 +355,9 @@ def _finalize(args, run_data, plan):
         run_data = rebuild_combined_SCG_outputs(run_data)
         phase_stats.checkpoint("combining: after SCG rebuild")
 
-        run_data = check_target_SCGs_have_seqs(run_data, run_data.general_ext,
-                                              SCGRemovalStage.NO_HITS)
+        run_data = check_target_SCGs_have_seqs(
+            run_data, run_data.general_ext, SCGRemovalStage.NO_HITS,
+            reason_fn=lambda scg: no_hits_reason(scg, run_data.best_hit_mode))
 
     run_data.mark_stage_complete(PipelineStage.PROCESS_GENOMES)
     write_run_data(run_data)

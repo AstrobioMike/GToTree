@@ -7,7 +7,7 @@ from gtotree.utils.misc.general import (write_run_data,
 from gtotree.utils.misc.messaging import (report_processing_stage,
                                      report_no_SCGs_remaining,
                                      report_SCG_alignment_update)
-from gtotree.utils.misc.summary_info import write_out_removed_SCG_targets
+from gtotree.utils.misc.summary_info import write_SCG_info_table
 from gtotree.utils.misc.stages import PipelineStage, SCGRemovalStage
 from gtotree.utils.misc.seqs import (copy_gene_alignments,
                                 run_muscle,
@@ -33,7 +33,7 @@ def align_and_prepare_SCG_sets(args, run_data):
             write_run_data(run_data)
 
             capture_failed_alignment_logs(run_data)
-            write_out_removed_SCG_targets(run_data)
+            write_SCG_info_table(run_data)
 
         else:
             report_no_SCGs_remaining(run_data)

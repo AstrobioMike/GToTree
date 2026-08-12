@@ -331,7 +331,7 @@ class TestAlignmentFailureReporting:
         out = _render(messaging.report_SCG_alignment_update, rd)
 
         assert "2 SCG-sets failed to align or trim" in out
-        assert "target-SCGs-dropped-from-analysis.tsv" in out
+        assert "SCG-info.tsv" in out
         assert "gtotree-output/logs/failed-SCG-alignments/" in out
         assert "remaining 11 target gene(s)" in out
         # not fatal -- the run finishes and the final summary states the real counts
@@ -462,3 +462,90 @@ class TestProcessingSummaryWording:
         _render(_searched(messaging.report_genome_processing_update), rd)
 
         assert len(_no_early_exit) == 1
+
+
+class TestSCGGenomeFilteringReporting:
+    """
+    What `-G` does to the SCG-sets had no report at all: `report_genome_filtering_update`
+    covers genomes only. Two things were invisible as a result -- sets that lost every
+    genome with a hit and left the run, and sets that survived but whose representation
+    fell below the `-r` the user asked for, since `-r` is evaluated once before `-G` and
+    never re-checked afterwards.
+    """
+
+    def _eroded(self, n_genomes=100, n_scgs=4, kept=5, dropped_genomes=45):
+        rd = _run_data(n_accs=n_genomes, n_scgs=n_scgs)
+        rd.gene_representation_cutoff = 0.5
+        for gd in rd.all_input_genomes[:dropped_genomes]:
+            gd.mark_removed("too few unique SCG hits",
+                            GenomeRemovalStage.SCG_HIT_FILTER)
+        for scg in rd.SCG_targets:
+            scg.num_genomes_with_hits_after_len_filtering = 50
+            scg.num_genomes_with_hits_after_genome_filtering = 55
+        rd.SCG_targets[0].num_genomes_with_hits_after_genome_filtering = kept
+        return rd
+
+    def test_a_clean_genome_filtering_stage_says_nothing(self, _no_early_exit):
+        rd = self._eroded(kept=55)
+        assert _render(messaging.report_SCG_genome_filtering_update, rd) == ""
+        assert _no_early_exit == []
+
+    def test_sets_that_lost_every_genome_are_reported(self, _no_early_exit):
+        rd = self._eroded(kept=55)
+        rd.SCG_targets[0].mark_removed("no hits remaining after genome filtering (`-G`)",
+                                       SCGRemovalStage.GENOME_FILTER)
+
+        out = _render(messaging.report_SCG_genome_filtering_update, rd)
+
+        assert "1 SCG-set lost every genome with a hit" in out
+        assert "SCG-info.tsv" in out
+        assert _no_early_exit == []
+
+    def test_erosion_below_the_r_cutoff_is_flagged_without_removing_anything(
+            self, _no_early_exit):
+        rd = self._eroded(kept=5)
+
+        out = _render(messaging.report_SCG_genome_filtering_update, rd)
+
+        assert "1 of the 4 remaining SCG-sets" in out
+        assert "50%" in out
+        assert "55 retained" in out
+        # flagged, not filtered -- the set is still in the run
+        assert len(rd.get_all_SCG_targets_remaining()) == 4
+        assert _no_early_exit == []
+
+    def test_losing_every_set_exits_here_rather_than_at_the_align_stage(
+            self, _no_early_exit):
+        """
+        The align stage would eventually notice and exit, but by then nothing has said
+        why, and SCG-info.tsv hasn't been rewritten with the genome-filter reasons.
+        """
+        rd = self._eroded(kept=55)
+        for scg in rd.SCG_targets:
+            scg.mark_removed("no hits remaining after genome filtering (`-G`)",
+                             SCGRemovalStage.GENOME_FILTER)
+
+        _render(messaging.report_SCG_genome_filtering_update, rd)
+
+        assert _no_early_exit == [rd]
+
+    def test_earlier_stage_drops_are_not_attributed_to_genome_filtering(
+            self, _no_early_exit):
+        rd = self._eroded(kept=55)
+        rd.SCG_targets[0].mark_removed("no hits in any genome", SCGRemovalStage.NO_HITS)
+        rd.SCG_targets[1].mark_removed("too few genomes with hits (1 < 3 required)",
+                                       SCGRemovalStage.GENE_FILTER)
+
+        out = _render(messaging.report_SCG_genome_filtering_update, rd)
+
+        assert "lost every genome" not in out
+        assert _no_early_exit == []
+
+    def test_no_cutoff_recorded_means_no_erosion_claim(self, _no_early_exit):
+        """
+        run_data.gene_representation_cutoff is None for a run started before it was
+        stored; the report has to stay quiet rather than divide by a missing cutoff.
+        """
+        rd = self._eroded(kept=5)
+        rd.gene_representation_cutoff = None
+        assert _render(messaging.report_SCG_genome_filtering_update, rd) == ""

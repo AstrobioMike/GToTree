@@ -79,9 +79,11 @@ def _cleanup(cwd, output_dir, keep=False):
         listing.unlink()
 
     if keep:
-        report_message(f"Test output left in place at:", ii="    ", newline=False, color=None)
-        report_message(f"{output_dir}", "yellow", ii="      ", newline=False, trailing_newline=True)
+        rel_dir = output_dir.name
+        report_message(f"Test output left in place at: {rel_dir}/".center(74), "yellow", ii="    ", newline=False)
         return
+    else:
+        report_message(f"Test output removed. Re-run as `gtt test -k` to keep it.".center(74), "yellow", ii="    ", newline=False)
 
     if output_dir.exists():
         shutil.rmtree(output_dir, ignore_errors=True)

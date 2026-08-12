@@ -43,7 +43,7 @@ def numbered_heading(number, title):
     return f"{' ' * SUBSECTION_INDENT}{color_text(f'{number}) {title}', 'orange')}\n"
 
 CONDENSED_NOTE = [
-    "This is the condensed help menu. Run with [-S | --show-detailed-help] to",
+    "This is the condensed help menu. Run with [-s | --show-detailed-help] to",
     "see all available parameters and their full descriptions.",
 ]
 
@@ -52,9 +52,9 @@ def condensed_note():
     out = "\n"
     for line in CONDENSED_NOTE:
         pad = " " * max(0, (WIDTH - len(line)) // 2)
-        if "[-S | --show-detailed-help]" in line:
-            before, after = line.split("[-S | --show-detailed-help]")
-            rendered = bold(before + "[") + flag("-S | --show-detailed-help") + bold("]" + after)
+        if "[-s | --show-detailed-help]" in line:
+            before, after = line.split("[-s | --show-detailed-help]")
+            rendered = bold(before + "[") + flag("-s | --show-detailed-help") + bold("]" + after)
         else:
             rendered = bold(line)
         out += pad + rendered + "\n"
@@ -122,7 +122,7 @@ def detail_block(text):
 ################################################################################
 # Each entry: (flags, brief, detail, brief_tier)
 #   brief_tier True  -> shown in both menus
-#   brief_tier False -> only appears under -S
+#   brief_tier False -> only appears under -s
 
 BRIEF, FULL = True, False
 
@@ -428,8 +428,8 @@ REQUIRED_INPUTS = [
       "wanted ref tax to include (see more details below)")),
     ("-a <file>", "single-column file of NCBI assembly accessions"),
     ("-f <file>", "single-column file with the paths to each fasta file"),
-    ("-g <file>", "single-column file with the paths to each genbank file"),
     ("-A <file>", "single-column file with the paths to each amino-acid file"),
+    ("-g <file>", "single-column file with the paths to each genbank file"),
 ]
 
 HMM_INPUT = (
@@ -492,7 +492,7 @@ def build_helpmenu(detailed=False):
     gap = "\n" if detailed else ""
     out += subsection("Help and version:", extra_gap=detailed)
     out += gap + entry("-h | --help", "show the condensed help menu and exit", detailed)
-    out += gap + entry("-S | --show-detailed-help",
+    out += gap + entry("-s | --show-detailed-help",
                        "show the detailed help menu and exit", detailed)
     out += gap + entry("-v | --version", "show the GToTree version and exit", detailed)
 
@@ -522,5 +522,5 @@ def print_helpmenu(detailed=False):
 
 
 if __name__ == "__main__":
-    print_helpmenu(detailed=any(a in ("-S", "--show-detailed-help")
+    print_helpmenu(detailed=any(a in ("-s", "--show-detailed-help")
                                 for a in sys.argv[1:]))

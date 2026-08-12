@@ -1,7 +1,11 @@
 import shutil
 from gtotree.utils.misc.messaging import (report_message, report_processing_stage,
-                                     report_genome_filtering_update)
-from gtotree.utils.misc.seqs import check_target_SCGs_have_seqs, filter_seqs_by_genome_ids
+                                     report_genome_filtering_update,
+                                     report_SCG_genome_filtering_update)
+from gtotree.utils.misc.seqs import (check_target_SCGs_have_seqs,
+                                count_fasta_records,
+                                filter_seqs_by_genome_ids)
+from gtotree.utils.misc.summary_info import write_SCG_info_table
 from gtotree.utils.misc.general import (write_run_data,
                                    required_count,
                                    run_pooled_stage)
@@ -40,27 +44,29 @@ def filter_genomes(args, run_data):
         def worker(scg, run_data):
             inpath = run_data.found_SCG_seqs_dir + f"/{scg.id}-gene-filtered{run_data.general_ext}"
             outpath = run_data.found_SCG_seqs_dir + f"/{scg.id}-genome-filtered{run_data.general_ext}"
-            # per-SCG file only; no shared state touched here
             if len(genome_ids_to_remove) == 0:
                 shutil.copy(inpath, outpath)
-            else:
-                filter_seqs_by_genome_ids(inpath, genome_ids_to_remove, outpath)
-            return
+                return count_fasta_records(outpath)
+            return filter_seqs_by_genome_ids(inpath, genome_ids_to_remove, outpath)
 
-        def apply_result(scg, result, run_data):
-            pass
+        def apply_result(scg, num_genomes_remaining, run_data):
+            scg.num_genomes_with_hits_after_genome_filtering = num_genomes_remaining
 
         run_data = run_pooled_stage(scgs, worker, apply_result, args, run_data)
 
-        run_data.mark_stage_complete(PipelineStage.FILTER_GENOMES)
-        write_run_data(run_data)
         capture_removed_genomes(run_data)
 
         run_data = check_target_SCGs_have_seqs(
             run_data, f"-genome-filtered{run_data.general_ext}",
             SCGRemovalStage.GENOME_FILTER)
 
+        write_SCG_info_table(run_data)
+
+        run_data.mark_stage_complete(PipelineStage.FILTER_GENOMES)
+        write_run_data(run_data)
+
     report_genome_filtering_update(run_data)
+    report_SCG_genome_filtering_update(run_data)
 
     return run_data
 

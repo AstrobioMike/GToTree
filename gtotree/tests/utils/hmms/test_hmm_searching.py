@@ -2,7 +2,9 @@
 
 
 from gtotree.utils.hmms.hmm_searching import (parse_hmmer_results,
-                                                rebuild_combined_SCG_outputs)
+                                                read_genome_hit_counts,
+                                                rebuild_combined_SCG_outputs,
+                                                write_genome_hit_counts)
 from gtotree.utils.misc.general import RunData, SCGset
 from gtotree.utils.misc.stages import GenomeRemovalStage
 
@@ -105,7 +107,11 @@ def test_counts_are_plain_ints(tmp_path):
 
 
 def test_result_order_follows_the_target_list(tmp_path):
-    """Counts are written positionally against the SCG-hit-counts.tsv header."""
+    """
+    The dict is ordered by the target list, which is the order the per-genome counts
+    file is written in. It's no longer what makes the counts *mean* anything -- that's
+    the target name on each line now -- but a stable order keeps the file diffable.
+    """
     rd = _run_data(["A", "B", "C"])
     path = _tblout(tmp_path, [("g1", "C"), ("g2", "A")])
     counts, _, _, _ = parse_hmmer_results(path, rd)
@@ -223,3 +229,171 @@ class TestRebuildCombinedSCGOutputs:
         rebuild_combined_SCG_outputs(rd)
         _, rows = self._rows(rd)
         assert [r.split("\t")[0] for r in rows] == ["G1"]
+
+
+# ---------------------------------------------------------------------------
+# per-genome hit counts
+# ---------------------------------------------------------------------------
+
+class TestGenomeHitCountsFormat:
+    """
+    The per-genome counts file is keyed by target name.
+
+    It used to be a bare positional row -- genome id, then one count per target in the
+    order the target list had when *that genome* was searched -- while the combined
+    table's header came from the target list as it stood at rebuild time. Those agree on
+    a fresh run. They stop agreeing on a resume, because the NO_HITS check at the end of
+    the search stage removes sets, so the second run's list is shorter: every count in
+    every row written by the first run then sat under the wrong column name, and the row
+    itself was wider than the header above it.
+    """
+
+    def _counts_file(self, tmp_path, text):
+        path = tmp_path / "SCG-hit-counts.txt"
+        path.write_text(text)
+        return str(path)
+
+    def test_a_round_trip_preserves_the_counts(self, tmp_path):
+        path = str(tmp_path / "SCG-hit-counts.txt")
+        write_genome_hit_counts(path, {"SCG_A": 1, "SCG_B": 0, "SCG_C": 3})
+
+        assert read_genome_hit_counts(path, ["SCG_A", "SCG_B", "SCG_C"]) == {
+            "SCG_A": 1, "SCG_B": 0, "SCG_C": 3}
+
+    def test_counts_survive_the_target_list_shrinking_underneath_them(self, tmp_path):
+        """
+        The actual regression: written against three targets, read back after one was
+        removed. The remaining two must still carry their own counts.
+        """
+        path = str(tmp_path / "SCG-hit-counts.txt")
+        write_genome_hit_counts(path, {"SCG_A": 1, "SCG_B": 5, "SCG_C": 2})
+
+        counts = read_genome_hit_counts(path, ["SCG_A", "SCG_C"])
+
+        assert counts["SCG_A"] == 1
+        assert counts["SCG_C"] == 2
+
+    def test_a_legacy_row_is_read_when_its_width_still_matches(self, tmp_path):
+        """
+        A run already in flight when the format changed. Width matching is sufficient
+        here: the target list only ever shrinks by removal and is never reordered, so an
+        equal length means it is the same list.
+        """
+        path = self._counts_file(tmp_path, "G1\t1\t0\t3\n")
+
+        assert read_genome_hit_counts(path, ["SCG_A", "SCG_B", "SCG_C"]) == {
+            "SCG_A": 1, "SCG_B": 0, "SCG_C": 3}
+
+    def test_a_legacy_row_of_the_wrong_width_is_refused_not_guessed(self, tmp_path):
+        """
+        This is the case that used to silently corrupt the table. Nothing in the old
+        format records which targets those counts belonged to, so there is no way to
+        recover the mapping -- None is the only honest answer.
+        """
+        path = self._counts_file(tmp_path, "G1\t1\t0\t3\n")
+
+        assert read_genome_hit_counts(path, ["SCG_A", "SCG_C"]) is None
+
+    def test_a_missing_file_reads_as_None(self, tmp_path):
+        assert read_genome_hit_counts(str(tmp_path / "nope.txt"), ["SCG_A"]) is None
+
+    def test_an_empty_file_reads_as_None(self, tmp_path):
+        path = self._counts_file(tmp_path, "")
+        assert read_genome_hit_counts(path, ["SCG_A"]) is None
+
+
+class TestCombinedTableAlignment:
+
+    def _setup(self, tmp_path, rows, scg_ids):
+        """`rows` maps genome id -> the raw text of its counts file."""
+        import os
+        from gtotree.utils.misc.general import RunData, GenomeData, SCGset
+
+        rd = RunData()
+        rd.output_dir = str(tmp_path / "out")
+        rd.hmm_results_dir = str(tmp_path / "hmm-results")
+        rd.found_SCG_seqs_dir = str(tmp_path / "found-scgs")
+        rd.general_ext = ".faa"
+        for d in (rd.output_dir, rd.hmm_results_dir, rd.found_SCG_seqs_dir):
+            os.makedirs(d, exist_ok=True)
+        rd.SCG_targets = [SCGset.from_id(s) for s in scg_ids]
+
+        for gid, text in rows.items():
+            gd = GenomeData.from_acc(gid)
+            gd.processing_done = True
+            gd.hmm_search_done = True
+            rd.ncbi_accs.append(gd)
+            gdir = os.path.join(rd.hmm_results_dir, gid)
+            os.makedirs(gdir, exist_ok=True)
+            with open(os.path.join(gdir, "SCG-hit-counts.txt"), "w") as f:
+                f.write(text)
+        rd.update_all_input_genomes()
+        return rd
+
+    def _table(self, rd):
+        import os
+        path = os.path.join(rd.output_dir, "SCG-hit-counts.tsv")
+        lines = [ln for ln in open(path).read().splitlines() if ln.strip()]
+        header = lines[0].split("\t")
+        return header, [dict(zip(header, ln.split("\t"))) for ln in lines[1:]]
+
+    def test_every_row_is_as_wide_as_the_header(self, tmp_path):
+        """
+        A row written against a longer target list used to be pasted in verbatim, so the
+        table came out ragged -- unparseable by anything expecting a rectangle.
+        """
+        rd = self._setup(tmp_path,
+                         {"G1": "target_SCG\tnum_hits\nSCG_A\t1\nSCG_B\t7\nSCG_C\t2\n"},
+                         scg_ids=("SCG_A", "SCG_C"))
+
+        rebuild_combined_SCG_outputs(rd)
+
+        header, rows = self._table(rd)
+        assert header == ["assembly_id", "SCG_A", "SCG_C"]
+        assert len(rows) == 1
+
+    def test_counts_land_under_their_own_target(self, tmp_path):
+        """
+        SCG_B was removed between the two runs. Its count must not slide into SCG_C's
+        column, which is exactly what the positional format did.
+        """
+        rd = self._setup(tmp_path,
+                         {"G1": "target_SCG\tnum_hits\nSCG_A\t1\nSCG_B\t7\nSCG_C\t2\n"},
+                         scg_ids=("SCG_A", "SCG_C"))
+
+        rebuild_combined_SCG_outputs(rd)
+
+        _header, rows = self._table(rd)
+        assert rows[0] == {"assembly_id": "G1", "SCG_A": "1", "SCG_C": "2"}
+
+    def test_a_row_that_cannot_be_mapped_is_dropped_rather_than_misaligned(self, tmp_path):
+        """
+        A legacy row of the wrong width loses that genome from the counts table. Its
+        sequences come from SCG-hits.faa and are unaffected, so the alignment and tree
+        are unchanged -- a missing row is a far better outcome than a wrong one.
+        """
+        rd = self._setup(tmp_path,
+                         {"G1": "G1\t1\t7\t2\n",
+                          "G2": "target_SCG\tnum_hits\nSCG_A\t4\nSCG_C\t5\n"},
+                         scg_ids=("SCG_A", "SCG_C"))
+
+        rebuild_combined_SCG_outputs(rd)
+
+        _header, rows = self._table(rd)
+        assert [r["assembly_id"] for r in rows] == ["G2"]
+
+    def test_the_any_hit_tally_counts_the_right_targets(self, tmp_path):
+        """
+        The tally feeds `no_hits_reason`, so a misaligned read would attribute one set's
+        hits to another and produce a removal reason naming the wrong gene.
+        """
+        rd = self._setup(tmp_path,
+                         {"G1": "target_SCG\tnum_hits\nSCG_A\t0\nSCG_B\t7\nSCG_C\t2\n",
+                          "G2": "target_SCG\tnum_hits\nSCG_A\t0\nSCG_B\t1\nSCG_C\t3\n"},
+                         scg_ids=("SCG_A", "SCG_C"))
+
+        rebuild_combined_SCG_outputs(rd)
+
+        by_id = {s.id: s for s in rd.SCG_targets}
+        assert by_id["SCG_A"].num_genomes_with_any_hit == 0
+        assert by_id["SCG_C"].num_genomes_with_any_hit == 2

@@ -49,9 +49,9 @@ def preflight_checks(args):
     """
     check_for_essential_deps()
     args = primary_args_validation(args)
-    check_for_required_dbs(args)
     previous_run_data = load_previous_run_data(args)
-    selection = select_wanted_ref_tax(args)
+    check_for_required_dbs(args, previous_run_data)
+    selection = select_wanted_ref_tax(args, previous_run_data)
     args = resolve_hmm(args, selection, previous_run_data)
     args, run_data = setup_run_data(args, previous_run_data)
     run_data = merge_wanted_ref_tax(run_data, selection)
@@ -282,8 +282,22 @@ def check_wanted_ref_tax_args(args):
             report_very_early_exit(suggest_help=True)
 
 
-def select_wanted_ref_tax(args):
+def wanted_ref_tax_already_resolved(previous_run_data):
+    """
+    True when a resume can reuse the `-w` accessions the previous run selected
+    """
+    return (previous_run_data is not None
+            and bool(previous_run_data.get_wanted_ref_tax_accs()))
+
+
+def select_wanted_ref_tax(args, previous_run_data=None):
+    """
+    Resolve `-w` to a set of reference accessions, or reuse the previous run's
+    """
     if not args.wanted_ref_tax:
+        return None
+
+    if wanted_ref_tax_already_resolved(previous_run_data):
         return None
 
     try:
@@ -730,11 +744,17 @@ def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
         report_very_early_exit()
 
 
-def check_for_required_dbs(args):
+def check_for_required_dbs(args, previous_run_data=None):
 
-    wanted_ref_tax_source = args.source.strip().lower() if args.wanted_ref_tax else None
+    reusing_wanted_ref_tax = wanted_ref_tax_already_resolved(previous_run_data)
 
-    auto_selecting_hmm = bool(args.wanted_ref_tax) and not args.hmm
+    if args.wanted_ref_tax and not reusing_wanted_ref_tax:
+        wanted_ref_tax_source = args.source.strip().lower()
+    else:
+        wanted_ref_tax_source = None
+
+    auto_selecting_hmm = (bool(args.wanted_ref_tax) and not args.hmm
+                          and not reusing_wanted_ref_tax)
 
     if (args.ncbi_accessions or args.add_ncbi_tax
             or wanted_ref_tax_source in ("ncbi", "gtdb")):
@@ -848,6 +868,7 @@ def final_setups(args, run_data):
     run_data.best_hit_mode = args.best_hit_mode
     run_data.output_dir = os.path.abspath(args.output_dir)
     run_data.seq_length_cutoff = args.seq_length_cutoff
+    run_data.gene_representation_cutoff = args.gene_representation_cutoff
 
     num_all_input_genomes = len(run_data.get_all_input_genome_ids())
     if num_all_input_genomes > 1000 and not args.no_super5:

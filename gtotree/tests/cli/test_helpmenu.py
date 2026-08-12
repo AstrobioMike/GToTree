@@ -33,7 +33,7 @@ def menu_flags(detailed=True):
     for entry_flags, _ in hm.REQUIRED_INPUTS:
         flags.update(FLAG.findall(hm.pick(entry_flags, detailed)))
     flags.update(FLAG.findall(hm.pick(hm.HMM_INPUT[0], detailed)))
-    flags.update({"-h", "--help", "-S", "--show-detailed-help", "-v", "--version"})
+    flags.update({"-h", "--help", "-s", "--show-detailed-help", "-v", "--version"})
     return flags
 
 
@@ -60,7 +60,6 @@ def test_detailed_menu_is_a_superset_of_condensed():
     condensed = ANSI.sub("", hm.build_helpmenu(detailed=False))
     detailed = ANSI.sub("", hm.build_helpmenu(detailed=True))
     assert len(detailed) > len(condensed)
-    # the "run -S for more" pointer belongs only on the condensed menu
     assert "condensed help menu" in condensed
     assert "This is the condensed help menu" not in detailed
 

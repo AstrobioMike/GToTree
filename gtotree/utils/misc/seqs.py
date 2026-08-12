@@ -6,6 +6,7 @@ import subprocess
 from gtotree.utils.misc.general import (remove_file_if_exists,
                                    file_is_usable_else_clear,
                                    atomic_write_text)
+from gtotree.utils.misc.stages import SCGRemovalStage
 
 
 def filter_and_rename_fasta(prefix, run_data, in_path, full_path = False, max_length = 99999):
@@ -98,9 +99,23 @@ def extract_fasta_from_gb(prefix, input_gb, run_data):
             outfile.write(f">{prefix}_{num}\n{rec.seq}\n")
 
 
-def check_target_SCGs_have_seqs(run_data, ext, stage):
+# "no usable seqs at this path" is the same *condition* at all three of the stages
+# below, but it means something different at each one, and that difference is what
+# ends up in SCG-info.tsv
+NO_SEQS_REASONS = {
+    SCGRemovalStage.NO_HITS:       "no hits in any genome",
+    SCGRemovalStage.GENE_FILTER:   "no hits remaining after gene-length filtering (`-c`)",
+    SCGRemovalStage.GENOME_FILTER: "no hits remaining after genome filtering (`-G`)",
+}
+
+
+def check_target_SCGs_have_seqs(run_data, ext, stage, reason_fn=None):
     """
-    Drop any SCG-set with no usable sequences at `ext`
+    Drop any SCG-set with no usable sequences at `ext`, recording a stage-specific reason
+
+    `reason_fn(scg) -> str` overrides the default for the stage. The NO_HITS caller uses
+    it to separate "nothing hit this at all" from "things hit it, but never as a single
+    copy", which are the same empty file but very different situations for the user.
     """
     for SCG_obj in run_data.get_all_SCG_targets():
 
@@ -109,8 +124,8 @@ def check_target_SCGs_have_seqs(run_data, ext, stage):
 
         path = run_data.found_SCG_seqs_dir + f"/{SCG_obj.id}{ext}"
         if not file_is_usable_else_clear(path):
-            SCG_obj.mark_removed(
-                "no seqs found or no seqs remaining after length-filtering", stage)
+            reason = reason_fn(SCG_obj) if reason_fn else NO_SEQS_REASONS[stage]
+            SCG_obj.mark_removed(reason, stage)
 
     return run_data
 
@@ -162,14 +177,32 @@ def filter_seqs_by_length(path, cutoff):
     return genomes_with_hits_after_filtering
 
 
+def count_fasta_records(path):
+    """
+    How many records are in a FASTA, without building any record objects
+    """
+    count = 0
+    try:
+        with open(path) as fh:
+            for line in fh:
+                if line.startswith(">"):
+                    count += 1
+    except OSError:
+        return 0
+    return count
+
+
 def filter_seqs_by_genome_ids(path, ids_to_remove, out_path):
     """
     Copy `path` to `out_path`, dropping records whose id is in `ids_to_remove`
     """
+    kept = 0
     with open(out_path, "w") as out_handle:
         for record in SeqIO.parse(path, "fasta"):
             if record.id not in ids_to_remove:
                 out_handle.write(f">{record.id}\n{record.seq}\n")
+                kept += 1
+    return kept
 
 
 def run_muscle(id, run_data, inpath, outpath, log_path):
