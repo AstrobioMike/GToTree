@@ -327,8 +327,4 @@ def no_hits_reason(scg, best_hit_mode):
             "extracted for them")
 
 
-def capture_hmm_search_failures(run_data):
-    if len(run_data.get_failed_hmm_search_paths()) > 0:
-        with open(run_data.run_files_dir + "/inputs-that-failed-at-the-hmm-search.txt", "w") as fail_file:
-            for genome_id in run_data.get_failed_hmm_search_paths():
-                fail_file.write(genome_id + "\n")
+

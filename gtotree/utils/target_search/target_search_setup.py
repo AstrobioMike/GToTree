@@ -37,7 +37,6 @@ class TargetSearchError(Exception):
 
 WORKING_DIR_NAME = "working-dir"
 RUN_DATA_FILENAME = "run-data.json"
-SUMMARY_FILENAME = "genomes-summary-info.tsv"
 
 
 ################################################################################

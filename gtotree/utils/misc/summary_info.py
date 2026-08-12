@@ -1,11 +1,14 @@
+import os
+
 import pandas as pd # type: ignore
 
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.misc.general import atomic_write_text
-from gtotree.utils.misc.stages import GenomeRemovalStage
+from gtotree.utils.misc.stages import (GenomeRemovalStage,
+                                       GENOME_REMOVAL_STAGE_ORDER)
+from gtotree.utils.misc.messaging import (REMOVED_GENOMES_FILENAME,
+                                          SCG_INFO_FILENAME)
 
-
-SCG_INFO_FILENAME = "SCG-info.tsv"
 
 SCG_INFO_COLUMNS = (
     "target_SCG",
@@ -20,6 +23,42 @@ SCG_INFO_COLUMNS = (
     "stage_removed",
     "reason_removed",
 )
+
+
+REMOVED_GENOMES_COLUMNS = (
+    "genome_id",
+    "input",
+    "source",
+    "stage_removed",
+    "reason_removed",
+)
+
+
+def write_removed_genomes_report(run_data):
+    """
+    Record every input genome that has left the run so far, and why
+    """
+    removed = [gd for gd in run_data.all_input_genomes if gd.removed]
+    if not removed:
+        return
+
+    removed.sort(key=lambda gd: (GENOME_REMOVAL_STAGE_ORDER.index(gd.removed_at),
+                                 gd.id))
+
+    out_path = os.path.join(run_data.run_files_dir, REMOVED_GENOMES_FILENAME)
+
+    def _write(f):
+        f.write("\t".join(REMOVED_GENOMES_COLUMNS) + "\n")
+        for gd in removed:
+            f.write("\t".join([
+                gd.id,
+                gd.provided_path or gd.id,
+                gd.source or "NA",
+                gd.removed_at,
+                gd.reason_removed or "NA",
+            ]) + "\n")
+
+    atomic_write_text(out_path, _write)
 
 
 def _perc(count, total):

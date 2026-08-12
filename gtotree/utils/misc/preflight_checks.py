@@ -55,6 +55,7 @@ def preflight_checks(args):
     args = resolve_hmm(args, selection, previous_run_data)
     args, run_data = setup_run_data(args, previous_run_data)
     run_data = merge_wanted_ref_tax(run_data, selection)
+    check_for_genome_id_collisions(run_data)
     check_for_min_input_genomes(run_data)
     run_data = track_tools_used(args, run_data)
     args, run_data = final_setups(args, run_data)
@@ -446,6 +447,68 @@ def setup_run_data(args, previous_run_data=None):
         run_data.total_ko_targets = total_ko_targets
 
     return args, run_data
+
+
+GENOME_SOURCE_FLAGS = {
+    "accession": "-a",
+    "genbank-file": "-g",
+    "nt-fasta-file": "-f",
+    "aa-fasta-file": "-A",
+}
+
+# how many colliding ids to spell out before summarizing the rest
+MAX_REPORTED_ID_COLLISIONS = 50
+
+
+def collect_genome_id_collisions(run_data):
+    """
+    {genome id -> the GenomeData entries that share it}, for ids claimed more than once
+
+    Split out from the reporting so the condition can be tested without going through a
+    terminal-and-exit path.
+    """
+    by_id = {}
+    for gd in run_data.all_input_genomes:
+        by_id.setdefault(gd.id, []).append(gd)
+
+    return {id: gds for id, gds in by_id.items() if len(gds) > 1}
+
+
+def check_for_genome_id_collisions(run_data):
+    """
+    No two input genomes from any source can be allowed to resolve to the same genome id
+    """
+    collisions = collect_genome_id_collisions(run_data)
+    if not collisions:
+        return
+
+    plural = "" if len(collisions) == 1 else "s"
+    report_message(
+        f"{len(collisions)} genome ID{plural} would be claimed by more than one input "
+        "genome. Since the ID is used as both a filename and a sequence-header prefix, "
+        "those genomes would clash and cause problems.\n\n"
+        "Problematic ones include:"
+    )
+
+    shown = list(collisions.items())[:MAX_REPORTED_ID_COLLISIONS]
+    lines = []
+    for id, gds in shown:
+        lines.append(id)
+        for gd in gds:
+            flag = GENOME_SOURCE_FLAGS.get(gd.source, "?")
+            lines.append(f"  {flag}  {gd.provided_path or gd.id}")
+    report_message("\n".join(lines), ii="    ", si="    ")
+
+    remaining = len(collisions) - len(shown)
+    if remaining:
+        report_message(f"...and {remaining} more.", ii="    ", si="    ")
+
+    report_message(
+        "Each input genome needs to resolve to a unique ID. Renaming the input files so "
+        "their names differ (ignoring any `.gz` and the sequence extension) will sort "
+        "this out."
+    )
+    report_very_early_exit()
 
 
 def check_for_min_input_genomes(run_data):

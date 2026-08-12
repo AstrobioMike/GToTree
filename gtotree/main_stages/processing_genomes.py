@@ -12,16 +12,13 @@ from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.general import write_run_data, run_pooled_stage, remove_file_if_exists
 from gtotree.utils.misc.seqs import check_target_SCGs_have_seqs
 from gtotree.utils.misc.stages import PipelineStage, SCGRemovalStage
+from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.pfam.pfam_handling import get_additional_pfam_targets
 from gtotree.utils.ko.ko_handling import parse_kofamscan_targets
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 
 from gtotree.utils.misc.processing_genomes import (
     build_base_link_map,
-    capture_ncbi_failed_downloads,
-    capture_failed_genbank_files,
-    capture_failed_fasta_files,
-    capture_failed_amino_acid_files,
     _process_one_ncbi_accession,
     _apply_ncbi_accession_status,
     _process_one_genbank_file,
@@ -34,7 +31,6 @@ from gtotree.utils.misc.processing_genomes import (
 from gtotree.utils.hmms.hmm_searching import (
     _hmm_search_worker,
     _apply_hmm_search_result,
-    capture_hmm_search_failures,
     no_hits_reason,
     rebuild_combined_SCG_outputs,
 )
@@ -256,7 +252,7 @@ def _process_ncbi(args, run_data, plan):
 
         worker, apply_result = _fused(preprocess, _apply_ncbi_accession_status, plan)
         run_data = run_pooled_stage(to_process, worker, apply_result, args, run_data)
-        run_data = capture_ncbi_failed_downloads(run_data)
+        write_removed_genomes_report(run_data)
         write_run_data(run_data)
 
     report_ncbi_update(run_data)
@@ -275,7 +271,7 @@ def _process_genbank(args, run_data, plan):
         worker, apply_result = _fused(_process_one_genbank_file, _apply_genbank_status, plan)
         run_data = run_pooled_stage(to_process, worker, apply_result, args, run_data)
         write_run_data(run_data)
-        capture_failed_genbank_files(run_data)
+        write_removed_genomes_report(run_data)
 
     report_genbank_update(run_data)
     return run_data
@@ -293,7 +289,7 @@ def _process_fasta(args, run_data, plan):
         worker, apply_result = _fused(_process_one_fasta_file, _apply_fasta_status, plan)
         run_data = run_pooled_stage(to_process, worker, apply_result, args, run_data)
         write_run_data(run_data)
-        capture_failed_fasta_files(run_data)
+        write_removed_genomes_report(run_data)
 
     report_fasta_update(run_data)
     return run_data
@@ -312,7 +308,7 @@ def _process_amino_acid(args, run_data, plan):
                                       _apply_amino_acid_status, plan)
         run_data = run_pooled_stage(to_process, worker, apply_result, args, run_data)
         write_run_data(run_data)
-        capture_failed_amino_acid_files(run_data)
+        write_removed_genomes_report(run_data)
 
     report_AA_update(run_data)
     return run_data
@@ -327,7 +323,7 @@ def _finalize(args, run_data, plan):
     run_data.update_all_input_genomes()
 
     if plan.do_scg:
-        capture_hmm_search_failures(run_data)
+        write_removed_genomes_report(run_data)
     report_genome_processing_update(run_data, searched=plan.do_scg)
 
     if plan.do_pfam:

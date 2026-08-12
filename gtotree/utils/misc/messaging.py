@@ -375,6 +375,22 @@ def add_border(extra_line=True):
         print()
     print("\n -------------------------------------------------------------------------------- ")
 
+
+REMOVED_GENOMES_FILENAME = "removed-genomes.tsv"
+SCG_INFO_FILENAME = "SCG-info.tsv"
+
+
+def removed_genomes_pointer(run_data, stage):
+    """
+    Point at the one removals file, and say which rows this report is about
+
+    Every stage that drops genomes now writes into the same table, so the stage value
+    is what narrows it down rather than a per-stage filename
+    """
+    return (f"        {run_data.run_files_dir_rel}/{REMOVED_GENOMES_FILENAME}"
+            f"  (stage_removed = {stage})\n\n")
+
+
 @capture_stdout_to_log(lambda: log_file_var.get())
 def report_notice(message, color = "yellow"):
     print("")
@@ -595,7 +611,7 @@ def report_processing_stage(stage, run_data):
 
 def report_ncbi_accs_not_found(num_accs, path):
     report_notice(f"    {num_accs} accession(s) not successfully found at NCBI.\n\n"
-                f"    Reported in {path}/ncbi-accessions-not-found.txt")
+                f"    Reported in {path}/{REMOVED_GENOMES_FILENAME}")
     time.sleep(1)
 
 
@@ -612,10 +628,10 @@ def report_ncbi_update(run_data):
         message = f"    Of the input genomes provided as {color_text("NCBI accessions", "yellow")}:\n\n"
         if num_not_found_at_ncbi > 0:
             message += (f"      {color_text(f"{num_not_found_at_ncbi} not found at NCBI", "yellow")}, reported in:\n"
-                        f"        {run_data.run_files_dir_rel}/ncbi-accessions-not-found.txt\n\n")
+                        + removed_genomes_pointer(run_data, GenomeRemovalStage.NCBI_LOOKUP))
         if num_not_downloaded > 0:
             message += (f"      {color_text(f"{num_not_downloaded} found but not successfully downloaded", "yellow")}, reported in:\n"
-                        f"        {run_data.run_files_dir_rel}/ncbi-accessions-not-downloaded.txt\n\n")
+                        + removed_genomes_pointer(run_data, GenomeRemovalStage.NCBI_DOWNLOAD))
 
         message += (f"    {color_text(f"Overall, {num_prepared} of the input {num_input} accessions were successfully downloaded and\n    prepared.", "yellow")}")
 
@@ -639,7 +655,7 @@ def report_genbank_update(run_data):
         if num_prodigal_used > 0:
             message += f"      {prodigal_note}\n\n"
         message += (f"      {color_text(f"{num_failed} failed to be successfully parsed", "yellow")}, reported in:\n"
-                    f"        {run_data.run_files_dir_rel}/failed-genbank-files.txt\n\n")
+                    + removed_genomes_pointer(run_data, GenomeRemovalStage.GENBANK_PREP))
         message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} genbank files were successfully parsed and\n    prepared.", "yellow")}")
 
     report_update(message)
@@ -654,7 +670,7 @@ def report_fasta_update(run_data):
     else:
         message = f"    Of the input genomes provided as {color_text("fasta files", "yellow")}:\n\n"
         message += (f"      {color_text(f"{num_failed} failed to be successfully processed", "yellow")}, reported in:\n"
-                    f"        {run_data.run_files_dir_rel}/failed-fasta-files.txt\n\n")
+                    + removed_genomes_pointer(run_data, GenomeRemovalStage.FASTA_PREP))
         message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} fasta files were successfully processed.", "yellow")}")
 
     report_update(message)
@@ -668,7 +684,7 @@ def report_AA_update(run_data):
     else:
         message = f"    Of the input genomes provided as {color_text("amino-acid files", "yellow")}:\n\n"
         message += (f"      {color_text(f"{num_failed} failed to be successfully processed", "yellow")}, reported in:\n"
-                    f"        {run_data.run_files_dir_rel}/failed-amino-acid-files.txt\n\n")
+                    + removed_genomes_pointer(run_data, GenomeRemovalStage.AMINO_ACID_PREP))
         message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} amino-acid files were successfully processed.", "yellow")}")
 
     report_update(message)
@@ -699,7 +715,7 @@ def report_genome_processing_update(run_data, searched=False):
             message += f"      {color_text(f"{num_failed_processing} failed processing", "yellow")} as described above.\n\n"
         if num_failed_search > 0:
             message += (f"      {color_text(f"{num_failed_search} failed the target-gene search", "yellow")}, reported in:\n"
-                        f"        {run_data.run_files_dir_rel}/inputs-that-failed-at-the-hmm-search.txt\n\n")
+                        + removed_genomes_pointer(run_data, GenomeRemovalStage.HMM_SEARCH))
         message += f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully {verb}.", "yellow")}"
 
         if num_remaining >= 4:
@@ -798,7 +814,7 @@ def report_genome_filtering_update(run_data):
             message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few unique SCG hits", "yellow")}, reported in:\n")
         else:
             message += (f"      {color_text(f"{num_removed_due_to_hit_cutoff} genome(s) removed due to having too few SCG hits", "yellow")}, reported in:\n")
-        message += (f"        {run_data.run_files_dir_rel}/genomes-removed-for-too-few-SCG-hits.tsv\n\n")
+        message += removed_genomes_pointer(run_data, GenomeRemovalStage.SCG_HIT_FILTER)
 
         if not run_data.best_hit_mode:
             message += ("    If this is a problem for the genomes you're working with, you could\n")

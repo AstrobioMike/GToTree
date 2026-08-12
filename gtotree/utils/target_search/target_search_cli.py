@@ -189,13 +189,6 @@ def build_parser(spec, parent_subparsers=None):
     )
 
     genomes.add_argument(
-        "-g", "--genbank-files",
-        metavar="<FILE>",
-        help="A single-column file listing GenBank files to search.",
-        action="store",
-    )
-
-    genomes.add_argument(
         "-f", "--fasta-files",
         metavar="<FILE>",
         help=("A single-column file listing nucleotide fasta files to search; genes "
@@ -208,6 +201,13 @@ def build_parser(spec, parent_subparsers=None):
         metavar="<FILE>",
         help=("A single-column file listing amino-acid fasta files to search; each "
               "should hold the proteins for one genome."),
+        action="store",
+    )
+
+    genomes.add_argument(
+        "-g", "--genbank-files",
+        metavar="<FILE>",
+        help="A single-column file listing GenBank files to search.",
         action="store",
     )
 

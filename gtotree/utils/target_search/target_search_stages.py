@@ -24,16 +24,13 @@ from gtotree.utils.misc.general import (run_pooled_stage,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED,
                                    GTT_PROGRESS_SMOOTHING)
 from gtotree.utils.misc.messaging import report_message, color_text, spinner
+from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 from gtotree.main_stages.processing_genomes import (SearchPlan,
                                                     _fused,
                                                     genomes_needing_processing)
 from gtotree.utils.misc.processing_genomes import (
     build_base_link_map,
-    capture_ncbi_failed_downloads,
-    capture_failed_genbank_files,
-    capture_failed_fasta_files,
-    capture_failed_amino_acid_files,
     _process_one_ncbi_accession,
     _apply_ncbi_accession_status,
     _process_one_genbank_file,
@@ -226,32 +223,28 @@ def phase_search_genomes(args, run_data, spec, plan):
                                source_list=run_data.ncbi_accs,
                                label="NCBI accessions",
                                phase="ncbi accessions",
-                               prepare=_prepare_ncbi,
-                               capture=capture_ncbi_failed_downloads)
+                               prepare=_prepare_ncbi)
 
         run_data = _run_source(args, run_data, plan, spec,
                                source_list=run_data.genbank_files,
                                label="GenBank files",
                                phase="genbank files",
                                worker_pair=(_process_one_genbank_file,
-                                            _apply_genbank_status),
-                               capture=capture_failed_genbank_files)
+                                            _apply_genbank_status))
 
         run_data = _run_source(args, run_data, plan, spec,
                                source_list=run_data.fasta_files,
                                label="fasta files",
                                phase="fasta files",
                                worker_pair=(_process_one_fasta_file,
-                                            _apply_fasta_status),
-                               capture=capture_failed_fasta_files)
+                                            _apply_fasta_status))
 
         run_data = _run_source(args, run_data, plan, spec,
                                source_list=run_data.amino_acid_files,
                                label="amino-acid files",
                                phase="amino-acid files",
                                worker_pair=(_process_one_amino_acid_file,
-                                            _apply_amino_acid_status),
-                               capture=capture_failed_amino_acid_files)
+                                            _apply_amino_acid_status))
 
     return run_data
 
@@ -294,7 +287,7 @@ def _only_found(genomes):
 
 
 def _run_source(args, run_data, plan, spec, source_list, label, phase,
-                worker_pair=None, prepare=None, capture=None, ):
+                worker_pair=None, prepare=None):
     """
     Run one input source through the fused preprocess-and-search stage.
     """
@@ -327,8 +320,7 @@ def _run_source(args, run_data, plan, spec, source_list, label, phase,
     run_data = run_pooled_stage(to_process, worker, apply_result, args, run_data,
                                 bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED)
 
-    if capture is not None:
-        capture(run_data)
+    write_removed_genomes_report(run_data)
 
     write_run_data(run_data)
 

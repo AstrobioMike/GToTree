@@ -629,28 +629,13 @@ class RunData:
         return [gd.id for gd in
                 self._failed_at(GenomeRemovalStage.GENBANK_PREP, "genbank_files")]
 
-    def get_failed_genbank_paths(self) -> List[str]:
-        return [gd.provided_path for gd in
-                self._failed_at(GenomeRemovalStage.GENBANK_PREP, "genbank_files")]
-
     def get_failed_fasta_ids(self) -> List[str]:
         return [gd.id for gd in
-                self._failed_at(GenomeRemovalStage.FASTA_PREP, "fasta_files")]
-
-    def get_failed_fasta_paths(self) -> List[str]:
-        return [gd.provided_path for gd in
                 self._failed_at(GenomeRemovalStage.FASTA_PREP, "fasta_files")]
 
     def get_failed_amino_acid_ids(self) -> List[str]:
         return [gd.id for gd in
                 self._failed_at(GenomeRemovalStage.AMINO_ACID_PREP, "amino_acid_files")]
-
-    def get_failed_amino_acid_paths(self) -> List[str]:
-        return [gd.provided_path for gd in
-                self._failed_at(GenomeRemovalStage.AMINO_ACID_PREP, "amino_acid_files")]
-
-    def get_failed_hmm_search_paths(self) -> List[str]:
-        return [(gd.provided_path or gd.id) for gd in self.all_input_genomes if gd.processing_done and not gd.hmm_search_done]
 
     def get_prodigal_used_genbank_ids(self) -> List[str]:
         return [gd.id for gd in self.genbank_files if gd.prodigal_used]

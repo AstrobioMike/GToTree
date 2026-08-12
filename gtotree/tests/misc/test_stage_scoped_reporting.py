@@ -431,7 +431,8 @@ class TestProcessingSummaryWording:
 
         assert "1 failed processing" in out
         assert "1 failed the target-gene search" in out
-        assert "inputs-that-failed-at-the-hmm-search.txt" in out
+        assert "removed-genomes.tsv" in out
+        assert f"stage_removed = {GenomeRemovalStage.HMM_SEARCH}" in out
         assert "4 of the input 6 genomes were successfully processed and searched" in out
 
     def test_a_clean_run_says_so_once(self, _no_early_exit):

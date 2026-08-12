@@ -37,5 +37,10 @@ class FakeRunData:
         self.ncbi_sub_table_path = None
         self.ncbi_accs = [GenomeData.from_acc(a) for a in accessions]
 
+    @property
+    def all_input_genomes(self):
+        # accessions are the only source this stand-in ever carries
+        return self.ncbi_accs
+
     def get_input_ncbi_accs(self):
         return [gd.id for gd in self.ncbi_accs]

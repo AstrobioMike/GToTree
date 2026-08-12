@@ -136,8 +136,8 @@ def test_parse_marks_found_and_not_found(tmp_path):
     assert by_id["GCF_999999999.1"].acc_was_found is False
     assert by_id["GCF_999999999.1"].removed is True
 
-    not_found = Path(tmp_path / "ncbi-accessions-not-found.txt").read_text().split()
-    assert not_found == ["GCF_999999999.1"]
+    rows = Path(tmp_path / "removed-genomes.tsv").read_text().splitlines()
+    assert [r.split("\t")[0] for r in rows[1:]] == ["GCF_999999999.1"]
 
 
 def test_parse_matches_on_root_accession_ignoring_version(tmp_path):

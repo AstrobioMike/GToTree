@@ -5,7 +5,8 @@ from gtotree.utils.misc.messaging import (report_message, report_processing_stag
 from gtotree.utils.misc.seqs import (check_target_SCGs_have_seqs,
                                 count_fasta_records,
                                 filter_seqs_by_genome_ids)
-from gtotree.utils.misc.summary_info import write_SCG_info_table
+from gtotree.utils.misc.summary_info import (write_SCG_info_table,
+                                             write_removed_genomes_report)
 from gtotree.utils.misc.general import (write_run_data,
                                    required_count,
                                    run_pooled_stage)
@@ -54,7 +55,7 @@ def filter_genomes(args, run_data):
 
         run_data = run_pooled_stage(scgs, worker, apply_result, args, run_data)
 
-        capture_removed_genomes(run_data)
+        write_removed_genomes_report(run_data)
 
         run_data = check_target_SCGs_have_seqs(
             run_data, f"-genome-filtered{run_data.general_ext}",
@@ -69,21 +70,3 @@ def filter_genomes(args, run_data):
     report_SCG_genome_filtering_update(run_data)
 
     return run_data
-
-
-def capture_removed_genomes(run_data):
-
-    removed = run_data.get_all_input_genomes_due_for_SCG_min_hit_filtering()
-
-    if len(removed) > 0:
-
-        out_path = run_data.run_files_dir + "/genomes-removed-for-too-few-SCG-hits.tsv"
-
-        with open(out_path, "w") as fail_file:
-
-            fail_file.write("assembly_id\ttotal_SCG_hits\tunique_SCG_hits\tnum_SCG_hits_after_filtering\n")
-            for genome in removed:
-                total_hits = getattr(genome, 'num_SCG_hits', 0) or 0
-                unique_hits = getattr(genome, 'num_unique_SCG_hits', 0) or 0
-                hits_after = getattr(genome, 'num_SCG_hits_after_filtering', 0) or 0
-                fail_file.write(f"{genome.id}\t{int(total_hits)}\t{int(unique_hits)}\t{int(hits_after)}\n")

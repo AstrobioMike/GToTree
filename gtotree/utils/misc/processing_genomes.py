@@ -366,14 +366,6 @@ def get_base_link(acc, run_data, base_link_map=None):
     return _normalize_base_link(raw_base_link)
 
 
-def capture_ncbi_failed_downloads(run_data):
-    if len(run_data.get_ncbi_accs_not_downloaded()) > 0:
-        with open(run_data.run_files_dir + "/ncbi-accessions-not-downloaded.txt", "w") as not_downloaded_file:
-            for acc in run_data.get_ncbi_accs_not_downloaded():
-                not_downloaded_file.write(acc + "\n")
-    return run_data
-
-
 def _process_one_genbank_file(gb, run_data):
     """
     Worker: preprocess one genbank file. Tries CDS AA extraction first; falls back
@@ -448,14 +440,6 @@ def _apply_genbank_status(gb, status, run_data):
         run_data.tools_used.prodigal_used = True
 
 
-def capture_failed_genbank_files(run_data):
-    failed_genbank_files_list = run_data.get_failed_genbank_paths()
-    if len(failed_genbank_files_list) > 0:
-        with open(run_data.run_files_dir + "/failed-genbank-files.txt", "w") as not_parsed_file:
-            for entry in failed_genbank_files_list:
-                not_parsed_file.write(entry + "\n")
-
-
 def _process_one_fasta_file(fasta, run_data):
     """
     Worker: preprocess one nucleotide FASTA -- call genes with prodigal, then
@@ -520,14 +504,6 @@ def _apply_fasta_status(fasta, status, run_data):
         run_data.tools_used.prodigal_used = True
 
 
-def capture_failed_fasta_files(run_data):
-    failed_fasta_files_list = run_data.get_failed_fasta_paths()
-    if len(failed_fasta_files_list) > 0:
-        with open(run_data.run_files_dir + "/failed-fasta-files.txt", "w") as failed_fastas_file:
-            for entry in failed_fasta_files_list:
-                failed_fastas_file.write(entry + "\n")
-
-
 def _process_one_amino_acid_file(AA, run_data):
     """
     Worker: preprocess one amino-acid FASTA -- just filter/rename (no gene calling).
@@ -577,14 +553,6 @@ def _apply_amino_acid_status(AA, status, run_data):
         AA.mark_removed(f"amino-acid-file processing failed ({error})" if error
                         else "amino-acid-file processing failed",
                         GenomeRemovalStage.AMINO_ACID_PREP)
-
-
-def capture_failed_amino_acid_files(run_data):
-    failed_amino_acid_files_list = run_data.get_failed_amino_acid_paths()
-    if len(failed_amino_acid_files_list) > 0:
-        with open(run_data.run_files_dir + "/failed-amino-acid-files.txt", "w") as failed_amino_acids_file:
-            for entry in failed_amino_acid_files_list:
-                failed_amino_acids_file.write(entry + "\n")
 
 
 PRODIGAL_TOO_SHORT_EXIT = 10
