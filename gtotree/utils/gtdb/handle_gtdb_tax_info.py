@@ -1,4 +1,3 @@
-import os
 import pyarrow as pa # type: ignore
 import pyarrow.parquet as pq # type: ignore
 import pyarrow.compute as pc # type: ignore
@@ -10,7 +9,7 @@ from gtotree.utils.gtdb.get_gtdb_data import gtdb_data_table_path
 _WANTED_COLUMNS = ["ncbi_genbank_assembly_accession"] + list(RANKS)
 
 # extracts the numeric core (the run of digits) from a full assembly accession like
-# "GCA_000739065.1" -> "000739065"; used Arrow-side to build the join key column
+    # "GCA_000739065.1" -> "000739065"
 _ACCESSION_CORE_REGEX = r'^[A-Za-z]+_([0-9]+)\.[0-9]+$'
 
 
@@ -43,14 +42,35 @@ def subset_gtdb_info(run_data):
 
     Returns a dict: input_acc -> {rank: value for the 7 ranks}, with the species value
     de-duplicated of its leading genus
-
-    The join is done on the version-stripped numeric accession core
     """
-    input_accs = run_data.remaining_ncbi_accs()
+    lineages = gtdb_lineages_for_accessions(run_data.remaining_ncbi_accs())
 
+    for ranks in lineages.values():
+        # removing 'genus' from 'species' otherwise if the user wants genus and species,
+        # it would list the genus twice
+        genus = ranks["genus"]
+        species = ranks["species"]
+        if isinstance(species, str):
+            ranks["species"] = species.removeprefix(f"{genus} ")
+
+    return lineages
+
+
+def gtdb_lineages_for_accessions(accessions, gtdb_path=None):
+    """
+    Map assembly accessions to their GTDB lineages, verbatim from the Parquet asset.
+
+    Accessions with no GTDB row are simply absent from the result
+
+    Returns a dict: input_acc -> {rank: value for the 7 ranks}.
+
+    Shared by the two callers that need this join:
+    header re-labelling (`-D`) and the `-H` auto-pick, which links an NCBI-sourced `-w`
+    selection back to the GTDB taxonomy the pre-built SCG-sets are built from
+    """
     # map each wanted accession to its numeric core for the join
     core_to_input = {}
-    for acc in input_accs:
+    for acc in accessions:
         core = accession_core(acc)
         if core:
             core_to_input[core] = acc
@@ -58,30 +78,32 @@ def subset_gtdb_info(run_data):
     if not core_to_input:
         return {}
 
-    gtdb_path = gtdb_data_table_path(os.environ['GTDB_DIR'])
+    if gtdb_path is None:
+        gtdb_path = gtdb_data_table_path()
 
-    gb_col = pq.read_table(gtdb_path, columns=["ncbi_genbank_assembly_accession"]).column(0)
-    cores = pc.replace_substring_regex(gb_col, _ACCESSION_CORE_REGEX, r'\1')
-    mask = pc.is_in(cores, value_set=pa.array(list(core_to_input.keys())))
-    keep_idx = pc.indices_nonzero(mask)
-
-    subset = pq.read_table(gtdb_path, columns=_WANTED_COLUMNS).take(keep_idx)
-
-    gb_matched = subset.column("ncbi_genbank_assembly_accession").to_pylist()
-    rank_cols = {rank: subset.column(rank).to_pylist() for rank in RANKS}
+    wanted_cores = pa.array(list(core_to_input.keys()))
 
     result = {}
-    for i, gb_acc in enumerate(gb_matched):
-        input_acc = core_to_input.get(accession_core(gb_acc))
-        if input_acc is None:
+    parquet_file = pq.ParquetFile(gtdb_path)
+
+    for group_index in range(parquet_file.metadata.num_row_groups):
+        group = parquet_file.read_row_group(group_index, columns=_WANTED_COLUMNS)
+
+        cores = pc.replace_substring_regex(
+            group.column("ncbi_genbank_assembly_accession"),
+            _ACCESSION_CORE_REGEX, r'\1')
+        matched = group.filter(pc.is_in(cores, value_set=wanted_cores))
+
+        if matched.num_rows == 0:
             continue
-        ranks = {rank: rank_cols[rank][i] for rank in RANKS}
-        # removing 'genus' from 'species' otherwise if the user wants genus and species,
-        # it would list the genus twice
-        genus = ranks["genus"]
-        species = ranks["species"]
-        if isinstance(species, str):
-            ranks["species"] = species.removeprefix(f"{genus} ")
-        result[input_acc] = ranks
+
+        gb_matched = matched.column("ncbi_genbank_assembly_accession").to_pylist()
+        rank_cols = {rank: matched.column(rank).to_pylist() for rank in RANKS}
+
+        for i, gb_acc in enumerate(gb_matched):
+            input_acc = core_to_input.get(accession_core(gb_acc))
+            if input_acc is None:
+                continue
+            result[input_acc] = {rank: rank_cols[rank][i] for rank in RANKS}
 
     return result

@@ -56,6 +56,10 @@ def parser():
     primary.add_argument("-A", "--amino-acid-files", metavar="<file>", type=str)
     primary.add_argument("-H", "--hmm", metavar="<file>", type=str)
 
+    # not a flag: set by preflight when `-H` was left off and a set was chosen from `-w`,
+    # so the reporting can say so. Declared here to keep it on args from the start
+    primary.set_defaults(hmm_auto_selected=None)
+
     # --- Optional Inputs ---
     opt = parser.add_argument_group("Optional Inputs")
 

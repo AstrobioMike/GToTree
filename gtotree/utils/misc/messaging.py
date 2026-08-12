@@ -346,6 +346,8 @@ def display_initial_run_info(args, run_data):
 
     report_message("  Single-copy gene HMM source to be used:")
     print(f"      - {args.hmm} ({len(run_data.get_all_SCG_targets())} targets)", flush=True)
+    if getattr(args, "hmm_auto_selected", None):
+        print(f"          (auto-selected; {args.hmm_auto_selected})", flush=True)
     # time.sleep(1)
 
     check_and_report_any_changed_default_behavior(args, run_data)

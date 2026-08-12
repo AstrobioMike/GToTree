@@ -154,13 +154,18 @@ ENTRIES = [
          A taxon name (e.g., "Bacteria", "Nitrospirota", "Escherichia coli") whose
          reference genomes will be added to the tree in addition to any genomes
          provided through the other input parameters.
+
+         Note: If `-H` is not specified, the SCG-set will be auto-selected based on
+         a taxon provided here. The lower rank pre-packaged set covering this taxon will
+         be used. Be sure to specify `-H` specifically if you want to override this
+         behavior.
          """,
          FULL),
 
         ("--source <str>",
          "where to pull reference genomes from; default: gtdb",
          """
-         Which database the `-w` taxon and its genomes are drawn from. One of
+         Which database the `-w` taxon and its genomes are drawn from. Options are
          "gtdb" or "ncbi".
          """,
          FULL),

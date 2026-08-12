@@ -21,7 +21,8 @@ from gtotree.utils.misc.messaging import (color_text,
                                      gtotree_header,
                                      stdout_and_log,
                                      spinner)
-from gtotree.utils.hmms.scg_hmms_setup import (resolve_hmm_arg,
+from gtotree.utils.hmms.scg_hmms_setup import (autopick_scg_set,
+                                          resolve_hmm_arg,
                                           resolve_hmm_source,
                                           populate_SCG_targets)
 from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
@@ -43,10 +44,17 @@ from gtotree.utils.misc.context import log_file_var
 
 
 def preflight_checks(args):
+    """
+    Everything that has to be settled before the run starts
+    """
     check_for_essential_deps()
-    args, run_data = primary_args_validation(args)
+    args = primary_args_validation(args)
     check_for_required_dbs(args)
-    run_data = resolve_wanted_ref_tax(args, run_data)
+    previous_run_data = load_previous_run_data(args)
+    selection = select_wanted_ref_tax(args)
+    args = resolve_hmm(args, selection, previous_run_data)
+    args, run_data = setup_run_data(args, previous_run_data)
+    run_data = merge_wanted_ref_tax(run_data, selection)
     check_for_min_input_genomes(run_data)
     run_data = track_tools_used(args, run_data)
     args, run_data = final_setups(args, run_data)
@@ -54,10 +62,6 @@ def preflight_checks(args):
     return args, run_data
 
 
-# The main driver has no stage list: it already records its progress inside
-# run-data.json (per-genome flags plus its own `completed_stages` map, keyed by
-# stages.py::PipelineStage). Adding a parallel run-state.json would duplicate that and
-# give two records that could disagree. So this profile is fingerprint-only.
 RESUME = ResumeProfile(
     name="GToTree",
     field_labels={
@@ -89,7 +93,7 @@ RESUME = ResumeProfile(
     },
 )
 
-# input files are fingerprinted by CONTENTS, not by path
+# input files are fingerprinted by contents
 _INPUT_FILE_FIELDS = (
     ("ncbi_accessions_sha256", "ncbi_accessions"),
     ("genbank_files_sha256", "genbank_files"),
@@ -149,8 +153,8 @@ def primary_args_validation(args):
     checks_for_nucleotide_mode(args)
     check_wanted_ref_tax_args(args)
     args = check_output_dir(args)
-    args, run_data = check_input_files(args)
-    return args, run_data
+    args = check_input_genome_files(args)
+    return args
 
 
 def check_for_minimum_args(args):
@@ -158,9 +162,12 @@ def check_for_minimum_args(args):
             and not args.amino_acid_files and not args.wanted_ref_tax):
         report_message("You need to provide at least one input-genome source!")
         report_very_early_exit(suggest_help=True)
-    if not args.hmm:
-        report_message("You need to specify the HMM file of the target-SCGs you want to tree! "
-                       "You can view the available gene-sets packaged with GToTree by running `gtt hmms`.")
+    # `-H` is only mandatory without `-w`; with `-w` provided, gtotree can auto-select the used SCG-set
+    if not args.hmm and not args.wanted_ref_tax:
+        report_message("You need to specify the HMM file of the target-SCGs you want to tree. "
+                       "You can view the available gene-sets packaged with GToTree by running `gtt hmms`. "
+                       "Or, if you add reference genomes by taxonomy with `-w`/`--wanted-ref-tax`, "
+                       "GToTree will select a suitable pre-packaged set for you.")
         report_very_early_exit(suggest_help=True)
 
 
@@ -275,21 +282,13 @@ def check_wanted_ref_tax_args(args):
             report_very_early_exit(suggest_help=True)
 
 
-def resolve_wanted_ref_tax(args, run_data):
-    """
-    CLI layer for --wanted-ref-tax (-w): call the driver-side resolver (which raises),
-    translate any failure into a friendly message + early exit, surface the selection's
-    advisory warnings, and merge the resulting accessions into run_data's NCBI-accession
-    input pool (deduping against user-provided accessions).
-
-    Runs AFTER check_for_required_dbs so the GTDB/NCBI Parquet asset is on disk.
-    """
+def select_wanted_ref_tax(args):
     if not args.wanted_ref_tax:
-        return run_data
+        return None
 
     try:
         with spinner("Gathering references...", "", clear_on_done=True):
-            accessions, selection = resolve_wanted_ref_tax_accessions(
+            _accessions, selection = resolve_wanted_ref_tax_accessions(
                 args.source, args.wanted_ref_tax,
                 target_rank=args.target_rank, derep_rank=args.derep_rank,
                 building_tree=True)
@@ -309,12 +308,56 @@ def resolve_wanted_ref_tax(args, run_data):
     for warning in selection.warnings:
         report_message(warning, "yellow")
 
-    run_data.merge_wanted_ref_tax_accessions(accessions)
+    return selection
+
+
+def merge_wanted_ref_tax(run_data, selection):
+    """
+    Fold a `-w` selection's accessions into run_data's NCBI-accession input pool
+    (deduping against user-provided accessions). The run_data half of the job
+    select_wanted_ref_tax() starts.
+    """
+    if selection is None:
+        return run_data
+
+    run_data.merge_wanted_ref_tax_accessions(selection.accessions)
 
     return run_data
 
 
-def check_input_files(args):
+def resolve_hmm(args, selection=None, previous_run_data=None):
+    """
+    Figure out `-H` being used
+
+    Canonicalizing afterwards, whichever way the name arrived, is what keeps
+    `-H universal` and an auto-selected `Universal-Hug-et-al` the same string in the
+    fingerprint, in the reporting, and as a filename under GToTree_HMM_dir.
+    """
+    if not args.hmm:
+        carried_over = (previous_run_data.fingerprint.get("hmm")
+                        if previous_run_data is not None else None)
+
+        if carried_over:
+            args.hmm = carried_over
+            args.hmm_auto_selected = "carried over from the run being resumed"
+        else:
+            picked = autopick_scg_set(args.source, selection)
+            args.hmm = picked.name
+            args.hmm_auto_selected = picked.reason
+            report_message(
+                f"No `-H` was specified, so the \"{picked.name}\" SCG-set was "
+                f"auto-selected because {picked.reason}.", "green")
+
+    args = resolve_hmm_arg(args)
+
+    return args
+
+
+def check_input_genome_files(args):
+    """
+    Validate the single-column input-genome lists, up front so a malformed one fails
+    before any asset is downloaded or any taxon resolved.
+    """
     if args.ncbi_accessions:
         args.ncbi_accessions = check_expected_single_column_input(args.ncbi_accessions, "-a")
     if args.genbank_files:
@@ -324,38 +367,48 @@ def check_input_files(args):
     if args.amino_acid_files:
         args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
 
-    # before the fingerprint is built or compared, so `-H universal` and
-    # `-H Universal-Hug-et-al` are the same run as far as resuming is concerned, and so
-    # a resumed run reports and cites the set the same way a fresh one does
-    args = resolve_hmm_arg(args)
+    return args
 
-    run_data = None
 
-    if args.resume and os.path.exists(args.run_files_dir + "/run-data.json"):
-        try:
-            run_data = read_run_data(args.run_files_dir + "/run-data.json")
-        except CorruptRunData as e:
+def load_previous_run_data(args):
+    """
+    The previous run's RunData if we're resuming one and it's on disk, else None
+    """
+    if not args.resume:
+        return None
+
+    run_data_path = os.path.join(args.run_files_dir, "run-data.json")
+    if not os.path.exists(run_data_path):
+        return None
+
+    try:
+        return read_run_data(run_data_path)
+    except CorruptRunData as e:
+        report_message(
+            "We are trying to resume a previous run (specified by the `-R` or `--resume` "
+            f"flag), but {e}. That usually means the previous run was interrupted while "
+            "saving its state. Your best bet is to start a fresh run by adding the `-F` "
+            "flag to force-overwrite the previous outputs.")
+        report_very_early_exit()
+
+
+def setup_run_data(args, previous_run_data=None):
+    run_data = previous_run_data
+
+    if run_data is not None:
+        differences = RESUME.compare(run_data.fingerprint, build_fingerprint(args))
+        if differences:
             report_message(
-                "We are trying to resume a previous run (specified by the `-R` or `--resume` "
-                f"flag), but {e}. That usually means the previous run was interrupted while "
-                "saving its state. Your best bet is to start a fresh run by adding the `-F` "
-                "flag to force-overwrite the previous outputs.")
+                "We are trying to resume a previous run (specified by the `-R` or "
+                "`--resume` flag), but this run doesn't match the previous one:\n"
+                "        - " + "\n        - ".join(differences) + "\n\n"
+                "  Resuming would mix results from two different runs. Your best "
+                "bet is to start a fresh run by adding the `-F` flag to "
+                "force-overwrite the previous outputs or specify a new output dir.")
             report_very_early_exit()
 
-        if run_data is not None:
-            differences = RESUME.compare(run_data.fingerprint, build_fingerprint(args))
-            if differences:
-                report_message(
-                    "We are trying to resume a previous run (specified by the `-R` or "
-                    "`--resume` flag), but this run doesn't match the previous one:\n"
-                    "        - " + "\n        - ".join(differences) + "\n\n"
-                    "  Resuming would mix results from two different runs. Your best "
-                    "bet is to start a fresh run by adding the `-F` flag to "
-                    "force-overwrite the previous outputs or specify a new output dir.")
-                report_very_early_exit()
-
-            if run_data.stage_is_complete(PipelineStage.FINALIZE):
-                report_run_already_complete(args.output_dir)
+        if run_data.stage_is_complete(PipelineStage.FINALIZE):
+            report_run_already_complete(args.output_dir)
 
     fresh_run = run_data is None
 
@@ -363,8 +416,6 @@ def check_input_files(args):
         run_data = populate_run_data(args)
         run_data.fingerprint = build_fingerprint(args)
 
-    # always: a resume needs hmm_path resolved and the file validated too, it just
-    # keeps the SCG_targets (and their accumulated per-SCG state) it already has
     run_data = resolve_hmm_source(args, run_data)
 
     if fresh_run:
@@ -686,10 +737,12 @@ def check_for_required_dbs(args):
 
     wanted_ref_tax_source = args.source.strip().lower() if args.wanted_ref_tax else None
 
+    auto_selecting_hmm = bool(args.wanted_ref_tax) and not args.hmm
+
     if (args.ncbi_accessions or args.add_ncbi_tax
             or wanted_ref_tax_source in ("ncbi", "gtdb")):
         get_ncbi_assembly_data()
-    if args.add_gtdb_tax or wanted_ref_tax_source == "gtdb":
+    if args.add_gtdb_tax or wanted_ref_tax_source == "gtdb" or auto_selecting_hmm:
         get_gtdb_data()
     if args.target_kos_file:
         get_kofamscan_data()

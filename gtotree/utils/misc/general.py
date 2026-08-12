@@ -373,7 +373,7 @@ class RunData:
     all_input_genomes: List[GenomeData] = field(default_factory=list)
     SCG_targets: List[SCGset] = field(default_factory=list)
 
-    start_time: str = None
+    start_time: datetime = None
     ncbi_sub_table_path: str = ""
     ncbi_processing_dir: str = ""
     ncbi_processing_dir_rel: str = ""

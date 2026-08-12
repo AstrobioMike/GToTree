@@ -1,14 +1,27 @@
 import os
 import sys
+from collections import Counter
+from dataclasses import dataclass
+from typing import Optional
 from gtotree.utils.misc.messaging import wprint, color_text, report_message, report_early_exit
 import pandas as pd # type: ignore
 from gtotree.utils.misc.general import download_with_tqdm, SCGset, decode_pyhmmer_text
 from gtotree.utils.hmms.hmm_searching_engine import profiles_missing_gathering_cutoffs
+from gtotree.utils.taxonomy.tax_ranks import RANKS, NA
 import pyhmmer #type: ignore
 
 
 # aliases that aren't simply the file stem of a packaged set
 HMM_SET_ALIASES = {"universal": "Universal-Hug-et-al"}
+
+# this is what auto-selection picks when the target has no place in the GTDB taxonomy that
+# the pre-built sets are built from, or when it straddles domains
+UNIVERSAL_SCG_SET = "Universal-Hug-et-al"
+
+# how much of a linked reference set has to agree on a taxon before that taxon is
+# treated as the target group (this is relevant only for --source ncbi -w <taxon> situations where
+# NO -H was provided and we are trying to auto-select the best SCG-set to use from the prepackaged gtdb ones)
+CONSENSUS_THRESHOLD = 0.9
 
 
 def with_hmm_suffix(name):
@@ -45,10 +58,9 @@ def canonicalize_hmm_arg(hmm_arg):
     Resolve a requested SCG-set to the official spelling of its name
 
     e.g., `-H bacteria`, `-H BACTERIA`, and `-H Bacteria.HMM` all -> `Bacteria.hmm`
-    Matching case-insensitively is not sufficient on its own: the value is reused as a
+    Matching case-insensitively is not sufficient on its own since the value is reused as a
     filename under GToTree_HMM_dir, as the lookup key into hmm-sources-and-info.tsv, and
-    in run reporting. Left as typed, `-H bacteria` would download a second copy to
-    `bacteria.hmm` alongside the existing `Bacteria.hmm` on a case-sensitive filesystem.
+    in run reporting.
 
     Returned unchanged when it doesn't name a packaged set, so user paths and genuine
     typos both flow on to the existing handling.
@@ -113,6 +125,194 @@ def check_hmm_file(args, run_data):
     run_data = resolve_hmm_source(args, run_data)
 
     return populate_SCG_targets(run_data)
+
+
+################################################################################
+# auto-selecting an HMM set from --wanted-ref-tax
+################################################################################
+#
+# I'm adding this for convenience. If `-w` is given without `-H`, we can use the
+# wanted target taxon to auto-select the best prebuilt SCG-set we have.
+# Only annoying part is the sets are built from GTDB, so if the user also did
+# --source ncbi, we have to do some dancing to sort it out.
+
+
+@dataclass
+class AutoPickedSCGSet:
+    """
+    An auto-selected SCG-set, plus some reason printed out to the user
+    """
+    name: str
+    matched_rank: Optional[str] = None
+    matched_taxon: Optional[str] = None
+    reason: str = ""
+
+
+def packaged_sets_by_taxon():
+    """
+    {(rank, lowercased taxon): official set name} for the packaged sets that sit at one
+    of the seven taxonomic ranks
+
+    Sets whose rank is 'universal' or 'multi-domain' are left out on purpose: they don't
+    correspond to a node in any lineage, so nothing should reach them by walking one.
+    They're only ever chosen explicitly, as a fallback.
+
+    An unreadable summary table yields {} rather than raising -- the caller falls back
+    to the universal set, and the table's real problems get reported by the code that
+    goes on to look for the HMM file itself.
+    """
+    try:
+        df = read_in_hmm_summary_table()
+    except Exception:
+        return {}
+
+    index = {}
+    for _, row in df.iterrows():
+        rank = str(row.get("rank", "")).strip().lower()
+        taxon = str(row.get("target_taxa", "")).strip()
+        name = str(row.get("file", "")).strip()
+
+        if rank not in RANKS or not taxon or not name:
+            continue
+
+        if name.lower().endswith(".hmm"):
+            name = name[:-4]
+        index[(rank, taxon.lower())] = name
+
+    return index
+
+
+def pick_set_for_lineage(lineage, resolved_rank, index=None):
+    """
+    The finest packaged set covering `lineage`, walking upward from `resolved_rank`
+
+    Returns (set_name, matched_rank, matched_taxon), or (None, None, None).
+    """
+    if index is None:
+        index = packaged_sets_by_taxon()
+
+    if resolved_rank not in RANKS:
+        return (None, None, None)
+
+    for rank in reversed(RANKS[:RANKS.index(resolved_rank) + 1]):
+        taxon = str(lineage.get(rank) or "").strip()
+        if not taxon or taxon == NA:
+            continue
+        match = index.get((rank, taxon.lower()))
+        if match:
+            return (match, rank, taxon)
+
+    return (None, None, None)
+
+
+def consensus_lineage(lineages, threshold=CONSENSUS_THRESHOLD):
+    """
+    Collapse a set of per-genome lineages into the one lineage they share.
+
+    Returns ({rank: taxon}, deepest_agreed_rank); ({}, None) if `lineages` is empty or
+    the genomes don't even agree on a domain.
+
+    Walks coarse to fine and stops at the first rank where agreement falls below
+    `threshold`, dropping everything below it
+    """
+    if not lineages:
+        return {}, None
+
+    total = len(lineages)
+    agreed = {}
+    deepest = None
+
+    for rank in RANKS:
+        counts = Counter(lineage.get(rank) for lineage in lineages
+                         if lineage.get(rank) and lineage.get(rank) != NA)
+        if not counts:
+            break
+
+        taxon, count = counts.most_common(1)[0]
+        if count / total < threshold:
+            break
+
+        agreed[rank] = taxon
+        deepest = rank
+
+    return agreed, deepest
+
+
+def autopick_scg_set(source, selection):
+    """
+    Choose an SCG-set for a `-w` input that ALSO has no `-H` specified
+
+    GTDB source: the selection's rows already carry the GTDB lineage, so the walk needs
+    no further lookup, and the answer is exact
+
+    NCBI source: NCBI's names don't line up with GTDB's, so i can't map by name. Instead,
+    the selected accessions are linked back to GTDB instead, where possible, and their
+    lineages collapsed to a consensus.
+
+    Anything GTDB doesn't cover links to nothing and we fall back to the universal set
+
+    Returns an AutoPickedSCGSet. Never raises: no answer is a fallback, not an error.
+    """
+    if selection is None:
+        return AutoPickedSCGSet(UNIVERSAL_SCG_SET,
+                                reason="there was no taxon to select one from")
+
+    if str(source).strip().lower() == "gtdb":
+        return _autopick_from_gtdb_selection(selection)
+
+    return _autopick_from_ncbi_selection(selection)
+
+
+def _autopick_from_gtdb_selection(selection):
+    lineage = selection.rows[0] if selection.rows else {}
+
+    name, rank, taxon = pick_set_for_lineage(lineage, selection.resolved_rank)
+
+    if name is None:
+        # shouldn't be reachable: every GTDB lineage has a domain, and both domains have
+        # a set. Falling back rather than raising in case the summary table is unreadable
+        return AutoPickedSCGSet(
+            UNIVERSAL_SCG_SET,
+            reason=f"no pre-built set was found covering '{selection.canonical}'")
+
+    if rank == selection.resolved_rank:
+        reason = f"'{selection.canonical}' has a pre-built set of its own"
+    else:
+        reason = f"'{selection.canonical}' sits within {rank} {taxon} in GTDB"
+
+    return AutoPickedSCGSet(name, rank, taxon, reason)
+
+
+def _autopick_from_ncbi_selection(selection):
+    from gtotree.utils.gtdb.handle_gtdb_tax_info import gtdb_lineages_for_accessions
+
+    lineages = list(gtdb_lineages_for_accessions(selection.accessions).values())
+
+    if not lineages:
+        return AutoPickedSCGSet(
+            UNIVERSAL_SCG_SET,
+            reason=(f"none of the genomes selected for '{selection.canonical}' have a "
+                    "counterpart in GTDB, which the pre-built sets are built from"))
+
+    lineage, deepest = consensus_lineage(lineages)
+
+    if deepest is None:
+        return AutoPickedSCGSet(
+            UNIVERSAL_SCG_SET,
+            reason=(f"the genomes selected for '{selection.canonical}' span more than "
+                    "one domain in GTDB"))
+
+    name, rank, taxon = pick_set_for_lineage(lineage, deepest)
+
+    if name is None:
+        return AutoPickedSCGSet(
+            UNIVERSAL_SCG_SET,
+            reason=f"no pre-built set was found covering '{selection.canonical}'")
+
+    reason = (f"the genomes selected for '{selection.canonical}' fall in "
+              f"{rank} {taxon} in GTDB")
+
+    return AutoPickedSCGSet(name, rank, taxon, reason)
 
 
 def check_gathering_cutoffs(hmm_path, hmm_arg):
