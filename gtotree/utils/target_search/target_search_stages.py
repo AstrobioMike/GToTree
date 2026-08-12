@@ -1,16 +1,23 @@
 """
-The work phases behind `gtt search-pfams` / `gtt search-kos`.
+The work phases behind `gtt search-pfams` / `gtt search-kos`
 
 The per-genome heavy lifting is not reimplemented here. `main_stages.processing_genomes`
 already owns a fused worker that, for one genome, preprocesses it, immediately searches
-the resulting FASTA while it's still on disk, and then drops the FASTA -- which is what
-keeps peak disk usage flat across a large run. That worker dispatches on
-`SearchPlan.do_pfam` / `do_ko`, so these subcommands get it by constructing a plan with
-`do_scg=False` and the relevant target flag set, rather than by growing a second copy.
+the resulting FASTA while it's still on disk, and then drops the FASTA when it's downloaded
+That worker dispatches on `SearchPlan.do_pfam` / `do_ko`, so these subcommands get it by 
+constructing a plan with `do_scg=False` and the relevant target flag set, rather than by 
+growing a second copy.
 
-What *is* here is the orchestration and reporting layer: the phase structure, spinners,
-and progress bars follow `gtt gen-scg-hmms` rather than the main GToTree driver, whose
-`report_*_update` blocks assume an SCG set, a tree, and a four-genome floor.
+What *is* here is the orchestration and reporting layer. The one structural difference
+from the main driver is that all four input sources go through a *single* pool rather
+than four sequential ones: a search-only run is one thing happening to one set of
+genomes, and four separately-labelled bars made it read like four unrelated runs
+stapled together. The pool dispatches to the right preprocessing worker on
+`GenomeData.source`.
+
+That the search happens inside the same worker as the preprocessing is also what pins
+the phase order: targets have to be resolved before the pool starts, so the expensive
+half of the run can't begin until we know there's something to search for.
 """
 
 import os
@@ -23,7 +30,8 @@ from gtotree.utils.misc.general import (run_pooled_stage,
                                    write_run_data,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED,
                                    GTT_PROGRESS_SMOOTHING)
-from gtotree.utils.misc.messaging import report_message, color_text, spinner
+from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
+                                          REMOVED_GENOMES_FILENAME)
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 from gtotree.main_stages.processing_genomes import (SearchPlan,
@@ -43,20 +51,65 @@ from gtotree.utils.misc.processing_genomes import (
 from gtotree.utils.target_search.target_search_setup import TargetSearchError
 
 
+def _removals_pointer(run_data):
+    return f"{run_data.run_files_dir_rel}/{REMOVED_GENOMES_FILENAME}"
+
+
 ################################################################################
-# phase 1: input genomes
+# phase 1: resolving the input genome set
 ################################################################################
 
-def phase_resolve_genomes(args, run_data):
+def resolve_input_genomes(args, run_data):
     """
-    Report the input genomes already parsed into run_data, and fold in any `-w`
-    selection.
+    Fold in any `-w` selection, then report the input genome set
 
-    Returns (run_data, selection) where `selection` is the RefGenomeSelection when `-w`
-    was used, else None. The caller needs it for the run-state fingerprint.
+    The `-w` block comes first because those genomes are *part* of the input set: the
+    per-file counts and the total underneath them are only the whole picture once the
+    reference genomes have been merged in.
+
+    Nothing is downloaded here. This phase only settles *which* genomes the run is
+    about, so a misspelled taxon or an empty input set fails before any real work, and
+    so the caller can put the resume fingerprint check at the end of it.
+
+    Returns (run_data, selection), where `selection` is the RefGenomeSelection when
+    `-w` was used, else None.
     """
     from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
                                                        describe_source_version)
+
+    selection = None
+    num_selected = 0
+
+    if args.wanted_ref_tax:
+        source_desc = describe_source_version(args.source)
+        if source_desc:
+            print(f"      Genome source being used: "
+                  f"{color_text(source_desc, 'green')}\n")
+
+        with spinner(f"Selecting reference genomes for '{args.wanted_ref_tax}'...",
+                     "Selected reference genomes"):
+            accessions, selection = resolve_wanted_ref_tax_accessions(
+                args.source, args.wanted_ref_tax,
+                target_rank=args.target_rank,
+                derep_rank=args.derep_rank)
+
+        num_selected = run_data.merge_wanted_ref_tax_accessions(accessions)
+
+        detail = f"        {len(accessions):,} genome(s) selected"
+        if selection.resolved_rank:
+            detail += f" ({selection.canonical} at rank {selection.resolved_rank})"
+        print(detail)
+        if selection.effective_derep_rank:
+            print("        dereplicated to one genome per "
+                  f"{selection.effective_derep_rank}")
+        if num_selected != len(accessions):
+            print(f"        {len(accessions) - num_selected:,} already present "
+                  "from `-a`")
+
+        for warning in selection.warnings:
+            report_message(warning, "orange", ii="        ", si="        ")
+
+        print()
 
     counts = [
         (args.ncbi_accessions, len(run_data.get_user_provided_ncbi_accs()),
@@ -71,35 +124,8 @@ def phase_resolve_genomes(args, run_data):
         if provided:
             print(f"        {count:,} {label} read from {provided}")
 
-    selection = None
-
-    if args.wanted_ref_tax:
-        source_desc = describe_source_version(args.source)
-        if source_desc:
-            print(f"\n      Genome source being used: "
-                  f"{color_text(source_desc, 'green')}\n")
-
-        with spinner(f"Selecting reference genomes for '{args.wanted_ref_tax}'...",
-                     "Selected reference genomes"):
-            accessions, selection = resolve_wanted_ref_tax_accessions(
-                args.source, args.wanted_ref_tax,
-                target_rank=args.target_rank,
-                derep_rank=args.derep_rank)
-
-        added = run_data.merge_wanted_ref_tax_accessions(accessions)
-
-        detail = f"        {len(accessions):,} genome(s) selected"
-        if selection.resolved_rank:
-            detail += f" ({selection.canonical} at rank {selection.resolved_rank})"
-        print(detail)
-        if selection.effective_derep_rank:
-            print("        dereplicated to one genome per "
-                  f"{selection.effective_derep_rank}")
-        if added != len(accessions):
-            print(f"        {len(accessions) - added:,} already present from `-a`")
-
-        for warning in selection.warnings:
-            report_message(warning, "orange", ii="        ", si="        ")
+    if num_selected:
+        print(f"        {num_selected:,} reference genome accession(s) added by `-w`")
 
     run_data.update_all_input_genomes()
     total = len(run_data.all_input_genomes)
@@ -110,6 +136,41 @@ def phase_resolve_genomes(args, run_data):
     print(f"\n      {color_text(f'{total:,} total input genome(s)', 'green')}")
 
     return run_data, selection
+
+
+def lookup_ncbi_accessions(run_data):
+    """
+    Resolve accessions against the NCBI assembly summary
+
+    This supplies the download links the processing stage needs, and marks any
+    accession NCBI no longer lists as removed, so it lands in the summary table with a
+    reason rather than silently failing to download later.
+    """
+    from gtotree.utils.ncbi.parse_ncbi_assembly_summary import parse_assembly_summary
+    from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_summary_tab
+
+    if not run_data.ncbi_accs:
+        return run_data
+
+    with spinner("Looking up accessions in the NCBI assembly data...",
+                 "Looked up accessions at NCBI"):
+        run_data = parse_assembly_summary(get_ncbi_assembly_summary_tab(), run_data)
+
+    not_found = run_data.get_ncbi_accs_not_found()
+    if not_found:
+        report_message(
+            f"{len(not_found):,} accession(s) weren't found at NCBI, so they've been "
+            "dropped from the run. They're reported in:",
+            "yellow", ii="        ", si="        ")
+        print(f"          {color_text(_removals_pointer(run_data), 'yellow')}")
+
+        remaining = len([gd for gd in run_data.all_input_genomes if not gd.removed])
+        if not remaining:
+            raise TargetSearchError(
+                "None of the input accessions were found at NCBI, so there's nothing "
+                "left to search.")
+
+    return run_data
 
 
 ################################################################################
@@ -137,15 +198,12 @@ def target_stage_is_reusable(run_data, spec, out_dir):
 
 def phase_collect_targets(run_data, spec, out_dir, resuming=False):
     """
-    Resolve the requested target IDs to searchable profiles.
+    Resolve the requested target IDs to searchable profiles
 
     For Pfams this is a streaming pass over the master Pfam-A.hmm pulling out the
     wanted profiles; for KOs it's a lookup in ko_list plus copying the matching HMMs.
     Both are the same functions the main driver calls, and both write their own
     "requested vs found" bookkeeping into the output directory.
-
-    Reusing this on resume matters: the Pfam pass in particular is a multi-minute scan
-    over a ~2 GB file.
     """
     if resuming and target_stage_is_reusable(run_data, spec, out_dir):
         found = spec.found_targets(run_data)
@@ -191,23 +249,66 @@ def build_plan(args, spec):
     `do_scg=False` is what makes the shared fused worker usable here: there's no SCG
     HMM set to press or search, and no tree downstream that would consume one.
     """
-    plan = SearchPlan(
+    return SearchPlan(
         do_pfam=(spec.plan_flag == "do_pfam"),
         do_ko=(spec.plan_flag == "do_ko"),
         keep_genome_files=bool(getattr(args, "debug", False)),
         do_scg=False,
     )
-    return plan
+
+
+# GenomeData.source -> (preprocessing worker, status applier). The accession entry is
+# added per run, since its worker closes over that run's base-link map
+_SOURCE_WORKERS = {
+    "genbank-file": (_process_one_genbank_file, _apply_genbank_status),
+    "nt-fasta-file": (_process_one_fasta_file, _apply_fasta_status),
+    "aa-fasta-file": (_process_one_amino_acid_file, _apply_amino_acid_status),
+}
+
+
+def _dispatching_worker_pair(run_data):
+    """
+    One preprocessing worker/applier pair covering all four input sources
+
+    `run_pooled_stage` takes a single worker, so the per-source dispatch happens inside
+    it rather than by running four pools. The pair goes through `_fused` exactly like
+    the main driver's per-source pairs do, so each genome is still searched and dropped
+    in the same worker that produced it.
+
+    The base-link map is built once here rather than per genome.
+    """
+    workers = dict(_SOURCE_WORKERS)
+
+    if run_data.ncbi_accs:
+        base_link_map = build_base_link_map(run_data)
+
+        def _ncbi(gd, rd):
+            return _process_one_ncbi_accession(gd, rd, base_link_map)
+
+        workers["accession"] = (_ncbi, _apply_ncbi_accession_status)
+
+    def preprocess(gd, rd):
+        return workers[gd.source][0](gd, rd)
+
+    def apply_status(gd, status, rd):
+        workers[gd.source][1](gd, status, rd)
+
+    return preprocess, apply_status
 
 
 def phase_search_genomes(args, run_data, spec, plan):
     """
-    Preprocess and search every genome that isn't already done.
+    Preprocess and search every genome that isn't already done, in one pool with one
+    progress bar
 
-    Each source gets its own labelled progress bar. Genomes already carrying both
-    `processing_done` and this target type's search flag are skipped, which is what
-    makes `-R` resume at genome granularity without any extra bookkeeping.
+    Genomes already carrying both `processing_done` and this target type's search flag
+    are skipped, which is what makes `-R` resume at genome granularity without any
+    extra bookkeeping. Accessions that weren't found at NCBI were marked removed back
+    in phase 1, so they're excluded here by `genomes_needing_processing` rather than
+    needing a filter of their own.
     """
+    phase_stats.begin("processing and searching genomes")
+
     press_dir_cm = (tempfile.TemporaryDirectory(prefix="gtt-press-")
                     if spec.presses_profiles else _NullContext())
 
@@ -219,32 +320,49 @@ def phase_search_genomes(args, run_data, spec, plan):
                 plan.pressed_pfam_base = press_profiles(
                     hmm_path, press_dir, "target-profiles")
 
-        run_data = _run_source(args, run_data, plan, spec,
-                               source_list=run_data.ncbi_accs,
-                               label="NCBI accessions",
-                               phase="ncbi accessions",
-                               prepare=_prepare_ncbi)
+        to_process = genomes_needing_processing(run_data.all_input_genomes, plan)
 
-        run_data = _run_source(args, run_data, plan, spec,
-                               source_list=run_data.genbank_files,
-                               label="GenBank files",
-                               phase="genbank files",
-                               worker_pair=(_process_one_genbank_file,
-                                            _apply_genbank_status))
+        # only genomes still in the run count towards "already done"; ones dropped at
+        # the NCBI lookup are a different thing entirely and were reported in phase 1
+        alive = [gd for gd in run_data.all_input_genomes if not gd.removed]
+        already_done = len(alive) - len(to_process)
 
-        run_data = _run_source(args, run_data, plan, spec,
-                               source_list=run_data.fasta_files,
-                               label="fasta files",
-                               phase="fasta files",
-                               worker_pair=(_process_one_fasta_file,
-                                            _apply_fasta_status))
+        num_targets = len(spec.found_targets(run_data))
 
-        run_data = _run_source(args, run_data, plan, spec,
-                               source_list=run_data.amino_acid_files,
-                               label="amino-acid files",
-                               phase="amino-acid files",
-                               worker_pair=(_process_one_amino_acid_file,
-                                            _apply_amino_acid_status))
+        if not to_process:
+            print(f"\n      All {len(alive):,} genome(s) were already processed and "
+                  "searched in a previous run")
+            return run_data
+
+        print(f"\n      Processing and searching {len(to_process):,} genome(s) for "
+              f"{num_targets:,} {spec.target_label} target(s):")
+        if already_done:
+            print(f"        ({already_done:,} already done in a previous run)")
+
+        preprocess, apply_status = _dispatching_worker_pair(run_data)
+        worker, apply_result = _fused(preprocess, apply_status, plan)
+
+        run_data = run_pooled_stage(to_process, worker, apply_result, args, run_data,
+                                    bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED)
+
+    write_removed_genomes_report(run_data)
+    write_run_data(run_data)
+
+    searched = count_searched_genomes(run_data, spec)
+    dropped = len(run_data.all_input_genomes) - searched
+
+    print(f"\n      {color_text(f'{searched:,} genome(s) searched', 'green')}")
+
+    if dropped:
+        report_message(
+            f"{dropped:,} input genome(s) didn't make it through; the reason for each "
+            "is in:", "yellow", ii="      ", si="      ")
+        print(f"        {color_text(_removals_pointer(run_data), 'yellow')}")
+
+    if not searched:
+        raise TargetSearchError(
+            "None of the input genomes made it through to a completed search. The "
+            f"reason for each is in {_removals_pointer(run_data)}.")
 
     return run_data
 
@@ -259,86 +377,20 @@ class _NullContext:
         return False
 
 
-def _prepare_ncbi(args, run_data):
-    """
-    Resolve accessions against the NCBI assembly summary before downloading.
-
-    This both supplies the download links and marks any accession NCBI no longer lists
-    as removed, so it shows up in the summary table with a reason rather than silently
-    failing to download.
-    """
-    from gtotree.utils.ncbi.parse_ncbi_assembly_summary import parse_assembly_summary
-    from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_summary_tab
-
-    with spinner("Looking up accessions in the NCBI assembly data...",
-                 "Looked up accessions at NCBI"):
-        run_data = parse_assembly_summary(get_ncbi_assembly_summary_tab(), run_data)
-
-    base_link_map = build_base_link_map(run_data)
-
-    def preprocess(acc_gd, rd):
-        return _process_one_ncbi_accession(acc_gd, rd, base_link_map)
-
-    return run_data, (preprocess, _apply_ncbi_accession_status), _only_found
-
-
-def _only_found(genomes):
-    return [gd for gd in genomes if gd.acc_was_found]
-
-
-def _run_source(args, run_data, plan, spec, source_list, label, phase,
-                worker_pair=None, prepare=None):
-    """
-    Run one input source through the fused preprocess-and-search stage.
-    """
-    if not source_list:
-        return run_data
-
-    phase_stats.begin(f"searching: {phase}")
-
-    extra_filter = None
-    if prepare is not None:
-        run_data, worker_pair, extra_filter = prepare(args, run_data)
-
-    to_process = genomes_needing_processing(source_list, plan)
-    if extra_filter is not None:
-        to_process = extra_filter(to_process)
-
-    already_done = len(source_list) - len(to_process)
-
-    if not to_process:
-        print(f"\n      All {len(source_list):,} {label} were already done")
-        return run_data
-
-    print(f"\n      Processing and searching {len(to_process):,} {label}:")
-    if already_done:
-        print(f"        ({already_done:,} already done in a previous run)")
-
-    preprocess, apply_status = worker_pair
-    worker, apply_result = _fused(preprocess, apply_status, plan)
-
-    run_data = run_pooled_stage(to_process, worker, apply_result, args, run_data,
-                                bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED)
-
-    write_removed_genomes_report(run_data)
-
-    write_run_data(run_data)
-
-    return run_data
-
-
 ################################################################################
 # phase 4: outputs
 ################################################################################
 
 def phase_write_outputs(run_data, spec, out_dir):
     """
-    Build the combined outputs from the per-genome artifacts.
+    Build the combined outputs from the per-genome artifacts
 
     Both helpers are the main driver's, unmodified: they read the per-genome result
     files off disk rather than any in-memory accumulation, which is why they're
     idempotent and complete regardless of how much of the work happened in this
     invocation versus an earlier interrupted one.
+
+    Returns (summary_path, num_targets_with_hits).
     """
     from gtotree.utils.target_search import target_search_outputs as outputs
 
@@ -359,12 +411,38 @@ def phase_write_outputs(run_data, spec, out_dir):
             spec.combine_hits([target], spec.tmp_results_dir(run_data), hit_seqs_dir)
             pbar.update(1)
 
+    targets_with_hits = _count_and_prune_hit_seqs(hit_seqs_dir)
+
     with spinner("Writing the genome summary table...", "Wrote the genome summary table"):
         summary_path = outputs.write_genomes_summary(out_dir, run_data, spec)
 
     write_run_data(run_data)
 
-    return summary_path
+    return summary_path, targets_with_hits
+
+
+def _count_and_prune_hit_seqs(hit_seqs_dir):
+    """
+    How many targets got a combined hit-seqs file, removing the directory when that's
+    none of them
+
+    `combine_hits` writes nothing for a target with no hits, so an empty directory here
+    means not one genome hit not one target. Leaving it behind reads like the run
+    produced sequences that then went missing, and the finish banner would point at it.
+    """
+    if not os.path.isdir(hit_seqs_dir):
+        return 0
+
+    contents = os.listdir(hit_seqs_dir)
+
+    if not contents:
+        try:
+            os.rmdir(hit_seqs_dir)
+        except OSError:
+            pass
+        return 0
+
+    return len(contents)
 
 
 def count_searched_genomes(run_data, spec):

@@ -311,8 +311,15 @@ def section(title):
     print(color_text(f"\n\n  {title}\n", "yellow"))
 
 
-def report_finish(out_dir, run_data, spec, summary_path, args):
-    """The closing banner, mirroring gen-scg-hmms'."""
+def report_finish(out_dir, run_data, spec, summary_path, targets_with_hits):
+    """
+    The closing banner, mirroring gen-scg-hmms'.
+
+    `targets_with_hits` is how many targets actually got a combined hit-seqs fasta. At
+    zero there is no hit-seqs directory to point at, and saying so plainly is a lot
+    more useful than listing an output that isn't there -- a run where nothing hit
+    anything is a real (and usually surprising) result, not an error.
+    """
     searched, removed, failed = outputs.summarize_counts(run_data, spec)
     num_targets = len(spec.found_targets(run_data))
 
@@ -333,14 +340,23 @@ def report_finish(out_dir, run_data, spec, summary_path, args):
             "is in the summary table.", "yellow", ii="      ", si="      ")
         print()
 
+    if not targets_with_hits:
+        report_message(
+            f"No hits were found for any of the {num_targets:,} "
+            f"{spec.target_label} target(s) in any of the genomes searched, so there "
+            f"are no hit sequences to report (the '{spec.hit_seqs_subdir}/' directory "
+            "wasn't created).", "yellow", ii="      ", si="      ")
+        print()
+
     print("      Results written to:")
     print(f"        {color_text(out_dir + '/', 'green')}\n")
 
     print("      Including:")
     print(f"        {color_text(spec.counts_filename, 'green')}"
           f"  (the genome x {spec.target_label} hit-count matrix)")
-    print(f"        {color_text(spec.hit_seqs_subdir + '/', 'green')}"
-          f"  (the hit sequences, one fasta per {spec.target_label})")
+    if targets_with_hits:
+        print(f"        {color_text(spec.hit_seqs_subdir + '/', 'green')}"
+              f"  (the hit sequences, one fasta per {spec.target_label} with hits)")
     print(f"        {color_text(os.path.basename(summary_path), 'green')}"
           "  (per-genome summary)")
     print()
@@ -390,13 +406,11 @@ def run_search(args, spec):  # pragma: no cover
 
     ensure_reference_data(args, spec)
 
-    run_data, _selection = stages.phase_resolve_genomes(args, run_data)
+    run_data, _selection = stages.resolve_input_genomes(args, run_data)
 
     ensure_processing_dirs(run_data)
 
-    carried = adopt_genome_progress(run_data, previous)
-    if carried:
-        print(f"      {carried:,} genome(s) carried over from the previous run")
+    adopt_genome_progress(run_data, previous)
 
     fingerprint = build_fingerprint(run_data, args, spec, data_version=None)
 
@@ -410,6 +424,10 @@ def run_search(args, spec):  # pragma: no cover
         resuming = False
         state = RESUME.new(fingerprint)
         RESUME.save(work_dir, state)
+
+    # after the fingerprint gate, since the gate compares the accessions as given and
+    # this is where some of them stop being part of the run
+    run_data = stages.lookup_ncbi_accessions(run_data)
 
     write_run_data(run_data)
 
@@ -448,7 +466,7 @@ def run_search(args, spec):  # pragma: no cover
     RESUME.save(work_dir, state)
 
     section(f"Phase {n()}: Combining results and writing outputs...")
-    summary_path = stages.phase_write_outputs(run_data, spec, out_dir)
+    summary_path, targets_with_hits = stages.phase_write_outputs(run_data, spec, out_dir)
     RESUME.mark_complete(state, STAGE_OUTPUTS, work_dir=work_dir)
     RESUME.save(work_dir, state)
 
@@ -459,7 +477,7 @@ def run_search(args, spec):  # pragma: no cover
     phase_stats.finish()
     phase_stats.write_tsv(out_dir)
 
-    report_finish(out_dir, run_data, spec, summary_path, args)
+    report_finish(out_dir, run_data, spec, summary_path, targets_with_hits)
 
     return run_data
 

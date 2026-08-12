@@ -1,7 +1,6 @@
 import re
 import pyarrow.compute as pc # type: ignore
 import pyarrow.dataset as ds # type: ignore
-from gtotree.utils.misc.messaging import report_ncbi_accs_not_found
 from gtotree.utils.misc.stages import GenomeRemovalStage
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
 
@@ -149,7 +148,6 @@ def parse_assembly_summary(assembly_summary_file, run_data):
 
     if len(not_found) > 0:
         write_removed_genomes_report(run_data)
-        report_ncbi_accs_not_found(len(not_found), run_data.run_files_dir_rel)
 
     run_data.ncbi_sub_table_path = ncbi_sub_table_path
 
