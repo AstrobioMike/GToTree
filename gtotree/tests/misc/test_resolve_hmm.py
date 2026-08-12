@@ -76,8 +76,6 @@ def test_a_missing_hmm_is_auto_selected_from_the_taxon(picks, capsys):
 
     assert args.hmm == "Nitrospirota"
     assert args.hmm_auto_selected == "'Nitrospirota' has a pre-built set of its own"
-    # and it says so, since the user didn't ask for this set by name
-    assert "auto-selected" in capsys.readouterr().out
 
 
 def test_the_selection_and_source_are_what_gets_handed_to_the_picker(picks):

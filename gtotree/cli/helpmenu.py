@@ -38,6 +38,9 @@ def bold(text):
         return text
     return f"\033[1m{text}\033[0m"
 
+def numbered_heading(number, title):
+    """A '      1) Title' line, colored to match the subsection headers below."""
+    return f"{' ' * SUBSECTION_INDENT}{color_text(f'{number}) {title}', 'orange')}\n"
 
 CONDENSED_NOTE = [
     "This is the condensed help menu. Run with [-S | --show-detailed-help] to",
@@ -69,17 +72,17 @@ def pick(text, detailed):
     return text
 
 
-def entry(flags, brief, detailed=False):
-    """A '        - [-o <dir>] one-line summary' row, wrapped to the detail column."""
+def entry(flags, brief, detailed=False, align_continuation=False):
     brief = pick(brief, detailed)
     lead = f"{' ' * ENTRY_INDENT}- [{flag(flags)}] "
     # the color codes don't occupy visible columns, so measure the plain version
     plain_lead_len = ENTRY_INDENT + 3 + len(flags) + 2
+    cont_indent = plain_lead_len if align_continuation else DETAIL_INDENT
     wrapped = textwrap.fill(
         " ".join(brief.split()),
         width=WIDTH,
         initial_indent=" " * plain_lead_len,
-        subsequent_indent=" " * DETAIL_INDENT,
+        subsequent_indent=" " * cont_indent,
     )
     return lead + wrapped[plain_lead_len:] + "\n"
 
@@ -431,9 +434,8 @@ REQUIRED_INPUTS = [
 
 HMM_INPUT = (
     "-H <file>",
-    ("target single-copy gene HMMs to use (can be a path or the name of one of "
-    "the pre-packaged sets; run 'gtt hmms' to view available gene-sets; will "
-    "be auto-selected if not specified AND the `-w` parameter was used)"),
+    ("can be your own, or the name of one of the pre-packaged gene-sets; run 'gtt hmms' "
+     "to view available sets; will be auto-selected if not specified AND `-w` was used"),
 )
 
 HMM_LEAD = "      2)  "
@@ -442,21 +444,18 @@ HMM_CONT = 22
 
 def required_inputs_section(detailed=False):
     out = banner("REQUIRED INPUTS")
-    out += "\n      1) Input genomes in one or any combination of the following formats:\n"
+
+    out += "\n" + numbered_heading(
+        1, "Input genomes in one or any combination of the following formats")
 
     for flags, brief in REQUIRED_INPUTS:
-        out += entry(pick(flags, detailed), brief, detailed)
+        out += entry(pick(flags, detailed), brief, detailed, align_continuation=True)
+
+    out += "\n" + numbered_heading(
+        2, "The target single-copy gene (SCG) HMMs to use")
 
     hmm_flags, hmm_brief = HMM_INPUT
-    hmm_flags = pick(hmm_flags, detailed)
-    lead_len = len(HMM_LEAD) + 1 + len(hmm_flags) + 2
-    wrapped = textwrap.fill(
-        " ".join(pick(hmm_brief, detailed).split()),
-        width=WIDTH,
-        initial_indent=" " * lead_len,
-        subsequent_indent=" " * HMM_CONT,
-    )
-    out += f"\n{HMM_LEAD}[{flag(hmm_flags)}] " + wrapped[lead_len:] + "\n"
+    out += entry(pick(hmm_flags, detailed), hmm_brief, detailed, align_continuation=True)
 
     return out
 
@@ -498,7 +497,12 @@ def build_helpmenu(detailed=False):
     out += gap + entry("-v | --version", "show the GToTree version and exit", detailed)
 
     out += banner("EXAMPLE USAGE")
-    out += "\n\tgtotree -w Alteromonas -f fasta-files.txt -H Gammaproteobacteria -D\n"
+    # out += "\n\tgtotree -w Alteromonas -f fasta-files.txt -H Gammaproteobacteria -D\n"
+
+    out += "\n             gtotree -w Alteromonas -f fasta-files.txt --add-gtdb-tax\n"
+    # out += "\n  Including reference genomes from a taxon of interest, your input fastas, and"
+    # out += "\n  adding GTDB taxonomy to the tree (HMM set auto-selected):"
+    # out += "\n\n    gtotree -w Alteromonas -f fasta-files.txt --add-gtdb-tax\n"
 
     if not detailed:
         out += condensed_note()

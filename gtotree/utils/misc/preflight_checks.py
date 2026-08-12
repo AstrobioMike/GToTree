@@ -164,8 +164,8 @@ def check_for_minimum_args(args):
         report_very_early_exit(suggest_help=True)
     # `-H` is only mandatory without `-w`; with `-w` provided, gtotree can auto-select the used SCG-set
     if not args.hmm and not args.wanted_ref_tax:
-        report_message("You need to specify the HMM file of the target-SCGs you want to tree. "
-                       "You can view the available gene-sets packaged with GToTree by running `gtt hmms`. "
+        report_message("You need to specify the target-SCG HMMs (`-H`) you want to use. You "
+                       "can view the available gene-sets packaged with GToTree by running `gtt hmms`. "
                        "Or, if you add reference genomes by taxonomy with `-w`/`--wanted-ref-tax`, "
                        "GToTree will select a suitable pre-packaged set for you.")
         report_very_early_exit(suggest_help=True)
@@ -344,9 +344,6 @@ def resolve_hmm(args, selection=None, previous_run_data=None):
             picked = autopick_scg_set(args.source, selection)
             args.hmm = picked.name
             args.hmm_auto_selected = picked.reason
-            report_message(
-                f"No `-H` was specified, so the \"{picked.name}\" SCG-set was "
-                f"auto-selected because {picked.reason}.", "green")
 
     args = resolve_hmm_arg(args)
 

@@ -692,7 +692,7 @@ def report_genome_processing_update(run_data, searched=False):
     verb = "processed and searched" if searched else "processed"
 
     if num_input == num_remaining:
-        message = f"    {color_text(f"All {num_input} input genomes were successfully {verb}.", "green")}"
+        message = f"{color_text(f"All {num_input} input genomes were successfully {verb}.".center(82), "green")}"
     else:
         message = "    Of all the input genomes provided:\n"
         if num_failed_processing > 0:
@@ -703,7 +703,7 @@ def report_genome_processing_update(run_data, searched=False):
         message += f"    {color_text(f"Overall, {num_remaining} of the input {num_input} genomes were successfully {verb}.", "yellow")}"
 
         if num_remaining >= 4:
-            message += "\n    Moving forward with those :)"
+            message += "\n\n    Moving forward with those :)"
 
     report_section_info(message)
 
