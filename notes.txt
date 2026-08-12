@@ -4,28 +4,7 @@
 
 ### TO DO STILL ###
 
-    # final output summary doesn't have relative path to the tree file (missing gtotree-output/...)
-
-            # Tree written to:
-            #     gtotree-output.tre
-
-            # Alignment written to:
-            #     gtotree-output/aligned-SCGs-mod-names.faa
-
-
-    # look into putting a block (or catch) for this prodigal failure: "at least 100000 bases for training." (search original files)
-        # AND need to catch prodigal error outputs that would be messing up the progress bar (and see if they exist anywhere else too)
-
-            #             0%|                  | 0/3 [time elapsed: 00:00 | est. remaining: ?][prodigal failed for genome-short] exit 10: Error:  Sequence must be 20000 characters (only 4 read).
-            # (Consider running with the -p meta option or finding more contigs from the same genome.)
-            #       100%|██████████████| 3/3 [time elapsed: 00:10 | est. remaining: 00:00]
-
-        # i'm not sure if 20000 is the new minimum, or if 100,000 still applies
-        # either way, i cna ignore that and let it be caught properly and just drop the genome with a proper note as to why in the output genome info table
-
-
-    # when 0 accessions are found/make it through, at that stage summary the message is like "0 of total found...", it should probably explicitly check and say None
-        # this is probably the case for all input-processing stages
+    # does a resume need to re-do the taxonomy resolving for -w like it currently does at the start?
 
 
     # if genome-filtering drops all genes of a given SCG-set, things might break
@@ -35,8 +14,6 @@
     # do i want to modify 'reason-removed' for SCGs to delineate bewteen 'no/multiple hits found'
         # and dropped due to length filtering?
         # yes, i do, figure out if that's still needed and do it if so
-
-
 
 
     # run the following with all 4 input types and make sure all messages make sense

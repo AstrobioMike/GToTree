@@ -1,3 +1,4 @@
+import os
 import textwrap
 import sys
 import time
@@ -615,8 +616,8 @@ def report_ncbi_update(run_data):
         if num_not_downloaded > 0:
             message += (f"      {color_text(f"{num_not_downloaded} found but not successfully downloaded", "yellow")}, reported in:\n"
                         f"        {run_data.run_files_dir_rel}/ncbi-accessions-not-downloaded.txt\n\n")
-        if num_removed > 0:
-            message += (f"    {color_text(f"Overall, {num_prepared} of the input {num_input} accessions were successfully downloaded and\n    prepared.", "yellow")}")
+
+        message += (f"    {color_text(f"Overall, {num_prepared} of the input {num_input} accessions were successfully downloaded and\n    prepared.", "yellow")}")
 
     report_update(message)
 
@@ -626,20 +627,19 @@ def report_genbank_update(run_data):
     num_failed = len(run_data.get_failed_genbank_ids())
     num_prodigal_used = len(run_data.get_prodigal_used_genbank_ids())
 
-    if num_failed == 0 and num_prodigal_used == 0:
-        message = (f"{color_text(f"All {num_input} input genbank files were successfully parsed and prepared!".center(82), "green")}")
-    elif num_failed == 0:
-        message = (f"{color_text(f"All {num_input} input genbank files were successfully parsed and prepared!".center(82), "green")}\n\n")
+    prodigal_note = (f"{color_text(f"{num_prodigal_used} had no CDS entries", "yellow")}, "
+                     "so prodigal was used on the nucleotide sequences.")
+
+    if num_failed == 0:
+        message = color_text(f"All {num_input} input genbank files were successfully parsed and prepared!".center(82), "green")
+        if num_prodigal_used > 0:
+            message += f"\n\n    {prodigal_note}"
     else:
         message = f"    Of the input genomes provided as {color_text("genbank files", "yellow")}:\n\n"
-    if num_prodigal_used > 0 and num_failed == 0:
-        message += (f"      {color_text(f"{num_prodigal_used} had no CDS entries", "yellow")}, so prodigal was used on the nucleotide sequences.")
-    elif num_prodigal_used > 0:
-        message += (f"      {color_text(f"{num_prodigal_used} had no CDS entries", "yellow")}, so prodigal was used on the nucleotide sequences.\n\n")
-    if num_failed > 0:
+        if num_prodigal_used > 0:
+            message += f"      {prodigal_note}\n\n"
         message += (f"      {color_text(f"{num_failed} failed to be successfully parsed", "yellow")}, reported in:\n"
                     f"        {run_data.run_files_dir_rel}/failed-genbank-files.txt\n\n")
-    if num_failed > 0:
         message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} genbank files were successfully parsed and\n    prepared.", "yellow")}")
 
     report_update(message)
@@ -944,10 +944,11 @@ def summarize_results(args, run_data):
 
 
 def get_path_rel_to_outdir(path, args):
-
+    """
+    Re-express an absolute path as a relative path including the output dir
+    """
     key_dir = args.output_dir
-    idx = path.rfind(key_dir)
-    if idx != -1:
-        sub_path = path[idx:]
-        return(sub_path)
-    raise ValueError(f"Directory {key_dir!r} not found in {path!r}")
+    rel = os.path.relpath(os.path.abspath(path), os.path.abspath(key_dir))
+    if rel == os.pardir or rel.startswith(os.pardir + os.sep):
+        raise ValueError(f"Directory {key_dir!r} not found in {path!r}")
+    return os.path.join(key_dir, rel)

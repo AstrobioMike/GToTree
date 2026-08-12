@@ -498,3 +498,30 @@ class TestRunDataPersistence:
 def test_decode_pyhmmer_text_normalizes_to_str(value, expected):
     """pyhmmer returns name/accession as bytes or str depending on version."""
     assert general.decode_pyhmmer_text(value) == expected
+
+
+# ---------------------------------------------------------------------------
+# get_path_rel_to_outdir
+# ---------------------------------------------------------------------------
+
+def test_get_path_rel_to_outdir_keeps_outdir_when_basename_repeats_it(tmp_path, monkeypatch):
+    """
+    The final tree is named after the output directory (`<outdir>/<outdir>.tre`), so the
+    directory name appears twice in its path. Re-expressing it must still keep the
+    directory, not collapse to the bare filename.
+    """
+    from types import SimpleNamespace
+    from gtotree.utils.misc.messaging import get_path_rel_to_outdir
+
+    # args.output_dir is the user's (usually relative) spelling; run_data.output_dir is
+    # its abspath, so the two only line up from the directory the run started in
+    monkeypatch.chdir(tmp_path)
+    args = SimpleNamespace(output_dir="GToTree-output")
+    outdir = tmp_path / "GToTree-output"
+
+    tree = str(outdir / "GToTree-output.tre")
+    assert get_path_rel_to_outdir(tree, args) == "GToTree-output/GToTree-output.tre"
+
+    # a path with no repeated component behaves the same way
+    aln = str(outdir / "aligned-SCGs.faa")
+    assert get_path_rel_to_outdir(aln, args) == "GToTree-output/aligned-SCGs.faa"

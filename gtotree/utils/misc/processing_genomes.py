@@ -78,8 +78,9 @@ def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
             done, nt = prepare_accession(acc_gd.id, run_data, base_link_map=base_link_map)
         downloaded = bool(done)
 
+        error = None
         if done and nt:
-            done = run_prodigal(acc_gd.id, run_data, group="ncbi")
+            done, error = run_prodigal(acc_gd.id, run_data, group="ncbi")
             prodigal_used = True
         else:
             prodigal_used = False
@@ -99,6 +100,7 @@ def _process_one_ncbi_accession(acc_gd, run_data, base_link_map=None):
             "final_AA_path": final_AA_path,
             "final_nt_path": final_nt_path,
             "num_genes": int(num_genes or 0),
+            "error": error,
         }
     except BaseException as e:
         # a worker must never take down the whole pool; treat any unexpected
@@ -386,12 +388,13 @@ def _process_one_genbank_file(gb, run_data):
         final_nt_path = None
         final_AA_path = None
         num_genes = 0
+        error = None
 
         done, final_AA_path, num_genes = extract_filter_and_rename_cds_amino_acids_from_gb(gb.id, path, run_data)
 
         if not done:
             extract_fasta_from_gb(gb.id, path, run_data)
-            done = run_prodigal(gb.id, run_data, path, "genbank")
+            done, error = run_prodigal(gb.id, run_data, path, "genbank")
             prodigal_used = True
             if done:
                 done, final_AA_path, num_genes, final_nt_path = filter_and_rename_fasta(gb.id, run_data, run_data.genbank_processing_dir)
@@ -408,8 +411,9 @@ def _process_one_genbank_file(gb, run_data):
             "final_AA_path": final_AA_path,
             "final_nt_path": final_nt_path,
             "num_genes": int(num_genes or 0),
+            "error": error,
         }
-    except BaseException:
+    except BaseException as e:
         return {
             "done": False,
             "prodigal_used": False,
@@ -417,6 +421,7 @@ def _process_one_genbank_file(gb, run_data):
             "final_AA_path": None,
             "final_nt_path": None,
             "num_genes": 0,
+            "error": f"{type(e).__name__}: {e}",
         }
 
 
@@ -433,7 +438,9 @@ def _apply_genbank_status(gb, status, run_data):
         gb.final_AA_path = status.get("final_AA_path")
         gb.final_nt_path = status.get("final_nt_path")
     else:
-        gb.mark_removed("genbank-file processing failed",
+        error = status.get("error")
+        gb.mark_removed(f"genbank-file processing failed ({error})" if error
+                        else "genbank-file processing failed",
                         GenomeRemovalStage.GENBANK_PREP)
 
     if status.get("prodigal_used"):
@@ -458,7 +465,7 @@ def _process_one_fasta_file(fasta, run_data):
     try:
         path, was_gzipped = gunzip_if_needed(fasta.full_path)
 
-        done = run_prodigal(fasta.id, run_data, path, "fasta")
+        done, error = run_prodigal(fasta.id, run_data, path, "fasta")
 
         if was_gzipped:
             os.remove(path)
@@ -477,8 +484,9 @@ def _process_one_fasta_file(fasta, run_data):
             "final_AA_path": final_AA_path,
             "final_nt_path": final_nt_path,
             "num_genes": int(num_genes or 0),
+            "error": error,
         }
-    except BaseException:
+    except BaseException as e:
         return {
             "done": False,
             "was_gzipped": False,
@@ -486,6 +494,7 @@ def _process_one_fasta_file(fasta, run_data):
             "final_AA_path": None,
             "final_nt_path": None,
             "num_genes": 0,
+            "error": f"{type(e).__name__}: {e}",
         }
 
 
@@ -502,7 +511,9 @@ def _apply_fasta_status(fasta, status, run_data):
         fasta.final_AA_path = status.get("final_AA_path")
         fasta.final_nt_path = status.get("final_nt_path")
     else:
-        fasta.mark_removed("fasta-file processing failed",
+        error = status.get("error")
+        fasta.mark_removed(f"fasta-file processing failed ({error})" if error
+                           else "fasta-file processing failed",
                            GenomeRemovalStage.FASTA_PREP)
 
     if status.get("prodigal_used"):
@@ -538,13 +549,14 @@ def _process_one_amino_acid_file(AA, run_data):
             "final_nt_path": final_nt_path,
             "num_genes": int(num_genes or 0),
         }
-    except BaseException:
+    except BaseException as e:
         return {
             "done": False,
             "was_gzipped": False,
             "final_AA_path": None,
             "final_nt_path": None,
             "num_genes": 0,
+            "error": f"{type(e).__name__}: {e}",
         }
 
 
@@ -561,7 +573,9 @@ def _apply_amino_acid_status(AA, status, run_data):
         AA.final_AA_path = status.get("final_AA_path")
         AA.final_nt_path = status.get("final_nt_path")
     else:
-        AA.mark_removed("amino-acid-file processing failed",
+        error = status.get("error")
+        AA.mark_removed(f"amino-acid-file processing failed ({error})" if error
+                        else "amino-acid-file processing failed",
                         GenomeRemovalStage.AMINO_ACID_PREP)
 
 
@@ -573,9 +587,17 @@ def capture_failed_amino_acid_files(run_data):
                 failed_amino_acids_file.write(entry + "\n")
 
 
+PRODIGAL_TOO_SHORT_EXIT = 10
+PRODIGAL_TOO_SHORT_REASON = ("prodigal failed: genome too short for gene calling")
+
+
 def run_prodigal(id, run_data, full_inpath = None, group = None):
     """
     Call genes with prodigal and strip the trailing '*' stop characters
+
+    Returns `(done, error)`. `error` is None on success, otherwise a short human-readable
+    reason the caller can carry back to the main thread and hand to `mark_removed`, so it
+    lands in `reason_removed` in genomes-summary-info.tsv
     """
     allowed_groups = ["ncbi", "fasta", "genbank"]
     if group not in allowed_groups:
@@ -605,6 +627,7 @@ def run_prodigal(id, run_data, full_inpath = None, group = None):
     ]
 
     done = False
+    error = None
     try:
         subprocess.run(prodigal_cmd,
                        stdout=subprocess.DEVNULL,
@@ -617,31 +640,44 @@ def run_prodigal(id, run_data, full_inpath = None, group = None):
         done = True
 
     except subprocess.CalledProcessError as e:
-        stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
-        print(f"[prodigal failed for {id}] exit {e.returncode}: {stderr.strip()}")
-    except (OSError, ValueError):
+        if e.returncode == PRODIGAL_TOO_SHORT_EXIT:
+            error = PRODIGAL_TOO_SHORT_REASON
+        else:
+            stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
+            error = f"prodigal failed (exit {e.returncode})"
+            if stderr.strip():
+                error += f": {_condense(stderr)}"
+    except (OSError, ValueError) as e:
         # binary missing, unreadable input, or a failed strip/replace
-        pass
+        error = f"prodigal could not be run: {type(e).__name__}: {e}"
     finally:
         for tmp in (tmp_AA, tmp_nt):
             remove_file_if_exists(tmp)
 
-    # be defensive: if the output file doesn't exist or is empty, mark as not done
+    # if the output file doesn't exist or is empty, mark as not done
     if not os.path.exists(out_AA_path):
         done = False
     elif os.path.getsize(out_AA_path) == 0:
         os.remove(out_AA_path)
         done = False
 
-    return done
+    if not done and error is None:
+        error = "prodigal produced no genes"
+
+    return done, error
+
+
+def _condense(text, limit=200):
+    """
+    Flatten a captured stderr blob to a single line for a summary-table cell
+    """
+    flat = " ".join(text.split())
+    return flat if len(flat) <= limit else flat[:limit - 3] + "..."
 
 
 def _strip_stop_chars(src, dest):
     """
-    Copy `src` to `dest` with '*' characters removed, atomically.
-
-    Streams in chunks rather than reading the whole proteome into memory, and writes
-    via `.part` + os.replace() so `dest` never exists in a partial state.
+    Copy `src` to `dest` with '*' characters removed, atomically
     """
     tmp = f"{dest}.part"
     try:

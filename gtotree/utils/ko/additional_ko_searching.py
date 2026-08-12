@@ -6,7 +6,8 @@ from pathlib import Path
 import pandas as pd # type: ignore
 from Bio import SeqIO # type: ignore
 from gtotree.utils.misc.general import (search_threads_per_genome,
-                                   atomic_write_text)
+                                   atomic_write_text,
+                                   record_search_failure)
 
 
 def _ko_search_worker(genome, run_data, aa_path=None):
@@ -70,12 +71,12 @@ def run_ko_search(profiles_dir, ko_file, base_outpath, AA_file):
         kofamscan_failed = False
     except subprocess.CalledProcessError as e:
         stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
-        print(f"[kofamscan failed for {os.path.basename(base_outpath)}] "
-              f"exit {e.returncode}: {stderr.strip()}")
+        record_search_failure(base_outpath, "kofamscan",
+                              f"exit {e.returncode}: {stderr.strip()}")
         kofamscan_failed = True
     except OSError as e:
         # binary missing / not executable
-        print(f"[kofamscan could not be run for {os.path.basename(base_outpath)}]: {e}")
+        record_search_failure(base_outpath, "kofamscan", f"could not be run: {e}")
         kofamscan_failed = True
 
     shutil.rmtree(tmp_path, ignore_errors=True)

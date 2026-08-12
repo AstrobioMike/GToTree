@@ -38,6 +38,21 @@ def atomic_write_text(path, write_fn, encoding="utf-8"):
         raise
 
 
+SEARCH_FAILURE_FILENAME = "SEARCH-FAILED.txt"
+
+
+def record_search_failure(base_outpath, tool, detail):
+    """
+    Note why a per-genome search failed, in that genome's own results directory
+    """
+    try:
+        os.makedirs(base_outpath, exist_ok=True)
+        path = os.path.join(base_outpath, SEARCH_FAILURE_FILENAME)
+        atomic_write_text(path, lambda f: f.write(f"{tool} failed: {detail}\n"))
+    except BaseException:
+        pass
+
+
 def decode_pyhmmer_text(value):
     """
     Normalize a pyhmmer text attribute (`name`, `accession`, `description`) to str

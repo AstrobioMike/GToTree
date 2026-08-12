@@ -5,7 +5,8 @@ from pathlib import Path
 import pandas as pd # type: ignore
 from Bio import SeqIO # type: ignore
 from gtotree.utils.misc.general import (search_threads_per_genome,
-                                   atomic_write_text)
+                                   atomic_write_text,
+                                   record_search_failure)
 from gtotree.utils.hmms.hmm_searching_engine import search_one_genome
 
 
@@ -102,8 +103,8 @@ def run_pfam_search(all_pfam_targets_hmm, base_outpath, AA_file, pressed_base=No
                           cpus=search_threads_per_genome(None))
         pfam_search_failed = False
     except Exception as e:
-        print(f"[Pfam search failed for {os.path.basename(base_outpath)}] "
-              f"{type(e).__name__}: {e}")
+        record_search_failure(base_outpath, "Pfam search",
+                              f"{type(e).__name__}: {e}")
         pfam_search_failed = True
 
     return pfam_search_failed
