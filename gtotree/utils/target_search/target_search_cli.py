@@ -342,7 +342,7 @@ def report_finish(out_dir, run_data, spec, summary_path, targets_with_hits):
     if not targets_with_hits:
         report_message(
             f"No hits were found for any of the {num_targets:,} "
-            f"{spec.target_label} target(s) in any of the genomes searched :/", "yellow", ii="      ", si="      ")
+            f"{spec.target_label} target(s) in any of the genomes searched :/", "yellow", ii="      ", si="      ", newline=False)
         print()
 
     print("      Results written to:")
