@@ -13,76 +13,26 @@
         # gtt gen-scg-hmms
 
 
+    # still working on printout formatting for search-pfams/kos a little (latest chat has latest changes i still need to integrate)
 
-On a main gtotree run, i want this printed output:
+    # main gtotree needs to download the HMM first (when other dbs grabbed) if specified/we know what it will be
+        # and I need to work on formatting when it does download after start like it currently does, e.g., here:
 
-        # Input-genome sources include:
-        #   - NCBI accessions listed in accs.txt (2 genomes)
-        #   - NCBI accessions selected for --wanted-ref-tax 'Methanobacteria' (4 genomes)
-        #   - Genbank files listed in gb-files.txt (1 genomes)
-        #   - Fasta files listed in fasta-files.txt (3 genomes)
-        #   - Amino-acid files listed in aa-files.txt (1 genomes)
-
-to look like this:
-
-        # Input-genome sources include:
-        #   - NCBI accessions selected for --wanted-ref-tax 'Methanobacteria' (4 genomes)
-        #       - wanted rank "class" was dereplicated to one genome per family
-        #   - NCBI accessions listed in accs.txt (2 genomes)
-        #   - Genbank files listed in gb-files.txt (1 genomes)
-        #   - Fasta files listed in fasta-files.txt (3 genomes)
-        #   - Amino-acid files listed in aa-files.txt (1 genomes)
+                # gtotree -w Methanobacteria -H universal -F
 
 
-and work in search-kos and search-pfams i want includes:
-        # one thing is i want all needed dbs to be checked and fetched as-needed up front before any normal work starts (like main gtotree)
-        # another is it's not keeping track of the genomes grabbed with -w appropriately in the final summary tsv (they're all just labeled accession)
-        #  i don't like the formatting of the numbers in phase 1
-
-            # Phase 1: Resolving input genomes...
-
-            #     Genome source being used: GTDB v232 (released Apr 15, 2026)
-
-            #     ✔ Selected reference genomes
-            #         4 genome(s) selected (Methanobacteria at rank class)
-            #         dereplicated to one genome per family
-
-            #         8 NCBI accession(s) read from GToTree-test-data/ncbi_accessions.txt
-            #         2 nucleotide fasta file(s) read from fasta-files.txt
-            #         4 amino-acid fasta file(s) read from amino-acid-files.txt
-            #         4 reference genome accession(s) added by `-w`
-
-            #     18 total input genome(s)
-            #     ✔ Looked up accessions at NCBI
-
-            #         1 accession(s) weren't found at NCBI, so they've been dropped
-            #         from the run. They're reported in:
-            #         gtt-pfam-search-output/removed-genomes.tsv
-
-        # should mirror the main gtotree output where possible, like this:
-
-            # Phase 1: Resolving input genomes...
-
-            #     Genome source being used: GTDB v232 (released Apr 15, 2026)
-            #     ✔ Selected reference genomes
+                #                                   GToTree v2.0.0
+                #                           github.com/AstrobioMike/GToTree
 
 
-            #     - NCBI accessions selected for --wanted-ref-tax 'Methanobacteria' (4 genomes)
-            #         - wanted rank "class" was dereplicated to one genome per family
-            #     - NCBI accessions listed in GToTree-test-data/ncbi_accessions.txt (8 genomes)
-            #     - Fasta files listed in fasta-files.txt (2 genomes)
-            #     - Amino-acid files listed in amino-acid-files.txt (4 genomes)
-            #         
-            #                     Total input genomes: 18 
-            #
-            #
-            #     ✔ Looked up accessions at NCBI
+                #   Only 4 reference genome(s) selected. Consider a finer --derep-rank
+                #   (e.g., 'genus') for more genomes to be included.
+                #     Downloading the prebuilt "Universal-Hug-et-al" HMM set (only needs to be done once)...
 
-            #         1 accession(s) weren't found at NCBI, so they've been dropped
-            #         from the run. They're reported in:
-            #         gtt-pfam-search-output/removed-genomes.tsv
+                #         Universal-Hug-et-al HMM file: 100%|████████████| 900k/900k [00:00<00:00, 17.1MB/s]
 
 
+        # maybe that Only 4 reference genome(s) notice should have a newline at end, that might solve it
 
 
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
