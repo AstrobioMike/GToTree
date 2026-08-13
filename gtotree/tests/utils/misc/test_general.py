@@ -418,7 +418,7 @@ class TestRunDataPersistence:
 
     def test_all_input_genomes_is_rebuilt_on_read(self, tmp_path):
         rd = self._run_data(tmp_path)
-        rd.amino_acid_files = [general.GenomeData.from_path("/in/mock.faa", "aa-fasta-file")]
+        rd.amino_acid_files = [general.GenomeData.from_path("/in/mock.faa", "amino-acid-fasta")]
         rd.update_all_input_genomes()
         general.write_run_data(rd)
 
@@ -447,7 +447,7 @@ class TestRunDataPersistence:
         on_disk = json.loads(Path(rd.run_data_path).read_text())
         # a stale duplicate, deliberately disagreeing with the source list
         on_disk["all_input_genomes"] = [
-            {"id": "STALE", "source": "accession", "full_path": None,
+            {"id": "STALE", "source": "ncbi-accession", "full_path": None,
              "provided_path": None, "basename": "STALE"}
         ]
         Path(rd.run_data_path).write_text(json.dumps(on_disk))

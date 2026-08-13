@@ -1,4 +1,5 @@
 import argparse
+import os
 import pyarrow as pa # type: ignore
 import pyarrow.parquet as pq # type: ignore
 import pytest # type: ignore
@@ -6,8 +7,11 @@ import gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli as cli
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (
     TargetGenomeError,
+    build_run_data,
     resolve_download_info,
 )
+from gtotree.utils.misc.messaging import REMOVED_GENOMES_FILENAME
+from gtotree.utils.misc.stages import GenomeRemovalStage
 from gtotree.tests.paths import DATA_DIR
 
 
@@ -27,9 +31,10 @@ def _write_ncbi_table(path, rows):
 
 
 def _phase_args(**kw):
-    base = dict(target_accessions=None, wanted_ref_tax=None, genbank_files=None,
+    base = dict(ncbi_accessions=None, wanted_ref_tax=None, genbank_files=None,
                 fasta_files=None, amino_acid_files=None, source="GTDB",
-                target_rank=None, derep_rank="off", num_jobs=4, num_threads=1)
+                target_rank=None, derep_rank="off", num_jobs=4, num_threads=1,
+                min_completeness=None, max_contamination=None)
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -85,16 +90,26 @@ def test_resolve_download_info_raises_without_table(tmp_path):
 # phase_resolve_genomes
 ################################################################################
 
-def test_phase_resolve_genomes_from_accessions_file(tmp_path, capsys):
+def _run_data(args, tmp_path):
+    out_dir = str(tmp_path / "out"); os.makedirs(out_dir, exist_ok=True)
+    work_dir = str(tmp_path / "work"); os.makedirs(work_dir, exist_ok=True)
+    return build_run_data(args, out_dir, work_dir)
+
+
+def _resolved(args, tmp_path):
+    """Phase 1's output: the RunData carrying the whole input genome set."""
+    run_data, _selections = cli.phase_resolve_genomes(args, _run_data(args, tmp_path))
+    return run_data
+
+
+def test_phase_resolve_genomes_from_accessions_file(tmp_path):
     accs = tmp_path / "accs.txt"
     accs.write_text("GCF_000000001.1\nGCF_000000002.1\n")
 
-    args = _phase_args(target_accessions=str(accs))
-    accessions, sources, local, missing = cli.phase_resolve_genomes(args)
+    run_data = _resolved(_phase_args(ncbi_accessions=str(accs)), tmp_path)
 
-    assert accessions == ["GCF_000000001.1", "GCF_000000002.1"]
-    assert set(sources.values()) == {"input-accessions"}
-    assert local == [] and missing == []
+    assert run_data.get_input_ncbi_accs() == ["GCF_000000001.1", "GCF_000000002.1"]
+    assert run_data.get_wanted_ref_tax_accs() == []
 
 
 def test_phase_resolve_genomes_from_local_files(tmp_path):
@@ -102,11 +117,10 @@ def test_phase_resolve_genomes_from_local_files(tmp_path):
     aa.write_text(">p1\n" + MOTIFS["PF90001.3"] + "\n")
 
     args = _phase_args(amino_acid_files=_listing(tmp_path, "aa.txt", [aa]))
-    accessions, sources, local, missing = cli.phase_resolve_genomes(args)
+    run_data = _resolved(args, tmp_path)
 
-    assert accessions == []
-    assert [g.id for g in local] == ["g1"]
-    assert missing == []
+    assert run_data.get_input_ncbi_accs() == []
+    assert [g.id for g in run_data.amino_acid_files] == ["g1"]
 
 
 def test_phase_resolve_genomes_combines_sources(tmp_path):
@@ -115,38 +129,52 @@ def test_phase_resolve_genomes_combines_sources(tmp_path):
     aa = tmp_path / "g1.faa"
     aa.write_text(">p1\n" + MOTIFS["PF90001.3"] + "\n")
 
-    args = _phase_args(target_accessions=str(accs),
+    args = _phase_args(ncbi_accessions=str(accs),
                        amino_acid_files=_listing(tmp_path, "aa.txt", [aa]))
-    accessions, sources, local, missing = cli.phase_resolve_genomes(args)
+    run_data = _resolved(args, tmp_path)
 
-    assert accessions == ["GCF_000000001.1"]
-    assert [g.id for g in local] == ["g1"]
+    assert [g.id for g in run_data.all_input_genomes] == ["GCF_000000001.1", "g1"]
 
 
 def test_phase_resolve_genomes_raises_when_nothing_resolves(tmp_path):
-    aa_listing = tmp_path / "aa.txt"
-    aa_listing.write_text(str(tmp_path / "ghost.faa") + "\n")
-
-    args = _phase_args(amino_acid_files=str(aa_listing))
-    with pytest.raises(GenSCGHMMsError, match="No target genomes"):
-        cli.phase_resolve_genomes(args)
+    args = _phase_args()
+    with pytest.raises(GenSCGHMMsError, match="No input genomes"):
+        cli.phase_resolve_genomes(args, _run_data(args, tmp_path))
 
 
-def test_phase_resolve_genomes_reports_missing_local_files(tmp_path):
+def test_phase_resolve_genomes_keeps_missing_local_files_as_removed(tmp_path):
+    """
+    A listed-but-absent file is a genome that left the run, not a nothing. Keeping it
+    is what puts it in removed-genomes.tsv with a stage and a reason.
+    """
     real = tmp_path / "g1.faa"
     real.write_text(">p1\n" + MOTIFS["PF90001.3"] + "\n")
 
     args = _phase_args(amino_acid_files=_listing(
         tmp_path, "aa.txt", [real, tmp_path / "ghost.faa"]))
-    _, _, local, missing = cli.phase_resolve_genomes(args)
+    run_data = _resolved(args, tmp_path)
 
-    assert [g.id for g in local] == ["g1"]
-    assert [m[0] for m in missing] == ["ghost"]
+    ghost = {g.id: g for g in run_data.all_input_genomes}["ghost"]
+    assert ghost.removed
+    assert ghost.removed_at == GenomeRemovalStage.AMINO_ACID_PREP
 
 
 ################################################################################
 # phase_get_amino_acids
 ################################################################################
+
+def _amino_acids(args, tmp_path, work=None):
+    """Phase 1 then phase 2, the way the driver runs them."""
+    run_data = _resolved(args, tmp_path)
+    work = work or str(tmp_path / "work")
+    os.makedirs(work, exist_ok=True)
+    combined, kept = cli.phase_get_amino_acids(run_data, work, args)
+    return run_data, combined, kept
+
+
+def _removed(run_data):
+    return {g.id: g for g in run_data.all_input_genomes if g.removed}
+
 
 def test_phase_get_amino_acids_local_only(tmp_path):
     genome_dir = tmp_path / "genomes"
@@ -157,16 +185,11 @@ def test_phase_get_amino_acids_local_only(tmp_path):
 
     args = _phase_args(amino_acid_files=_listing(
         tmp_path, "aa.txt", sorted(genome_dir.glob("*.faa"))))
-    _, _, local, missing = cli.phase_resolve_genomes(args)
 
-    work = tmp_path / "work"
-    work.mkdir()
-    combined, kept, missed, organisms, sources_extra = cli.phase_get_amino_acids(
-        [], local, missing, str(work), args)
+    run_data, combined, kept = _amino_acids(args, tmp_path)
 
     assert kept == ["g1", "g2"]
-    assert missed == []
-    assert sources_extra == {"g1": "amino-acid", "g2": "amino-acid"}
+    assert _removed(run_data) == {}
 
     # The combined fasta is written in COMPLETION order, not input order -- the pool
     # applies results as they land. That's by design and harmless, because genome
@@ -183,7 +206,7 @@ def test_phase_get_amino_acids_local_only(tmp_path):
 
 def test_phase_get_amino_acids_preserves_input_order(tmp_path):
     """
-    The pool completes out of order, so kept_ids must be re-sorted to input order --
+    The pool completes out of order, so kept_ids must come back in input order --
     otherwise the output tables would vary run to run.
     """
     genome_dir = tmp_path / "genomes"
@@ -192,14 +215,10 @@ def test_phase_get_amino_acids_preserves_input_order(tmp_path):
     for name in names:
         (genome_dir / f"{name}.faa").write_text(">p1\n" + MOTIFS["PF90001.3"] + "\n")
 
-    listing = _listing(tmp_path, "aa.txt",
-                       [genome_dir / f"{n}.faa" for n in names])
-    args = _phase_args(amino_acid_files=listing)
-    _, _, local, missing = cli.phase_resolve_genomes(args)
+    args = _phase_args(amino_acid_files=_listing(
+        tmp_path, "aa.txt", [genome_dir / f"{n}.faa" for n in names]))
 
-    work = tmp_path / "work"
-    work.mkdir()
-    _, kept, _, _, _ = cli.phase_get_amino_acids([], local, missing, str(work), args)
+    _run, _combined, kept = _amino_acids(args, tmp_path)
 
     assert kept == names
 
@@ -213,15 +232,38 @@ def test_phase_get_amino_acids_records_failures(tmp_path):
 
     args = _phase_args(amino_acid_files=_listing(
         tmp_path, "aa.txt", [genome_dir / "good.faa", genome_dir / "empty.faa"]))
-    _, _, local, missing = cli.phase_resolve_genomes(args)
 
-    work = tmp_path / "work"
-    work.mkdir()
-    _, kept, missed, _, _ = cli.phase_get_amino_acids(
-        [], local, missing, str(work), args)
+    run_data, _combined, kept = _amino_acids(args, tmp_path)
 
     assert kept == ["good"]
-    assert [m[0] for m in missed] == ["empty"]
+    assert list(_removed(run_data)) == ["empty"]
+    assert _removed(run_data)["empty"].removed_at == \
+        GenomeRemovalStage.AMINO_ACID_PREP
+
+
+def test_phase_get_amino_acids_writes_the_removed_genomes_report(tmp_path):
+    """
+    The losses have to reach the shared report file, not just the in-memory RunData --
+    that file is the only place the user ever sees them.
+    """
+    genome_dir = tmp_path / "genomes"
+    genome_dir.mkdir()
+    (genome_dir / "good.faa").write_text(">p1\n" + MOTIFS["PF90001.3"] + "\n")
+    (genome_dir / "empty.faa").write_text("")
+
+    args = _phase_args(amino_acid_files=_listing(
+        tmp_path, "aa.txt", [genome_dir / "good.faa", genome_dir / "empty.faa",
+                             tmp_path / "ghost.faa"]))
+
+    run_data, _combined, _kept = _amino_acids(args, tmp_path)
+
+    report = os.path.join(run_data.run_files_dir, REMOVED_GENOMES_FILENAME)
+    rows = [line.rstrip("\n").split("\t") for line in open(report)]
+
+    assert rows[0] == ["genome_id", "input", "source", "stage_removed",
+                       "reason_removed"]
+    assert {r[0] for r in rows[1:]} == {"empty", "ghost"}
+    assert {r[3] for r in rows[1:]} == {GenomeRemovalStage.AMINO_ACID_PREP}
 
 
 def test_phase_get_amino_acids_raises_when_all_fail(tmp_path):
@@ -231,38 +273,18 @@ def test_phase_get_amino_acids_raises_when_all_fail(tmp_path):
 
     args = _phase_args(amino_acid_files=_listing(
         tmp_path, "aa.txt", [genome_dir / "empty.faa"]))
-    _, _, local, missing = cli.phase_resolve_genomes(args)
 
-    work = tmp_path / "work"
-    work.mkdir()
     with pytest.raises(GenSCGHMMsError, match="No amino-acid sequences"):
-        cli.phase_get_amino_acids([], local, missing, str(work), args)
-
-
-def test_phase_get_amino_acids_carries_missing_into_report(tmp_path):
-    """Files listed but absent must reach missed-accessions.tsv, not vanish."""
-    genome_dir = tmp_path / "genomes"
-    genome_dir.mkdir()
-    (genome_dir / "good.faa").write_text(">p1\n" + MOTIFS["PF90001.3"] + "\n")
-
-    args = _phase_args(amino_acid_files=_listing(
-        tmp_path, "aa.txt", [genome_dir / "good.faa", tmp_path / "ghost.faa"]))
-    _, _, local, missing = cli.phase_resolve_genomes(args)
-
-    work = tmp_path / "work"
-    work.mkdir()
-    _, kept, missed, _, _ = cli.phase_get_amino_acids(
-        [], local, missing, str(work), args)
-
-    assert kept == ["good"]
-    assert [m[0] for m in missed] == ["ghost"]
+        _amino_acids(args, tmp_path)
 
 
 def test_phase_get_amino_acids_raises_when_nothing_resolvable(tmp_path):
-    work = tmp_path / "work"
-    work.mkdir()
+    """Every input genome absent up front leaves nothing to even attempt."""
+    args = _phase_args(amino_acid_files=_listing(
+        tmp_path, "aa.txt", [tmp_path / "ghost.faa"]))
+
     with pytest.raises(GenSCGHMMsError, match="None of the target genomes"):
-        cli.phase_get_amino_acids([], [], [], str(work), _phase_args())
+        _amino_acids(args, tmp_path)
 
 
 ################################################################################
@@ -277,12 +299,9 @@ def test_phase_search_returns_hit_counts(tmp_path):
 
     args = _phase_args(amino_acid_files=_listing(
         tmp_path, "aa.txt", [genome_dir / "g1.faa"]))
-    _, _, local, missing = cli.phase_resolve_genomes(args)
 
     work = tmp_path / "work"
-    work.mkdir()
-    combined, kept, _, _, _ = cli.phase_get_amino_acids(
-        [], local, missing, str(work), args)
+    _run, combined, kept = _amino_acids(args, tmp_path, work=str(work))
 
     # phase_search takes the genome count to size a per-genome progress bar; the caller
     # already knows it, so no pre-pass over the combined fasta is needed
@@ -304,12 +323,9 @@ def test_phase_search_checkpoints_into_the_work_dir(tmp_path):
 
     args = _phase_args(amino_acid_files=_listing(
         tmp_path, "aa.txt", [genome_dir / "g1.faa"]))
-    _, _, local, missing = cli.phase_resolve_genomes(args)
 
     work = tmp_path / "work"
-    work.mkdir()
-    combined, kept, _, _, _ = cli.phase_get_amino_acids(
-        [], local, missing, str(work), args)
+    _run, combined, kept = _amino_acids(args, tmp_path, work=str(work))
 
     cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined, len(kept), args,
                      work_dir=str(work))
@@ -325,13 +341,53 @@ def test_phase_search_without_a_work_dir_writes_no_checkpoint(tmp_path):
 
     args = _phase_args(amino_acid_files=_listing(
         tmp_path, "aa.txt", [genome_dir / "g1.faa"]))
-    _, _, local, missing = cli.phase_resolve_genomes(args)
 
     work = tmp_path / "work"
-    work.mkdir()
-    combined, kept, _, _, _ = cli.phase_get_amino_acids(
-        [], local, missing, str(work), args)
+    _run, combined, kept = _amino_acids(args, tmp_path, work=str(work))
 
     hits = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined, len(kept), args)
     assert hits["g1"]["PF90001.3"] == 1
     assert not (work / cli.SEARCH_CHECKPOINT_FILENAME).exists()
+
+
+################################################################################
+# NCBI lookup removals
+################################################################################
+
+def test_accessions_missing_from_ncbi_are_removed_at_the_lookup_stage(tmp_path,
+                                                                     monkeypatch,
+                                                                     capsys):
+    """
+    An accession NCBI no longer lists leaves at `ncbi-lookup`, not at `ncbi-download`:
+    nothing was ever attempted for it. The distinction is the whole point of the
+    stage_removed column, and it's the same one the search subcommands draw.
+    """
+    accs = tmp_path / "accs.txt"
+    accs.write_text("GCF_000000001.1\nGCF_999999999.9\n")
+
+    monkeypatch.setattr(
+        cli, "resolve_download_info",
+        lambda ids: ({"GCF_000000001.1": {"base_link": "https://example.org/x",
+                                          "organism_name": "Testus one"}},
+                     ["GCF_999999999.9"]))
+
+    args = _phase_args(ncbi_accessions=str(accs))
+    run_data = _resolved(args, tmp_path)
+
+    to_fetch, info = cli._resolve_accession_downloads(run_data)
+
+    assert [gd.id for gd in to_fetch] == ["GCF_000000001.1"]
+    assert list(info) == ["GCF_000000001.1"]
+
+    missing = {gd.id: gd for gd in run_data.ncbi_accs}["GCF_999999999.9"]
+    assert missing.removed_at == GenomeRemovalStage.NCBI_LOOKUP
+    assert missing.acc_was_found is False
+
+    # organism names ride on the genome now rather than in a parallel dict
+    found = {gd.id: gd for gd in run_data.ncbi_accs}["GCF_000000001.1"]
+    assert found.organism_name == "Testus one"
+
+    # and the printout points at the shared report, the way the search tools' does
+    out = capsys.readouterr().out
+    assert "1 accession(s) not found at NCBI" in out
+    assert REMOVED_GENOMES_FILENAME in out

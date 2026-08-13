@@ -10,7 +10,8 @@ separately, so it can't drift from the counts the OVERALL SUMMARY reports.
 
 import pytest  # type: ignore
 
-from gtotree.utils.misc.general import GenomeData, RunData
+from gtotree.utils.misc.general import (GenomeData, RunData,
+                                        REASON_NOT_FOUND_AT_NCBI)
 from gtotree.utils.misc.stages import GenomeRemovalStage
 from gtotree.utils.misc.summary_info import (REMOVED_GENOMES_COLUMNS,
                                              REMOVED_GENOMES_FILENAME,
@@ -61,7 +62,7 @@ class TestWriteRemovedGenomesReport:
 
     def test_carries_the_stage_and_the_reason(self, tmp_path):
         rd = _run_data(tmp_path)
-        _add_acc(rd, "G1").mark_removed("accession not found at NCBI",
+        _add_acc(rd, "G1").mark_removed(REASON_NOT_FOUND_AT_NCBI,
                                         GenomeRemovalStage.NCBI_LOOKUP)
 
         write_removed_genomes_report(rd)
@@ -69,7 +70,7 @@ class TestWriteRemovedGenomesReport:
         row = _rows(tmp_path)[1].split("\t")
         assert row[0] == "G1"
         assert row[3] == GenomeRemovalStage.NCBI_LOOKUP
-        assert row[4] == "accession not found at NCBI"
+        assert row[4] == REASON_NOT_FOUND_AT_NCBI
 
     def test_file_inputs_report_the_path_the_user_provided(self, tmp_path):
         """
@@ -80,7 +81,7 @@ class TestWriteRemovedGenomesReport:
         """
         rd = _run_data(tmp_path)
         gd = _add_file(rd, "some/nested/dir/genome_1.fa.gz",
-                       "fasta_files", "nt-fasta-file")
+                       "fasta_files", "nucleotide-fasta")
         gd.mark_removed("fasta-file processing failed",
                         GenomeRemovalStage.FASTA_PREP)
 
@@ -97,7 +98,7 @@ class TestWriteRemovedGenomesReport:
         """`provided_path` is None for accessions, so the accession itself stands in."""
         rd = _run_data(tmp_path)
         _add_acc(rd, "GCF_999999999.1").mark_removed(
-            "accession not found at NCBI", GenomeRemovalStage.NCBI_LOOKUP)
+            REASON_NOT_FOUND_AT_NCBI, GenomeRemovalStage.NCBI_LOOKUP)
 
         write_removed_genomes_report(rd)
 
@@ -108,9 +109,9 @@ class TestWriteRemovedGenomesReport:
         _add_acc(rd, "A1").mark_removed("r", GenomeRemovalStage.NCBI_LOOKUP)
         _add_file(rd, "g.gb", "genbank_files", "genbank-file").mark_removed(
             "r", GenomeRemovalStage.GENBANK_PREP)
-        _add_file(rd, "f.fa", "fasta_files", "nt-fasta-file").mark_removed(
+        _add_file(rd, "f.fa", "fasta_files", "nucleotide-fasta").mark_removed(
             "r", GenomeRemovalStage.FASTA_PREP)
-        _add_file(rd, "a.faa", "amino_acid_files", "aa-fasta-file").mark_removed(
+        _add_file(rd, "a.faa", "amino_acid_files", "amino-acid-fasta").mark_removed(
             "r", GenomeRemovalStage.AMINO_ACID_PREP)
 
         write_removed_genomes_report(rd)
@@ -195,3 +196,22 @@ class TestWriteRemovedGenomesReport:
 
         assert not (tmp_path / f"{REMOVED_GENOMES_FILENAME}.part").exists()
         assert not (tmp_path / REMOVED_GENOMES_FILENAME).exists()
+
+
+class TestReasonWordingIsSharedWhereTheEventIs:
+    """
+    The main driver and gen-scg-hmms both discover "this accession isn't in the NCBI
+    assembly table", from the same table, and both write it to `reason_removed` in a
+    file with the same name. They used to word it two different ways, so diffing two
+    runs' removed-genomes.tsv showed two spellings of one thing.
+    """
+
+    def test_both_programs_use_the_same_not_found_reason(self):
+        import inspect
+        from gtotree.utils.ncbi import parse_ncbi_assembly_summary
+        from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_cli
+
+        for module in (parse_ncbi_assembly_summary, gen_scg_hmms_cli):
+            assert module.REASON_NOT_FOUND_AT_NCBI is REASON_NOT_FOUND_AT_NCBI
+            # and neither has quietly grown a literal alongside the import
+            assert "not found in NCBI assembly data" not in inspect.getsource(module)

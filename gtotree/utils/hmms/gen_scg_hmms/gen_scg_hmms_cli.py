@@ -24,18 +24,26 @@ from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_ar
 from gtotree.utils.misc.general import (run_pooled_stage,
                                    prepare_output_dir,
                                    OutputDirExistsError,
+                                   adopt_genome_progress,
+                                   read_run_data,
+                                   resolve_input_genomes,
+                                   wanted_ref_tax_list,
+                                   PREPROCESSING_STAGE_BY_SOURCE,
+                                   REASON_NOT_FOUND_AT_NCBI,
+                                   write_run_data,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED,
                                    GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED,
                                    GTT_PROGRESS_SMOOTHING)
+from gtotree.utils.misc.stages import GenomeRemovalStage
+from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
-                                     report_phase_header, report_very_early_exit)
+                                     report_phase_header, report_very_early_exit,
+                                     REMOVED_GENOMES_FILENAME)
 from gtotree.utils.misc.data_locations import ensure_reference_data
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
-from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
-                                                   describe_source_version,
-                                                   WantedRefTaxError)
+from gtotree.utils.taxonomy.wanted_ref_tax import WantedRefTaxError
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
     GenSCGHMMsError,
     DEFAULT_MIN_PFAM_COVERAGE,
@@ -46,16 +54,12 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
 )
 from gtotree.utils.misc.resume_state import ResumeProfile, hash_strings, hash_local_genomes, STATE_VERSION
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (TargetGenomeError,
-                                                                  read_accessions_file,
+                                                                  build_run_data,
                                                                   resolve_download_info,
                                                                   fetch_amino_acids_pooled,
                                                                   relabel_and_append,
-                                                                  MAX_DOWNLOAD_THREADS,
-                                                                  MISSED_NOT_FOUND)
-from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local import (build_local_genomes,
-                                                                process_local_genome,
-                                                                SOURCE_GENBANK, SOURCE_FASTA,
-                                                                SOURCE_AMINO_ACID)
+                                                                  MAX_DOWNLOAD_THREADS)
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local import process_local_genome
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search import search_profiles
 from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_outputs as outputs
 
@@ -104,7 +108,7 @@ RESUME = ResumeProfile(
 )
 
 
-def build_fingerprint(accessions, args, pfam_version=None, local_genomes=None):
+def build_fingerprint(run_data, args, pfam_version=None):
     """
     Everything that affects the final SCG set.
 
@@ -116,17 +120,20 @@ def build_fingerprint(accessions, args, pfam_version=None, local_genomes=None):
     NCBI accession a local file's contents can change while its path stays the same,
     and resuming across that would silently mix old results with new input.
     """
+    accessions = run_data.get_input_ncbi_accs()
+    local_genomes = (list(run_data.genbank_files) + list(run_data.fasta_files)
+                     + list(run_data.amino_acid_files))
+
     return {
         "state_version": STATE_VERSION,
         "accessions_sha256": hash_strings(accessions),
         "num_accessions": len(set(accessions)),
         "local_genomes_sha256": hash_local_genomes(local_genomes),
-        "num_local_genomes": len(local_genomes or []),
+        "num_local_genomes": len(local_genomes),
         "percent_single_copy": args.percent_single_copy,
         "min_pfam_coverage": args.min_pfam_coverage,
         "source": (args.source or "").upper(),
-        "wanted_ref_tax": (sorted(args.wanted_ref_tax)
-                           if args.wanted_ref_tax else None),
+        "wanted_ref_tax": (sorted(wanted_ref_tax_list(args)) or None),
         "target_rank": args.target_rank,
         "derep_rank": args.derep_rank,
         "min_completeness": args.min_completeness,
@@ -167,7 +174,7 @@ def build_parser(parent_subparsers=None):
     optional = parser.add_argument_group("Optional Parameters")
 
     required.add_argument(
-        "-a", "--target-accessions",
+        "-a", "--ncbi-accessions",
         metavar="<FILE>",
         help=("A single-column file of NCBI accessions to build the SCG set from."),
         action="store",
@@ -360,7 +367,7 @@ def section_border():
 
 def check_args(args):
     """Validate arguments, raising GenSCGHMMsError with a friendly message."""
-    input_flags = (args.target_accessions, args.wanted_ref_tax, args.genbank_files,
+    input_flags = (args.ncbi_accessions, args.wanted_ref_tax, args.genbank_files,
                    args.fasta_files, args.amino_acid_files)
     if not any(input_flags):
         raise GenSCGHMMsError(
@@ -426,141 +433,36 @@ def setup_output_dir(args):
 # phases
 ################################################################################
 
-def phase_resolve_genomes(args):
+def phase_resolve_genomes(args, run_data):
     """
-    Resolve the target genomes from `-a` and/or `-w`.
-
-    Returns (accessions, sources) where `sources` maps accession -> where it came
-    from, for the target-genomes table.
+    Resolve the target genomes from `-a`, `-w`, and the local-file flags
     """
-
-    ensure_reference_data(has_ncbi_accessions=bool(args.target_accessions),
+    ensure_reference_data(has_ncbi_accessions=bool(args.ncbi_accessions),
                           wanted_ref_tax=args.wanted_ref_tax,
                           source=args.source)
 
-    accessions = []
-    sources = {}
-
-    if args.target_accessions:
-        with spinner("Reading target accessions...", "Read target accessions"):
-            from_file = read_accessions_file(args.target_accessions)
-        for acc in from_file:
-            if acc not in sources:
-                accessions.append(acc)
-                sources[acc] = "input-accessions"
-        print(f"        {len(from_file):,} accession(s) read from "
-              f"{args.target_accessions}")
-
-    if args.wanted_ref_tax:
-        source_desc = describe_source_version(args.source)
-        if source_desc:
-            print(f"      Genome source being used: {color_text(source_desc, 'green')}\n")
-
-        # -w is repeatable (action="append" -> a list). Normalise a lone string too, so
-        # a programmatic caller passing "Bacteria" isn't silently iterated into its
-        # characters. Each taxon is resolved and dereplicated independently, then its
-        # genomes are merged into the shared pool -- per-taxon rather than over the
-        # union so a derep rank means the same thing it would for a single -w (one
-        # genome per group WITHIN each taxon), and so two taxa sharing a genus each keep
-        # a representative.
-        wanted_list = ([args.wanted_ref_tax] if isinstance(args.wanted_ref_tax, str)
-                       else list(args.wanted_ref_tax))
-        for wanted in wanted_list:
-            with spinner(f"Selecting reference genomes for '{wanted}'...",
-                         "Selected reference genomes"):
-                selected, selection = resolve_wanted_ref_tax_accessions(
-                    args.source, wanted,
-                    target_rank=args.target_rank,
-                    derep_rank=args.derep_rank,
-                    min_completeness=args.min_completeness,
-                    max_contamination=args.max_contamination)
-
-            added = 0
-            for acc in selected:
-                if acc not in sources:
-                    accessions.append(acc)
-                    sources[acc] = f"{args.source.upper()}:{selection.canonical}"
-                    added += 1
-
-            detail = f"        {len(selected):,} genome(s) selected"
-            if selection.resolved_rank:
-                detail += f" ({selection.canonical} at rank {selection.resolved_rank})"
-            print(detail)
-            if selection.effective_derep_rank:
-                print("        dereplicated to one genome per "
-                      f"{selection.effective_derep_rank}")
-            if added != len(selected):
-                # already present from -a, or overlapping a previously-resolved -w taxon
-                print(f"        {len(selected) - added:,} already counted")
-
-            for warning in selection.warnings:
-                report_message(warning, "orange", ii="        ", si="        ")
-
-    local_genomes, local_missing = build_local_genomes(args)
-    if local_genomes or local_missing:
-        with spinner("Reading local genome files...", "Read local genome files"):
-            pass
-        by_source = {}
-        for gd in local_genomes:
-            by_source[gd.source] = by_source.get(gd.source, 0) + 1
-        for source in (SOURCE_GENBANK, SOURCE_FASTA, SOURCE_AMINO_ACID):
-            if by_source.get(source):
-                print(f"        {by_source[source]:,} {source} file(s)")
-        if local_missing:
-            report_message(
-                f"{len(local_missing):,} listed file(s) couldn't be found and will be "
-                "skipped.", "yellow", ii="        ", si="        ")
-
-    total = len(accessions) + len(local_genomes)
-    if not total:
-        raise GenSCGHMMsError("No target genomes were resolved to work with.")
-
-    print(f"\n      {color_text(f'{total:,} total target genome(s)', 'green')}")
-
-    return accessions, sources, local_genomes, local_missing
+    return resolve_input_genomes(args, run_data, GenSCGHMMsError)
 
 
-def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, args):
+def phase_get_amino_acids(run_data, work_dir, args):
     """
     Get amino acids for every target genome, downloading NCBI accessions and
     processing any local files, and combine them into a single fasta with
-    genome-traceable headers.
-
-    Returns (combined_path, kept_ids, missed, organism_names, sources_extra).
+    genome-traceable headers
     """
     phase_stats.checkpoint("phase 2 start")
 
-    missed = list(local_missing)
-    organism_names = {}
-    sources_extra = {}
-    kept_ids = []
-    prodigal_used = 0
+    combined_path = os.path.join(work_dir, "all-target-proteins.faa")
 
-    info = {}
-    to_fetch = []
-    if accessions:
-        with spinner("Resolving download locations...", "Resolved download locations"):
-            info, not_found = resolve_download_info(accessions)
+    to_fetch, download_info = _resolve_accession_downloads(run_data)
 
-        phase_stats.checkpoint("phase 2 after resolve_download_info (NCBI parquet)")
+    phase_stats.checkpoint("phase 2 after resolve_download_info (NCBI parquet)")
 
-        missed.extend((acc, MISSED_NOT_FOUND) for acc in not_found)
-        if not_found:
-            report_message(f"{len(not_found):,} accession(s) were not found in the NCBI "
-                           "assembly data.", "yellow", ii="      ", si="      ")
-
-        to_fetch = [acc for acc in accessions if acc in info]
-        for acc in to_fetch:
-            organism_names[acc] = info[acc].get("organism_name")
+    local_genomes = [gd for gd in _local_genomes(run_data) if not gd.removed]
 
     if not to_fetch and not local_genomes:
-        raise GenSCGHMMsError(
-            "None of the target genomes could be resolved to something usable.")
-
-    for gd in local_genomes:
-        sources_extra[gd.id] = gd.source
-
-    combined_path = os.path.join(work_dir, "all-target-proteins.faa")
+        _report_removals(run_data, "None of the target genomes could be resolved to "
+                                   "something usable.")
 
     workers = max(1, min(int(args.num_jobs), MAX_DOWNLOAD_THREADS, max(len(to_fetch), 1)))
     download_labelled = bool(to_fetch and workers > 1)
@@ -569,19 +471,16 @@ def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, ar
 
     with open(combined_path, "w") as combined:
 
-        def absorb(genome_id, aa_path, used_prodigal, error):
+        def absorb(gd, aa_path, error):
             """Fold one finished genome into the combined fasta and clean up."""
-            nonlocal prodigal_used
             if error is not None:
-                missed.append((genome_id, error))
+                gd.mark_removed(error, PREPROCESSING_STAGE_BY_SOURCE[gd.source])
             else:
                 try:
-                    relabel_and_append(genome_id, aa_path, combined)
-                    kept_ids.append(genome_id)
-                    if used_prodigal:
-                        prodigal_used += 1
+                    relabel_and_append(gd.id, aa_path, combined)
+                    gd.mark_processing_done()
                 except TargetGenomeError as e:
-                    missed.append((genome_id, str(e)))
+                    gd.mark_removed(str(e), PREPROCESSING_STAGE_BY_SOURCE[gd.source])
             if aa_path and os.path.exists(aa_path):
                 try:
                     os.remove(aa_path)
@@ -589,8 +488,20 @@ def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, ar
                     pass
 
         if to_fetch:
+            by_id = {gd.id: gd for gd in to_fetch}
+
+            def on_result(acc, aa_path, used_prodigal, error):
+                gd = by_id[acc]
+                if used_prodigal:
+                    gd.mark_prodigal_used()
+                    run_data.tools_used.prodigal_used = True
+                if error is not None:
+                    gd.acc_was_downloaded = False
+                absorb(gd, aa_path, error)
+
             fetch_amino_acids_pooled(
-                to_fetch, info, work_dir, args=args, on_result=absorb,
+                [gd.id for gd in to_fetch], download_info, work_dir, args=args,
+                on_result=on_result,
                 bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED if download_labelled else None,
                 lead_newline=not download_labelled)
 
@@ -613,34 +524,98 @@ def phase_get_amino_acids(accessions, local_genomes, local_missing, work_dir, ar
                     return {"aa_path": None, "prodigal": False, "error": str(e)}
 
             def local_apply(gd, status, rd):
-                absorb(gd.id, status["aa_path"], status["prodigal"], status["error"])
+                if status["prodigal"]:
+                    gd.mark_prodigal_used()
+                    run_data.tools_used.prodigal_used = True
+                absorb(gd, status["aa_path"], status["error"])
 
             run_pooled_stage(local_genomes, local_worker, local_apply, args,
                              {"work_dir": work_dir})
 
-    # keep output ordering tied to the inputs rather than download timing
-    order = {acc: i for i, acc in enumerate(to_fetch)}
-    for i, gd in enumerate(local_genomes):
-        order[gd.id] = len(to_fetch) + i
-    kept_ids.sort(key=lambda a: order.get(a, 0))
+    write_removed_genomes_report(run_data)
+    write_run_data(run_data)
+
+    kept_ids = [gd.id for gd in run_data.all_input_genomes
+                if gd.processing_done and not gd.removed]
 
     print()
-    if prodigal_used:
-        print(f"      {prodigal_used:,} genome(s) needed gene-calling with prodigal")
 
     if not kept_ids:
-        raise GenSCGHMMsError(
-            "No amino-acid sequences could be obtained for any of the target genomes.")
+        _report_removals(run_data, "No amino-acid sequences could be obtained for any "
+                                   "of the target genomes.")
 
-    total_wanted = len(to_fetch) + len(local_genomes)
-    if len(kept_ids) != total_wanted:
-        report_message(
-            f"{total_wanted - len(kept_ids):,} of {total_wanted:,} target genome(s) "
-            "didn't make it through.", "yellow", ii="      ", si="      ")
+    _report_removals(run_data)
 
     print(f"\n      {color_text(f'{len(kept_ids):,} genome(s) ready to search', 'green')}")
 
-    return combined_path, kept_ids, missed, organism_names, sources_extra
+    return combined_path, kept_ids
+
+
+def _local_genomes(run_data):
+    """The three local-file input pools, in input order."""
+    return (list(run_data.genbank_files) + list(run_data.fasta_files)
+            + list(run_data.amino_acid_files))
+
+
+def _resolve_accession_downloads(run_data):
+    """
+    Look every accession up in the NCBI assembly table, marking the ones NCBI doesn't
+    list as removed at the lookup stage.
+
+    Returns (to_fetch, download_info): the accession GenomeData still in play, and the
+    accession -> download-location map the fetch stage takes.
+    """
+    accs = [gd for gd in run_data.ncbi_accs if not gd.removed]
+    if not accs:
+        return [], {}
+
+    with spinner("Resolving download locations...", "Resolved download locations"):
+        info, not_found = resolve_download_info([gd.id for gd in accs])
+
+    to_fetch = []
+    for gd in accs:
+        entry = info.get(gd.id)
+        if entry is None:
+            gd.acc_was_found = False
+            gd.mark_removed(REASON_NOT_FOUND_AT_NCBI, GenomeRemovalStage.NCBI_LOOKUP)
+            continue
+        gd.acc_was_found = True
+        gd.organism_name = entry.get("organism_name")
+        to_fetch.append(gd)
+
+    if not_found:
+        report_message(f"{len(not_found):,} accession(s) not found at NCBI. Reported in:",
+                       "yellow", ii="      ", si="      ")
+        print(f"        {color_text(removed_genomes_path(run_data), 'yellow')}")
+
+    return to_fetch, info
+
+
+def _report_removals(run_data, fatal_message=None):
+    """
+    Say how many target genomes were lost and point at the file explaining each.
+
+    Written once, at the end of the phase, rather than per failure mode: the user wants
+    a count and a filename, not a running commentary on which stage lost what.
+    """
+    removed = [gd for gd in run_data.all_input_genomes if gd.removed]
+
+    if removed:
+        total = len(run_data.all_input_genomes)
+        report_message(
+            f"{len(removed):,} of {total:,} target genome(s) didn't make it through. "
+            "Reported in:", "yellow", ii="      ", si="      ")
+        print(f"        {color_text(removed_genomes_path(run_data), 'yellow')}")
+
+    if fatal_message:
+        if removed:
+            fatal_message += (f" The reason for each is in "
+                              f"{removed_genomes_path(run_data)}.")
+        raise GenSCGHMMsError(fatal_message)
+
+
+def removed_genomes_path(run_data):
+    return f"{run_data.run_files_dir_rel}/{REMOVED_GENOMES_FILENAME}"
 
 
 def phase_filter_pfams(work_dir, args, state=None, resuming=False):
@@ -708,8 +683,7 @@ def phase_search(filtered_hmm_path, combined_path, num_genomes, args,
 
 
 def phase_determine_and_write(out_dir, filtered_hmm_path, hits_by_genome, kept_ids,
-                              filtered_accs, pfam_info, pfam_version, sources,
-                              organism_names, missed, args):
+                              filtered_accs, pfam_info, pfam_version, run_data, args):
     """Determine the single-copy set, extract it, and write all outputs."""
     from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import count_single_copy_hits
 
@@ -737,15 +711,14 @@ def phase_determine_and_write(out_dir, filtered_hmm_path, hits_by_genome, kept_i
     with spinner("Writing summary tables...", "Wrote summary tables"):
         outputs.write_scg_targets_info(out_dir, wanted_accs, pfam_info)
         outputs.write_hit_counts(out_dir, kept_ids, filtered_accs, per_genome_counts)
-        outputs.write_target_genomes(out_dir, kept_ids, sources, organism_names)
+        outputs.write_target_genomes(out_dir, kept_ids, run_data)
         outputs.write_pfam_version(out_dir, pfam_version)
-        missed_path = outputs.write_missed_accessions(out_dir, missed)
 
-    return final_hmm_path, len(wanted_accs), missed_path
+    return final_hmm_path, len(wanted_accs)
 
 
 def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_version,
-                  missed_path, args):
+                  run_data, args):
     border = color_text("  " + "-" * 78, "green")
     title = color_text("  " + "SCG-HMM set complete!".center(78), "green")
     print()
@@ -760,10 +733,10 @@ def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_versio
     print("      Supporting tables written to:")
     print(f"        {color_text(out_dir + '/', 'green')}\n")
 
-    if missed_path:
-        report_message("Any input accessions that didn't make it through are reported in:",
+    if any(gd.removed for gd in run_data.all_input_genomes):
+        report_message("Any input genomes that didn't make it through are reported in:",
                        "yellow", ii="      ", si="      ")
-        print(f"        {color_text(missed_path, 'yellow')}\n")
+        print(f"        {color_text(removed_genomes_path(run_data), 'yellow')}\n")
     print()
 
     # if os.environ.get("GToTree_HMM_dir"):
@@ -774,14 +747,8 @@ def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_versio
     #     print()
 
 
-GENOME_STAGE_SIDECAR = "genome-stage.json"
 SEARCH_STAGE_SIDECAR = "search-hits.json"
 
-# within-stage crash recovery for the search, appended to per finished chunk. Distinct
-# from SEARCH_STAGE_SIDECAR, which only appears once the whole stage is done: the
-# sidecar says "skip this stage entirely", the checkpoint says "pick the stage back up
-# partway". A resumed run consults the sidecar first, so the checkpoint only ever comes
-# into play when the stage didn't finish.
 SEARCH_CHECKPOINT_FILENAME = "search-checkpoint.jsonl"
 
 
@@ -834,21 +801,24 @@ def gen_scg_hmms(args):  # pragma: no cover
 
     n = _phase_counter()
 
-    section(f"Phase {n()}: Resolving target genomes...")
-    accessions, sources, local_genomes, local_missing = phase_resolve_genomes(args)
+    run_data = build_run_data(args, out_dir, work_dir)
+    previous = read_run_data(run_data.run_data_path) if resuming else None
 
-    if len(accessions) + len(local_genomes) < FEW_GENOMES_THRESHOLD:
+    section(f"Phase {n()}: Resolving target genomes...")
+    run_data, _selections = phase_resolve_genomes(args, run_data)
+
+    adopt_genome_progress(run_data, previous)
+
+    total_genomes = len(run_data.all_input_genomes)
+    if total_genomes < FEW_GENOMES_THRESHOLD:
         report_message(
-            f"Just so you know, {len(accessions) + len(local_genomes)} genomes is on "
+            f"Just so you know, {total_genomes} genomes is on "
             "the low side for this. "
             "The single-copy percentage becomes a weak signal with few genomes, and the "
             "resulting SCG set may be less reliable.", "orange",
             ii="      ", si="      ")
 
-    # the fingerprint can only be built once the genome set is known; the Pfam version
-    # isn't known until later, so it starts as None and is filled in below
-    fingerprint = build_fingerprint(
-        accessions, args, pfam_version=None, local_genomes=local_genomes)
+    fingerprint = build_fingerprint(run_data, args, pfam_version=None)
 
     if resuming and state:
         differences = RESUME.compare(state.get("fingerprint"), fingerprint)
@@ -856,36 +826,26 @@ def gen_scg_hmms(args):  # pragma: no cover
             raise GenSCGHMMsError(RESUME.refusal_message(differences))
         print(f"\n      {color_text('Resuming from the previous run', 'green')}")
     else:
+        resuming = False
         state = RESUME.new(fingerprint)
         RESUME.save(work_dir, state)
 
+    write_run_data(run_data)
+
     section(f"Phase {n()}: Getting target-genome amino acids...")
     combined_path = os.path.join(work_dir, "all-target-proteins.faa")
-    sidecar = _load_json(work_dir, GENOME_STAGE_SIDECAR) if resuming else None
 
-    if resuming and RESUME.is_reusable(state, STAGE_GENOMES, work_dir) \
-            and sidecar:
-        kept_ids = sidecar["kept_ids"]
-        missed = [tuple(m) for m in sidecar["missed"]]
-        organism_names = sidecar["organism_names"]
-        sources.update(sidecar.get("sources_extra") or {})
+    if resuming and RESUME.is_reusable(state, STAGE_GENOMES, work_dir):
+        kept_ids = [gd.id for gd in run_data.all_input_genomes
+                    if gd.processing_done and not gd.removed]
         with spinner("Reusing previously downloaded amino acids...",
                      f"Reused amino acids for {len(kept_ids):,} genome(s)"):
             pass
     else:
-        (combined_path, kept_ids, missed, organism_names,
-         sources_extra) = phase_get_amino_acids(
-            accessions, local_genomes, local_missing, work_dir, args)
-        sources.update(sources_extra)
-        _save_json(work_dir, GENOME_STAGE_SIDECAR, {
-            "kept_ids": kept_ids,
-            "missed": [list(m) for m in missed],
-            "organism_names": organism_names,
-            "sources_extra": sources_extra,
-        })
+        combined_path, kept_ids = phase_get_amino_acids(run_data, work_dir, args)
         RESUME.mark_complete(
             state, STAGE_GENOMES,
-            [combined_path, os.path.join(work_dir, GENOME_STAGE_SIDECAR)],
+            [combined_path, run_data.run_data_path],
             work_dir=work_dir)
         RESUME.save(work_dir, state)
 
@@ -919,15 +879,12 @@ def gen_scg_hmms(args):  # pragma: no cover
             [os.path.join(work_dir, SEARCH_STAGE_SIDECAR)],
             work_dir=work_dir)
         RESUME.save(work_dir, state)
-        # the sidecar now covers everything the checkpoint did, and the checkpoint runs
-        # to a couple of hundred MB on a large run, so we're dropping it rather than leaving it
-        # behind under `--keep-working-dir`. Only after the sidecar is safely written.
         _remove_quietly(os.path.join(work_dir, SEARCH_CHECKPOINT_FILENAME))
 
     section(f"Phase {n()}: Determining single-copy genes and writing outputs...")
-    final_hmm_path, num_targets, missed_path = phase_determine_and_write(
+    final_hmm_path, num_targets = phase_determine_and_write(
         out_dir, filtered_hmm_path, hits_by_genome, kept_ids, filtered_accs, pfam_info,
-        pfam_version, sources, organism_names, missed, args)
+        pfam_version, run_data, args)
 
     if not args.keep_working_dir:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -937,7 +894,7 @@ def gen_scg_hmms(args):  # pragma: no cover
     phase_stats.write_tsv(out_dir)
 
     report_finish(out_dir, final_hmm_path, num_targets, len(kept_ids), pfam_version,
-                  missed_path, args)
+                  run_data, args)
 
 
 def main():  # pragma: no cover

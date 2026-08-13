@@ -68,47 +68,82 @@ def test_hit_counts_row_per_genome_even_when_no_hits(tmp_path):
 
 
 ################################################################################
-# missed accessions
+# removed genomes
 ################################################################################
 
-def test_write_missed_accessions(tmp_path):
-    path = outputs.write_missed_accessions(
-        str(tmp_path), [("GCA_1", "not found"), ("GCA_2", "download failed")])
+def test_removed_genomes_are_not_this_module_s_job(tmp_path):
+    """
+    gen-scg-hmms used to write its own `missed-accessions.tsv`. It now reports losses
+    through the shared `write_removed_genomes_report`, so this program's account of
+    what it lost has the same filename, columns, and wording as the main driver's and
+    the search subcommands'. A second writer here would be a second answer.
+    """
+    assert not hasattr(outputs, "write_missed_accessions")
+    assert not hasattr(outputs, "MISSED_FILENAME")
 
-    rows = _read(path)
-    assert rows[0] == ["accession", "why_missing"]
-    assert rows[1] == ["GCA_1", "not found"]
-    assert rows[2] == ["GCA_2", "download failed"]
 
+def test_removed_genomes_report_covers_a_gen_scg_hmms_run(tmp_path):
+    from gtotree.utils.misc.summary_info import write_removed_genomes_report
+    from gtotree.utils.misc.messaging import REMOVED_GENOMES_FILENAME
+    from gtotree.utils.misc.stages import GenomeRemovalStage
 
-def test_no_missed_file_when_nothing_missed(tmp_path):
-    """No file at all is clearer than an empty one with just a header."""
-    assert outputs.write_missed_accessions(str(tmp_path), []) is None
-    assert not (tmp_path / outputs.MISSED_FILENAME).exists()
+    run_data = _run_data(tmp_path)
+    run_data.ncbi_accs[0].mark_removed("not found in NCBI assembly data",
+                                       GenomeRemovalStage.NCBI_LOOKUP)
+    run_data.fasta_files[0].mark_removed("prodigal failed",
+                                         GenomeRemovalStage.FASTA_PREP)
+
+    write_removed_genomes_report(run_data)
+
+    rows = _read(str(tmp_path / REMOVED_GENOMES_FILENAME))
+    assert rows[0] == ["genome_id", "input", "source", "stage_removed",
+                       "reason_removed"]
+    assert rows[1] == ["G1", "-w Nitrospirota", "ncbi-accession (via -w)",
+                       "ncbi-lookup", "not found in NCBI assembly data"]
+    assert rows[2] == ["g2", "g2.fna", "nucleotide-fasta", "fasta-prep",
+                       "prodigal failed"]
 
 
 ################################################################################
 # target genomes
 ################################################################################
 
+def _run_data(tmp_path):
+    """A RunData shaped like a small gen-scg-hmms run: one `-w` accession, one fasta."""
+    from gtotree.utils.misc.general import GenomeData, RunData
+
+    run_data = RunData()
+    run_data.run_files_dir = str(tmp_path)
+    run_data.run_files_dir_rel = str(tmp_path)
+
+    acc = GenomeData.from_acc("G1")
+    acc.from_wanted_ref_tax = True
+    acc.wanted_ref_tax_taxon = "Nitrospirota"
+    acc.organism_name = "Nitrospira sp."
+    run_data.ncbi_accs = [acc]
+
+    run_data.fasta_files = [GenomeData.from_path("g2.fna", "nucleotide-fasta")]
+    run_data.update_all_input_genomes()
+    return run_data
+
+
 def test_write_target_genomes(tmp_path):
-    path = outputs.write_target_genomes(
-        str(tmp_path), ["G1"], {"G1": "GTDB:Nitrospirota"}, {"G1": "Nitrospira sp."})
+    run_data = _run_data(tmp_path)
+    path = outputs.write_target_genomes(str(tmp_path), ["G1", "g2"], run_data)
 
     rows = _read(path)
-    assert rows[0] == ["accession", "source", "organism_name"]
-    assert rows[1] == ["G1", "GTDB:Nitrospirota", "Nitrospira sp."]
+    # the same `input` and `source` columns the removed-genomes report uses, from the
+    # same helpers, so the two tables can be read side by side
+    assert rows[0] == ["genome_id", "input", "source", "organism_name"]
+    assert rows[1] == ["G1", "-w Nitrospirota", "ncbi-accession (via -w)",
+                       "Nitrospira sp."]
+    assert rows[2] == ["g2", "g2.fna", "nucleotide-fasta", "NA"]
 
 
-def test_write_target_genomes_defaults_to_na(tmp_path):
-    path = outputs.write_target_genomes(str(tmp_path), ["G1"])
-    assert _read(path)[1] == ["G1", "NA", "NA"]
-
-
-def test_write_target_genomes_handles_none_organism(tmp_path):
-    path = outputs.write_target_genomes(str(tmp_path), ["G1"], {"G1": "fasta"},
-                                        {"G1": None})
-    assert _read(path)[1] == ["G1", "fasta", "NA"]
+def test_write_target_genomes_defaults_to_na_for_an_unknown_genome(tmp_path):
+    path = outputs.write_target_genomes(str(tmp_path), ["ghost"],
+                                        _run_data(tmp_path))
+    assert _read(path)[1] == ["ghost", "NA", "NA", "NA"]
 
 
 ################################################################################

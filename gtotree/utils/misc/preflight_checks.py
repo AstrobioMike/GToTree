@@ -35,6 +35,8 @@ from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_access
                                                    WantedRefTaxError)
 from gtotree.utils.misc.general import (ToolsUsed,
                                    CorruptRunData,
+                                   SOURCE_ACCESSION, SOURCE_GENBANK, SOURCE_FASTA,
+                                   SOURCE_AMINO_ACID,
                                    populate_run_data,
                                    read_run_data)
 from gtotree.utils.misc.stages import PipelineStage
@@ -335,8 +337,10 @@ def merge_wanted_ref_tax(run_data, selection):
     if selection is None:
         return run_data
 
-    run_data.merge_wanted_ref_tax_accessions(selection.accessions)
-    run_data.record_wanted_ref_tax_selection(selection, taxon=selection.canonical)
+    added = run_data.merge_wanted_ref_tax_accessions(selection.accessions,
+                                                     taxon=selection.canonical)
+    run_data.record_wanted_ref_tax_selection(selection, taxon=selection.canonical,
+                                             num_added=added)
 
     return run_data
 
@@ -451,10 +455,10 @@ def setup_run_data(args, previous_run_data=None):
 
 
 GENOME_SOURCE_FLAGS = {
-    "accession": "-a",
-    "genbank-file": "-g",
-    "nt-fasta-file": "-f",
-    "aa-fasta-file": "-A",
+    SOURCE_ACCESSION: "-a",
+    SOURCE_GENBANK: "-g",
+    SOURCE_FASTA: "-f",
+    SOURCE_AMINO_ACID: "-A",
 }
 
 # how many colliding ids to spell out before summarizing the rest

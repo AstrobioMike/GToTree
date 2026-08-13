@@ -27,6 +27,7 @@ from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import WantedRefTaxError
+from gtotree.utils.misc.general import wanted_ref_tax_list
 from gtotree.utils.target_search import target_search_stages as stages
 from gtotree.utils.target_search import target_search_outputs as outputs
 from gtotree.utils.target_search.target_search_setup import (
@@ -115,7 +116,7 @@ def build_fingerprint(run_data, args, spec, data_version=None):
         "targets_sha256": hash_file_contents(spec.targets_file(args)),
         "num_targets": getattr(args, "total_targets", None),
         "source": (args.source or "").lower(),
-        "wanted_ref_tax": args.wanted_ref_tax,
+        "wanted_ref_tax": (sorted(wanted_ref_tax_list(args)) or None),
         "target_rank": args.target_rank,
         "derep_rank": args.derep_rank,
         "data_version": data_version,
@@ -176,9 +177,11 @@ def build_parser(spec, parent_subparsers=None):
     genomes.add_argument(
         "-w", "--wanted-ref-tax",
         metavar="<STR>",
-        help=("A target taxon whose reference genomes should also be searched (e.g. "
-              "'Nitrospirota')."),
-        action="store",
+        help=("A target taxon whose reference genomes should also be searched (e.g., "
+              "'Nitrospirota'). May be given more than once to pool several taxa into "
+              "one set (e.g. `-w Bacteria -w Archaea`); each is resolved and "
+              "dereplicated on its own, then merged."),
+        action="append",
     )
 
     genomes.add_argument(

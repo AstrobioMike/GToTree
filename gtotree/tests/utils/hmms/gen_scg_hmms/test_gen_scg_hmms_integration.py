@@ -9,9 +9,10 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
                                                                  )
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import relabel_and_append
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local import (
-    build_local_genomes,
+    populate_local_genomes,
     process_local_genome,
 )
+from gtotree.utils.misc.general import RunData
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_search import search_profiles
 from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_outputs as outputs
 from gtotree.tests.paths import DATA_DIR
@@ -38,6 +39,12 @@ def _listing(tmp_path, name, paths):
     p = tmp_path / name
     p.write_text("\n".join(str(x) for x in paths) + "\n")
     return str(p)
+
+
+def _resolve_local(args):
+    """The genome stage's input half: a RunData plus its flat genome list."""
+    run_data = populate_local_genomes(args, RunData())
+    return run_data, list(run_data.all_input_genomes)
 
 
 def test_full_pipeline_from_local_amino_acid_files(tmp_path):
@@ -67,8 +74,8 @@ def test_full_pipeline_from_local_amino_acid_files(tmp_path):
     work.mkdir()
 
     # --- genome stage -------------------------------------------------------
-    genomes, missing = build_local_genomes(args)
-    assert missing == []
+    run_data, genomes = _resolve_local(args)
+    assert not any(g.removed for g in genomes)
     assert [g.id for g in genomes] == ["g1", "g2", "g3"]
 
     combined_path = work / "all-target-proteins.faa"
@@ -106,10 +113,8 @@ def test_full_pipeline_from_local_amino_acid_files(tmp_path):
 
     outputs.write_scg_targets_info(str(out_dir), wanted, pfam_info)
     outputs.write_hit_counts(str(out_dir), kept_ids, filtered_accs, per_genome)
-    outputs.write_target_genomes(str(out_dir), kept_ids,
-                                 {g.id: g.source for g in genomes})
+    outputs.write_target_genomes(str(out_dir), kept_ids, run_data)
     outputs.write_pfam_version(str(out_dir), "38.2-mock")
-    assert outputs.write_missed_accessions(str(out_dir), []) is None
 
     produced = sorted(p.name for p in out_dir.iterdir())
     assert produced == [
@@ -136,7 +141,7 @@ def test_pipeline_lowering_threshold_keeps_more(tmp_path):
                                   sorted(genome_dir.glob("*.faa"))))
     work = tmp_path / "work"; work.mkdir()
 
-    genomes, _ = build_local_genomes(args)
+    _run_data, genomes = _resolve_local(args)
     combined_path = work / "combined.faa"
     with open(combined_path, "w") as combined:
         for gd in genomes:
@@ -179,7 +184,7 @@ def test_mixed_sources_share_one_header_convention(tmp_path):
         amino_acid_files=_listing(tmp_path, "aa.txt", [aa]))
 
     work = tmp_path / "work"; work.mkdir()
-    genomes, _ = build_local_genomes(args)
+    _run_data, genomes = _resolve_local(args)
 
     combined = io.StringIO()
     for gd in genomes:

@@ -328,18 +328,19 @@ INPUT_SOURCE_SUB_INDENT = " " * 10
 TOTAL_LINE_INDENT = " " * 29
 
 
-def _wanted_ref_tax_detail_lines(run_data, indent):
+def _wanted_ref_tax_detail_lines(selection, indent):
     """
-    The sub-bullets under the `-w` line: how the selection was narrowed, and how much
-    of it the user had already asked for by accession.
+    The sub-bullets under one `-w` line: how that selection was narrowed, and how much
+    of it had already been asked for.
 
-    Read off run_data rather than a RefGenomeSelection so a resumed run (which doesn't
-    re-resolve `-w`) describes its selection exactly the way the original run did.
+    Takes a recorded selection dict off run_data rather than a live RefGenomeSelection,
+    so a resumed run (which doesn't re-resolve `-w`) describes its selection exactly
+    the way the original run did.
     """
     lines = []
 
-    rank = run_data.wanted_ref_tax_rank
-    derep = run_data.wanted_ref_tax_derep_rank
+    rank = selection.get("rank")
+    derep = selection.get("derep_rank")
 
     if rank and derep:
         lines.append(f'{indent}- wanted rank "{rank}" was dereplicated to one genome '
@@ -348,11 +349,12 @@ def _wanted_ref_tax_detail_lines(run_data, indent):
         lines.append(f'{indent}- all genomes under the wanted rank "{rank}" were kept '
                      f'(dereplication off)')
 
-    already_had = (run_data.wanted_ref_tax_num_selected
-                   - len(run_data.get_wanted_ref_tax_accs()))
+    already_had = selection.get("num_selected", 0) - selection.get("num_added", 0)
     if already_had > 0:
+        # with a repeated `-w`, the overlap can be with a previously-resolved taxon as
+        # well as with `-a`, so this stays deliberately vague about which
         lines.append(f"{indent}- {already_had} more were selected, but were already "
-                     f"listed in the input accessions")
+                     f"counted")
 
     return lines
 
@@ -361,11 +363,13 @@ def input_genome_source_lines(args, run_data, indent=INPUT_SOURCE_INDENT):
     sub_indent = indent + "    "
     lines = []
 
-    if args.wanted_ref_tax:
-        num_wanted = len(run_data.get_wanted_ref_tax_accs())
+    # driven off the recorded selections rather than `args.wanted_ref_tax`, because
+    # `-w` is repeatable and each taxon gets its own line with its own detail
+    for selection in getattr(run_data, "wanted_ref_tax_selections", None) or []:
         lines.append(f"{indent}- NCBI accessions selected for --wanted-ref-tax "
-                     f"'{args.wanted_ref_tax}' ({num_wanted} genomes)")
-        lines.extend(_wanted_ref_tax_detail_lines(run_data, sub_indent))
+                     f"'{selection.get('taxon')}' "
+                     f"({selection.get('num_added', 0)} genomes)")
+        lines.extend(_wanted_ref_tax_detail_lines(selection, sub_indent))
 
     if args.ncbi_accessions:
         lines.append(f"{indent}- NCBI accessions listed in {args.ncbi_accessions} "

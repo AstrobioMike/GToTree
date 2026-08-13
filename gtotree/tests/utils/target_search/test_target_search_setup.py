@@ -269,7 +269,7 @@ def test_intermediates_live_in_the_working_dir(built):
 def test_input_genomes_are_parsed_with_the_shared_factories(built):
     _args, run_data, _out, _work = built
     assert [gd.id for gd in run_data.all_input_genomes] == ["g1", "g2"]
-    assert all(gd.source == "aa-fasta-file" for gd in run_data.amino_acid_files)
+    assert all(gd.source == "amino-acid-fasta" for gd in run_data.amino_acid_files)
 
 
 def test_requested_target_count_is_recorded(built, spec):

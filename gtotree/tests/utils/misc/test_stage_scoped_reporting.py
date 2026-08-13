@@ -26,8 +26,8 @@ from gtotree.utils.misc.stages import (GenomeRemovalStage, SCGRemovalStage,
 from gtotree.utils.misc import messaging
 
 
-def _genome(gid, source="accession"):
-    gd = GenomeData.from_acc(gid) if source == "accession" \
+def _genome(gid, source="ncbi-accession"):
+    gd = GenomeData.from_acc(gid) if source == "ncbi-accession" \
         else GenomeData.from_path(f"/in/{gid}.fa", source)
     gd.id = gid
     gd.processing_done = True
@@ -291,7 +291,7 @@ class TestSerializationRoundTrip:
 
         path = tmp_path / "run-data.json"
         path.write_text(json.dumps({
-            "ncbi_accs": [{"id": "GCF_1", "source": "accession", "full_path": None,
+            "ncbi_accs": [{"id": "GCF_1", "source": "ncbi-accession", "full_path": None,
                            "provided_path": None, "basename": "GCF_1",
                            "removed": True, "processing_failed": True}],
             "run_complete": True,

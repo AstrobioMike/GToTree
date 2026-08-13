@@ -8,12 +8,13 @@ from tqdm import tqdm  # type: ignore
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.general import (run_pooled_stage,
                                    write_run_data,
+                                   resolve_input_genomes as shared_resolve_input_genomes,
+                                   SOURCE_ACCESSION, SOURCE_GENBANK, SOURCE_FASTA,
+                                   SOURCE_AMINO_ACID,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED_6,
                                    GTT_PROGRESS_SMOOTHING)
 from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
-                                          input_genome_source_lines,
-                                          total_input_genomes_line,
                                           REMOVED_GENOMES_FILENAME)
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.misc.stages import (GenomeRemovalStage,
@@ -51,58 +52,15 @@ SEARCH_PHASE_REMOVAL_STAGES = tuple(
 
 def resolve_input_genomes(args, run_data):
     """
-    Fold in any `-w` selection, then report the input genome set
+    Fold in any `-w` selections, then report the input genome set
 
-    The `-w` block comes first because those genomes are *part* of the input set: the
-    per-file counts and the total underneath them are only the whole picture once the
-    reference genomes have been merged in.
+    The body is `general.resolve_input_genomes`, shared with `gtt gen-scg-hmms` so all
+    three programs render this phase identically. Only the exception type differs.
 
-    Nothing is downloaded here. This phase only settles *which* genomes the run is
-    about, so a misspelled taxon or an empty input set fails before any real work, and
-    so the caller can put the resume fingerprint check at the end of it.
-
-    Returns (run_data, selection), where `selection` is the RefGenomeSelection when
-    `-w` was used, else None.
+    Returns (run_data, selections), where `selections` is the list of
+    RefGenomeSelection objects `-w` produced (empty when `-w` wasn't used).
     """
-    from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
-                                                       describe_source_version)
-
-    selection = None
-
-    if args.wanted_ref_tax:
-        source_desc = describe_source_version(args.source)
-        if source_desc:
-            print(f"      Genome source being used for `-w` input: "
-                  f"{color_text(source_desc, 'green')}\n")
-
-        with spinner(f"Selecting reference genomes for '{args.wanted_ref_tax}'...",
-                     "Selected reference genomes"):
-            accessions, selection = resolve_wanted_ref_tax_accessions(
-                args.source, args.wanted_ref_tax,
-                target_rank=args.target_rank,
-                derep_rank=args.derep_rank)
-
-        run_data.merge_wanted_ref_tax_accessions(accessions)
-        run_data.record_wanted_ref_tax_selection(selection,
-                                                 taxon=selection.canonical)
-
-        for warning in selection.warnings:
-            report_message(warning, "orange", ii="        ", si="        ")
-
-        print()
-
-    run_data.update_all_input_genomes()
-    total = len(run_data.all_input_genomes)
-
-    if not total:
-        raise TargetSearchError("No input genomes were resolved to work with.")
-
-    for line in input_genome_source_lines(args, run_data):
-        print(line)
-
-    print(f"\n{color_text(total_input_genomes_line(run_data), 'green')}\n")
-
-    return run_data, selection
+    return shared_resolve_input_genomes(args, run_data, TargetSearchError)
 
 
 def lookup_ncbi_accessions(run_data):
@@ -226,9 +184,9 @@ def build_plan(args, spec):
 # GenomeData.source -> (preprocessing worker, status applier). The accession entry is
 # added per run, since its worker closes over that run's base-link map
 _SOURCE_WORKERS = {
-    "genbank-file": (_process_one_genbank_file, _apply_genbank_status),
-    "nt-fasta-file": (_process_one_fasta_file, _apply_fasta_status),
-    "aa-fasta-file": (_process_one_amino_acid_file, _apply_amino_acid_status),
+    SOURCE_GENBANK: (_process_one_genbank_file, _apply_genbank_status),
+    SOURCE_FASTA: (_process_one_fasta_file, _apply_fasta_status),
+    SOURCE_AMINO_ACID: (_process_one_amino_acid_file, _apply_amino_acid_status),
 }
 
 
@@ -251,7 +209,7 @@ def _dispatching_worker_pair(run_data):
         def _ncbi(gd, rd):
             return _process_one_ncbi_accession(gd, rd, base_link_map)
 
-        workers["accession"] = (_ncbi, _apply_ncbi_accession_status)
+        workers[SOURCE_ACCESSION] = (_ncbi, _apply_ncbi_accession_status)
 
     def preprocess(gd, rd):
         return workers[gd.source][0](gd, rd)

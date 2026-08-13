@@ -231,18 +231,33 @@ GENOME_SOURCE_FIELDS = ("ncbi_accs", "genbank_files", "fasta_files", "amino_acid
 DERIVED_RUN_DATA_FIELDS = frozenset({"all_input_genomes"})
 
 
-# How GenomeData.source values read in an output table. Shared so every table that
-# reports where a genome came from says it the same way.
-GENOME_SOURCE_LABELS = {
-    "accession": "ncbi-accession",
-    "genbank-file": "genbank-file",
-    "nt-fasta-file": "nucleotide-fasta",
-    "aa-fasta-file": "amino-acid-fasta",
+# ---------------------------------------------------------------------------------
+# THE input-source vocabulary. Every `GenomeData.source` value in the package is one
+# of these four, and everything that dispatches on a genome's source -- the output
+# labels below, the removal-stage map, the input-flag map in preflight_checks, the
+# per-source worker table in target_search -- is keyed on them.
+#
+# They're constants rather than bare literals because that set of keyed lookups is
+# exactly what a private spelling falls silently through: gen-scg-hmms used its own
+# "genbank"/"fasta"/"amino-acid" for a while and missed every one of them without
+# raising anything.
+# ---------------------------------------------------------------------------------
+SOURCE_ACCESSION = "ncbi-accession"
+SOURCE_GENBANK = "genbank-file"
+SOURCE_FASTA = "nucleotide-fasta"
+SOURCE_AMINO_ACID = "amino-acid-fasta"
+
+GENOME_SOURCES = (SOURCE_ACCESSION, SOURCE_GENBANK, SOURCE_FASTA, SOURCE_AMINO_ACID)
+
+PREPROCESSING_STAGE_BY_SOURCE = {
+    SOURCE_ACCESSION: GenomeRemovalStage.NCBI_DOWNLOAD,
+    SOURCE_GENBANK: GenomeRemovalStage.GENBANK_PREP,
+    SOURCE_FASTA: GenomeRemovalStage.FASTA_PREP,
+    SOURCE_AMINO_ACID: GenomeRemovalStage.AMINO_ACID_PREP,
 }
 
-# reference genomes pulled in by `-w` are accessions too, but they aren't accessions
-# the USER listed, and a table that can't tell them apart can't answer "which of these
-# did I ask for?" -- which is the whole point of the column
+REASON_NOT_FOUND_AT_NCBI = "not found in NCBI assembly data"
+
 WANTED_REF_TAX_SOURCE_LABEL = "ncbi-accession (via -w)"
 
 
@@ -250,16 +265,25 @@ def genome_source_label(gd):
     """The output-table label for one genome's input source."""
     if getattr(gd, "from_wanted_ref_tax", False):
         return WANTED_REF_TAX_SOURCE_LABEL
-    return GENOME_SOURCE_LABELS.get(gd.source, gd.source or "NA")
+    return gd.source or "NA"
 
 
 def genome_input_label(gd, run_data=None):
     """
     What the user actually handed over for this genome: the path they listed, or the
     `-w` request that produced it (which has no path to report).
+
+    The taxon is read off the genome itself, because `-w` is repeatable in
+    gen-scg-hmms / search-pfams / search-kos and a run-level taxon can't say WHICH of
+    several requests pulled a given accession in. `run_data` is still consulted as a
+    fallback for genomes recorded before that field existed.
     """
     if getattr(gd, "from_wanted_ref_tax", False):
-        taxon = getattr(run_data, "wanted_ref_tax", None) if run_data else None
+        taxon = getattr(gd, "wanted_ref_tax_taxon", None)
+        if not taxon and run_data is not None:
+            selections = getattr(run_data, "wanted_ref_tax_selections", None) or []
+            if len(selections) == 1:
+                taxon = selections[0].get("taxon")
         return f"-w {taxon}" if taxon else "-w"
     return gd.provided_path or gd.id
 
@@ -280,6 +304,11 @@ class GenomeData:
     acc_was_found: bool = None
     acc_was_downloaded: bool = None
     from_wanted_ref_tax: bool = False
+    # which `-w` taxon selected this genome, when `-w` was used (see genome_input_label)
+    wanted_ref_tax_taxon: str = None
+    # organism name as NCBI reports it; only ever set for accessions, and only once
+    # the assembly table has been consulted
+    organism_name: str = None
     mapping: str = None
     hmm_search_done: bool = False
     hmm_search_failed: bool = None
@@ -331,7 +360,7 @@ class GenomeData:
         provided_path = None
         basename = acc
         id = acc
-        source = "accession"
+        source = SOURCE_ACCESSION
 
         return cls(id=id,
                    source=source,
@@ -492,15 +521,7 @@ class RunData:
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
-    # --- how a `-w` selection was made ---------------------------------------
-    # Kept on run_data rather than passed around as the RefGenomeSelection object so
-    # the reporting can describe the selection on a resumed run too, where `-w` isn't
-    # re-resolved and there is no selection object to ask. Plain str/int so they
-    # survive the run-data.json round-trip.
-    wanted_ref_tax: str = None
-    wanted_ref_tax_rank: str = None
-    wanted_ref_tax_derep_rank: str = None
-    wanted_ref_tax_num_selected: int = 0
+    wanted_ref_tax_selections: List[dict] = field(default_factory=list)
 
     # dict of the run parameters that affect what this run produces; compared on -R
     # to decide whether resuming is safe. See preflight_checks.build_fingerprint
@@ -585,13 +606,17 @@ class RunData:
     def get_all_input_genome_ids(self) -> List[str]:
         return [gd.id for gd in self.all_input_genomes]
 
-    def merge_wanted_ref_tax_accessions(self, accessions) -> int:
+    def merge_wanted_ref_tax_accessions(self, accessions, taxon=None) -> int:
         """
         Fold --wanted-ref-tax (-w) accessions into the NCBI-accession input pool,
         skipping any already provided by the user by accession id.
         Order is preserved: existing accs first, then the new -w ones in the order
         the taxonomy core returned them. Refreshes all_input_genomes and returns the
         number actually added.
+
+        `taxon` is stamped onto each genome this call adds. With a repeatable `-w`
+        the dedupe is also what keeps two taxa that share a genus from each keeping a
+        copy of the same accession
         """
         existing = {gd.id for gd in self.ncbi_accs}
         added = 0
@@ -600,6 +625,7 @@ class RunData:
                 continue
             gd = GenomeData.from_acc(acc)
             gd.from_wanted_ref_tax = True
+            gd.wanted_ref_tax_taxon = taxon
             self.ncbi_accs.append(gd)
             existing.add(acc)
             added += 1
@@ -607,21 +633,36 @@ class RunData:
             self.update_all_input_genomes()
         return added
 
-    def record_wanted_ref_tax_selection(self, selection, taxon=None):
+    def record_wanted_ref_tax_selection(self, selection, taxon=None, num_added=None):
         """
-        Remember HOW a `-w` selection was made, for the reporting layer.
+        Remember HOW one `-w` selection was made, for the reporting layer
 
-        `wanted_ref_tax_num_selected` is what the taxonomy core handed back, BEFORE
-        deduping against `-a`, so the difference between it and
-        `get_wanted_ref_tax_accs()` is exactly the overlap worth mentioning.
+        `num_selected` is what the taxonomy core handed back, BEFORE deduping against
+        `-a` and against any earlier `-w`, so the difference between it and
+        `num_added` is exactly the overlap worth mentioning.
+
+        Appends rather than overwrites: a repeated `-w` produces one entry per taxon,
+        in the order they were resolved.
         """
         if selection is None:
             return self
 
-        self.wanted_ref_tax = taxon or getattr(selection, "canonical", None)
-        self.wanted_ref_tax_rank = selection.resolved_rank
-        self.wanted_ref_tax_derep_rank = selection.effective_derep_rank
-        self.wanted_ref_tax_num_selected = len(selection.accessions)
+        canonical = taxon or getattr(selection, "canonical", None)
+
+        if num_added is None:
+            num_added = len(self.get_wanted_ref_tax_accs_for(canonical))
+            # a caller that merged without naming the taxon leaves nothing to match on;
+            # with only one selection in play, every `-w` genome came from it
+            if not num_added and not self.wanted_ref_tax_selections:
+                num_added = len(self.get_wanted_ref_tax_accs())
+
+        self.wanted_ref_tax_selections.append({
+            "taxon": canonical,
+            "rank": selection.resolved_rank,
+            "derep_rank": selection.effective_derep_rank,
+            "num_selected": len(selection.accessions),
+            "num_added": num_added,
+        })
 
         return self
 
@@ -644,6 +685,11 @@ class RunData:
 
     def get_wanted_ref_tax_accs(self) -> List[str]:
         return [gd.id for gd in self.ncbi_accs if gd.from_wanted_ref_tax]
+
+    def get_wanted_ref_tax_accs_for(self, taxon) -> List[str]:
+        """The `-w` accessions one particular taxon brought in."""
+        return [gd.id for gd in self.ncbi_accs
+                if gd.from_wanted_ref_tax and gd.wanted_ref_tax_taxon == taxon]
 
     def get_input_genbank_ids(self) -> List[str]:
         return [gd.id for gd in self.genbank_files]
@@ -713,19 +759,19 @@ def populate_run_data(args):
     if args.genbank_files:
         with open(args.genbank_files) as f:
             entries_list = f.read().splitlines()
-        run_data.genbank_files = [GenomeData.from_path(entry, "genbank-file") for entry in entries_list]
+        run_data.genbank_files = [GenomeData.from_path(entry, SOURCE_GENBANK) for entry in entries_list]
 
     if args.fasta_files:
         with open(args.fasta_files) as f:
             entries_list = f.read().splitlines()
-        run_data.fasta_files = [GenomeData.from_path(entry, "nt-fasta-file") for entry in entries_list]
+        run_data.fasta_files = [GenomeData.from_path(entry, SOURCE_FASTA) for entry in entries_list]
         for gd in run_data.fasta_files:
             gd.prodigal_used = True
 
     if args.amino_acid_files:
         with open(args.amino_acid_files) as f:
             entries_list = f.read().splitlines()
-        run_data.amino_acid_files = [GenomeData.from_path(entry, "aa-fasta-file") for entry in entries_list]
+        run_data.amino_acid_files = [GenomeData.from_path(entry, SOURCE_AMINO_ACID) for entry in entries_list]
 
     run_data.update_all_input_genomes()
     run_data.run_files_dir = args.run_files_dir
@@ -733,6 +779,118 @@ def populate_run_data(args):
     run_data.run_data_path = run_data.run_files_dir + "/run-data.json"
 
     return run_data
+
+
+# GenomeData fields that identify a genome rather than describe its progress; these
+# come from the current input files and must never be overwritten by a previous run
+_GENOME_IDENTITY_FIELDS = frozenset(
+    {"id", "source", "full_path", "provided_path", "basename"})
+
+
+def adopt_genome_progress(run_data, previous):
+    """
+    Copy per-genome progress flags from a resumed run onto the current genome set
+
+    Matched by genome ID, which is stable across runs because it's derived by the same
+    `GenomeData.from_path` / `from_acc` factories from the same inputs. A genome present
+    now but not before simply keeps its fresh (all-false) flags and gets processed.
+
+    Called after the genome set is final rather than while the RunData is being built,
+    because `-w` accessions are merged in during phase 1 and would otherwise come back
+    with their progress wiped.
+
+    Returns the number of genomes whose progress was carried over.
+    """
+    if previous is None:
+        return 0
+
+    by_id = {gd.id: gd for gd in previous.all_input_genomes}
+    carried = 0
+
+    for gd in run_data.all_input_genomes:
+        old = by_id.get(gd.id)
+        if old is None or old.source != gd.source:
+            continue
+        for field_info in fields(gd):
+            if field_info.name in _GENOME_IDENTITY_FIELDS:
+                continue
+            setattr(gd, field_info.name, getattr(old, field_info.name))
+        carried += 1
+
+    return carried
+
+
+def resolve_input_genomes(args, run_data, error_cls):
+    """
+    Phase 1 for every program that takes the four genome inputs plus `-w`: fold in any
+    `-w` selections, then report the whole input set
+    """
+    # imported here rather than at module scope: the taxonomy layer reaches back into
+    # the GTDB/NCBI asset modules, and this module is imported by almost everything
+    from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
+                                                       describe_source_version)
+    from gtotree.utils.misc.messaging import (input_genome_source_lines,
+                                              total_input_genomes_line,
+                                              spinner)
+
+    selections = []
+    wanted = wanted_ref_tax_list(args)
+
+    if wanted:
+        source_desc = describe_source_version(args.source)
+        if source_desc:
+            print(f"      Genome source being used for `-w` input: "
+                  f"{color_text(source_desc, 'green')}\n")
+
+        for taxon in wanted:
+            with spinner(f"Selecting reference genomes for '{taxon}'...",
+                         "Selected reference genomes"):
+                accessions, selection = resolve_wanted_ref_tax_accessions(
+                    args.source, taxon,
+                    target_rank=args.target_rank,
+                    derep_rank=args.derep_rank,
+                    min_completeness=getattr(args, "min_completeness", None),
+                    max_contamination=getattr(args, "max_contamination", None))
+
+            added = run_data.merge_wanted_ref_tax_accessions(
+                accessions, taxon=selection.canonical)
+            run_data.record_wanted_ref_tax_selection(
+                selection, taxon=selection.canonical, num_added=added)
+            selections.append(selection)
+
+            for warning in selection.warnings:
+                report_message(warning, "orange", ii="        ", si="        ")
+
+        print()
+
+    run_data.update_all_input_genomes()
+
+    if not run_data.all_input_genomes:
+        raise error_cls("No input genomes were resolved to work with.")
+
+    for line in input_genome_source_lines(args, run_data):
+        print(line)
+
+    print(f"\n{color_text(total_input_genomes_line(run_data), 'green')}\n")
+
+    return run_data, selections
+
+
+def wanted_ref_tax_list(args):
+    """
+    `args.wanted_ref_tax` as a list of taxa, however the parser declared it.
+
+    `-w` is `action="append"` in gen-scg-hmms / search-pfams / search-kos and a plain
+    string in the main driver, and a programmatic caller may pass either. The lone
+    string is wrapped rather than iterated, so "Bacteria" doesn't silently become eight
+    single-character taxa.
+    """
+    wanted = getattr(args, "wanted_ref_tax", None)
+    if not wanted:
+        return []
+    if isinstance(wanted, str):
+        return [wanted]
+    return list(wanted)
 
 
 def run_data_as_dict(run_data):

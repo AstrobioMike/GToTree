@@ -9,9 +9,14 @@ Files produced in the output directory:
     <name>.hmm                      the new SCG-HMM set (the actual deliverable)
     SCG-targets-info.tsv            one row per retained target: acc, name, description
     Pfam-hit-counts.tsv             genome x Pfam hit-count matrix
-    missed-accessions.tsv           any input accession that dropped out, and why
     target-genomes.tsv              the genomes actually used, with their source
     pfam-version-used.txt           the Pfam release the set was built from
+    removed-genomes.tsv             any input genome that dropped out, and where/why
+
+That last one isn't written here: it comes from the shared
+`summary_info.write_removed_genomes_report`, so this program's account of what it lost
+has the same name, columns, and wording as the main driver's and the search
+subcommands'.
 """
 
 import os
@@ -20,7 +25,6 @@ import contextlib
 
 HMM_INFO_FILENAME = "SCG-targets-info.tsv"
 HIT_COUNTS_FILENAME = "Pfam-hit-counts.tsv"
-MISSED_FILENAME = "missed-accessions.tsv"
 TARGET_GENOMES_FILENAME = "target-genomes.tsv"
 PFAM_VERSION_FILENAME = "pfam-version-used.txt"
 
@@ -74,36 +78,28 @@ def write_hit_counts(out_dir, genome_ids, filtered_accs, per_genome_counts):
     return path
 
 
-def write_missed_accessions(out_dir, missed):
+def write_target_genomes(out_dir, genome_ids, run_data):
     """
-    Write the accessions that didn't make it, with the reason for each.
-
-    `missed` is an iterable of (accession, reason). Returns the path, or None if
-    nothing was missed (in which case no file is written).
+    Write the genomes that made it through and were actually searched
     """
-    missed = list(missed)
-    if not missed:
-        return None
+    from gtotree.utils.misc.general import genome_input_label, genome_source_label
 
-    path = os.path.join(out_dir, MISSED_FILENAME)
-    with _atomic_write(path) as out:
-        out.write("accession\twhy_missing\n")
-        for acc, reason in missed:
-            out.write(f"{acc}\t{reason}\n")
-    return path
-
-
-def write_target_genomes(out_dir, genome_ids, sources=None, organism_names=None):
-    """ Write the genomes that made it through and were actually searched. """
     path = os.path.join(out_dir, TARGET_GENOMES_FILENAME)
-    sources = sources or {}
-    organism_names = organism_names or {}
+    by_id = {gd.id: gd for gd in run_data.all_input_genomes}
+
     with _atomic_write(path) as out:
-        out.write("accession\tsource\torganism_name\n")
+        out.write("genome_id\tinput\tsource\torganism_name\n")
         for genome_id in genome_ids:
-            source = sources.get(genome_id, "NA")
-            organism = organism_names.get(genome_id) or "NA"
-            out.write(f"{genome_id}\t{source}\t{organism}\n")
+            gd = by_id.get(genome_id)
+            if gd is None:
+                out.write(f"{genome_id}\tNA\tNA\tNA\n")
+                continue
+            out.write("\t".join([
+                gd.id,
+                genome_input_label(gd, run_data),
+                genome_source_label(gd),
+                gd.organism_name or "NA",
+            ]) + "\n")
     return path
 
 

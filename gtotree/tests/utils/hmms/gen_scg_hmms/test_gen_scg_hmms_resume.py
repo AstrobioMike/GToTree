@@ -6,15 +6,29 @@ import pytest # type: ignore
 
 from gtotree.utils.hmms.gen_scg_hmms import gen_scg_hmms_cli as cli
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli import RESUME
+from gtotree.utils.misc.general import GenomeData, RunData
 
 
 def _args(**kw):
     base = dict(percent_single_copy=90, min_pfam_coverage=50.0, source="GTDB",
-                wanted_ref_tax="Nitrospirota", target_rank=None, derep_rank="off",
+                wanted_ref_tax=["Nitrospirota"], target_rank=None, derep_rank="off",
                 genbank_files=None, fasta_files=None, amino_acid_files=None,
                 min_completeness=None, max_contamination=None)
     base.update(kw)
     return argparse.Namespace(**base)
+
+
+def _fp(accessions=(), args=None, pfam_version="38.2", local_genomes=()):
+    """
+    build_fingerprint reads the genome set off a RunData now, so the tests assemble
+    one rather than passing bare lists.
+    """
+    run_data = RunData()
+    run_data.ncbi_accs = [GenomeData.from_acc(a) for a in accessions]
+    run_data.fasta_files = list(local_genomes)
+    run_data.update_all_input_genomes()
+    return cli.build_fingerprint(run_data, args if args is not None else _args(),
+                                 pfam_version)
 
 
 class _FakeGenome:
@@ -34,20 +48,20 @@ def test_fingerprint_is_order_independent():
     With threaded downloads and taxonomy-driven selection, the same genome set can
     legitimately arrive in a different order. What matters is WHICH genomes.
     """
-    a = cli.build_fingerprint(["A", "B", "C"], _args(), "38.2")
-    b = cli.build_fingerprint(["C", "A", "B"], _args(), "38.2")
+    a = _fp(["A", "B", "C"], _args(), "38.2")
+    b = _fp(["C", "A", "B"], _args(), "38.2")
     assert a == b
 
 
 def test_fingerprint_ignores_duplicates():
-    a = cli.build_fingerprint(["A", "B"], _args(), "38.2")
-    b = cli.build_fingerprint(["A", "B", "A"], _args(), "38.2")
+    a = _fp(["A", "B"], _args(), "38.2")
+    b = _fp(["A", "B", "A"], _args(), "38.2")
     assert a == b
 
 
 def test_fingerprint_detects_added_genome():
-    a = cli.build_fingerprint(["A", "B"], _args(), "38.2")
-    b = cli.build_fingerprint(["A", "B", "C"], _args(), "38.2")
+    a = _fp(["A", "B"], _args(), "38.2")
+    b = _fp(["A", "B", "C"], _args(), "38.2")
     diffs = RESUME.compare(a, b)
     assert any("target genomes" in d for d in diffs)
 
@@ -65,15 +79,15 @@ def test_fingerprint_detects_added_genome():
     (dict(derep_rank="genus"), "--derep-rank"),
 ])
 def test_result_affecting_params_invalidate(kwargs, expected):
-    base = cli.build_fingerprint(["A"], _args(), "38.2")
-    changed = cli.build_fingerprint(["A"], _args(**kwargs), "38.2")
+    base = _fp(["A"], _args(), "38.2")
+    changed = _fp(["A"], _args(**kwargs), "38.2")
     diffs = RESUME.compare(base, changed)
     assert any(expected in d for d in diffs), diffs
 
 
 def test_pfam_version_change_invalidates():
-    base = cli.build_fingerprint(["A"], _args(), "38.2")
-    changed = cli.build_fingerprint(["A"], _args(), "37.0")
+    base = _fp(["A"], _args(), "38.2")
+    changed = _fp(["A"], _args(), "37.0")
     diffs = RESUME.compare(base, changed)
     assert any("Pfam version" in d for d in diffs)
 
@@ -83,18 +97,18 @@ def test_unknown_pfam_version_does_not_invalidate():
     The Pfam version isn't resolved until the Pfam stage runs, so a run interrupted
     before then legitimately stores None and must not be refused on that basis.
     """
-    known = cli.build_fingerprint(["A"], _args(), "38.2")
-    unknown = cli.build_fingerprint(["A"], _args(), None)
+    known = _fp(["A"], _args(), "38.2")
+    unknown = _fp(["A"], _args(), None)
     assert RESUME.compare(known, unknown) == []
 
 
 def test_identical_fingerprints_have_no_differences():
-    fp = cli.build_fingerprint(["A", "B"], _args(), "38.2")
+    fp = _fp(["A", "B"], _args(), "38.2")
     assert RESUME.compare(fp, fp) == []
 
 
 def test_missing_previous_state_is_reported():
-    fp = cli.build_fingerprint(["A"], _args(), "38.2")
+    fp = _fp(["A"], _args(), "38.2")
     diffs = RESUME.compare(None, fp)
     assert diffs == ["no previous run state was found"]
 
@@ -106,10 +120,10 @@ def test_missing_previous_state_is_reported():
 def test_local_genome_files_are_fingerprinted(tmp_path):
     f = tmp_path / "g1.faa"
     f.write_text(">a\nMK\n")
-    genomes = [_FakeGenome("g1", "amino-acid", str(f))]
+    genomes = [_FakeGenome("g1", "amino-acid-fasta", str(f))]
 
-    with_local = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
-    without = cli.build_fingerprint([], _args(), "38.2", local_genomes=[])
+    with_local = _fp([], _args(), "38.2", local_genomes=genomes)
+    without = _fp([], _args(), "38.2", local_genomes=[])
 
     diffs = RESUME.compare(without, with_local)
     assert any("local genome files" in d for d in diffs)
@@ -122,12 +136,12 @@ def test_edited_local_file_invalidates_resume(tmp_path):
     """
     f = tmp_path / "g1.faa"
     f.write_text(">a\nMK\n")
-    genomes = [_FakeGenome("g1", "amino-acid", str(f))]
-    before = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
+    genomes = [_FakeGenome("g1", "amino-acid-fasta", str(f))]
+    before = _fp([], _args(), "38.2", local_genomes=genomes)
 
     time.sleep(1.1)  # mtime has second resolution
     f.write_text(">a\nMKVLAAA\n")
-    after = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
+    after = _fp([], _args(), "38.2", local_genomes=genomes)
 
     assert RESUME.compare(before, after)
 
@@ -135,16 +149,16 @@ def test_edited_local_file_invalidates_resume(tmp_path):
 def test_local_fingerprint_stable_when_untouched(tmp_path):
     f = tmp_path / "g1.faa"
     f.write_text(">a\nMK\n")
-    genomes = [_FakeGenome("g1", "amino-acid", str(f))]
+    genomes = [_FakeGenome("g1", "amino-acid-fasta", str(f))]
 
-    a = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
-    b = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
+    a = _fp([], _args(), "38.2", local_genomes=genomes)
+    b = _fp([], _args(), "38.2", local_genomes=genomes)
     assert a == b
 
 
 def test_local_fingerprint_handles_missing_file(tmp_path):
     genomes = [_FakeGenome("ghost", "fasta", str(tmp_path / "gone.fna"))]
-    fp = cli.build_fingerprint([], _args(), "38.2", local_genomes=genomes)
+    fp = _fp([], _args(), "38.2", local_genomes=genomes)
     assert fp["local_genomes_sha256"] is not None
 
 
@@ -153,8 +167,8 @@ def test_runtime_only_params_do_not_invalidate():
     -n/-j/output dir change HOW a run executes, not WHAT it produces, so they must not
     force a full redo.
     """
-    a = cli.build_fingerprint(["A"], _args(), "38.2")
-    b = cli.build_fingerprint(["A"], _args(), "38.2")
+    a = _fp(["A"], _args(), "38.2")
+    b = _fp(["A"], _args(), "38.2")
     assert RESUME.compare(a, b) == []
 
 
@@ -163,7 +177,7 @@ def test_runtime_only_params_do_not_invalidate():
 ################################################################################
 
 def test_state_round_trips(tmp_path):
-    fp = cli.build_fingerprint(["A"], _args(), "38.2")
+    fp = _fp(["A"], _args(), "38.2")
     state = RESUME.new(fp)
     RESUME.mark_complete(state, cli.STAGE_GENOMES, [])
     RESUME.save(str(tmp_path), state)

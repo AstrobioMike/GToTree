@@ -21,10 +21,10 @@ def _run_data(**by_source):
     """
     rd = RunData()
     for field, entries in by_source.items():
-        source = {"ncbi_accs": "accession",
+        source = {"ncbi_accs": "ncbi-accession",
                   "genbank_files": "genbank-file",
-                  "fasta_files": "nt-fasta-file",
-                  "amino_acid_files": "aa-fasta-file"}[field]
+                  "fasta_files": "nucleotide-fasta",
+                  "amino_acid_files": "amino-acid-fasta"}[field]
         for entry in entries:
             gd = (GenomeData.from_acc(entry) if field == "ncbi_accs"
                   else GenomeData.from_path(entry, source))

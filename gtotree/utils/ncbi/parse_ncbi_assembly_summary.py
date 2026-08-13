@@ -1,6 +1,7 @@
 import re
 import pyarrow.compute as pc # type: ignore
 import pyarrow.dataset as ds # type: ignore
+from gtotree.utils.misc.general import REASON_NOT_FOUND_AT_NCBI
 from gtotree.utils.misc.stages import GenomeRemovalStage
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
 
@@ -141,7 +142,7 @@ def parse_assembly_summary(assembly_summary_file, run_data):
     for acc_gd in run_data.ncbi_accs:
         if acc_gd.id in not_found:
             acc_gd.acc_was_found = False
-            acc_gd.mark_removed("accession not found at NCBI",
+            acc_gd.mark_removed(REASON_NOT_FOUND_AT_NCBI,
                                 GenomeRemovalStage.NCBI_LOOKUP)
         else:
             acc_gd.acc_was_found = True

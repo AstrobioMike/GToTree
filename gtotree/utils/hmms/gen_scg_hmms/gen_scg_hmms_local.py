@@ -25,24 +25,21 @@ import os
 import gzip
 import shutil
 
-from gtotree.utils.misc.general import GenomeData, remove_file_if_exists
+from gtotree.utils.misc.general import (GenomeData, remove_file_if_exists,
+                                        SOURCE_GENBANK, SOURCE_FASTA,
+                                        SOURCE_AMINO_ACID)
+from gtotree.utils.misc.stages import GenomeRemovalStage
 from gtotree.utils.misc.seqs import (extract_filter_and_rename_cds_amino_acids_from_gb,
                                 extract_fasta_from_gb,
                                 _filter_and_rename_fasta)
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (TargetGenomeError,
+                                                                  MISSED_FILE_NOT_FOUND,
+                                                                  MISSED_NO_CDS,
                                                                   MISSED_NO_PROTEINS,
                                                                   MISSED_PRODIGAL_FAILED,
+                                                                  MISSED_UNREADABLE,
                                                                   run_prodigal)
-
-
-# sources, matching the main driver's naming
-SOURCE_GENBANK = "genbank"
-SOURCE_FASTA = "fasta"
-SOURCE_AMINO_ACID = "amino-acid"
-
-MISSED_UNREADABLE = "file could not be read"
-MISSED_NO_CDS = "no usable CDS translations found"
 
 
 class _ShimRunData:
@@ -93,34 +90,39 @@ def read_paths_file(path, label):
     return paths
 
 
-def build_local_genomes(args):
+def populate_local_genomes(args, run_data):
     """
-    Turn the -g/-f/-A inputs into GenomeData objects.
-
-    Returns (genomes, missing) where `missing` holds (id, reason) for any listed path
-    that doesn't exist on disk, checked up front so a typo in a long list is reported
-    before any expensive work starts, rather than midway through.
+    Turn the -g/-f/-A inputs into GenomeData objects on `run_data`
     """
-    genomes = []
-    missing = []
-
-    for attr, label, source in (
-        ("genbank_files", "genbank-files", SOURCE_GENBANK),
-        ("fasta_files", "fasta-files", SOURCE_FASTA),
-        ("amino_acid_files", "amino-acid-files", SOURCE_AMINO_ACID),
+    for attr, label, source, stage in (
+        ("genbank_files", "genbank-files", SOURCE_GENBANK,
+         GenomeRemovalStage.GENBANK_PREP),
+        ("fasta_files", "fasta-files", SOURCE_FASTA,
+         GenomeRemovalStage.FASTA_PREP),
+        ("amino_acid_files", "amino-acid-files", SOURCE_AMINO_ACID,
+         GenomeRemovalStage.AMINO_ACID_PREP),
     ):
         listing = getattr(args, attr, None)
         if not listing:
+            setattr(run_data, attr, [])
             continue
 
+        genomes = []
         for path in read_paths_file(listing, label):
             gd = GenomeData.from_path(path, source)
             if not os.path.isfile(gd.full_path):
-                missing.append((gd.id, f"{source} file not found: {path}"))
-                continue
+                gd.mark_removed(f"{MISSED_FILE_NOT_FOUND}: {path}", stage)
+            # nucleotide fastas always route through gene calling; recording it here
+            # rather than after the fact matches how the main driver does it
+            elif source == SOURCE_FASTA:
+                gd.mark_prodigal_used()
             genomes.append(gd)
 
-    return genomes, missing
+        setattr(run_data, attr, genomes)
+
+    run_data.update_all_input_genomes()
+
+    return run_data
 
 
 def _gunzip_into_workdir(gd, work_dir):

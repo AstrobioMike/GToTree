@@ -9,8 +9,8 @@ def _run_data():
     rd = RunData()
     rd.mapping_file_path = "map.tsv"
     rd.amino_acid_files = [
-        GenomeData.from_path("genomes/mock-1.faa", "aa-fasta-file"),
-        GenomeData.from_path("genomes/mock-2.faa", "aa-fasta-file"),
+        GenomeData.from_path("genomes/mock-1.faa", "amino-acid-fasta"),
+        GenomeData.from_path("genomes/mock-2.faa", "amino-acid-fasta"),
     ]
     rd.ncbi_accs = [GenomeData.from_acc("GCF_000000001.1")]
     rd.update_all_input_genomes()

@@ -21,9 +21,11 @@ directory is already the search results.
 import os
 import shutil
 import argparse
-
 from gtotree.utils.misc.general import (GenomeData, RunData, ToolsUsed,
-                                        prepare_output_dir)
+                                        SOURCE_GENBANK, SOURCE_FASTA,
+                                        SOURCE_AMINO_ACID,
+                                        prepare_output_dir,
+                                        adopt_genome_progress)
 from gtotree.utils.misc.messaging import report_message
 
 
@@ -287,12 +289,6 @@ _SHARED_CARRIED_FIELDS = ("pfam_dict", "all_pfam_targets_hmm_path", "target_kos_
                           "target_ko_profiles_dir", "wanted_ko_targets",
                           "wanted_pfam_targets", "tax_info_dict")
 
-# GenomeData fields that identify a genome rather than describe its progress; these
-# come from the current input files and must never be overwritten by a previous run
-_GENOME_IDENTITY_FIELDS = frozenset(
-    {"id", "source", "full_path", "provided_path", "basename"})
-
-
 def _adopt_run_level_state(run_data, previous, spec):
     """
     Carry the previous run's resolved target set and its assets onto a fresh RunData
@@ -319,44 +315,6 @@ def _adopt_run_level_state(run_data, previous, spec):
     return run_data
 
 
-def adopt_genome_progress(run_data, previous):
-    """
-    Copy per-genome progress flags from a resumed run onto the current genome set
-
-    Matched by genome ID, which is stable across runs because it's derived by the same
-    `GenomeData.from_path` / `from_acc` factories from the same inputs. A genome present
-    now but not before simply keeps its fresh (all-false) flags and gets processed.
-
-    Called after the genome set is final rather than inside `build_run_data`, because
-    `-w` accessions are merged in during phase 1 and would otherwise come back with
-    their progress wiped.
-
-    Returns the number of genomes whose progress was carried over.
-    """
-    if previous is None:
-        return 0
-
-    from dataclasses import fields
-
-    by_id = {gd.id: gd for gd in previous.all_input_genomes}
-    carried = 0
-
-    for gd in run_data.all_input_genomes:
-        old = by_id.get(gd.id)
-        # source is checked too: the same basename arriving as a genbank file in one
-        # run and a fasta in the next is a different genome, and reusing its flags
-        # would skip work that needs redoing
-        if old is None or old.source != gd.source:
-            continue
-        for field_info in fields(gd):
-            if field_info.name in _GENOME_IDENTITY_FIELDS:
-                continue
-            setattr(gd, field_info.name, getattr(old, field_info.name))
-        carried += 1
-
-    return carried
-
-
 def _populate_input_genomes(args, run_data):
     """
     Turn the four input flags into GenomeData lists.
@@ -372,17 +330,17 @@ def _populate_input_genomes(args, run_data):
                               for entry in _read_entries(args.ncbi_accessions)]
 
     if args.genbank_files:
-        run_data.genbank_files = [GenomeData.from_path(entry, "genbank-file")
+        run_data.genbank_files = [GenomeData.from_path(entry, SOURCE_GENBANK)
                                   for entry in _read_entries(args.genbank_files)]
 
     if args.fasta_files:
-        run_data.fasta_files = [GenomeData.from_path(entry, "nt-fasta-file")
+        run_data.fasta_files = [GenomeData.from_path(entry, SOURCE_FASTA)
                                 for entry in _read_entries(args.fasta_files)]
         for gd in run_data.fasta_files:
             gd.prodigal_used = True
 
     if args.amino_acid_files:
-        run_data.amino_acid_files = [GenomeData.from_path(entry, "aa-fasta-file")
+        run_data.amino_acid_files = [GenomeData.from_path(entry, SOURCE_AMINO_ACID)
                                      for entry in _read_entries(args.amino_acid_files)]
 
     run_data.update_all_input_genomes()

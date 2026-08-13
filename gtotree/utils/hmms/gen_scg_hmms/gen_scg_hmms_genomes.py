@@ -19,7 +19,8 @@ import pyarrow as pa  # type: ignore
 import pyarrow.compute as pc  # type: ignore
 import pyarrow.parquet as pq  # type: ignore
 
-from gtotree.utils.misc.general import run_pooled_stage
+from gtotree.utils.misc.general import (run_pooled_stage, GenomeData,
+                                        REASON_NOT_FOUND_AT_NCBI)
 from gtotree.utils.ncbi.get_ncbi_assembly_data import ncbi_data_table_path
 from gtotree.utils.ncbi.parse_ncbi_assembly_summary import resolve_base_link
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError, _remove_quietly
@@ -27,16 +28,51 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError,
 
 MAX_DOWNLOAD_THREADS = 20
 
-# reasons an accession can drop out, recorded in the missed-accessions report
-MISSED_NOT_FOUND = "not found in NCBI assembly data"
 MISSED_NO_LINK = "no resolvable download location"
 MISSED_DOWNLOAD_FAILED = "download failed"
 MISSED_PRODIGAL_FAILED = "prodigal failed"
 MISSED_NO_PROTEINS = "no protein sequences found"
+MISSED_UNREADABLE = "file could not be read"
+MISSED_NO_CDS = "no usable CDS translations found"
+MISSED_FILE_NOT_FOUND = "file not found"
 
 
 class TargetGenomeError(GenSCGHMMsError):
     """The requested target genomes could not be resolved."""
+
+
+WORK_RUN_DATA_FILENAME = "run-data.json"
+
+
+def build_run_data(args, out_dir, work_dir):
+    """
+    Build the RunData this program threads through the shared machinery
+    """
+    from gtotree.utils.misc.general import RunData, ToolsUsed
+    from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local import populate_local_genomes
+
+    run_data = RunData()
+    run_data.tools_used = ToolsUsed()
+
+    if args.ncbi_accessions:
+        run_data.ncbi_accs = [GenomeData.from_acc(acc)
+                              for acc in read_accessions_file(args.ncbi_accessions)]
+
+    populate_local_genomes(args, run_data)
+
+    run_data.output_dir = os.path.abspath(out_dir)
+    run_data.output_dir_rel = out_dir
+    run_data.run_files_dir = os.path.abspath(out_dir)
+    run_data.run_files_dir_rel = out_dir
+    run_data.run_data_path = os.path.join(work_dir, WORK_RUN_DATA_FILENAME)
+    run_data.tmp_dir = work_dir
+    run_data.ready_genome_files_dir = work_dir
+
+    # amino-acid only: there's no nucleotide mode to build an SCG set in
+    run_data.nucleotide_mode = False
+    run_data.general_ext = ".faa"
+
+    return run_data
 
 
 def _download_and_unzip():
@@ -60,7 +96,7 @@ def read_accessions_file(path):
     """
     if not os.path.isfile(path):
         raise TargetGenomeError(
-            f"the specified target-accessions file '{path}' can't be found.")
+            f"the specified accessions file '{path}' can't be found.")
 
     accessions = []
     seen = set()
@@ -251,7 +287,7 @@ def fetch_amino_acids(accession, entry, work_dir, nucleotide_fallback=True):
     downloading the nucleotide fasta and calling genes with prodigal.
 
     Returns (out_path, used_prodigal) on success, or raises TargetGenomeError with a
-    reason string suitable for the missed-accessions report.
+    reason string suitable for the removed-genomes report.
     """
     base_link = (entry or {}).get("base_link")
     if not base_link or str(base_link).lower() == "na":

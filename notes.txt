@@ -13,69 +13,53 @@
         # gtt gen-scg-hmms
 
 
-    # still working on printout formatting for search-pfams/kos a little (latest chat has latest changes i still need to integrate)
-
-    # main gtotree needs to download the HMM first (when other dbs grabbed) if specified/we know what it will be
-        # and I need to work on formatting when it does download after start like it currently does, e.g., here:
-
-                # gtotree -w Methanobacteria -H universal -F
+    # maybe still working on printout formatting for search-pfams/kos a little, check them out again (and gen-scg-hmms)
 
 
-                #                                   GToTree v2.0.0
-                #                           github.com/AstrobioMike/GToTree
+    # the two download bars back to back, with no identifying info for the second, looks confusing:
 
-
-                #   Only 4 reference genome(s) selected. Consider a finer --derep-rank
-                #   (e.g., 'genus') for more genomes to be included.
-                #     Downloading the prebuilt "Universal-Hug-et-al" HMM set (only needs to be done once)...
-
-                #         Universal-Hug-et-al HMM file: 100%|████████████| 900k/900k [00:00<00:00, 17.1MB/s]
-
-
-        # maybe that Only 4 reference genome(s) notice should have a newline at end, that might solve it
-
-
-
-    # get rid of messages like "X genome(s) needed gene-calling with prodigal" (no one cares)
-
-    # making phase 1 of gen-scg-hmms visually match search-pfams/kos
-        #   Phase 1: Resolving target genomes...
-
-        #     ✔ Read target accessions
-        #         2 accession(s) read from accs.txt
-        #       Genome source being used: GTDB v232 (released Apr 15, 2026)
-
-        #     ✔ Selected reference genomes
-        #         4 genome(s) selected (Methanobacteria at rank class)
-        #         dereplicated to one genome per family
-        #     ✔ Read local genome files
-        #         1 genbank file(s)
-        #         3 fasta file(s)
-        #         1 amino-acid file(s)
-
-        #       11 total target genome(s)
-
-
-
-    # gen-scg-hmms also needs removed-genomes.tsv tracking and/or printouts
-
+        #   ---------------------------------------------
         #   Phase 2: Getting target-genome amino acids...
+        #   ---------------------------------------------
 
         #     ✔ Resolved download locations
 
-        #       1 accession(s) were not found in the NCBI assembly data.
+        #       1 accession(s) not found at NCBI. Reported in:
+        #         gtt-gen-scg-hmms-output/removed-genomes.tsv
 
         #       Downloading with 5 concurrent job(s):
-        #         100%|████████████| 5/5 [time elapsed: 00:02 | est. remaining: 00:00]
+        #         100%|████████████| 5/5 [time elapsed: 00:03 | est. remaining: 00:00]
 
 
         #       100%|██████████████| 5/5 [time elapsed: 00:11 | est. remaining: 00:00]
 
-        #       3 genome(s) needed gene-calling with prodigal
 
-        #       1 of 10 target genome(s) didn't make it through.
+        #       2 of 11 target genome(s) didn't make it through. Reported in:
+        #         gtt-gen-scg-hmms-output/removed-genomes.tsv
 
         #       9 genome(s) ready to search
+
+    # maybe we should put a label over that second one, and indent it the two more spaces so it lines up
+    # depends what's going on though, i presume the first bar is download and/or run prodigal when needed
+    # and second bar is getting the amino acids for the non-downloaded input genomes
+    # maybe for the purposes here, these should be rolled into one progress bar?
+
+
+    # from general.py, do we need both of these? Can't we just use one set everywhere?
+
+        # SOURCE_ACCESSION = "accession"
+        # SOURCE_GENBANK = "genbank-file"
+        # SOURCE_FASTA = "nt-fasta-file"
+        # SOURCE_AMINO_ACID = "aa-fasta-file"
+
+        # GENOME_SOURCES = (SOURCE_ACCESSION, SOURCE_GENBANK, SOURCE_FASTA, SOURCE_AMINO_ACID)
+
+        # GENOME_SOURCE_LABELS = {
+        #     SOURCE_ACCESSION: "ncbi-accession",
+        #     SOURCE_GENBANK: "genbank-file",
+        #     SOURCE_FASTA: "nucleotide-fasta",
+        #     SOURCE_AMINO_ACID: "amino-acid-fasta",
+        # }
 
 
 

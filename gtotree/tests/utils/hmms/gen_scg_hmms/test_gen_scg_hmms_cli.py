@@ -8,6 +8,7 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli import (
     check_args,
     setup_output_dir,
 )
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import build_run_data
 
 
 def _parse(*argv):
@@ -39,7 +40,7 @@ def test_input_sources_can_be_combined():
     args = _parse("-a", "accs.txt", "-w", "Nitrospirota",
                   "-g", "gb.txt", "-f", "fa.txt", "-A", "aa.txt")
     check_args(args)
-    assert args.target_accessions == "accs.txt"
+    assert args.ncbi_accessions == "accs.txt"
     assert args.wanted_ref_tax == ["Nitrospirota"]
     assert args.genbank_files == "gb.txt"
     assert args.fasta_files == "fa.txt"
@@ -177,23 +178,58 @@ def _resolve_args(**overrides):
     An args namespace for phase_resolve_genomes tests.
 
     Defaults are taken from the real parser so that adding a CLI flag can't silently
-    break these with an AttributeError -- phase_resolve_genomes reads args attributes
-    directly, and a hand-maintained dict here is exactly the kind of parallel list that
-    drifts out of sync.
+    break these with an AttributeError -- phase 1 reads args attributes directly, and a
+    hand-maintained dict here is exactly the kind of parallel list that drifts out of
+    sync.
     """
     import argparse
 
     base = vars(cli.build_parser().parse_args([]))
     # these tests drive phase 1 directly and set their own inputs, so start from
     # "nothing requested" rather than the parser's placeholder values
-    base.update(target_accessions=None, wanted_ref_tax=None, source="gtdb",
+    base.update(ncbi_accessions=None, wanted_ref_tax=None, source="gtdb",
                 derep_rank="off")
     base.update(overrides)
     return argparse.Namespace(**base)
 
 
-def test_phase_one_fetches_the_ncbi_table_for_target_accessions(reference_data_fetches,
-                                                                monkeypatch, tmp_path):
+def _run_phase_one(args, tmp_path):
+    """Build the RunData the driver would and run phase 1 over it."""
+    out_dir = str(tmp_path / "out")
+    work_dir = str(tmp_path / "work")
+    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(work_dir, exist_ok=True)
+    run_data = build_run_data(args, out_dir, work_dir)
+    return cli.phase_resolve_genomes(args, run_data)
+
+
+def _patch_wanted_ref_tax(monkeypatch, by_taxon):
+    """
+    Stand in for the taxonomy core.
+
+    Patched on `wanted_ref_tax` itself rather than on this CLI module, because phase 1
+    is `general.resolve_input_genomes` now and reaches the taxonomy layer through its
+    own import.
+    """
+    from gtotree.utils.taxonomy import wanted_ref_tax as wrt
+
+    monkeypatch.setattr(wrt, "describe_source_version", lambda source: None)
+    monkeypatch.setattr(wrt, "resolve_wanted_ref_tax_accessions",
+                        lambda source, taxon, **kw: by_taxon[taxon])
+
+
+class _Sel:
+    def __init__(self, canonical, accessions=(), resolved_rank="phylum",
+                 effective_derep_rank=None):
+        self.canonical = canonical
+        self.accessions = list(accessions)
+        self.resolved_rank = resolved_rank
+        self.effective_derep_rank = effective_derep_rank
+        self.warnings = []
+
+
+def test_phase_one_fetches_the_ncbi_table_for_accessions(reference_data_fetches,
+                                                         tmp_path):
     """
     Regression test. This module reaches the NCBI table through `ncbi_data_table_path`,
     which only resolves a path -- nothing here ever downloaded the asset. On a machine
@@ -203,104 +239,98 @@ def test_phase_one_fetches_the_ncbi_table_for_target_accessions(reference_data_f
     accs = tmp_path / "accs.txt"
     accs.write_text("GCF_000008865.2\n")
 
-    monkeypatch.setattr(cli, "read_accessions_file", lambda p: ["GCF_000008865.2"])
-    monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([], []))
-
-    cli.phase_resolve_genomes(_resolve_args(target_accessions=str(accs)))
+    _run_phase_one(_resolve_args(ncbi_accessions=str(accs)), tmp_path)
 
     assert reference_data_fetches == ["ncbi"]
 
 
 def test_phase_one_fetches_both_tables_for_a_gtdb_wanted_ref_tax(reference_data_fetches,
-                                                                 monkeypatch):
+                                                                 monkeypatch, tmp_path):
     """
     A GTDB selection needs both: GTDB resolves the taxon, but the assemblies it names
     are NCBI accessions, screened against and downloaded using the NCBI summary.
     """
-    monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([], []))
-    monkeypatch.setattr(cli, "describe_source_version", lambda source: None)
+    _patch_wanted_ref_tax(monkeypatch, {
+        "Nitrospirota": (["GCF_000008865.2"],
+                         _Sel("Nitrospirota", ["GCF_000008865.2"]))})
 
-    class _Selection:
-        canonical = "Nitrospirota"
-        resolved_rank = "phylum"
-        effective_derep_rank = None
-        warnings = []
-
-    monkeypatch.setattr(cli, "resolve_wanted_ref_tax_accessions",
-                        lambda *a, **kw: (["GCF_000008865.2"], _Selection()))
-
-    cli.phase_resolve_genomes(_resolve_args(wanted_ref_tax="Nitrospirota",
-                                            source="gtdb"))
+    _run_phase_one(_resolve_args(wanted_ref_tax=["Nitrospirota"], source="gtdb"),
+                   tmp_path)
 
     assert sorted(reference_data_fetches) == ["gtdb", "ncbi"]
 
 
-def test_repeated_wanted_ref_tax_pools_every_taxon(reference_data_fetches, monkeypatch):
+def test_repeated_wanted_ref_tax_pools_every_taxon(reference_data_fetches,
+                                                   monkeypatch, tmp_path):
     """`-w Bacteria -w Archaea` resolves each taxon and merges their genomes."""
-    monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([], []))
-    monkeypatch.setattr(cli, "describe_source_version", lambda source: None)
+    _patch_wanted_ref_tax(monkeypatch, {
+        "Bacteria": (["GCF_000000001.1", "GCF_000000002.1"],
+                     _Sel("Bacteria", ["GCF_000000001.1", "GCF_000000002.1"],
+                          "domain", "family")),
+        "Archaea": (["GCF_000000003.1"],
+                    _Sel("Archaea", ["GCF_000000003.1"], "domain", "family")),
+    })
 
-    class _Sel:
-        def __init__(self, canonical):
-            self.canonical = canonical
-            self.resolved_rank = "domain"
-            self.effective_derep_rank = "family"
-            self.warnings = []
+    run_data, selections = _run_phase_one(
+        _resolve_args(wanted_ref_tax=["Bacteria", "Archaea"], source="gtdb"), tmp_path)
 
-    by_taxon = {
-        "Bacteria": (["GCF_000000001.1", "GCF_000000002.1"], _Sel("Bacteria")),
-        "Archaea": (["GCF_000000003.1"], _Sel("Archaea")),
-    }
-    monkeypatch.setattr(cli, "resolve_wanted_ref_tax_accessions",
-                        lambda source, taxon, **kw: by_taxon[taxon])
+    assert sorted(run_data.get_input_ncbi_accs()) == [
+        "GCF_000000001.1", "GCF_000000002.1", "GCF_000000003.1"]
+    assert [s.canonical for s in selections] == ["Bacteria", "Archaea"]
 
-    accessions, sources, _, _ = cli.phase_resolve_genomes(
-        _resolve_args(wanted_ref_tax=["Bacteria", "Archaea"], source="gtdb"))
-
-    assert sorted(accessions) == ["GCF_000000001.1", "GCF_000000002.1",
-                                  "GCF_000000003.1"]
     # provenance records which taxon each genome came from
-    assert sources["GCF_000000003.1"] == "GTDB:Archaea"
-    assert sources["GCF_000000001.1"] == "GTDB:Bacteria"
+    by_id = {gd.id: gd for gd in run_data.ncbi_accs}
+    assert by_id["GCF_000000001.1"].wanted_ref_tax_taxon == "Bacteria"
+    assert by_id["GCF_000000003.1"].wanted_ref_tax_taxon == "Archaea"
 
 
-def test_repeated_wanted_ref_tax_dedups_overlap(reference_data_fetches, monkeypatch):
+def test_repeated_wanted_ref_tax_dedups_overlap(reference_data_fetches,
+                                                monkeypatch, tmp_path):
     """A genome selected by two overlapping taxa is kept once, attributed to the
     first taxon that introduced it."""
-    monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([], []))
-    monkeypatch.setattr(cli, "describe_source_version", lambda source: None)
-
-    class _Sel:
-        def __init__(self, canonical):
-            self.canonical = canonical
-            self.resolved_rank = "phylum"
-            self.effective_derep_rank = None
-            self.warnings = []
-
     shared = "GCF_000000009.1"
-    by_taxon = {
-        "TaxonA": ([shared, "GCF_000000010.1"], _Sel("TaxonA")),
-        "TaxonB": ([shared, "GCF_000000011.1"], _Sel("TaxonB")),
-    }
-    monkeypatch.setattr(cli, "resolve_wanted_ref_tax_accessions",
-                        lambda source, taxon, **kw: by_taxon[taxon])
+    _patch_wanted_ref_tax(monkeypatch, {
+        "TaxonA": ([shared, "GCF_000000010.1"],
+                   _Sel("TaxonA", [shared, "GCF_000000010.1"])),
+        "TaxonB": ([shared, "GCF_000000011.1"],
+                   _Sel("TaxonB", [shared, "GCF_000000011.1"])),
+    })
 
-    accessions, sources, _, _ = cli.phase_resolve_genomes(
-        _resolve_args(wanted_ref_tax=["TaxonA", "TaxonB"], source="gtdb"))
+    run_data, _ = _run_phase_one(
+        _resolve_args(wanted_ref_tax=["TaxonA", "TaxonB"], source="gtdb"), tmp_path)
 
+    accessions = run_data.get_input_ncbi_accs()
     assert accessions.count(shared) == 1
-    assert sources[shared] == "GTDB:TaxonA"
     assert len(accessions) == 3
+
+    by_id = {gd.id: gd for gd in run_data.ncbi_accs}
+    assert by_id[shared].wanted_ref_tax_taxon == "TaxonA"
+
+    # and the overlap is accounted for rather than silently swallowed
+    assert run_data.wanted_ref_tax_selections[1]["num_selected"] == 2
+    assert run_data.wanted_ref_tax_selections[1]["num_added"] == 1
 
 
 def test_phase_one_fetches_nothing_for_a_local_files_only_run(reference_data_fetches,
-                                                              monkeypatch):
+                                                              tmp_path):
     """Local genome files never touch either table, so neither should be fetched."""
-    from gtotree.utils.misc.general import GenomeData
+    genome = tmp_path / "g1.faa"
+    genome.write_text(">p1\nMKVLAAAL\n")
+    listing = tmp_path / "aa.txt"
+    listing.write_text(f"{genome}\n")
 
-    gd = GenomeData.from_path("/tmp/g1.faa", "amino-acid")
-    monkeypatch.setattr(cli, "build_local_genomes", lambda args: ([gd], []))
-
-    cli.phase_resolve_genomes(_resolve_args(amino_acid_files="aa.txt"))
+    run_data, _ = _run_phase_one(_resolve_args(amino_acid_files=str(listing)),
+                                 tmp_path)
 
     assert reference_data_fetches == []
+    assert [gd.id for gd in run_data.all_input_genomes] == ["g1"]
+
+
+def test_phase_one_raises_when_nothing_resolves(tmp_path):
+    args = _resolve_args()
+    out_dir = str(tmp_path / "out"); os.makedirs(out_dir, exist_ok=True)
+    work_dir = str(tmp_path / "work"); os.makedirs(work_dir, exist_ok=True)
+    run_data = build_run_data(args, out_dir, work_dir)
+
+    with pytest.raises(GenSCGHMMsError, match="No input genomes"):
+        cli.phase_resolve_genomes(args, run_data)

@@ -12,10 +12,18 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_local import (
     SOURCE_AMINO_ACID,
     SOURCE_FASTA,
     SOURCE_GENBANK,
-    build_local_genomes,
+    populate_local_genomes,
     process_local_genome,
     read_paths_file,
 )
+from gtotree.utils.misc.general import RunData
+from gtotree.utils.misc.stages import GenomeRemovalStage
+
+
+def _local_genomes(args):
+    """populate_local_genomes' output as the flat, input-ordered list."""
+    rd = populate_local_genomes(args, RunData())
+    return list(rd.all_input_genomes), rd
 
 
 # a GenBank record with three CDS features, one of them flagged frameshifted -- the
@@ -93,7 +101,7 @@ def test_read_paths_file_empty(tmp_path):
 # building GenomeData
 ################################################################################
 
-def test_build_local_genomes_tags_sources(tmp_path):
+def test_populate_local_genomes_tags_sources(tmp_path):
     gb = tmp_path / "g1.gb"; gb.write_text(GENBANK)
     fa = tmp_path / "g2.fna"; fa.write_text(">c\nATGAAA\n")
     aa = tmp_path / "g3.faa"; aa.write_text(AMINO_ACIDS)
@@ -102,42 +110,102 @@ def test_build_local_genomes_tags_sources(tmp_path):
                  fasta_files=_listing(tmp_path, "fa.txt", [fa]),
                  amino_acid_files=_listing(tmp_path, "aa.txt", [aa]))
 
-    genomes, missing = build_local_genomes(args)
+    genomes, _rd = _local_genomes(args)
 
-    assert missing == []
+    assert not any(g.removed for g in genomes)
     assert [(g.id, g.source) for g in genomes] == [
         ("g1", SOURCE_GENBANK), ("g2", SOURCE_FASTA), ("g3", SOURCE_AMINO_ACID)]
 
 
-def test_build_local_genomes_reports_missing_up_front(tmp_path):
+def test_populate_local_genomes_uses_the_shared_source_vocabulary():
     """
-    A typo in a long listing should be reported before any expensive work starts,
-    not midway through downloading and gene-calling.
+    These strings are keys as well as labels: PREPROCESSING_STAGE_BY_SOURCE,
+    GENOME_SOURCE_FLAGS, target_search's per-source worker table, and
+    adopt_genome_progress's same-basename-different-source check all look genomes up
+    by them, and a private spelling here would fall through every one of those
+    silently.
+
+    This module now imports them from general.py rather than defining its own, so the
+    real check is that they ARE the shared ones -- identity, not coincidence.
+    """
+    from gtotree.utils.misc import general
+    from gtotree.utils.misc.preflight_checks import GENOME_SOURCE_FLAGS
+
+    assert SOURCE_GENBANK is general.SOURCE_GENBANK
+    assert SOURCE_FASTA is general.SOURCE_FASTA
+    assert SOURCE_AMINO_ACID is general.SOURCE_AMINO_ACID
+
+    for source in general.GENOME_SOURCES:
+        assert source in general.PREPROCESSING_STAGE_BY_SOURCE
+        assert source in GENOME_SOURCE_FLAGS
+
+
+def test_source_values_are_what_the_output_tables_show():
+    """
+    There's no rename layer between `gd.source` and the `source` column any more, so
+    the constants have to be readable as-is. If someone reintroduces an internal
+    spelling, this is where it shows up.
+    """
+    from gtotree.utils.misc.general import GenomeData, genome_source_label
+
+    gd = GenomeData.from_path("g1.fna", SOURCE_FASTA)
+    assert genome_source_label(gd) == "nucleotide-fasta"
+
+
+def test_populate_local_genomes_keeps_missing_files_as_removed_genomes(tmp_path):
+    """
+    A typo in a long listing should be reported before any expensive work starts, not
+    midway through downloading and gene-calling -- and it should land in
+    removed-genomes.tsv with everything else rather than in a side channel, which is
+    what keeping it as a removed genome buys.
     """
     real = tmp_path / "g1.faa"; real.write_text(AMINO_ACIDS)
     args = _args(amino_acid_files=_listing(
         tmp_path, "aa.txt", [real, tmp_path / "ghost.faa"]))
 
-    genomes, missing = build_local_genomes(args)
+    genomes, _rd = _local_genomes(args)
 
-    assert [g.id for g in genomes] == ["g1"]
-    assert len(missing) == 1
-    assert missing[0][0] == "ghost"
-    assert "not found" in missing[0][1]
+    assert [g.id for g in genomes] == ["g1", "ghost"]
 
-
-def test_build_local_genomes_with_no_inputs():
-    genomes, missing = build_local_genomes(_args())
-    assert genomes == [] and missing == []
+    ghost = genomes[1]
+    assert ghost.removed
+    assert ghost.removed_at == GenomeRemovalStage.AMINO_ACID_PREP
+    assert "not found" in ghost.reason_removed
 
 
-def test_build_local_genomes_strips_gz_for_id(tmp_path):
+def test_populate_local_genomes_marks_nucleotide_fastas_for_prodigal(tmp_path):
+    fa = tmp_path / "g2.fna"; fa.write_text(">c\nATGAAA\n")
+    args = _args(fasta_files=_listing(tmp_path, "fa.txt", [fa]))
+
+    genomes, _rd = _local_genomes(args)
+
+    assert genomes[0].prodigal_used is True
+
+
+def test_populate_local_genomes_with_no_inputs():
+    genomes, _rd = _local_genomes(_args())
+    assert genomes == []
+
+
+def test_populate_local_genomes_is_idempotent(tmp_path):
+    """Called twice on one RunData, the genome set must not double."""
+    aa = tmp_path / "g1.faa"; aa.write_text(AMINO_ACIDS)
+    args = _args(amino_acid_files=_listing(tmp_path, "aa.txt", [aa]))
+
+    rd = RunData()
+    populate_local_genomes(args, rd)
+    populate_local_genomes(args, rd)
+
+    assert [g.id for g in rd.all_input_genomes] == ["g1"]
+
+
+def test_populate_local_genomes_strips_gz_for_id(tmp_path):
     path = tmp_path / "g1.gb.gz"
     with gzip.open(path, "wt") as f:
         f.write(GENBANK)
     args = _args(genbank_files=_listing(tmp_path, "gb.txt", [path]))
 
-    genomes, _ = build_local_genomes(args)
+    genomes, _rd = _local_genomes(args)
     assert [g.id for g in genomes] == ["g1"]
 
 
@@ -148,7 +216,7 @@ def test_build_local_genomes_strips_gz_for_id(tmp_path):
 def test_process_amino_acid_file(tmp_path):
     aa = tmp_path / "g3.faa"; aa.write_text(AMINO_ACIDS)
     args = _args(amino_acid_files=_listing(tmp_path, "aa.txt", [aa]))
-    gd = build_local_genomes(args)[0][0]
+    gd = _local_genomes(args)[0][0]
 
     work = tmp_path / "work"; work.mkdir()
     out_path, used_prodigal = process_local_genome(gd, str(work))
@@ -166,7 +234,7 @@ def test_process_genbank_uses_existing_translations(tmp_path):
     """
     gb = tmp_path / "g1.gb"; gb.write_text(GENBANK)
     args = _args(genbank_files=_listing(tmp_path, "gb.txt", [gb]))
-    gd = build_local_genomes(args)[0][0]
+    gd = _local_genomes(args)[0][0]
 
     work = tmp_path / "work"; work.mkdir()
     out_path, used_prodigal = process_local_genome(gd, str(work))
@@ -181,7 +249,7 @@ def test_process_amino_acid_gz_is_handled(tmp_path):
     with gzip.open(path, "wt") as f:
         f.write(AMINO_ACIDS)
     args = _args(amino_acid_files=_listing(tmp_path, "aa.txt", [path]))
-    gd = build_local_genomes(args)[0][0]
+    gd = _local_genomes(args)[0][0]
 
     work = tmp_path / "work"; work.mkdir()
     out_path, _ = process_local_genome(gd, str(work))
@@ -206,7 +274,7 @@ def test_gzipped_input_does_not_clobber_user_file(tmp_path):
     before = hashlib.md5(sibling.read_bytes()).hexdigest()
 
     args = _args(amino_acid_files=_listing(tmp_path, "aa.txt", [gz_path]))
-    gd = build_local_genomes(args)[0][0]
+    gd = _local_genomes(args)[0][0]
 
     work = tmp_path / "work"; work.mkdir()
     process_local_genome(gd, str(work))
@@ -221,7 +289,7 @@ def test_gzip_staging_is_cleaned_up(tmp_path):
     with gzip.open(path, "wt") as f:
         f.write(AMINO_ACIDS)
     args = _args(amino_acid_files=_listing(tmp_path, "aa.txt", [path]))
-    gd = build_local_genomes(args)[0][0]
+    gd = _local_genomes(args)[0][0]
 
     work = tmp_path / "work"; work.mkdir()
     process_local_genome(gd, str(work))
@@ -233,7 +301,7 @@ def test_gzip_staging_is_cleaned_up(tmp_path):
 def test_process_empty_amino_acid_file_raises(tmp_path):
     aa = tmp_path / "g3.faa"; aa.write_text("")
     args = _args(amino_acid_files=_listing(tmp_path, "aa.txt", [aa]))
-    gd = build_local_genomes(args)[0][0]
+    gd = _local_genomes(args)[0][0]
 
     work = tmp_path / "work"; work.mkdir()
     with pytest.raises(TargetGenomeError):
@@ -244,7 +312,7 @@ def test_process_fasta_requires_prodigal(tmp_path, monkeypatch):
     """Nucleotide input always needs gene calling."""
     fa = tmp_path / "g2.fna"; fa.write_text(">c1\n" + "ATGAAAGTTCTGGCC" * 40 + "\n")
     args = _args(fasta_files=_listing(tmp_path, "fa.txt", [fa]))
-    gd = build_local_genomes(args)[0][0]
+    gd = _local_genomes(args)[0][0]
 
     called = {}
 
@@ -267,7 +335,7 @@ def test_process_fasta_requires_prodigal(tmp_path, monkeypatch):
 def test_unrecognized_source_raises(tmp_path):
     aa = tmp_path / "g3.faa"; aa.write_text(AMINO_ACIDS)
     args = _args(amino_acid_files=_listing(tmp_path, "aa.txt", [aa]))
-    gd = build_local_genomes(args)[0][0]
+    gd = _local_genomes(args)[0][0]
     gd.source = "not-a-real-source"
 
     work = tmp_path / "work"; work.mkdir()
