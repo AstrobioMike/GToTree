@@ -4,6 +4,19 @@
 
 ### TO DO STILL ###
 
+    # change this from search-pfams/kos:
+        #       2 input genome(s) didn't make it through; see summary table.
+    # and make it match what's in gen-scg-hmms (the below also needs to bump up one line):
+
+        #       Any input genomes that didn't make it through are reported in:
+        #         gtt-gen-scg-hmms-output/removed-genomes.tsv
+
+
+
+    # do i want a message like this for the main gtotree too?
+        #       Genome source being used for `-w` input: GTDB v232 (released Apr 15, 2026)
+
+
 
     # run the following with all 5 input types and make sure all messages make sense
         # main gtotree
@@ -11,39 +24,6 @@
         # gtt search-pfams
         # gtt search-kos
         # gtt gen-scg-hmms
-
-
-    # maybe still working on printout formatting for search-pfams/kos a little, check them out again (and gen-scg-hmms)
-
-
-    # the two download bars back to back, with no identifying info for the second, looks confusing:
-
-        #   ---------------------------------------------
-        #   Phase 2: Getting target-genome amino acids...
-        #   ---------------------------------------------
-
-        #     ✔ Resolved download locations
-
-        #       1 accession(s) not found at NCBI. Reported in:
-        #         gtt-gen-scg-hmms-output/removed-genomes.tsv
-
-        #       Downloading with 5 concurrent job(s):
-        #         100%|████████████| 5/5 [time elapsed: 00:03 | est. remaining: 00:00]
-
-
-        #       100%|██████████████| 5/5 [time elapsed: 00:11 | est. remaining: 00:00]
-
-
-        #       2 of 11 target genome(s) didn't make it through. Reported in:
-        #         gtt-gen-scg-hmms-output/removed-genomes.tsv
-
-        #       9 genome(s) ready to search
-
-    # maybe we should put a label over that second one, and indent it the two more spaces so it lines up
-    # depends what's going on though, i presume the first bar is download and/or run prodigal when needed
-    # and second bar is getting the amino acids for the non-downloaded input genomes
-    # maybe for the purposes here, these should be rolled into one progress bar?
-
 
 
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K

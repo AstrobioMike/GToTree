@@ -98,6 +98,6 @@ def parser():
     opt.add_argument("-R", "--resume", action="store_true")
     opt.add_argument("-F", "--force-overwrite", action="store_true")
     opt.add_argument("--tmp-dir", default=None)
-    opt.add_argument("-d", "--debug", action="store_true")
+    opt.add_argument("-d", "--keep-working-dir", action="store_true")
 
     return parser

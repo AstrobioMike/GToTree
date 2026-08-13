@@ -361,7 +361,7 @@ class TestFailedAlignmentLogCapture:
     def test_logs_for_failed_sets_are_copied_out_of_the_temp_dir(self, tmp_path):
         """
         The align/trimal logs live under tmp_dir, which is deleted at the end of a run
-        unless --debug. Without copying them the report would point at a directory that
+        unless --keep-working-dir. Without copying them the report would point at a directory that
         no longer exists by the time anyone reads it.
         """
         from gtotree.main_stages.aligning_and_preparing_SCG_sets import (

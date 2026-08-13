@@ -9,8 +9,10 @@ table.
 
 The counts matrix and per-target hit fastas are written by the main driver's own
 helpers (`write_pfam_counts_table` / `write_ko_counts_table` and
-`combine_all_*_hits`), unmodified, so those files are byte-for-byte what a full GToTree
-run with `-p`/`-K` would have produced.
+`combine_all_*_hits`), so those files are byte-for-byte what a full GToTree run with
+`-p`/`-K` would have produced. The counts writer additionally returns the per-genome
+hit tallies it already computed, which feed the `num_hits` / `num_targets_hit` columns
+here.
 """
 
 import os
@@ -22,36 +24,38 @@ from gtotree.utils.misc.summary_info import search_completed_value
 
 SUMMARY_FILENAME = "genomes-summary-info.tsv"
 
-COLUMNS = ["genome_id", "input", "source", "num_genes",
-           "prodigal_used", "search_completed", "reason_removed"]
+COLUMNS = ["genome_id", "input", "source", "num_genes", "num_hits",
+           "num_targets_hit", "prodigal_used", "search_completed",
+           "reason_removed"]
 
 
-def _row(gd, spec, run_data=None):
+def _row(gd, spec, run_data=None, hit_tallies=None):
     completed = search_completed_value(gd, spec.search_done_flag,
                                        spec.search_failed_flag)
+
+    num_hits, num_targets_hit = (hit_tallies or {}).get(gd.id, (None, None))
 
     return [
         gd.id,
         genome_input_label(gd, run_data),
         genome_source_label(gd),
         "NA" if gd.num_genes is None else str(gd.num_genes),
+        "NA" if num_hits is None else str(num_hits),
+        "NA" if num_targets_hit is None else str(num_targets_hit),
         "Yes" if gd.prodigal_used else "No",
         completed,
         gd.reason_removed or "NA",
     ]
 
 
-def write_genomes_summary(out_dir, run_data, spec):
+def write_genomes_summary(out_dir, run_data, spec, hit_tallies=None):
     """
-    Write one row per input genome, in input order.
-
-    Every input genome appears, including ones that dropped out -- a genome missing
-    from the counts matrix is only interpretable if there's somewhere that says why it
-    isn't there.
+    Write one row per input genome, in input order
     """
     path = os.path.join(out_dir, SUMMARY_FILENAME)
 
-    rows = [_row(gd, spec, run_data) for gd in run_data.all_input_genomes]
+    rows = [_row(gd, spec, run_data, hit_tallies)
+            for gd in run_data.all_input_genomes]
 
     def write(f):
         f.write("\t".join(COLUMNS) + "\n")

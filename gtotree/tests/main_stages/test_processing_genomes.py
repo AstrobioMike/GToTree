@@ -94,8 +94,8 @@ def test_processing_searches_every_genome_and_drops_its_sequence_files(tmp_path)
     assert os.listdir(run_data.ready_genome_files_dir) == []
 
 
-def test_debug_keeps_the_sequence_files(tmp_path):
-    _, run_data = _process(tmp_path, "-A", AA_GENOMES, MOCK_HMM, extra=["--debug"])
+def test_keep_working_dir_keeps_the_sequence_files(tmp_path):
+    _, run_data = _process(tmp_path, "-A", AA_GENOMES, MOCK_HMM, extra=["--keep-working-dir"])
     assert sorted(os.listdir(run_data.ready_genome_files_dir)) == \
         ["mock-1.faa", "mock-2.faa", "mock-3.faa", "mock-4.faa"]
 

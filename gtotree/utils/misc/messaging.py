@@ -553,8 +553,8 @@ def check_and_report_any_changed_default_behavior(args, run_data):
     if args.keep_gene_alignments:
         lines.append("Individual protein-alignment files will retained, due to the `-k` flag being provided")
 
-    if args.debug:
-        lines.append("Debug mode is enabled, so the temp directory won't be removed at the end of the run")
+    if args.keep_working_dir:
+        lines.append("The working directory and its intermediate files will be kept, due to the `-d` flag being provided")
 
     if args.target_pfams_file:
         lines.append(f"Genomes will be searched for Pfams listed in: {args.target_pfams_file} ({run_data.total_pfam_targets} targets)")

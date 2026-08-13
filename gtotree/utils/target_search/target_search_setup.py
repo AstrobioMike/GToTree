@@ -392,15 +392,13 @@ def fill_in_shared_args(args):
     Add the attributes the shared machinery reads off `args` but this CLI doesn't ask
     for.
 
-    `run_pooled_stage` reads `num_jobs`; `build_search_plan` reads `debug`; the
-    processing helpers reach `nucleotide_mode` through run_data but a couple of
-    shared paths still check args. Setting them explicitly here (rather than letting an
-    AttributeError surface from inside a worker thread) keeps the shim in one visible
-    place.
+    `run_pooled_stage` reads `num_jobs`; the processing helpers reach
+    `nucleotide_mode` through run_data but a couple of shared paths still check args.
+    Setting them explicitly here (rather than letting an AttributeError surface from
+    inside a worker thread) keeps the shim in one visible place.
     """
     defaults = {
         "nucleotide_mode": False,
-        "debug": False,
         "target_pfams_file": None,
         "target_kos_file": None,
         "add_ncbi_tax": False,
@@ -432,7 +430,6 @@ def make_args(**overrides):
         "resume": False,
         "force_overwrite": False,
         "keep_working_dir": False,
-        "debug": False,
     }
     base.update(overrides)
     return fill_in_shared_args(argparse.Namespace(**base))

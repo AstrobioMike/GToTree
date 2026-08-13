@@ -176,15 +176,15 @@ def phase_collect_targets(run_data, spec, out_dir, resuming=False):
 
 def build_plan(args, spec):
     """
-    A SearchPlan that turns on exactly this subcommand's search and nothing else.
+    A SearchPlan that turns on exactly this subcommand's search and nothing else
 
     `do_scg=False` is what makes the shared fused worker usable here: there's no SCG
-    HMM set to press or search, and no tree downstream that would consume one.
+    HMM set to press or search, and no tree downstream that would consume one
     """
     return SearchPlan(
         do_pfam=(spec.plan_flag == "do_pfam"),
         do_ko=(spec.plan_flag == "do_ko"),
-        keep_genome_files=bool(getattr(args, "debug", False)),
+        keep_genome_files=bool(getattr(args, "keep_working_dir", False)),
         do_scg=False,
     )
 
@@ -318,31 +318,18 @@ class _NullContext:
 def phase_write_outputs(run_data, spec, out_dir):
     """
     Build the combined outputs from the per-genome artifacts
-
-    Both helpers are the main driver's, unmodified: they read the per-genome result
-    files off disk rather than any in-memory accumulation, which is why they're
-    idempotent and complete regardless of how much of the work happened in this
-    invocation versus an earlier interrupted one.
-
-    Returns (summary_path, num_targets_with_hits).
     """
     from gtotree.utils.target_search import target_search_outputs as outputs
 
     run_data.update_all_input_genomes()
 
-    # with spinner("Writing the hit-counts table...", "Wrote the hit-counts table"):
-    #     spec.write_counts_table(run_data)
-
-    spec.write_counts_table(run_data)
+    hit_tallies = spec.write_counts_table(run_data)
 
     found = spec.found_targets(run_data)
     hit_seqs_dir = os.path.join(spec.results_dir(run_data), spec.hit_seqs_subdir)
 
-    # print("      Combining per-genome hit sequences:")
     with tqdm(total=len(found), bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED_6,
               ncols=76, smoothing=GTT_PROGRESS_SMOOTHING) as pbar:
-        # combine_hits takes the whole target list, so it's driven one target at a
-        # time here purely to give the bar something to advance on
         for target in found:
             spec.combine_hits([target], spec.tmp_results_dir(run_data), hit_seqs_dir)
             pbar.update(1)
@@ -351,10 +338,7 @@ def phase_write_outputs(run_data, spec, out_dir):
 
     targets_with_hits = _count_and_prune_hit_seqs(hit_seqs_dir)
 
-    # with spinner("Writing the genome summary table...", "Wrote the genome summary table"):
-    #     summary_path = outputs.write_genomes_summary(out_dir, run_data, spec)
-
-    summary_path = outputs.write_genomes_summary(out_dir, run_data, spec)
+    summary_path = outputs.write_genomes_summary(out_dir, run_data, spec, hit_tallies)
 
     write_run_data(run_data)
 

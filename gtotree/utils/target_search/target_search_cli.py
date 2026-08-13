@@ -95,8 +95,8 @@ def build_fingerprint(run_data, args, spec, data_version=None):
 
     So there are no per-genome stages here: run-data.json is that record.
 
-    Deliberately excludes `--num-jobs`, `--keep-working-dir`, `-d`, and the output
-    directory name -- those change how the run executes, not what it produces.
+    Deliberately excludes `--num-jobs`, `--keep-working-dir`, and the output directory
+    name -- those change how the run executes, not what it produces.
 
     The target list is hashed by CONTENTS rather than path: the meaningful unit is
     which IDs were asked for, so moving or renaming the file shouldn't force a re-run,
@@ -264,7 +264,7 @@ def build_parser(spec, parent_subparsers=None):
     optional.add_argument(
         "--keep-working-dir",
         action="store_true",
-        help="Keep the intermediate working directory",
+        help=("Keep the working directory and typically temp intermediate files"),
     )
 
     optional.add_argument(
@@ -278,12 +278,6 @@ def build_parser(spec, parent_subparsers=None):
         "-F", "--force-overwrite",
         action="store_true",
         help="Overwrite the output directory if it already exists",
-    )
-
-    optional.add_argument(
-        "-d", "--debug",
-        action="store_true",
-        help="Keep each genome's intermediate sequence files",
     )
 
     add_help(optional)
@@ -466,7 +460,7 @@ def run_search(args, spec):  # pragma: no cover
     RESUME.mark_complete(state, STAGE_OUTPUTS, work_dir=work_dir)
     RESUME.save(work_dir, state)
 
-    if not args.keep_working_dir and not args.debug:
+    if not args.keep_working_dir:
         shutil.rmtree(work_dir, ignore_errors=True)
 
     # closes the final phase, so this has to happen before anything reads the table

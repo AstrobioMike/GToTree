@@ -101,7 +101,7 @@ def build_search_plan(args, run_data):
     elif run_data.target_kos_file:
         do_ko = len(run_data.found_ko_targets) > 0
 
-    plan = SearchPlan(do_pfam=do_pfam, do_ko=do_ko, keep_genome_files=bool(args.debug))
+    plan = SearchPlan(do_pfam=do_pfam, do_ko=do_ko, keep_genome_files=bool(args.keep_working_dir))
     return run_data, plan
 
 

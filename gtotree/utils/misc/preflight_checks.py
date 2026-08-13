@@ -109,9 +109,10 @@ _INPUT_FILE_FIELDS = (
 
 # args that change how the run executes, not what it produces. Listed explicitly
 # so adding any new flags is a deliberate decision about if they impact a resume attempt or not
-_EXECUTION_ONLY_ARGS = ("num_jobs", "num_muscle_threads", "debug", "tmp_dir",
-                        "force_overwrite", "resume", "output_dir", "run_files_dir",
-                        "run_files_dir_rel", "output_already_existed")
+_EXECUTION_ONLY_ARGS = ("num_jobs", "num_muscle_threads", "keep_working_dir",
+                        "tmp_dir", "force_overwrite", "resume", "output_dir",
+                        "run_files_dir", "run_files_dir_rel",
+                        "output_already_existed")
 
 
 def build_fingerprint(args):

@@ -408,10 +408,10 @@ ENTRIES = [
          """,
          FULL),
 
-        ("-d | --debug",
-         "debug mode",
+        ("-d | --keep-working-dir",
+         "keep the working directory",
          """
-         Provide this flag if you'd like to keep the temporary directory.
+         Provide this flag if you'd like to keep the typically temporary working directory.
          """,
          FULL),
     ]),

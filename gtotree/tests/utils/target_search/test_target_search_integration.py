@@ -141,6 +141,42 @@ def test_summary_table_covers_every_input_genome(basic_run):
     assert rows[2]["num_genes"] == "3"
 
 
+def test_summary_table_reports_hit_totals(basic_run):
+    """
+    num_hits counts hits; num_targets_hit counts targets that got at least one. g3 is
+    the case that separates them -- two copies of PF90001 plus one of PF90002.
+    """
+    header, rows = _read_tsv(os.path.join(basic_run[1], "genomes-summary-info.tsv"))
+
+    assert header[:6] == ["genome_id", "input", "source", "num_genes",
+                          "num_hits", "num_targets_hit"]
+
+    by_id = {row["genome_id"]: row for row in rows}
+    assert (by_id["g1"]["num_hits"], by_id["g1"]["num_targets_hit"]) == ("2", "2")
+    assert (by_id["g3"]["num_hits"], by_id["g3"]["num_targets_hit"]) == ("3", "2")
+
+
+def test_summary_hit_totals_match_the_counts_matrix(basic_run, pfam_spec):
+    """
+    The two numbers are the row sum and non-zero count of that genome's counts row --
+    a mismatch would mean the summary and the matrix disagree about the same search.
+    """
+    _run_data, out_dir = basic_run
+
+    counts_header, counts_rows = _read_tsv(
+        os.path.join(out_dir, pfam_spec.counts_filename))
+    targets = counts_header[2:]
+
+    _header, summary = _read_tsv(os.path.join(out_dir, "genomes-summary-info.tsv"))
+    by_id = {row["genome_id"]: row for row in summary}
+
+    for row in counts_rows:
+        counts = [int(row[t]) for t in targets]
+        assert by_id[row["genome_id"]]["num_hits"] == str(sum(counts))
+        assert by_id[row["genome_id"]]["num_targets_hit"] == str(
+            sum(1 for c in counts if c))
+
+
 def test_no_nested_search_results_directory(basic_run):
     """The flattened layout: no `pfam-search-results/` wrapper."""
     _run_data, out_dir = basic_run
@@ -150,6 +186,41 @@ def test_no_nested_search_results_directory(basic_run):
 def test_working_dir_is_cleaned_up_on_success(basic_run):
     _run_data, out_dir = basic_run
     assert not os.path.exists(os.path.join(out_dir, WORKING_DIR_NAME))
+
+
+################################################################################
+# --keep-working-dir
+################################################################################
+
+def _ready_genome_files(out_dir):
+    ready = os.path.join(out_dir, WORKING_DIR_NAME, "tmp", "ready-genome-files")
+    return sorted(os.listdir(ready)) if os.path.isdir(ready) else []
+
+
+def test_keep_working_dir_keeps_the_genome_fastas_too(run_pfam_search):
+    """
+    The whole point of collapsing `-d` into this flag: keeping the directory has to
+    mean keeping what's in it, or the genome fastas are deleted per-genome as they're
+    searched and the retained working dir has a hole where they were.
+    """
+    _run_data, out_dir = run_pfam_search(
+        genomes={"g1": ["PF90001"], "g2": ["PF90001"]},
+        targets=["PF90001"],
+        keep_working_dir=True,
+    )
+
+    assert os.path.isdir(os.path.join(out_dir, WORKING_DIR_NAME))
+    assert _ready_genome_files(out_dir) == ["g1.faa", "g2.faa"]
+
+
+def test_without_keep_working_dir_nothing_intermediate_survives(run_pfam_search):
+    _run_data, out_dir = run_pfam_search(
+        genomes={"g1": ["PF90001"], "g2": ["PF90001"]},
+        targets=["PF90001"],
+    )
+
+    assert not os.path.exists(os.path.join(out_dir, WORKING_DIR_NAME))
+    assert _ready_genome_files(out_dir) == []
 
 
 def test_no_scg_or_tree_artifacts_are_produced(basic_run):
@@ -199,6 +270,11 @@ def test_a_genome_with_no_hits_still_appears_everywhere(run_pfam_search, pfam_sp
 
     _header, summary = _read_tsv(os.path.join(out_dir, "genomes-summary-info.tsv"))
     assert {row["genome_id"] for row in summary} == {"hit", "nohit"}
+
+    # zero, not NA: it was searched, and the answer was nothing
+    by_id = {row["genome_id"]: row for row in summary}
+    assert (by_id["nohit"]["num_hits"], by_id["nohit"]["num_targets_hit"]) == ("0", "0")
+    assert (by_id["hit"]["num_hits"], by_id["hit"]["num_targets_hit"]) == ("1", "1")
 
 
 def test_single_genome_run_works(run_pfam_search):
@@ -297,6 +373,11 @@ def test_a_failed_search_stays_out_of_the_counts_matrix(run_pfam_search,
     by_id = {row["genome_id"]: row for row in summary}
     assert by_id["broken"]["search_completed"] == "No"
     assert by_id["fine"]["search_completed"] == "Yes"
+
+    # and NA rather than 0 for its hit totals, for the same reason it's out of the
+    # matrix: there was never an answer, not an answer of none
+    assert by_id["broken"]["num_hits"] == "NA"
+    assert by_id["broken"]["num_targets_hit"] == "NA"
 
 
 def test_a_failed_search_is_not_counted_as_searched(run_pfam_search, fail_search_for,

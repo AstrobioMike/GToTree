@@ -7,7 +7,8 @@ import pandas as pd # type: ignore
 from Bio import SeqIO # type: ignore
 from gtotree.utils.misc.general import (search_threads_per_genome,
                                    atomic_write_text,
-                                   record_search_failure)
+                                   record_search_failure,
+                                   tally_hit_counts)
 
 
 def _ko_search_worker(genome, run_data, aa_path=None):
@@ -92,11 +93,13 @@ def write_ko_counts_table(run_data):
                if gd.ko_search_done and not gd.removed]
 
     count_rows = []
+    hit_tallies = {}
     for gd in genomes:
         ko_results_tsv = (f"{run_data.ko_results_dir}/individual-genome-results/"
                           f"{gd.id}/kofamscan-results.tsv")
         counts_list = get_ko_counts(run_data.found_ko_targets, ko_results_tsv)
         count_rows.append([gd.id, gd.num_genes] + counts_list)
+        hit_tallies[gd.id] = tally_hit_counts(counts_list)
 
     cols = ['genome_id', 'total_gene_count'] + run_data.found_ko_targets
     ko_counts_df = pd.DataFrame(count_rows, columns=cols)
@@ -105,6 +108,8 @@ def write_ko_counts_table(run_data):
     atomic_write_text(
         f"{run_data.ko_results_dir}/ko-hit-counts.tsv",
         lambda f: ko_counts_df.to_csv(f, sep='\t', index=False))
+
+    return hit_tallies
 
 
 def write_out_failed_ko_targets(run_data):

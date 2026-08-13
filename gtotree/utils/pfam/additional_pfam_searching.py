@@ -6,7 +6,8 @@ import pandas as pd # type: ignore
 from Bio import SeqIO # type: ignore
 from gtotree.utils.misc.general import (search_threads_per_genome,
                                    atomic_write_text,
-                                   record_search_failure)
+                                   record_search_failure,
+                                   tally_hit_counts)
 from gtotree.utils.hmms.hmm_searching_engine import search_one_genome
 
 
@@ -60,20 +61,19 @@ def _pfam_search_worker_inner(genome, run_data, aa_path=None, pressed_base=None)
 
 def write_pfam_counts_table(run_data):
     """
-    Write pfam-hit-counts.tsv from the per-genome result files.
-
-    Idempotent, and complete regardless of how much of the work happened in this
-    invocation versus an earlier interrupted one.
+    Write pfam-hit-counts.tsv from the per-genome result files
     """
     genomes = [gd for gd in run_data.all_input_genomes
                if gd.pfam_search_done and not gd.removed]
 
     count_rows = []
+    hit_tallies = {}
     for gd in genomes:
         results_txt = (f"{run_data.pfam_results_dir}/individual-genome-results/"
                        f"{gd.id}/pfam-hmmsearch.txt")
         counts_list = get_pfam_counts(run_data.found_pfam_targets, results_txt)
         count_rows.append([gd.id, gd.num_genes] + counts_list)
+        hit_tallies[gd.id] = tally_hit_counts(counts_list)
 
     cols = ['genome_id', 'total_gene_count'] + run_data.found_pfam_targets
     pfam_counts_df = pd.DataFrame(count_rows, columns=cols)
@@ -82,6 +82,8 @@ def write_pfam_counts_table(run_data):
     atomic_write_text(
         f"{run_data.pfam_results_dir}/pfam-hit-counts.tsv",
         lambda f: pfam_counts_df.to_csv(f, sep='\t', index=False))
+
+    return hit_tallies
 
 
 def run_pfam_search(all_pfam_targets_hmm, base_outpath, AA_file, pressed_base=None):

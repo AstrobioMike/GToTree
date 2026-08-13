@@ -288,6 +288,23 @@ def genome_input_label(gd, run_data=None):
     return gd.provided_path or gd.id
 
 
+def tally_hit_counts(counts_list):
+    """
+    (num_hits, num_targets_hit) for one genome's row of a Pfam/KO hit-counts matrix
+
+    Two different measures, deliberately named apart: `num_hits` counts hits, and
+    `num_targets_hit` counts targets that got at least one
+    """
+    num_hits = 0
+    num_targets_hit = 0
+    for count in counts_list:
+        count = int(count)
+        if count:
+            num_hits += count
+            num_targets_hit += 1
+    return num_hits, num_targets_hit
+
+
 @dataclass
 class GenomeData:
     id: str
@@ -1224,6 +1241,6 @@ def concat_files(file_list, output_file):
 
 
 def cleanup(args, run_data):
-    if not args.debug:
+    if not args.keep_working_dir:
         shutil.rmtree(run_data.tmp_dir, ignore_errors=True)
         run_data.tmp_dir = ""
