@@ -1,30 +1,10 @@
 """
 The work phases behind `gtt search-pfams` / `gtt search-kos`
-
-The per-genome heavy lifting is not reimplemented here. `main_stages.processing_genomes`
-already owns a fused worker that, for one genome, preprocesses it, immediately searches
-the resulting FASTA while it's still on disk, and then drops the FASTA when it's downloaded
-That worker dispatches on `SearchPlan.do_pfam` / `do_ko`, so these subcommands get it by 
-constructing a plan with `do_scg=False` and the relevant target flag set, rather than by 
-growing a second copy.
-
-What *is* here is the orchestration and reporting layer. The one structural difference
-from the main driver is that all four input sources go through a *single* pool rather
-than four sequential ones: a search-only run is one thing happening to one set of
-genomes, and four separately-labelled bars made it read like four unrelated runs
-stapled together. The pool dispatches to the right preprocessing worker on
-`GenomeData.source`.
-
-That the search happens inside the same worker as the preprocessing is also what pins
-the phase order: targets have to be resolved before the pool starts, so the expensive
-half of the run can't begin until we know there's something to search for.
 """
 
 import os
 import tempfile
-
 from tqdm import tqdm  # type: ignore
-
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.general import (run_pooled_stage,
                                    write_run_data,
@@ -36,6 +16,8 @@ from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
                                           total_input_genomes_line,
                                           REMOVED_GENOMES_FILENAME)
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
+from gtotree.utils.misc.stages import (GenomeRemovalStage,
+                                       GENOME_REMOVAL_STAGE_ORDER)
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 from gtotree.main_stages.processing_genomes import (SearchPlan,
                                                     _fused,
@@ -56,6 +38,11 @@ from gtotree.utils.target_search.target_search_setup import TargetSearchError
 
 def _removals_pointer(run_data):
     return f"{run_data.run_files_dir_rel}/{REMOVED_GENOMES_FILENAME}"
+
+
+SEARCH_PHASE_REMOVAL_STAGES = tuple(
+    stage for stage in GENOME_REMOVAL_STAGE_ORDER
+    if stage != GenomeRemovalStage.NCBI_LOOKUP)
 
 
 ################################################################################
@@ -102,13 +89,14 @@ def resolve_input_genomes(args, run_data):
         for warning in selection.warnings:
             report_message(warning, "orange", ii="        ", si="        ")
 
+        print()
+
     run_data.update_all_input_genomes()
     total = len(run_data.all_input_genomes)
 
     if not total:
         raise TargetSearchError("No input genomes were resolved to work with.")
 
-    print()
     for line in input_genome_source_lines(args, run_data):
         print(line)
 
@@ -323,18 +311,21 @@ def phase_search_genomes(args, run_data, spec, plan):
         run_data = run_pooled_stage(to_process, worker, apply_result, args, run_data,
                                     bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED_6)
 
+    mark_failed_searches_removed(run_data, spec)
+
     write_removed_genomes_report(run_data)
     write_run_data(run_data)
 
     searched = count_searched_genomes(run_data, spec)
-    dropped = len(run_data.all_input_genomes) - searched
+    failed_here = run_data.genomes_removed_at(*SEARCH_PHASE_REMOVAL_STAGES)
 
-    print(f"\n      {color_text(f'{searched:,} genome(s) searched', 'green')}")
+    # print(f"\n      {color_text(f'{searched:,} genome(s) searched', 'green')}")
 
-    # if dropped:
-    #     report_message(
-    #         f"{dropped:,} input genome(s) didn't make it through; see details in:", "yellow", ii="      ", si="      ")
-    #     print(f"        {color_text(_removals_pointer(run_data), 'yellow')}")
+    if failed_here:
+        report_message(
+            f"{len(failed_here):,} genome(s) failed the search phase. Reported in:",
+            "yellow", ii="      ", si="      ")
+        print(f"        {color_text(_removals_pointer(run_data), 'yellow')}")
 
     if not searched:
         raise TargetSearchError(
@@ -428,9 +419,25 @@ def _count_and_prune_hit_seqs(hit_seqs_dir):
     return len(contents)
 
 
+def mark_failed_searches_removed(run_data, spec):
+    """
+    Drop genomes whose search failed at the search stage
+    """
+    for gd in run_data.all_input_genomes:
+        if gd.removed:
+            continue
+        if getattr(gd, spec.search_failed_flag, False):
+            gd.mark_removed(f"{spec.target_label} search failed",
+                            GenomeRemovalStage.HMM_SEARCH)
+
+    return run_data
+
+
 def count_searched_genomes(run_data, spec):
     """
-    How many genomes actually made it all the way through to a completed search.
+    How many genomes actually made it all the way through to a completed search
     """
     return len([gd for gd in run_data.all_input_genomes
-                if getattr(gd, spec.search_done_flag, False) and not gd.removed])
+                if getattr(gd, spec.search_done_flag, False)
+                and not getattr(gd, spec.search_failed_flag, False)
+                and not gd.removed])

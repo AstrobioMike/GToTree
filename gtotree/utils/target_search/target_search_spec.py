@@ -50,6 +50,7 @@ class TargetSearchSpec:
     failed_targets_attr: str         # "failed_pfam_targets"
     searching_done_attr: str         # "additional_pfam_searching_done"
     search_done_flag: str            # GenomeData attr: "pfam_search_done"
+    search_failed_flag: str
 
     # --- output layout ---------------------------------------------------------
     # subdirectories created under the (flattened) output directory
@@ -141,10 +142,8 @@ def _pfam_spec():
         failed_targets_attr="failed_pfam_targets",
         searching_done_attr="additional_pfam_searching_done",
         search_done_flag="pfam_search_done",
+        search_failed_flag="pfam_search_failed",
 
-        # `info/` is kept even in the flattened layout because
-        # write_requested_and_pulled_pfams writes there unconditionally; reusing that
-        # function as-is is worth one extra directory
         result_subdirs=["info", "individual-genome-results", "pfam-hit-seqs",
                         "target-pfam-profiles"],
         target_stage_artifacts=["target-pfam-profiles/all-pfam-targets.hmm"],
@@ -197,6 +196,7 @@ def _ko_spec():
         failed_targets_attr="failed_ko_targets",
         searching_done_attr="additional_ko_searching_done",
         search_done_flag="ko_search_done",
+        search_failed_flag="ko_search_failed",
 
         result_subdirs=["individual-genome-results", "ko-hit-seqs",
                         "target-ko-profiles"],
@@ -211,9 +211,6 @@ def _ko_spec():
         combine_hits=combine_all_ko_hits,
         ensure_data=get_kofamscan_data,
         describe_data_version=None,
-
-        # the KO search shells out to kofamscan rather than going through pyhmmer,
-        # so the binary is a hard requirement and there's nothing to hmmpress
         required_binaries=["exec_annotation"],
         required_env_vars=["KO_data_dir"],
         presses_profiles=False,

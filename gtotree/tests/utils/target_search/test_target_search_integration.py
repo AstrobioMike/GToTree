@@ -16,9 +16,13 @@ import os
 import time
 import pytest  # type: ignore
 from gtotree.utils.target_search import target_search_cli
+from gtotree.utils.target_search import target_search_stages as stages
+from gtotree.utils.target_search import target_search_outputs as outputs
 from gtotree.utils.target_search.target_search_setup import (TargetSearchError,
                                                              make_args,
                                                              WORKING_DIR_NAME)
+from gtotree.utils.misc.messaging import REMOVED_GENOMES_FILENAME
+from gtotree.utils.misc.stages import GenomeRemovalStage
 from gtotree.tests.utils.target_search.conftest import MOCK_PFAM_VERSION
 
 
@@ -203,6 +207,158 @@ def test_single_genome_run_works(run_pfam_search):
                                         targets=["PF90001"])
     assert len(run_data.all_input_genomes) == 1
     assert os.path.isfile(os.path.join(out_dir, "pfam-hit-seqs", "PF90001.faa"))
+
+
+################################################################################
+# a search that fails
+################################################################################
+
+@pytest.fixture
+def fail_search_for(monkeypatch):
+    """
+    Returns a callable making the Pfam search fail for the named genomes.
+
+    Patched at `processing_genomes`, which is where the fused worker looks the search
+    function up, and returning the same shape the real worker returns when it catches
+    something -- so this exercises the production failure path rather than a synthetic
+    one bolted on beside it.
+    """
+    from gtotree.main_stages import processing_genomes
+
+    real_worker = processing_genomes._pfam_search_worker
+
+    def _install(*genome_ids):
+        wanted = set(genome_ids)
+
+        def worker(genome, run_data, **kwargs):
+            if genome.id in wanted:
+                return {"pfam_search_failed": True, "error": "RuntimeError: planted"}
+            return real_worker(genome, run_data, **kwargs)
+
+        monkeypatch.setattr(processing_genomes, "_pfam_search_worker", worker)
+
+    return _install
+
+
+def test_a_failed_search_drops_the_genome_from_the_run(run_pfam_search, fail_search_for):
+    """
+    In a full GToTree run a failed Pfam search leaves the genome in place -- it still
+    has its SCG hits and still belongs in the tree. Here the search is the whole run,
+    so a genome that failed it has nothing left to contribute and has to leave.
+    """
+    fail_search_for("broken")
+    run_data, _out_dir = run_pfam_search(
+        genomes={"fine": ["PF90001"], "broken": ["PF90001"]},
+        targets=["PF90001"],
+    )
+
+    by_id = {gd.id: gd for gd in run_data.all_input_genomes}
+
+    assert by_id["broken"].removed
+    assert by_id["broken"].removed_at == GenomeRemovalStage.HMM_SEARCH
+    assert "search failed" in by_id["broken"].reason_removed
+    assert not by_id["fine"].removed
+
+
+def test_a_failed_search_is_recorded_in_the_removals_table(run_pfam_search,
+                                                           fail_search_for):
+    fail_search_for("broken")
+    _run_data, out_dir = run_pfam_search(
+        genomes={"fine": ["PF90001"], "broken": ["PF90001"]},
+        targets=["PF90001"],
+    )
+
+    header, rows = _read_tsv(os.path.join(out_dir, REMOVED_GENOMES_FILENAME))
+    assert header == ["genome_id", "input", "source", "stage_removed",
+                      "reason_removed"]
+    assert [row["genome_id"] for row in rows] == ["broken"]
+    assert rows[0]["stage_removed"] == GenomeRemovalStage.HMM_SEARCH
+
+
+def test_a_failed_search_stays_out_of_the_counts_matrix(run_pfam_search,
+                                                        fail_search_for, pfam_spec):
+    """
+    The regression this guards: `mark_pfam_search_failed` sets the *done* flag too, and
+    the counts writer selects on `search_done and not removed` -- so before the genome
+    was removed it landed in the matrix as a row of zeros, indistinguishable from a
+    genome that really was searched and hit nothing.
+    """
+    fail_search_for("broken")
+    _run_data, out_dir = run_pfam_search(
+        genomes={"fine": ["PF90001"], "broken": ["PF90001"]},
+        targets=["PF90001"],
+    )
+
+    _header, rows = _read_tsv(os.path.join(out_dir, pfam_spec.counts_filename))
+    assert [row["assembly_id"] for row in rows] == ["fine"]
+
+    # but it still gets a summary row, saying plainly that it didn't finish
+    _header, summary = _read_tsv(os.path.join(out_dir, "genomes-summary-info.tsv"))
+    by_id = {row["genome_id"]: row for row in summary}
+    assert by_id["broken"]["search_completed"] == "No"
+    assert by_id["fine"]["search_completed"] == "Yes"
+
+
+def test_a_failed_search_is_not_counted_as_searched(run_pfam_search, fail_search_for,
+                                                    pfam_spec):
+    fail_search_for("broken")
+    run_data, _out_dir = run_pfam_search(
+        genomes={"fine": ["PF90001"], "broken": ["PF90001"]},
+        targets=["PF90001"],
+    )
+
+    assert stages.count_searched_genomes(run_data, pfam_spec) == 1
+
+    searched, removed, failed = outputs.summarize_counts(run_data, pfam_spec)
+    assert (searched, removed, failed) == (1, 1, 0)
+
+
+def test_every_genome_failing_its_search_is_a_friendly_error(run_pfam_search,
+                                                             fail_search_for):
+    fail_search_for("a", "b")
+    with pytest.raises(TargetSearchError, match="completed search"):
+        run_pfam_search(genomes={"a": ["PF90001"], "b": ["PF90001"]},
+                        targets=["PF90001"])
+
+
+################################################################################
+# which removals the search phase reports
+################################################################################
+
+def test_search_phase_stages_exclude_the_phase_one_lookup():
+    """
+    The NCBI lookup happens in phase 1 and is reported there. Counting it again in
+    phase 3 was the bug: total-input minus searched swept in genomes the search phase
+    never touched and blamed them on it.
+    """
+    assert GenomeRemovalStage.NCBI_LOOKUP not in stages.SEARCH_PHASE_REMOVAL_STAGES
+    assert GenomeRemovalStage.NCBI_DOWNLOAD in stages.SEARCH_PHASE_REMOVAL_STAGES
+    assert GenomeRemovalStage.HMM_SEARCH in stages.SEARCH_PHASE_REMOVAL_STAGES
+
+
+def test_only_this_phases_removals_are_counted():
+    """
+    A genome lost at the lookup and one lost at the search sit in the same removals
+    table; only the second is the search phase's to report.
+    """
+    from gtotree.utils.misc.general import RunData, GenomeData
+
+    lost_at_lookup = GenomeData.from_acc("GCF_000000001.1")
+    lost_at_lookup.mark_removed("not found at NCBI",
+                                GenomeRemovalStage.NCBI_LOOKUP)
+
+    lost_at_search = GenomeData.from_acc("GCF_000000002.1")
+    lost_at_search.mark_removed("Pfam search failed",
+                                GenomeRemovalStage.HMM_SEARCH)
+
+    survivor = GenomeData.from_acc("GCF_000000003.1")
+
+    run_data = RunData()
+    run_data.ncbi_accs = [lost_at_lookup, lost_at_search, survivor]
+    run_data.update_all_input_genomes()
+
+    reported = run_data.genomes_removed_at(*stages.SEARCH_PHASE_REMOVAL_STAGES)
+    assert [gd.id for gd in reported] == ["GCF_000000002.1"]
 
 
 ################################################################################

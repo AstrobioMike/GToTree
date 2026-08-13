@@ -627,8 +627,6 @@ def report_processing_stage(stage, run_data):
         "fasta":                       "PROCESSING THE GENOMES PROVIDED AS FASTA FILES",
         "amino-acid":                  "PROCESSING THE GENOMES PROVIDED AS AMINO-ACID FILES",
         "processing-update":           "OVERALL SUMMARY OF INPUT-GENOME PROCESSING",
-        "additional-pfam-searching":   "SUMMARY OF THE SPECIFIED PFAM-TARGET SEARCH",
-        "additional-ko-searching":     "SUMMARY OF THE SPECIFIED KO-TARGET SEARCH",
         "hmm-search":                  "SUMMARY OF THE TARGET SINGLE-COPY-GENE SEARCH",
         "filter-genes":                "FILTERING GENES BY LENGTH AND REPRESENTATION",
         "filter-genomes":              "FILTERING GENOMES WITH TOO FEW HITS",

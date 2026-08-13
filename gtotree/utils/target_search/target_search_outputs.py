@@ -17,6 +17,7 @@ import os
 
 from gtotree.utils.misc.general import (atomic_write_text, genome_source_label,
                                         genome_input_label)
+from gtotree.utils.misc.summary_info import search_completed_value
 
 
 SUMMARY_FILENAME = "genomes-summary-info.tsv"
@@ -26,15 +27,8 @@ COLUMNS = ["genome_id", "input_source", "input_path", "num_genes",
 
 
 def _row(gd, spec, run_data=None):
-    searched = bool(getattr(gd, spec.search_done_flag, False))
-    failed_flag = getattr(gd, spec.search_done_flag.replace("_done", "_failed"), False)
-
-    if gd.removed:
-        completed = "No"
-    elif searched and not failed_flag:
-        completed = "Yes"
-    else:
-        completed = "No"
+    completed = search_completed_value(gd, spec.search_done_flag,
+                                       spec.search_failed_flag)
 
     return [
         gd.id,
@@ -77,7 +71,7 @@ def summarize_counts(run_data, spec):
     removed = 0
     failed = 0
 
-    failed_attr = spec.search_done_flag.replace("_done", "_failed")
+    failed_attr = spec.search_failed_flag
 
     for gd in run_data.all_input_genomes:
         if gd.removed:

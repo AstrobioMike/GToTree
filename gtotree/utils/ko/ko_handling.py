@@ -16,7 +16,6 @@ def parse_kofamscan_targets(run_data):
     full_KO_HMMs_dir = KO_data_dir + "/profiles"
 
     wanted_KOs = get_wanted_KOs(run_data)
-    print()
     with spinner("Collecting KO targets...", "", clear_on_done=True):
         found_KOs, missing_KOs = get_target_KOs_tab(full_KO_list_tsv, wanted_KOs, target_KOs_tsv)
         missing_hmm_KOs = copy_over_target_ko_HMMs(found_KOs, full_KO_HMMs_dir, target_KO_profiles_dir)

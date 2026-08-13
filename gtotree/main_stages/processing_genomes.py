@@ -80,13 +80,21 @@ def build_search_plan(args, run_data):
     do_pfam = False
     do_ko = False
 
-    if run_data.target_pfams_file and not run_data.additional_pfam_searching_done:
+    collecting_pfams = bool(run_data.target_pfams_file
+                            and not run_data.additional_pfam_searching_done)
+    collecting_kos = bool(run_data.target_kos_file
+                          and not run_data.additional_ko_searching_done)
+
+    if collecting_pfams or collecting_kos:
+        print()
+
+    if collecting_pfams:
         run_data = get_additional_pfam_targets(run_data)
         do_pfam = len(run_data.found_pfam_targets) > 0
     elif run_data.target_pfams_file:
         do_pfam = len(run_data.found_pfam_targets) > 0
 
-    if run_data.target_kos_file and not run_data.additional_ko_searching_done:
+    if collecting_kos:
         run_data = parse_kofamscan_targets(run_data)
         write_out_failed_ko_targets(run_data)
         do_ko = len(run_data.found_ko_targets) > 0

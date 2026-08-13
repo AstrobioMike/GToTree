@@ -68,7 +68,6 @@ def get_additional_pfam_targets(run_data):
     found_pfam_targets = []
     found_pfam_paths = []
 
-    print()
     with spinner("Collecting Pfam targets...", "", clear_on_done=True):
         # single streaming pass over the master HMM, pulling only wanted profiles
         with pyhmmer.plan7.HMMFile(master_hmm_path) as hmm_file:

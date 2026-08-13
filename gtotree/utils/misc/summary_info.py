@@ -1,12 +1,11 @@
 import os
-
 import pandas as pd # type: ignore
-
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.misc.general import (atomic_write_text, genome_source_label,
                                         genome_input_label)
 from gtotree.utils.misc.stages import (GenomeRemovalStage,
-                                       GENOME_REMOVAL_STAGE_ORDER)
+                                       GENOME_REMOVAL_STAGE_ORDER,
+                                       PREPROCESSING_REMOVAL_STAGES)
 from gtotree.utils.misc.messaging import (REMOVED_GENOMES_FILENAME,
                                           SCG_INFO_FILENAME)
 
@@ -70,6 +69,19 @@ def _perc(count, total):
 
 def _na(value):
     return "NA" if value is None else str(value)
+
+
+def search_completed_value(gd, done_attr, failed_attr):
+    """
+    Three-state answer for a Pfam/KO search column: Yes, No, or NA
+
+    NA is for a genome dropped during preprocessing that never reached the search
+    """
+    if gd.removed_at in PREPROCESSING_REMOVAL_STAGES:
+        return "NA"
+    if getattr(gd, done_attr, False) and not getattr(gd, failed_attr, False):
+        return "Yes"
+    return "No"
 
 
 def scg_info_denominators(run_data):
@@ -157,6 +169,9 @@ def generate_primary_summary_table(args, run_data):
 
     m = run_data.mapping_dict
 
+    report_pfam = bool(run_data.target_pfams_file)
+    report_ko = bool(run_data.target_kos_file)
+
     rows = []
     for g in run_data.all_input_genomes:
         label = m.get(g.id) or g.id
@@ -164,7 +179,7 @@ def generate_primary_summary_table(args, run_data):
         # lookup taxid only if an NCBI sub-table was produced
         taxid = taxid_map.get(g.id, "NA") if run_data.ncbi_sub_table_path else "NA"
 
-        rows.append({
+        row = {
             "assembly_id":                   g.id,
             "label":                         label,
             "source":                        genome_source_label(g),
@@ -173,9 +188,19 @@ def generate_primary_summary_table(args, run_data):
             "num_uniq_SCG_hits":             g.num_unique_SCG_hits,
             "num_SCG_hits_after_filtering":  g.num_SCG_hits_after_filtering,
             "num_total_genes":               g.num_genes,
-            "in_final_tree":                 "Yes" if not g.removed else "No",
-            "reason_removed":                g.reason_removed,
-        })
+        }
+
+        if report_pfam:
+            row["pfam_search_completed"] = search_completed_value(
+                g, "pfam_search_done", "pfam_search_failed")
+        if report_ko:
+            row["ko_search_completed"] = search_completed_value(
+                g, "ko_search_done", "ko_search_failed")
+
+        row["in_final_tree"] = "Yes" if not g.removed else "No"
+        row["reason_removed"] = g.reason_removed
+
+        rows.append(row)
 
     df = (pd.DataFrame(rows).convert_dtypes())
 
@@ -189,8 +214,8 @@ def generate_primary_summary_table(args, run_data):
 def add_tax_info(df, run_data, args):
 
     # taxonomy was resolved from the hosted Parquet asset during header-updating and
-    # stashed on run_data as {input_acc: {rank: value, ...}}; build the summary
-    # columns from that rather than re-reading anything from disk
+    # stashed on run_data as {input_acc: {rank: value, ...}}, summary
+    # columns are built from that
     tax_info = run_data.tax_info_dict or {}
 
     tax_cols = list(RANKS)

@@ -63,14 +63,15 @@ def test_named_run_data_fields_exist(spec, attr_name):
         f"{spec.subcommand} spec.{attr_name} names RunData.{field_name}, which is gone"
 
 
-def test_named_genome_data_flag_exists(spec):
+def test_named_genome_data_flags_exist(spec):
     """
-    Same for the per-genome done flag, plus the `*_failed` companion the summary table
-    derives from it by string surgery.
+    Same for the two per-genome search flags. Both are needed everywhere, because the
+    done flag is set on a failed search too -- it records that the search was attempted,
+    not that it worked.
     """
     gd = GenomeData.from_acc("GCF_000000000.1")
     assert hasattr(gd, spec.search_done_flag)
-    assert hasattr(gd, spec.search_done_flag.replace("_done", "_failed"))
+    assert hasattr(gd, spec.search_failed_flag)
 
 
 def test_combined_hmm_attr_is_set_iff_profiles_are_pressed(spec):

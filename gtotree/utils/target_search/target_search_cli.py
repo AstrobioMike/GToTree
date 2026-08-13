@@ -443,7 +443,7 @@ def run_search(args, spec):  # pragma: no cover
     section(f"Phase {n()}: Collecting target {spec.target_label_plural}...")
     if data_version:
         print(f"      {spec.target_label} version being used: "
-              f"{color_text(data_version, 'green')}")
+              f"{color_text(data_version, 'green')}\n")
 
     state.setdefault("fingerprint", {})["data_version"] = data_version
 
