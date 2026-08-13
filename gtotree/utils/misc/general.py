@@ -871,7 +871,7 @@ def resolve_input_genomes(args, run_data, error_cls):
     for line in input_genome_source_lines(args, run_data):
         print(line)
 
-    print(f"\n{color_text(total_input_genomes_line(run_data), 'green')}\n")
+    print(f"\n{color_text(total_input_genomes_line(run_data), 'green')}")
 
     return run_data, selections
 

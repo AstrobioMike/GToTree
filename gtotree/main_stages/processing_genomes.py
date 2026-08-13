@@ -247,8 +247,9 @@ def _process_ncbi(args, run_data, plan):
     phase_stats.begin("processing genomes: ncbi accessions")
     report_processing_stage("ncbi", run_data)
 
-    run_data = parse_assembly_summary(get_ncbi_assembly_summary_tab(), run_data)
-    phase_stats.checkpoint("ncbi: after parsing assembly summary")
+    if genomes_needing_processing(run_data.ncbi_accs, plan):
+        run_data = parse_assembly_summary(get_ncbi_assembly_summary_tab(), run_data)
+        phase_stats.checkpoint("ncbi: after parsing assembly summary")
 
     num_not_found = len(run_data.get_ncbi_accs_not_found())
     if num_not_found:

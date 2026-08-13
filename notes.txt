@@ -45,32 +45,12 @@
     # maybe for the purposes here, these should be rolled into one progress bar?
 
 
-    # from general.py, do we need both of these? Can't we just use one set everywhere?
-
-        # SOURCE_ACCESSION = "accession"
-        # SOURCE_GENBANK = "genbank-file"
-        # SOURCE_FASTA = "nt-fasta-file"
-        # SOURCE_AMINO_ACID = "aa-fasta-file"
-
-        # GENOME_SOURCES = (SOURCE_ACCESSION, SOURCE_GENBANK, SOURCE_FASTA, SOURCE_AMINO_ACID)
-
-        # GENOME_SOURCE_LABELS = {
-        #     SOURCE_ACCESSION: "ncbi-accession",
-        #     SOURCE_GENBANK: "genbank-file",
-        #     SOURCE_FASTA: "nucleotide-fasta",
-        #     SOURCE_AMINO_ACID: "amino-acid-fasta",
-        # }
-
-
 
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
         # same for pfam, that they start with PF, and a note that says
         # something like "these don't match the expected format (e.g., ...). Are you sure you passed the right file to the right parameter?"
         # also, doublecheck how it handles if a target KO/PFam isn't found
 
-
-    # main subcommand printouts may still need some formatting tweaks if i'm feeling neurotic
-        # gen-scg-hmms, search-kos, search-pfams
 
 
 ################################################

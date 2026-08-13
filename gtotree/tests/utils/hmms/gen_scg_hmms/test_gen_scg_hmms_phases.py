@@ -168,7 +168,10 @@ def _amino_acids(args, tmp_path, work=None):
     run_data = _resolved(args, tmp_path)
     work = work or str(tmp_path / "work")
     os.makedirs(work, exist_ok=True)
-    combined, kept = cli.phase_get_amino_acids(run_data, work, args)
+    # the accession lookup is part of phase 1 now, and phase 2 takes what it produced
+    to_fetch, download_info = cli._resolve_accession_downloads(run_data)
+    combined, kept = cli.phase_get_amino_acids(run_data, work, args,
+                                               to_fetch, download_info)
     return run_data, combined, kept
 
 
@@ -387,7 +390,8 @@ def test_accessions_missing_from_ncbi_are_removed_at_the_lookup_stage(tmp_path,
     found = {gd.id: gd for gd in run_data.ncbi_accs}["GCF_000000001.1"]
     assert found.organism_name == "Testus one"
 
-    # and the printout points at the shared report, the way the search tools' does
+    # the message matches what `gtt search-pfams` / `gtt search-kos` print for the
+    # same lookup, since it's the same phase-1 step in all three
     out = capsys.readouterr().out
     assert "1 accession(s) not found at NCBI" in out
     assert REMOVED_GENOMES_FILENAME in out

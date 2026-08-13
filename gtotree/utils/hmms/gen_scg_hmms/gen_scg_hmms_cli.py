@@ -34,7 +34,9 @@ from gtotree.utils.misc.general import (run_pooled_stage,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED,
                                    GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED,
                                    GTT_PROGRESS_SMOOTHING)
-from gtotree.utils.misc.stages import GenomeRemovalStage
+from gtotree.utils.misc.stages import (GenomeRemovalStage,
+                                       GENOME_REMOVAL_STAGE_ORDER,
+                                       PREPROCESSING_REMOVAL_STAGES)
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
@@ -444,19 +446,15 @@ def phase_resolve_genomes(args, run_data):
     return resolve_input_genomes(args, run_data, GenSCGHMMsError)
 
 
-def phase_get_amino_acids(run_data, work_dir, args):
+def phase_get_amino_acids(run_data, work_dir, args, to_fetch, download_info):
     """
-    Get amino acids for every target genome, downloading NCBI accessions and
-    processing any local files, and combine them into a single fasta with
+    Get amino acids for every target genome, downloading the NCBI accessions phase 1
+    resolved and processing any local files, and combine them into a single fasta with
     genome-traceable headers
     """
     phase_stats.checkpoint("phase 2 start")
 
     combined_path = os.path.join(work_dir, "all-target-proteins.faa")
-
-    to_fetch, download_info = _resolve_accession_downloads(run_data)
-
-    phase_stats.checkpoint("phase 2 after resolve_download_info (NCBI parquet)")
 
     local_genomes = [gd for gd in _local_genomes(run_data) if not gd.removed]
 
@@ -464,10 +462,9 @@ def phase_get_amino_acids(run_data, work_dir, args):
         _report_removals(run_data, "None of the target genomes could be resolved to "
                                    "something usable.")
 
-    workers = max(1, min(int(args.num_jobs), MAX_DOWNLOAD_THREADS, max(len(to_fetch), 1)))
-    download_labelled = bool(to_fetch and workers > 1)
-    if download_labelled:
-        print(f"\n      Downloading with {workers} concurrent job(s):")
+    download_workers = max(1, min(int(args.num_jobs), MAX_DOWNLOAD_THREADS,
+                                  max(len(to_fetch), 1)))
+    local_workers = max(1, min(int(args.num_jobs), max(len(local_genomes), 1)))
 
     with open(combined_path, "w") as combined:
 
@@ -499,17 +496,18 @@ def phase_get_amino_acids(run_data, work_dir, args):
                     gd.acc_was_downloaded = False
                 absorb(gd, aa_path, error)
 
+            _print_pool_label("Processing", "NCBI-derived", download_workers,
+                              lead_newline=False)
+
             fetch_amino_acids_pooled(
                 [gd.id for gd in to_fetch], download_info, work_dir, args=args,
                 on_result=on_result,
-                bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED if download_labelled else None,
-                lead_newline=not download_labelled)
+                bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED,
+                lead_newline=False)
 
         phase_stats.checkpoint("phase 2 after downloads + prodigal + relabel")
 
         if local_genomes:
-            if to_fetch:
-                print()
 
             def local_worker(gd, rd):
                 """
@@ -529,16 +527,19 @@ def phase_get_amino_acids(run_data, work_dir, args):
                     run_data.tools_used.prodigal_used = True
                 absorb(gd, status["aa_path"], status["error"])
 
+            _print_pool_label("Processing", "local", local_workers,
+                              lead_newline=bool(to_fetch))
+
             run_pooled_stage(local_genomes, local_worker, local_apply, args,
-                             {"work_dir": work_dir})
+                             {"work_dir": work_dir},
+                             bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED,
+                             lead_newline=False)
 
     write_removed_genomes_report(run_data)
     write_run_data(run_data)
 
     kept_ids = [gd.id for gd in run_data.all_input_genomes
                 if gd.processing_done and not gd.removed]
-
-    print()
 
     if not kept_ids:
         _report_removals(run_data, "No amino-acid sequences could be obtained for any "
@@ -549,6 +550,17 @@ def phase_get_amino_acids(run_data, work_dir, args):
     print(f"\n      {color_text(f'{len(kept_ids):,} genome(s) ready to search', 'green')}")
 
     return combined_path, kept_ids
+
+
+def _print_pool_label(action, kind, workers, lead_newline=True):
+    """
+    Print the header line that sits above a pooled-stage progress bar
+    """
+    label = f"      {action} {kind} genome(s)"
+    if workers > 1:
+        label += f" with {workers} concurrent job(s)"
+    lead = "\n" if lead_newline else ""
+    print(f"{lead}{label}:")
 
 
 def _local_genomes(run_data):
@@ -564,12 +576,21 @@ def _resolve_accession_downloads(run_data):
 
     Returns (to_fetch, download_info): the accession GenomeData still in play, and the
     accession -> download-location map the fetch stage takes.
+
+    Runs in phase 1, the way `gtt search-pfams` / `gtt search-kos` do it: an accession
+    NCBI no longer lists is a fact about the *input set*, so it belongs next to the
+    input-source listing rather than mixed in with the fetch stage's own failures.
     """
     accs = [gd for gd in run_data.ncbi_accs if not gd.removed]
     if not accs:
         return [], {}
 
-    with spinner("Resolving download locations...", "Resolved download locations"):
+    # the input-source listing above doesn't end with a blank line, so this step owns
+    # the one that separates it
+    print()
+
+    with spinner("Looking up accessions in the NCBI assembly data...",
+                 "Looked up accessions at NCBI"):
         info, not_found = resolve_download_info([gd.id for gd in accs])
 
     to_fetch = []
@@ -593,25 +614,72 @@ def _resolve_accession_downloads(run_data):
 
 def _report_removals(run_data, fatal_message=None):
     """
-    Say how many target genomes were lost and point at the file explaining each.
-
-    Written once, at the end of the phase, rather than per failure mode: the user wants
-    a count and a filename, not a running commentary on which stage lost what.
+    Say how many target genomes this phase lost, and point at the file explaining each
     """
-    removed = [gd for gd in run_data.all_input_genomes if gd.removed]
+    removed = run_data.genomes_removed_at(*PROCESSING_REMOVAL_STAGES)
 
     if removed:
-        total = len(run_data.all_input_genomes)
-        report_message(
-            f"{len(removed):,} of {total:,} target genome(s) didn't make it through. "
-            "Reported in:", "yellow", ii="      ", si="      ")
-        print(f"        {color_text(removed_genomes_path(run_data), 'yellow')}")
+        by_stage = _removals_by_stage(removed)
+
+        if len(by_stage) == 1:
+            report_message(f"{len(removed):,} genome(s) "
+                           f"{_removal_stage_label(by_stage[0][0])}. Reported in:",
+                           "yellow", ii="      ", si="      ")
+            print(f"        {color_text(removed_genomes_path(run_data), 'yellow')}")
+        else:
+            report_message(f"{len(removed):,} genome(s) didn't make it through "
+                           "processing:", "yellow", ii="      ", si="      ")
+            for stage, count in by_stage:
+                print(f"        "
+                      f"{color_text(f'{count:,} {_removal_stage_label(stage)}', 'yellow')}")
+            print(f"\n      {color_text('Each is reported in:', 'yellow')}")
+            print(f"        {color_text(removed_genomes_path(run_data), 'yellow')}")
 
     if fatal_message:
-        if removed:
+        if any(gd.removed for gd in run_data.all_input_genomes):
             fatal_message += (f" The reason for each is in "
                               f"{removed_genomes_path(run_data)}.")
         raise GenSCGHMMsError(fatal_message)
+
+
+PROCESSING_REMOVAL_STAGES = tuple(stage for stage in PREPROCESSING_REMOVAL_STAGES
+                                  if stage != GenomeRemovalStage.NCBI_LOOKUP)
+
+
+# how each removal stage this phase can reach reads in the end-of-phase summary
+REMOVAL_STAGE_LABELS = {
+    GenomeRemovalStage.NCBI_LOOKUP: "not found at NCBI",
+    GenomeRemovalStage.NCBI_DOWNLOAD: "failed downloading or gene-calling",
+    GenomeRemovalStage.GENBANK_PREP: "failed GenBank-file processing",
+    GenomeRemovalStage.FASTA_PREP: "failed fasta-file processing",
+    GenomeRemovalStage.AMINO_ACID_PREP: "failed amino-acid-file processing",
+}
+
+
+def _removal_stage_label(stage):
+    """
+    Reads correctly both after a count ("1 not found at NCBI") and as the tail of the
+    collapsed one-cause line ("3 of 11 target genome(s) not found at NCBI")
+    """
+    return REMOVAL_STAGE_LABELS.get(stage, f"removed at the {stage} stage")
+
+
+def _removals_by_stage(removed):
+    """
+    (stage, count) pairs in pipeline order, skipping stages nothing was lost at
+    """
+    counts = {}
+    for gd in removed:
+        counts[gd.removed_at] = counts.get(gd.removed_at, 0) + 1
+
+    ordered = [(stage, counts.pop(stage)) for stage in GENOME_REMOVAL_STAGE_ORDER
+               if stage in counts]
+
+    # anything with a stage outside the known order still gets reported rather than
+    # silently dropped from a total that counts it
+    ordered.extend(sorted(counts.items()))
+
+    return ordered
 
 
 def removed_genomes_path(run_data):
@@ -830,19 +898,29 @@ def gen_scg_hmms(args):  # pragma: no cover
         state = RESUME.new(fingerprint)
         RESUME.save(work_dir, state)
 
+    reusing_genomes = bool(resuming
+                           and RESUME.is_reusable(state, STAGE_GENOMES, work_dir))
+
+    if reusing_genomes:
+        to_fetch, download_info = [], {}
+    else:
+        to_fetch, download_info = _resolve_accession_downloads(run_data)
+        phase_stats.checkpoint("phase 1 after resolve_download_info (NCBI parquet)")
+
     write_run_data(run_data)
 
     section(f"Phase {n()}: Getting target-genome amino acids...")
     combined_path = os.path.join(work_dir, "all-target-proteins.faa")
 
-    if resuming and RESUME.is_reusable(state, STAGE_GENOMES, work_dir):
+    if reusing_genomes:
         kept_ids = [gd.id for gd in run_data.all_input_genomes
                     if gd.processing_done and not gd.removed]
         with spinner("Reusing previously downloaded amino acids...",
                      f"Reused amino acids for {len(kept_ids):,} genome(s)"):
             pass
     else:
-        combined_path, kept_ids = phase_get_amino_acids(run_data, work_dir, args)
+        combined_path, kept_ids = phase_get_amino_acids(run_data, work_dir, args,
+                                                        to_fetch, download_info)
         RESUME.mark_complete(
             state, STAGE_GENOMES,
             [combined_path, run_data.run_data_path],

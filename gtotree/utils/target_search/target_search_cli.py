@@ -437,9 +437,10 @@ def run_search(args, spec):  # pragma: no cover
         state = RESUME.new(fingerprint)
         RESUME.save(work_dir, state)
 
-    # after the fingerprint gate, since the gate compares the accessions as given and
-    # this is where some of them stop being part of the run
-    run_data = stages.lookup_ncbi_accessions(run_data)
+    plan = stages.build_plan(args, spec)
+
+    if not (resuming and stages.all_genomes_already_processed(run_data, plan)):
+        run_data = stages.lookup_ncbi_accessions(run_data)
 
     write_run_data(run_data)
 
@@ -456,7 +457,6 @@ def run_search(args, spec):  # pragma: no cover
     RESUME.save(work_dir, state)
 
     section(f"Phase {n()}: Processing and searching genomes...")
-    plan = stages.build_plan(args, spec)
     run_data = stages.phase_search_genomes(args, run_data, spec, plan)
     RESUME.mark_complete(state, STAGE_SEARCH, work_dir=work_dir)
     RESUME.save(work_dir, state)

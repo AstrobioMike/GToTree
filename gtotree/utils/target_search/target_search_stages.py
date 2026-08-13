@@ -63,6 +63,13 @@ def resolve_input_genomes(args, run_data):
     return shared_resolve_input_genomes(args, run_data, TargetSearchError)
 
 
+def all_genomes_already_processed(run_data, plan):
+    """
+    True when every genome still in the run was fully processed and searched already
+    """
+    return not genomes_needing_processing(run_data.all_input_genomes, plan)
+
+
 def lookup_ncbi_accessions(run_data):
     """
     Resolve accessions against the NCBI assembly summary
@@ -77,10 +84,11 @@ def lookup_ncbi_accessions(run_data):
     if not run_data.ncbi_accs:
         return run_data
 
+    print()
+
     with spinner("Looking up accessions in the NCBI assembly data...",
                  "Looked up accessions at NCBI"):
         run_data = parse_assembly_summary(get_ncbi_assembly_summary_tab(), run_data)
-
     not_found = run_data.get_ncbi_accs_not_found()
     if not_found:
         report_message(
