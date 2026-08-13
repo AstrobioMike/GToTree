@@ -260,7 +260,7 @@ def rebuild_combined_SCG_outputs(run_data):
 
     # --- the combined per-genome hit-count table ---
     def _write_table(out):
-        out.write("assembly_id\t" + "\t".join(target_SCG_ids) + "\n")
+        out.write("genome_id\t" + "\t".join(target_SCG_ids) + "\n")
         for gd in genomes:
             counts = read_genome_hit_counts(
                 f"{run_data.hmm_results_dir}/{gd.id}/SCG-hit-counts.txt",

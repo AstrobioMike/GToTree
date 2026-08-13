@@ -80,8 +80,8 @@ def test_hit_counts_matrix_matches_the_planted_copies(basic_run, pfam_spec):
     _run_data, out_dir = basic_run
     header, rows = _read_tsv(os.path.join(out_dir, pfam_spec.counts_filename))
 
-    assert header == ["assembly_id", "total_gene_count", "PF90001", "PF90002"]
-    by_genome = {row["assembly_id"]: row for row in rows}
+    assert header == ["genome_id", "total_gene_count", "PF90001", "PF90002"]
+    by_genome = {row["genome_id"]: row for row in rows}
 
     assert by_genome["g1"]["PF90001"] == "1"
     assert by_genome["g2"]["PF90001"] == "1"
@@ -137,7 +137,7 @@ def test_summary_table_covers_every_input_genome(basic_run):
     assert "search_completed" in header
     assert [row["genome_id"] for row in rows] == ["g1", "g2", "g3"]
     assert all(row["search_completed"] == "Yes" for row in rows)
-    assert all(row["input_source"] == "amino-acid-fasta" for row in rows)
+    assert all(row["source"] == "amino-acid-fasta" for row in rows)
     assert rows[2]["num_genes"] == "3"
 
 
@@ -194,7 +194,7 @@ def test_a_genome_with_no_hits_still_appears_everywhere(run_pfam_search, pfam_sp
     )
 
     _header, rows = _read_tsv(os.path.join(out_dir, pfam_spec.counts_filename))
-    by_genome = {row["assembly_id"]: row for row in rows}
+    by_genome = {row["genome_id"]: row for row in rows}
     assert by_genome["nohit"]["PF90001"] == "0"
 
     _header, summary = _read_tsv(os.path.join(out_dir, "genomes-summary-info.tsv"))
@@ -290,7 +290,7 @@ def test_a_failed_search_stays_out_of_the_counts_matrix(run_pfam_search,
     )
 
     _header, rows = _read_tsv(os.path.join(out_dir, pfam_spec.counts_filename))
-    assert [row["assembly_id"] for row in rows] == ["fine"]
+    assert [row["genome_id"] for row in rows] == ["fine"]
 
     # but it still gets a summary row, saying plainly that it didn't finish
     _header, summary = _read_tsv(os.path.join(out_dir, "genomes-summary-info.tsv"))

@@ -438,6 +438,14 @@ def add_border(extra_line=True):
     print("\n -------------------------------------------------------------------------------- ")
 
 
+def report_phase_header(title, color = "yellow"):
+    """
+    The phase banner used by `gtt gen-scg-hmms`, `gtt search-pfams`, and `gtt search-kos`
+    """
+    rule = "  " + "-" * len(title)
+    print(color_text(f"\n\n{rule}\n  {title}\n{rule}\n", color))
+
+
 REMOVED_GENOMES_FILENAME = "removed-genomes.tsv"
 SCG_INFO_FILENAME = "SCG-info.tsv"
 

@@ -29,7 +29,7 @@ from gtotree.utils.misc.general import (run_pooled_stage,
                                    GTT_PROGRESS_SMOOTHING)
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
-                                     report_very_early_exit)
+                                     report_phase_header, report_very_early_exit)
 from gtotree.utils.misc.data_locations import ensure_reference_data
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
@@ -347,7 +347,7 @@ def _phase_counter():
 
 def section(title):
     phase_stats.begin(title)
-    print(color_text(f"\n\n  {title}\n", "yellow"))
+    report_phase_header(title)
 
 
 def section_border():

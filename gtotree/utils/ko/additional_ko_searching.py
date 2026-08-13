@@ -98,10 +98,10 @@ def write_ko_counts_table(run_data):
         counts_list = get_ko_counts(run_data.found_ko_targets, ko_results_tsv)
         count_rows.append([gd.id, gd.num_genes] + counts_list)
 
-    cols = ['assembly_id', 'total_gene_count'] + run_data.found_ko_targets
+    cols = ['genome_id', 'total_gene_count'] + run_data.found_ko_targets
     ko_counts_df = pd.DataFrame(count_rows, columns=cols)
     if not ko_counts_df.empty:
-        ko_counts_df = ko_counts_df.sort_values("assembly_id").reset_index(drop=True)
+        ko_counts_df = ko_counts_df.sort_values("genome_id").reset_index(drop=True)
     atomic_write_text(
         f"{run_data.ko_results_dir}/ko-hit-counts.tsv",
         lambda f: ko_counts_df.to_csv(f, sep='\t', index=False))

@@ -35,6 +35,50 @@
         # maybe that Only 4 reference genome(s) notice should have a newline at end, that might solve it
 
 
+
+    # get rid of messages like "X genome(s) needed gene-calling with prodigal" (no one cares)
+
+    # making phase 1 of gen-scg-hmms visually match search-pfams/kos
+        #   Phase 1: Resolving target genomes...
+
+        #     ✔ Read target accessions
+        #         2 accession(s) read from accs.txt
+        #       Genome source being used: GTDB v232 (released Apr 15, 2026)
+
+        #     ✔ Selected reference genomes
+        #         4 genome(s) selected (Methanobacteria at rank class)
+        #         dereplicated to one genome per family
+        #     ✔ Read local genome files
+        #         1 genbank file(s)
+        #         3 fasta file(s)
+        #         1 amino-acid file(s)
+
+        #       11 total target genome(s)
+
+
+
+    # gen-scg-hmms also needs removed-genomes.tsv tracking and/or printouts
+
+        #   Phase 2: Getting target-genome amino acids...
+
+        #     ✔ Resolved download locations
+
+        #       1 accession(s) were not found in the NCBI assembly data.
+
+        #       Downloading with 5 concurrent job(s):
+        #         100%|████████████| 5/5 [time elapsed: 00:02 | est. remaining: 00:00]
+
+
+        #       100%|██████████████| 5/5 [time elapsed: 00:11 | est. remaining: 00:00]
+
+        #       3 genome(s) needed gene-calling with prodigal
+
+        #       1 of 10 target genome(s) didn't make it through.
+
+        #       9 genome(s) ready to search
+
+
+
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
         # same for pfam, that they start with PF, and a note that says
         # something like "these don't match the expected format (e.g., ...). Are you sure you passed the right file to the right parameter?"

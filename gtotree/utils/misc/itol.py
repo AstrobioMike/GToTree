@@ -7,18 +7,18 @@ ITOL_COLOR = "#0000ff"
 
 def _read_hit_counts(counts_path):
     """
-    Return (target_ids, {assembly_id: {target_id: count}}).
+    Return (target_ids, {genome_id: {target_id: count}}).
 
-    The hit-counts tsv has header: assembly_id, total_gene_count, <target ...>.
+    The hit-counts tsv has header: genome_id, total_gene_count, <target ...>.
     Target columns are everything after the first two.
     """
-    df = pd.read_csv(counts_path, sep="\t", header=0, dtype={"assembly_id": str})
-    target_ids = [c for c in df.columns if c not in ("assembly_id", "total_gene_count")]
+    df = pd.read_csv(counts_path, sep="\t", header=0, dtype={"genome_id": str})
+    target_ids = [c for c in df.columns if c not in ("genome_id", "total_gene_count")]
 
     counts_by_genome = {}
     for _, row in df.iterrows():
-        assembly_id = row["assembly_id"]
-        counts_by_genome[assembly_id] = {t: int(row[t]) for t in target_ids}
+        genome_id = row["genome_id"]
+        counts_by_genome[genome_id] = {t: int(row[t]) for t in target_ids}
 
     return target_ids, counts_by_genome
 
@@ -27,16 +27,16 @@ def _read_summary(summary_path):
     """
     Return (label_map, in_tree_set) from genomes-summary-info.tsv.
 
-    label_map: assembly_id -> label (label differs from assembly_id only when
+    label_map: genome_id -> label (label differs from genome_id only when
                headers were swapped; if identical, no swap effectively happened)
-    in_tree_set: assembly_ids whose in_final_tree == "Yes"
+    in_tree_set: genome_ids whose in_final_tree == "Yes"
     """
-    df = pd.read_csv(summary_path, sep="\t", header=0, dtype={"assembly_id": str})
+    df = pd.read_csv(summary_path, sep="\t", header=0, dtype={"genome_id": str})
 
-    label_map = dict(zip(df["assembly_id"], df["label"].astype(str), strict=True))
-    in_tree_set = set(df.loc[df["in_final_tree"] == "Yes", "assembly_id"])
+    label_map = dict(zip(df["genome_id"], df["label"].astype(str), strict=True))
+    in_tree_set = set(df.loc[df["in_final_tree"] == "Yes", "genome_id"])
 
-    # a swap occurred if any label differs from its assembly_id
+    # a swap occurred if any label differs from its genome_id
     labels_swapped = any(label_map[a] != a for a in label_map)
 
     return label_map, in_tree_set, labels_swapped
@@ -79,9 +79,9 @@ def generate_search_itol_files(counts_path, summary_path, itol_dir):
     for target in target_ids:
         # genomes with a hit to this target AND retained in the final tree
         leaf_ids = []
-        for assembly_id, counts in counts_by_genome.items():
-            if counts.get(target, 0) > 0 and assembly_id in in_tree_set:
-                leaf = label_map.get(assembly_id, assembly_id) if labels_swapped else assembly_id
+        for genome_id, counts in counts_by_genome.items():
+            if counts.get(target, 0) > 0 and genome_id in in_tree_set:
+                leaf = label_map.get(genome_id, genome_id) if labels_swapped else genome_id
                 leaf_ids.append(leaf)
 
         if not leaf_ids:

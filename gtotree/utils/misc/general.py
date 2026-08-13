@@ -308,7 +308,7 @@ class GenomeData:
         provided_path = path
         basename = os.path.basename(full_path)
 
-        extensions_to_remove = [".gb", ".gbff", ".fasta", ".fna", ".fa", ".faa"]
+        extensions_to_remove = [".gb", ".gbk", ".gbff", ".fasta", ".fna", ".fa", ".faa"]
 
         id = basename
         if id.lower().endswith(".gz"):

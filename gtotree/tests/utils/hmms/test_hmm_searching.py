@@ -190,7 +190,7 @@ class TestRebuildCombinedSCGOutputs:
         rd = self._setup(tmp_path, ["G1", "G2", "G3"])
         rebuild_combined_SCG_outputs(rd)
         header, rows = self._rows(rd)
-        assert header.split("\t") == ["assembly_id", "SCG_A", "SCG_B"]
+        assert header.split("\t") == ["genome_id", "SCG_A", "SCG_B"]
         assert [r.split("\t")[0] for r in rows] == ["G1", "G2", "G3"]
 
     def test_running_twice_produces_the_same_output(self, tmp_path):
@@ -349,7 +349,7 @@ class TestCombinedTableAlignment:
         rebuild_combined_SCG_outputs(rd)
 
         header, rows = self._table(rd)
-        assert header == ["assembly_id", "SCG_A", "SCG_C"]
+        assert header == ["genome_id", "SCG_A", "SCG_C"]
         assert len(rows) == 1
 
     def test_counts_land_under_their_own_target(self, tmp_path):
@@ -364,7 +364,7 @@ class TestCombinedTableAlignment:
         rebuild_combined_SCG_outputs(rd)
 
         _header, rows = self._table(rd)
-        assert rows[0] == {"assembly_id": "G1", "SCG_A": "1", "SCG_C": "2"}
+        assert rows[0] == {"genome_id": "G1", "SCG_A": "1", "SCG_C": "2"}
 
     def test_a_row_that_cannot_be_mapped_is_dropped_rather_than_misaligned(self, tmp_path):
         """
@@ -380,7 +380,7 @@ class TestCombinedTableAlignment:
         rebuild_combined_SCG_outputs(rd)
 
         _header, rows = self._table(rd)
-        assert [r["assembly_id"] for r in rows] == ["G2"]
+        assert [r["genome_id"] for r in rows] == ["G2"]
 
     def test_the_any_hit_tally_counts_the_right_targets(self, tmp_path):
         """

@@ -22,7 +22,7 @@ from gtotree.utils.misc.summary_info import search_completed_value
 
 SUMMARY_FILENAME = "genomes-summary-info.tsv"
 
-COLUMNS = ["genome_id", "input_source", "input_path", "num_genes",
+COLUMNS = ["genome_id", "input", "source", "num_genes",
            "prodigal_used", "search_completed", "reason_removed"]
 
 
@@ -32,8 +32,8 @@ def _row(gd, spec, run_data=None):
 
     return [
         gd.id,
-        genome_source_label(gd),
         genome_input_label(gd, run_data),
+        genome_source_label(gd),
         "NA" if gd.num_genes is None else str(gd.num_genes),
         "Yes" if gd.prodigal_used else "No",
         completed,

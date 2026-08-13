@@ -42,7 +42,7 @@ def _table(tmp_path):
     lines = (tmp_path / "genomes-summary-info.tsv").read_text().splitlines()
     header = lines[0].split("\t")
     rows = [dict(zip(header, line.split("\t"), strict=True)) for line in lines[1:]]
-    return header, {row["assembly_id"]: row for row in rows}
+    return header, {row["genome_id"]: row for row in rows}
 
 
 ################################################################################

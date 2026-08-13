@@ -180,9 +180,10 @@ def generate_primary_summary_table(args, run_data):
         taxid = taxid_map.get(g.id, "NA") if run_data.ncbi_sub_table_path else "NA"
 
         row = {
-            "assembly_id":                   g.id,
-            "label":                         label,
+            "genome_id":                     g.id,
+            "input":                         genome_input_label(g, run_data),
             "source":                        genome_source_label(g),
+            "label":                         label,
             "taxid":                         taxid,
             "num_SCG_hits":                  g.num_SCG_hits,
             "num_uniq_SCG_hits":             g.num_unique_SCG_hits,
@@ -232,7 +233,7 @@ def add_tax_info(df, run_data, args):
     df = df.merge(
         tax_df,
         how = "left",
-        left_on = "assembly_id",
+        left_on = "genome_id",
         right_on = "input_acc",
     )
 

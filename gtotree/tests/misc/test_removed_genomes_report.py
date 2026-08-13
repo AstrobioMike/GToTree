@@ -73,10 +73,10 @@ class TestWriteRemovedGenomesReport:
 
     def test_file_inputs_report_the_path_the_user_provided(self, tmp_path):
         """
-        The whole reason this file isn't just a pointer at genomes-summary-info.tsv:
-        that table keys on `assembly_id`, which for a file input is the basename minus
-        its extension. Two `genome_1.fa` files in different directories collapse to the
-        same id there, and neither tells you which file to go fix.
+        `genome_id` for a file input is the basename minus its extension, so two
+        `genome_1.fa` files in different directories collapse to the same id. The
+        `input` column is what tells you which file to go fix, and it has to carry
+        the path the user actually listed rather than the resolved or copied one.
         """
         rd = _run_data(tmp_path)
         gd = _add_file(rd, "some/nested/dir/genome_1.fa.gz",

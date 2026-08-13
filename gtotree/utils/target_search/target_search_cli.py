@@ -23,7 +23,7 @@ from gtotree.utils.misc.resume_state import (ResumeProfile, hash_strings,
                                         hash_local_genomes, hash_file_contents,
                                         STATE_VERSION)
 from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
-                                     report_very_early_exit)
+                                     report_phase_header, report_very_early_exit)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import WantedRefTaxError
@@ -308,7 +308,7 @@ def _phase_counter():
 
 def section(title):
     phase_stats.begin(title)
-    print(color_text(f"\n\n  {title}\n", "yellow"))
+    report_phase_header(title)
 
 
 def report_finish(out_dir, run_data, spec, summary_path, targets_with_hits):

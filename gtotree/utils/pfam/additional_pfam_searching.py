@@ -75,10 +75,10 @@ def write_pfam_counts_table(run_data):
         counts_list = get_pfam_counts(run_data.found_pfam_targets, results_txt)
         count_rows.append([gd.id, gd.num_genes] + counts_list)
 
-    cols = ['assembly_id', 'total_gene_count'] + run_data.found_pfam_targets
+    cols = ['genome_id', 'total_gene_count'] + run_data.found_pfam_targets
     pfam_counts_df = pd.DataFrame(count_rows, columns=cols)
     if not pfam_counts_df.empty:
-        pfam_counts_df = pfam_counts_df.sort_values("assembly_id").reset_index(drop=True)
+        pfam_counts_df = pfam_counts_df.sort_values("genome_id").reset_index(drop=True)
     atomic_write_text(
         f"{run_data.pfam_results_dir}/pfam-hit-counts.tsv",
         lambda f: pfam_counts_df.to_csv(f, sep='\t', index=False))
