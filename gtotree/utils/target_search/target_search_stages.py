@@ -29,8 +29,11 @@ from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.general import (run_pooled_stage,
                                    write_run_data,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED,
+                                   GTT_PROGRESS_BAR_FORMAT_INDENTED_6,
                                    GTT_PROGRESS_SMOOTHING)
 from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
+                                          input_genome_source_lines,
+                                          total_input_genomes_line,
                                           REMOVED_GENOMES_FILENAME)
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
@@ -78,12 +81,11 @@ def resolve_input_genomes(args, run_data):
                                                        describe_source_version)
 
     selection = None
-    num_selected = 0
 
     if args.wanted_ref_tax:
         source_desc = describe_source_version(args.source)
         if source_desc:
-            print(f"      Genome source being used: "
+            print(f"      Genome source being used for `-w` input: "
                   f"{color_text(source_desc, 'green')}\n")
 
         with spinner(f"Selecting reference genomes for '{args.wanted_ref_tax}'...",
@@ -93,39 +95,12 @@ def resolve_input_genomes(args, run_data):
                 target_rank=args.target_rank,
                 derep_rank=args.derep_rank)
 
-        num_selected = run_data.merge_wanted_ref_tax_accessions(accessions)
-
-        detail = f"        {len(accessions):,} genome(s) selected"
-        if selection.resolved_rank:
-            detail += f" ({selection.canonical} at rank {selection.resolved_rank})"
-        print(detail)
-        if selection.effective_derep_rank:
-            print("        dereplicated to one genome per "
-                  f"{selection.effective_derep_rank}")
-        if num_selected != len(accessions):
-            print(f"        {len(accessions) - num_selected:,} already present "
-                  "from `-a`")
+        run_data.merge_wanted_ref_tax_accessions(accessions)
+        run_data.record_wanted_ref_tax_selection(selection,
+                                                 taxon=selection.canonical)
 
         for warning in selection.warnings:
             report_message(warning, "orange", ii="        ", si="        ")
-
-        print()
-
-    counts = [
-        (args.ncbi_accessions, len(run_data.get_user_provided_ncbi_accs()),
-         "NCBI accession(s)"),
-        (args.genbank_files, len(run_data.genbank_files), "GenBank file(s)"),
-        (args.fasta_files, len(run_data.fasta_files), "nucleotide fasta file(s)"),
-        (args.amino_acid_files, len(run_data.amino_acid_files),
-         "amino-acid fasta file(s)"),
-    ]
-
-    for provided, count, label in counts:
-        if provided:
-            print(f"        {count:,} {label} read from {provided}")
-
-    if num_selected:
-        print(f"        {num_selected:,} reference genome accession(s) added by `-w`")
 
     run_data.update_all_input_genomes()
     total = len(run_data.all_input_genomes)
@@ -133,7 +108,11 @@ def resolve_input_genomes(args, run_data):
     if not total:
         raise TargetSearchError("No input genomes were resolved to work with.")
 
-    print(f"\n      {color_text(f'{total:,} total input genome(s)', 'green')}")
+    print()
+    for line in input_genome_source_lines(args, run_data):
+        print(line)
+
+    print(f"\n{color_text(total_input_genomes_line(run_data), 'green')}\n")
 
     return run_data, selection
 
@@ -159,10 +138,9 @@ def lookup_ncbi_accessions(run_data):
     not_found = run_data.get_ncbi_accs_not_found()
     if not_found:
         report_message(
-            f"{len(not_found):,} accession(s) weren't found at NCBI, so they've been "
-            "dropped from the run. They're reported in:",
-            "yellow", ii="        ", si="        ")
-        print(f"          {color_text(_removals_pointer(run_data), 'yellow')}")
+            f"{len(not_found):,} accession(s) not found at NCBI. Reported in:",
+            "yellow", ii="      ", si="      ")
+        print(f"        {color_text(_removals_pointer(run_data), 'yellow')}")
 
         remaining = len([gd for gd in run_data.all_input_genomes if not gd.removed])
         if not remaining:
@@ -219,7 +197,7 @@ def phase_collect_targets(run_data, spec, out_dir, resuming=False):
     failed = spec.failed_targets(run_data)
     total = spec.total_targets(run_data)
 
-    print(f"        {len(found):,} of {total:,} requested "
+    print(f"      {len(found):,} of {total:,} requested "
           f"{spec.target_label_plural} found and ready to search")
 
     if failed:
@@ -232,7 +210,7 @@ def phase_collect_targets(run_data, spec, out_dir, resuming=False):
         raise TargetSearchError(
             f"None of the requested {spec.target_label_plural} could be found, so "
             "there's nothing to search the genomes for. Check the IDs in "
-            f"`{spec.targets_flag}` -- they should look like "
+            f"`{spec.targets_flag}`, they should look like "
             f"'{spec.example_target}'.")
 
     return run_data
@@ -343,7 +321,7 @@ def phase_search_genomes(args, run_data, spec, plan):
         worker, apply_result = _fused(preprocess, apply_status, plan)
 
         run_data = run_pooled_stage(to_process, worker, apply_result, args, run_data,
-                                    bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED)
+                                    bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED_6)
 
     write_removed_genomes_report(run_data)
     write_run_data(run_data)
@@ -353,11 +331,10 @@ def phase_search_genomes(args, run_data, spec, plan):
 
     print(f"\n      {color_text(f'{searched:,} genome(s) searched', 'green')}")
 
-    if dropped:
-        report_message(
-            f"{dropped:,} input genome(s) didn't make it through; the reason for each "
-            "is in:", "yellow", ii="      ", si="      ")
-        print(f"        {color_text(_removals_pointer(run_data), 'yellow')}")
+    # if dropped:
+    #     report_message(
+    #         f"{dropped:,} input genome(s) didn't make it through; see details in:", "yellow", ii="      ", si="      ")
+    #     print(f"        {color_text(_removals_pointer(run_data), 'yellow')}")
 
     if not searched:
         raise TargetSearchError(
@@ -396,14 +373,16 @@ def phase_write_outputs(run_data, spec, out_dir):
 
     run_data.update_all_input_genomes()
 
-    with spinner("Writing the hit-counts table...", "Wrote the hit-counts table"):
-        spec.write_counts_table(run_data)
+    # with spinner("Writing the hit-counts table...", "Wrote the hit-counts table"):
+    #     spec.write_counts_table(run_data)
+
+    spec.write_counts_table(run_data)
 
     found = spec.found_targets(run_data)
     hit_seqs_dir = os.path.join(spec.results_dir(run_data), spec.hit_seqs_subdir)
 
-    print("\n      Combining per-genome hit sequences:")
-    with tqdm(total=len(found), bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED,
+    # print("      Combining per-genome hit sequences:")
+    with tqdm(total=len(found), bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED_6,
               ncols=76, smoothing=GTT_PROGRESS_SMOOTHING) as pbar:
         # combine_hits takes the whole target list, so it's driven one target at a
         # time here purely to give the bar something to advance on
@@ -411,10 +390,14 @@ def phase_write_outputs(run_data, spec, out_dir):
             spec.combine_hits([target], spec.tmp_results_dir(run_data), hit_seqs_dir)
             pbar.update(1)
 
+    print()
+
     targets_with_hits = _count_and_prune_hit_seqs(hit_seqs_dir)
 
-    with spinner("Writing the genome summary table...", "Wrote the genome summary table"):
-        summary_path = outputs.write_genomes_summary(out_dir, run_data, spec)
+    # with spinner("Writing the genome summary table...", "Wrote the genome summary table"):
+    #     summary_path = outputs.write_genomes_summary(out_dir, run_data, spec)
+
+    summary_path = outputs.write_genomes_summary(out_dir, run_data, spec)
 
     write_run_data(run_data)
 

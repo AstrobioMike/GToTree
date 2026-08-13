@@ -316,6 +316,77 @@ def stdout_and_log(*args, log_file="gtotree-runlog.txt", sep=" ", end="\n\n", fl
             f.write(message)
 
 
+################################################################################
+# input-genome sources (shared by the main driver and the search subcommands)
+################################################################################
+
+# bullets sit at column 6 in both surfaces, and the total sits under them at 29 --
+# `gtt search-pfams` / `gtt search-kos` are a subset of a GToTree run, so the block
+# describing their inputs should be indistinguishable from GToTree's
+INPUT_SOURCE_INDENT = " " * 6
+INPUT_SOURCE_SUB_INDENT = " " * 10
+TOTAL_LINE_INDENT = " " * 29
+
+
+def _wanted_ref_tax_detail_lines(run_data, indent):
+    """
+    The sub-bullets under the `-w` line: how the selection was narrowed, and how much
+    of it the user had already asked for by accession.
+
+    Read off run_data rather than a RefGenomeSelection so a resumed run (which doesn't
+    re-resolve `-w`) describes its selection exactly the way the original run did.
+    """
+    lines = []
+
+    rank = run_data.wanted_ref_tax_rank
+    derep = run_data.wanted_ref_tax_derep_rank
+
+    if rank and derep:
+        lines.append(f'{indent}- wanted rank "{rank}" was dereplicated to one genome '
+                     f'per {derep}')
+    elif rank:
+        lines.append(f'{indent}- all genomes under the wanted rank "{rank}" were kept '
+                     f'(dereplication off)')
+
+    already_had = (run_data.wanted_ref_tax_num_selected
+                   - len(run_data.get_wanted_ref_tax_accs()))
+    if already_had > 0:
+        lines.append(f"{indent}- {already_had} more were selected, but were already "
+                     f"listed in the input accessions")
+
+    return lines
+
+
+def input_genome_source_lines(args, run_data, indent=INPUT_SOURCE_INDENT):
+    sub_indent = indent + "    "
+    lines = []
+
+    if args.wanted_ref_tax:
+        num_wanted = len(run_data.get_wanted_ref_tax_accs())
+        lines.append(f"{indent}- NCBI accessions selected for --wanted-ref-tax "
+                     f"'{args.wanted_ref_tax}' ({num_wanted} genomes)")
+        lines.extend(_wanted_ref_tax_detail_lines(run_data, sub_indent))
+
+    if args.ncbi_accessions:
+        lines.append(f"{indent}- NCBI accessions listed in {args.ncbi_accessions} "
+                     f"({len(run_data.get_user_provided_ncbi_accs())} genomes)")
+    if args.fasta_files:
+        lines.append(f"{indent}- Fasta files listed in {args.fasta_files} "
+                     f"({len(run_data.get_input_fasta_ids())} genomes)")
+    if args.amino_acid_files:
+        lines.append(f"{indent}- Amino-acid files listed in {args.amino_acid_files} "
+                     f"({len(run_data.get_input_amino_acid_ids())} genomes)")
+    if args.genbank_files:
+        lines.append(f"{indent}- Genbank files listed in {args.genbank_files} "
+                     f"({len(run_data.get_input_genbank_ids())} genomes)")
+
+    return lines
+
+
+def total_input_genomes_line(run_data, indent=TOTAL_LINE_INDENT):
+    return f"{indent}Total input genomes: {len(run_data.all_input_genomes):,}"
+
+
 @capture_stdout_to_log(lambda: log_file_var.get())
 def display_initial_run_info(args, run_data):
 
@@ -330,19 +401,10 @@ def display_initial_run_info(args, run_data):
 
     report_message("  Input-genome sources include:")
 
-    if args.wanted_ref_tax:
-        num_wanted_ref_tax = len(run_data.get_wanted_ref_tax_accs())
-        print(f"      - NCBI accessions selected for --wanted-ref-tax '{args.wanted_ref_tax}' ({num_wanted_ref_tax} genomes)", flush=True)
-    if args.ncbi_accessions:
-        print(f"      - NCBI accessions listed in {args.ncbi_accessions} ({len(run_data.get_user_provided_ncbi_accs())} genomes)", flush=True)
-    if args.fasta_files:
-        print(f"      - Fasta files listed in {args.fasta_files} ({len(run_data.get_input_fasta_ids())} genomes)", flush=True)
-    if args.amino_acid_files:
-        print(f"      - Amino-acid files listed in {args.amino_acid_files} ({len(run_data.get_input_amino_acid_ids())} genomes)", flush=True)
-    if args.genbank_files:
-        print(f"      - Genbank files listed in {args.genbank_files} ({len(run_data.get_input_genbank_ids())} genomes)", flush=True)
+    for line in input_genome_source_lines(args, run_data):
+        print(line, flush=True)
 
-    report_message(f"                           Total input genomes: {len(run_data.all_input_genomes)}", "green")
+    report_message(total_input_genomes_line(run_data, " " * 27), "green")
     # time.sleep(1)
 
     report_message("  Single-copy gene HMM source to be used:")

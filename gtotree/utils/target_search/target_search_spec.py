@@ -75,7 +75,9 @@ class TargetSearchSpec:
     combine_hits: Callable
     # (force_update=False) -> path; ensures the managed dataset is present
     ensure_data: Callable
-    # (run_data) -> str or None; a short version string for the run-info block
+    # (run_data) -> str or None; a short version string for the run-info block.
+    # Called before run_data exists (the data is fetched up front), so it must
+    # accept None and read the version off disk rather than off the run.
     describe_data_version: Optional[Callable] = None
 
     # --- environment -----------------------------------------------------------
@@ -113,7 +115,7 @@ def _pfam_spec():
     from gtotree.utils.pfam.additional_pfam_searching import (write_pfam_counts_table,
                                                               combine_all_pfam_hits)
 
-    def describe_version(run_data):
+    def describe_version(run_data=None):
         import os
         pfam_dir = os.environ.get("Pfam_data_dir")
         if not pfam_dir:

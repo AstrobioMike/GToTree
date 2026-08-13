@@ -336,6 +336,7 @@ def merge_wanted_ref_tax(run_data, selection):
         return run_data
 
     run_data.merge_wanted_ref_tax_accessions(selection.accessions)
+    run_data.record_wanted_ref_tax_selection(selection, taxon=selection.canonical)
 
     return run_data
 

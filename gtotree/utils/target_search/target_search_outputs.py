@@ -15,7 +15,8 @@ run with `-p`/`-K` would have produced.
 
 import os
 
-from gtotree.utils.misc.general import atomic_write_text
+from gtotree.utils.misc.general import (atomic_write_text, genome_source_label,
+                                        genome_input_label)
 
 
 SUMMARY_FILENAME = "genomes-summary-info.tsv"
@@ -23,16 +24,8 @@ SUMMARY_FILENAME = "genomes-summary-info.tsv"
 COLUMNS = ["genome_id", "input_source", "input_path", "num_genes",
            "prodigal_used", "search_completed", "reason_removed"]
 
-# how GenomeData.source values read in the table
-_SOURCE_LABELS = {
-    "accession": "ncbi-accession",
-    "genbank-file": "genbank-file",
-    "nt-fasta-file": "nucleotide-fasta",
-    "aa-fasta-file": "amino-acid-fasta",
-}
 
-
-def _row(gd, spec):
+def _row(gd, spec, run_data=None):
     searched = bool(getattr(gd, spec.search_done_flag, False))
     failed_flag = getattr(gd, spec.search_done_flag.replace("_done", "_failed"), False)
 
@@ -45,8 +38,8 @@ def _row(gd, spec):
 
     return [
         gd.id,
-        _SOURCE_LABELS.get(gd.source, gd.source or "NA"),
-        gd.provided_path or "NA",
+        genome_source_label(gd),
+        genome_input_label(gd, run_data),
         "NA" if gd.num_genes is None else str(gd.num_genes),
         "Yes" if gd.prodigal_used else "No",
         completed,
@@ -64,7 +57,7 @@ def write_genomes_summary(out_dir, run_data, spec):
     """
     path = os.path.join(out_dir, SUMMARY_FILENAME)
 
-    rows = [_row(gd, spec) for gd in run_data.all_input_genomes]
+    rows = [_row(gd, spec, run_data) for gd in run_data.all_input_genomes]
 
     def write(f):
         f.write("\t".join(COLUMNS) + "\n")

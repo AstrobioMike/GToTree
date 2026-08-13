@@ -14,7 +14,7 @@
 
 
 
-    # main gtotree run, this:
+On a main gtotree run, i want this printed output:
 
         # Input-genome sources include:
         #   - NCBI accessions listed in accs.txt (2 genomes)
@@ -23,7 +23,7 @@
         #   - Fasta files listed in fasta-files.txt (3 genomes)
         #   - Amino-acid files listed in aa-files.txt (1 genomes)
 
-    # should be this:
+to look like this:
 
         # Input-genome sources include:
         #   - NCBI accessions selected for --wanted-ref-tax 'Methanobacteria' (4 genomes)
@@ -34,114 +34,53 @@
         #   - Amino-acid files listed in aa-files.txt (1 genomes)
 
 
+and work in search-kos and search-pfams i want includes:
+        # one thing is i want all needed dbs to be checked and fetched as-needed up front before any normal work starts (like main gtotree)
+        # another is it's not keeping track of the genomes grabbed with -w appropriately in the final summary tsv (they're all just labeled accession)
+        #  i don't like the formatting of the numbers in phase 1
 
+            # Phase 1: Resolving input genomes...
 
-    # accs passed to a search-kos/pfams print out a message interrupting the spinner rather than notifying afterwards
-        #   Phase 3: Processing and searching genomes...
-
-        #     ✔ Prepared Pfam profiles
-        #     ⠙ Looking up accessions in the NCBI assembly data...
-        #   *********************************** NOTICE ***********************************
-        #     1 accession(s) not successfully found at NCBI.
-
-        #     Reported in gtt-pfam-search-output/ncbi-accessions-not-found.txt
-        #   ******************************************************************************
-        #     ✔ Looked up accessions at NCBI
-
-
-        ## actually this whole thing is a mess
-            # above problem
-            # all of Phase 1 should be preparing input genomes -> to AAs ready to rock
-            # Selecting reference genomes should happen first
-            # input genome summary overview
-            # then we should search all genomes at the same time with one progress bar
-            # below is saying "(1 already done in a previous run)" even though this is not a resume run
-            # add in a check that ANY targets had hits, when no, report that and don't create the would-be-empty ko-hit-seqs/ dir
-
-            # gtt search-pfams -p pfams.txt -w Methanobacteria -a accs.txt -f fasta-files.txt -g gb-files.txt -A aa-files.txt -F
-
-
-            #   Phase 1: Resolving input genomes...
-
-            #         2 NCBI accession(s) read from accs.txt
-            #         1 GenBank file(s) read from gb-files.txt
-            #         3 nucleotide fasta file(s) read from fasta-files.txt
-            #         1 amino-acid fasta file(s) read from aa-files.txt
-
-            #       Genome source being used: GTDB v232 (released Apr 15, 2026)
+            #     Genome source being used: GTDB v232 (released Apr 15, 2026)
 
             #     ✔ Selected reference genomes
             #         4 genome(s) selected (Methanobacteria at rank class)
             #         dereplicated to one genome per family
 
-            #       11 total input genome(s)
+            #         8 NCBI accession(s) read from GToTree-test-data/ncbi_accessions.txt
+            #         2 nucleotide fasta file(s) read from fasta-files.txt
+            #         4 amino-acid fasta file(s) read from amino-acid-files.txt
+            #         4 reference genome accession(s) added by `-w`
 
-
-            #   Phase 2: Collecting target Pfams...
-
-            #     ✔ Pfam data ready
-            #       Pfam version being used: 38.2
-
-
-            #         9 of 9 requested Pfams found and ready to search
-
-
-            #   Phase 3: Processing and searching genomes...
-
-            #     ✔ Prepared Pfam profiles
-            #     ⠙ Looking up accessions in the NCBI assembly data...
-            #   *********************************** NOTICE ***********************************
-            #     1 accession(s) not successfully found at NCBI.
-
-            #     Reported in gtt-pfam-search-output/ncbi-accessions-not-found.txt
-            #   ******************************************************************************
+            #     18 total input genome(s)
             #     ✔ Looked up accessions at NCBI
 
-            #       Processing and searching 5 NCBI accessions:
-            #         (1 already done in a previous run)
+            #         1 accession(s) weren't found at NCBI, so they've been dropped
+            #         from the run. They're reported in:
+            #         gtt-pfam-search-output/removed-genomes.tsv
 
-            #         100%|████████████| 5/5 [time elapsed: 00:08 | est. remaining: 00:00]
+        # should mirror the main gtotree output where possible, like this:
 
-            #       Processing and searching 1 GenBank files:
+            # Phase 1: Resolving input genomes...
 
-            #         100%|████████████| 1/1 [time elapsed: 00:00 | est. remaining: 00:00]
-
-            #       Processing and searching 3 fasta files:
-
-            #         100%|████████████| 3/3 [time elapsed: 00:10 | est. remaining: 00:00]
-
-            #       Processing and searching 1 amino-acid files:
-
-            #         100%|████████████| 1/1 [time elapsed: 00:00 | est. remaining: 00:00]
+            #     Genome source being used: GTDB v232 (released Apr 15, 2026)
+            #     ✔ Selected reference genomes
 
 
-            #   Phase 4: Combining results and writing outputs...
+            #     - NCBI accessions selected for --wanted-ref-tax 'Methanobacteria' (4 genomes)
+            #         - wanted rank "class" was dereplicated to one genome per family
+            #     - NCBI accessions listed in GToTree-test-data/ncbi_accessions.txt (8 genomes)
+            #     - Fasta files listed in fasta-files.txt (2 genomes)
+            #     - Amino-acid files listed in amino-acid-files.txt (4 genomes)
+            #         
+            #                     Total input genomes: 18 
+            #
+            #
+            #     ✔ Looked up accessions at NCBI
 
-            #     ✔ Wrote the hit-counts table
-
-            #       Combining per-genome hit sequences:
-            #         100%|████████████| 9/9 [time elapsed: 00:00 | est. remaining: 00:00]
-            #     ✔ Wrote the genome summary table
-
-            #   ------------------------------------------------------------------------------
-            #                               Pfam search complete!
-            #   ------------------------------------------------------------------------------
-
-            #       9 genome(s) searched for 9 Pfam target(s).
-
-
-            #       2 input genome(s) didn't make it through; the reason for each is in
-            #       the summary table.
-
-            #       Results written to:
-            #         gtt-pfam-search-output/
-
-            #       Including:
-            #         pfam-hit-counts.tsv  (the genome x Pfam hit-count matrix)
-            #         pfam-hit-seqs/  (the hit sequences, one fasta per Pfam)
-            #         genomes-summary-info.tsv  (per-genome summary)
-
-
+            #         1 accession(s) weren't found at NCBI, so they've been dropped
+            #         from the run. They're reported in:
+            #         gtt-pfam-search-output/removed-genomes.tsv
 
 
 

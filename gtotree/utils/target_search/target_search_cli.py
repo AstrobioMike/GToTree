@@ -331,34 +331,28 @@ def report_finish(out_dir, run_data, spec, summary_path, targets_with_hits):
     print(border)
 
     print(f"\n      {color_text(f'{searched:,}', 'green')} genome(s) searched for "
-          f"{color_text(f'{num_targets:,}', 'green')} {spec.target_label} target(s).\n")
+          f"{color_text(f'{num_targets:,}', 'green')} {spec.target_label} target(s).")
 
     if removed or failed:
         dropped = removed + failed
         report_message(
-            f"{dropped:,} input genome(s) didn't make it through; the reason for each "
-            "is in the summary table.", "yellow", ii="      ", si="      ")
+            f"{dropped:,} input genome(s) didn't make it through; see summary table.", "yellow", ii="      ", si="      ")
         print()
 
     if not targets_with_hits:
         report_message(
             f"No hits were found for any of the {num_targets:,} "
-            f"{spec.target_label} target(s) in any of the genomes searched, so there "
-            f"are no hit sequences to report (the '{spec.hit_seqs_subdir}/' directory "
-            "wasn't created).", "yellow", ii="      ", si="      ")
+            f"{spec.target_label} target(s) in any of the genomes searched :/", "yellow", ii="      ", si="      ")
         print()
 
     print("      Results written to:")
     print(f"        {color_text(out_dir + '/', 'green')}\n")
 
     print("      Including:")
-    print(f"        {color_text(spec.counts_filename, 'green')}"
-          f"  (the genome x {spec.target_label} hit-count matrix)")
+    print(f"        {color_text(spec.counts_filename, 'green')}")
     if targets_with_hits:
-        print(f"        {color_text(spec.hit_seqs_subdir + '/', 'green')}"
-              f"  (the hit sequences, one fasta per {spec.target_label} with hits)")
-    print(f"        {color_text(os.path.basename(summary_path), 'green')}"
-          "  (per-genome summary)")
+        print(f"        {color_text(spec.hit_seqs_subdir + '/', 'green')}")
+    print(f"        {color_text(os.path.basename(summary_path), 'green')}")
     print()
 
 
@@ -384,6 +378,21 @@ def _load_previous_run_data(work_dir):
             "start fresh with `-F`.") from e
 
 
+def ensure_all_required_data(args, spec):  # pragma: no cover
+    """
+    Make every managed dataset this run needs is present
+    """
+    ensure_reference_data(args, spec)
+    spec.ensure_data()
+
+    check_env_vars(spec)
+
+    if spec.describe_data_version is None:
+        return None
+
+    return spec.describe_data_version(None)
+
+
 def run_search(args, spec):  # pragma: no cover
     """
     The whole program, phase by phase.
@@ -400,11 +409,11 @@ def run_search(args, spec):  # pragma: no cover
 
     n = _phase_counter()
 
-    section(f"Phase {n()}: Resolving input genomes...")
     args = validate_input_files(args, spec)
-    run_data = build_run_data(args, spec, out_dir, work_dir, previous=previous)
+    data_version = ensure_all_required_data(args, spec)
 
-    ensure_reference_data(args, spec)
+    section(f"Phase {n()}: Resolving input genomes...")
+    run_data = build_run_data(args, spec, out_dir, work_dir, previous=previous)
 
     run_data, _selection = stages.resolve_input_genomes(args, run_data)
 
@@ -412,7 +421,7 @@ def run_search(args, spec):  # pragma: no cover
 
     adopt_genome_progress(run_data, previous)
 
-    fingerprint = build_fingerprint(run_data, args, spec, data_version=None)
+    fingerprint = build_fingerprint(run_data, args, spec, data_version=data_version)
 
     if resuming and state:
         differences = RESUME.compare(state.get("fingerprint"), fingerprint)
@@ -432,26 +441,10 @@ def run_search(args, spec):  # pragma: no cover
     write_run_data(run_data)
 
     section(f"Phase {n()}: Collecting target {spec.target_label_plural}...")
-    with spinner(f"Making sure the {spec.target_label} data is available...",
-                 f"{spec.target_label} data ready"):
-        spec.ensure_data()
-    check_env_vars(spec)
+    if data_version:
+        print(f"      {spec.target_label} version being used: "
+              f"{color_text(data_version, 'green')}")
 
-    data_version = None
-    if spec.describe_data_version is not None:
-        data_version = spec.describe_data_version(run_data)
-        if data_version:
-            print(f"      {spec.target_label} version being used: "
-                  f"{color_text(data_version, 'green')}\n")
-
-    # the database version isn't knowable until it's been fetched, so it gets folded
-    # into the fingerprint here rather than at the start
-    if resuming and state.get("fingerprint", {}).get("data_version") not in (None, data_version):
-        raise TargetSearchError(
-            "`-R`/`--resume` was specified, but the reference-database version changed "
-            f"since the previous run ({state['fingerprint']['data_version']} -> "
-            f"{data_version}). Use a new output directory with `-o`, or start over "
-            "with `-F`.")
     state.setdefault("fingerprint", {})["data_version"] = data_version
 
     run_data = stages.phase_collect_targets(run_data, spec, out_dir, resuming=resuming)
@@ -465,7 +458,7 @@ def run_search(args, spec):  # pragma: no cover
     RESUME.mark_complete(state, STAGE_SEARCH, work_dir=work_dir)
     RESUME.save(work_dir, state)
 
-    section(f"Phase {n()}: Combining results and writing outputs...")
+    section(f"Phase {n()}: Combining results...")
     summary_path, targets_with_hits = stages.phase_write_outputs(run_data, spec, out_dir)
     RESUME.mark_complete(state, STAGE_OUTPUTS, work_dir=work_dir)
     RESUME.save(work_dir, state)

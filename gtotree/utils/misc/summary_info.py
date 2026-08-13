@@ -3,7 +3,8 @@ import os
 import pandas as pd # type: ignore
 
 from gtotree.utils.taxonomy.tax_ranks import RANKS
-from gtotree.utils.misc.general import atomic_write_text
+from gtotree.utils.misc.general import (atomic_write_text, genome_source_label,
+                                        genome_input_label)
 from gtotree.utils.misc.stages import (GenomeRemovalStage,
                                        GENOME_REMOVAL_STAGE_ORDER)
 from gtotree.utils.misc.messaging import (REMOVED_GENOMES_FILENAME,
@@ -52,8 +53,8 @@ def write_removed_genomes_report(run_data):
         for gd in removed:
             f.write("\t".join([
                 gd.id,
-                gd.provided_path or gd.id,
-                gd.source or "NA",
+                genome_input_label(gd, run_data),
+                genome_source_label(gd),
                 gd.removed_at,
                 gd.reason_removed or "NA",
             ]) + "\n")
@@ -166,7 +167,7 @@ def generate_primary_summary_table(args, run_data):
         rows.append({
             "assembly_id":                   g.id,
             "label":                         label,
-            "source":                        g.source,
+            "source":                        genome_source_label(g),
             "taxid":                         taxid,
             "num_SCG_hits":                  g.num_SCG_hits,
             "num_uniq_SCG_hits":             g.num_unique_SCG_hits,

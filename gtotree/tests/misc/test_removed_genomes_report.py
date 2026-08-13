@@ -89,7 +89,9 @@ class TestWriteRemovedGenomesReport:
         row = _rows(tmp_path)[1].split("\t")
         assert row[0] == "genome_1"
         assert row[1] == "some/nested/dir/genome_1.fa.gz"
-        assert row[2] == "nt-fasta-file"
+        # the human-facing label, not the internal GenomeData.source value; every
+        # table that reports an input source now goes through genome_source_label
+        assert row[2] == "nucleotide-fasta"
 
     def test_accessions_fall_back_to_the_id_for_the_input_column(self, tmp_path):
         """`provided_path` is None for accessions, so the accession itself stands in."""

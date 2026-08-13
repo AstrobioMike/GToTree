@@ -231,6 +231,39 @@ GENOME_SOURCE_FIELDS = ("ncbi_accs", "genbank_files", "fasta_files", "amino_acid
 DERIVED_RUN_DATA_FIELDS = frozenset({"all_input_genomes"})
 
 
+# How GenomeData.source values read in an output table. Shared so every table that
+# reports where a genome came from says it the same way.
+GENOME_SOURCE_LABELS = {
+    "accession": "ncbi-accession",
+    "genbank-file": "genbank-file",
+    "nt-fasta-file": "nucleotide-fasta",
+    "aa-fasta-file": "amino-acid-fasta",
+}
+
+# reference genomes pulled in by `-w` are accessions too, but they aren't accessions
+# the USER listed, and a table that can't tell them apart can't answer "which of these
+# did I ask for?" -- which is the whole point of the column
+WANTED_REF_TAX_SOURCE_LABEL = "ncbi-accession (via -w)"
+
+
+def genome_source_label(gd):
+    """The output-table label for one genome's input source."""
+    if getattr(gd, "from_wanted_ref_tax", False):
+        return WANTED_REF_TAX_SOURCE_LABEL
+    return GENOME_SOURCE_LABELS.get(gd.source, gd.source or "NA")
+
+
+def genome_input_label(gd, run_data=None):
+    """
+    What the user actually handed over for this genome: the path they listed, or the
+    `-w` request that produced it (which has no path to report).
+    """
+    if getattr(gd, "from_wanted_ref_tax", False):
+        taxon = getattr(run_data, "wanted_ref_tax", None) if run_data else None
+        return f"-w {taxon}" if taxon else "-w"
+    return gd.provided_path or gd.id
+
+
 @dataclass
 class GenomeData:
     id: str
@@ -459,6 +492,16 @@ class RunData:
 
     tools_used: ToolsUsed = field(default_factory=ToolsUsed)
 
+    # --- how a `-w` selection was made ---------------------------------------
+    # Kept on run_data rather than passed around as the RefGenomeSelection object so
+    # the reporting can describe the selection on a resumed run too, where `-w` isn't
+    # re-resolved and there is no selection object to ask. Plain str/int so they
+    # survive the run-data.json round-trip.
+    wanted_ref_tax: str = None
+    wanted_ref_tax_rank: str = None
+    wanted_ref_tax_derep_rank: str = None
+    wanted_ref_tax_num_selected: int = 0
+
     # dict of the run parameters that affect what this run produces; compared on -R
     # to decide whether resuming is safe. See preflight_checks.build_fingerprint
     fingerprint: dict = field(default_factory=dict)
@@ -563,6 +606,24 @@ class RunData:
         if added:
             self.update_all_input_genomes()
         return added
+
+    def record_wanted_ref_tax_selection(self, selection, taxon=None):
+        """
+        Remember HOW a `-w` selection was made, for the reporting layer.
+
+        `wanted_ref_tax_num_selected` is what the taxonomy core handed back, BEFORE
+        deduping against `-a`, so the difference between it and
+        `get_wanted_ref_tax_accs()` is exactly the overlap worth mentioning.
+        """
+        if selection is None:
+            return self
+
+        self.wanted_ref_tax = taxon or getattr(selection, "canonical", None)
+        self.wanted_ref_tax_rank = selection.resolved_rank
+        self.wanted_ref_tax_derep_rank = selection.effective_derep_rank
+        self.wanted_ref_tax_num_selected = len(selection.accessions)
+
+        return self
 
     def get_all_processed_genomes(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.processing_done]
@@ -823,6 +884,13 @@ GTT_PROGRESS_BAR_FORMAT_INDENTED = (
     "{n_fmt}/{total_fmt} "
     "[time elapsed: {elapsed} | est. remaining: {remaining}]"
 )
+
+GTT_PROGRESS_BAR_FORMAT_INDENTED_6 = (
+    "      {percentage:3.0f}%|{bar}| "
+    "{n_fmt}/{total_fmt} "
+    "[time elapsed: {elapsed} | est. remaining: {remaining}]"
+)
+
 
 # `smoothing=0` makes tqdm use a plain cumulative average (n / elapsed) instead, which is
 # what i want in almost everything
