@@ -610,16 +610,15 @@ def few_genomes_notice(total_input_genomes, args):
 def absurd_number_of_genomes_notice(total_input_genomes):
     return (
     f"""    The alignment and treeing steps, particularly the alignments, can become
-    prohibitively memory-intensive with many input genomes. With {total_input_genomes} genomes,
+    prohibitively computationally heavy with many input genomes. With {total_input_genomes:,} genomes,
     this job may not be feasible :(
 
     Often it is useful to slim down how many genomes of closely related organisms
     we are including when looking across a broad level of diversity, as having many
     closely related organisms may not add much to the final tree.
 
-    Have you considered using "representative" genomes only (either from NCBI or
-    GTDB)? Those both provide helpful systems for reducing some redundancy when
-    working at a broad level with many genomes.
+    Have you considered using a finer `--derep-rank`? It can help with reducing some
+    redundancy when working at a broad level with many genomes.
 
     More info on that can be found here:
       github.com/AstrobioMike/GToTree/wiki/things-to-consider

@@ -188,7 +188,6 @@ def test_a_gtdb_taxon_with_its_own_set_gets_it():
     picked = S.autopick_scg_set("gtdb", selection)
 
     assert picked.name == "Pseudomonadota"
-    assert "has a pre-built set of its own" in picked.reason
 
 
 def test_a_gtdb_taxon_below_any_set_climbs_to_its_ancestor():

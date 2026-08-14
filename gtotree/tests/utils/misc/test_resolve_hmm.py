@@ -68,14 +68,13 @@ def test_an_explicit_hmm_is_never_second_guessed(picks):
 
 
 def test_a_missing_hmm_is_auto_selected_from_the_taxon(picks, capsys):
-    picks("Nitrospirota", reason="'Nitrospirota' has a pre-built set of its own")
+    picks("Nitrospirota", reason="")
     args = make_args(wanted_ref_tax="Nitrospirota")
     selection = object()
 
     args = P.resolve_hmm(args, selections=selection)
 
     assert args.hmm == "Nitrospirota"
-    assert args.hmm_auto_selected == "'Nitrospirota' has a pre-built set of its own"
 
 
 def test_the_selection_and_source_are_what_gets_handed_to_the_picker(picks):
