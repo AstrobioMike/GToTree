@@ -100,12 +100,12 @@ class TestNoHitsReason:
 
     def test_nothing_hit_it_at_all(self):
         scg = SCGset.from_id("A")
-        scg.num_genomes_with_any_hit = 0
+        scg.num_genomes_with_hit = 0
         assert no_hits_reason(scg, best_hit_mode=False) == "no hits in any genome"
 
     def test_hits_present_but_never_single_copy_points_at_best_hit_mode(self):
         scg = SCGset.from_id("A")
-        scg.num_genomes_with_any_hit = 37
+        scg.num_genomes_with_hit = 37
 
         reason = no_hits_reason(scg, best_hit_mode=False)
 
@@ -119,7 +119,7 @@ class TestNoHitsReason:
         multi-copy case -- pointing the user at `-B` there would be misleading.
         """
         scg = SCGset.from_id("A")
-        scg.num_genomes_with_any_hit = 37
+        scg.num_genomes_with_hit = 37
 
         reason = no_hits_reason(scg, best_hit_mode=True)
 
@@ -128,7 +128,7 @@ class TestNoHitsReason:
 
     def test_a_single_genome_is_not_pluralized(self):
         scg = SCGset.from_id("A")
-        scg.num_genomes_with_any_hit = 1
+        scg.num_genomes_with_hit = 1
         assert "1 genome," in no_hits_reason(scg, best_hit_mode=False)
 
     def test_an_unset_count_reads_as_no_hits(self):

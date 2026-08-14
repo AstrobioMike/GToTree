@@ -302,8 +302,8 @@ def rebuild_combined_SCG_outputs(run_data):
         os.replace(f"{path}.part", path)
 
     for scg in scgs:
-        scg.num_genomes_with_any_hit = genomes_with_any_hit[scg.id]
-        scg.num_genomes_with_hits = genomes_with_usable_seq[scg.id]
+        scg.num_genomes_with_hit = genomes_with_any_hit[scg.id]
+        scg.num_genomes_after_copy_filtering = genomes_with_usable_seq[scg.id]
 
     return run_data
 
@@ -312,7 +312,7 @@ def no_hits_reason(scg, best_hit_mode):
     """
     Why an SCG-set came out of the search with no usable sequences
     """
-    num_with_hits = scg.num_genomes_with_any_hit or 0
+    num_with_hits = scg.num_genomes_with_hit or 0
 
     if not num_with_hits:
         return "no hits in any genome"

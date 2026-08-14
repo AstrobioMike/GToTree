@@ -121,6 +121,9 @@ These live in the output sub-directory `run-files/`.
 
 **SCG-info.tsv**
   * One row per target SCG, with how many genomes had hits to it at each stage, whether it was retained, and if not, why.
+  * The genome counts are a funnel, each with a matching `perc_` column: `num_genomes_with_hit` (at least one hit, including multi-copy) → `num_genomes_after_copy_filtering` (contributed a usable sequence; multi-copy hits are dropped here unless `-B`/`--best-hit-mode` is set) → `num_genomes_after_length_filtering` (`-c`) → `num_genomes_after_genome_filtering` (`-G`).
+  * A large drop from `num_genomes_with_hit` to `num_genomes_after_copy_filtering` means that SCG was frequently multi-copy across your input genomes.
+  * The first three percentages are out of the genomes that made it to the HMM search; the last is out of the genomes still retained after genome filtering.
 
 **partitions.txt** and **partitions.nex**
   * Partition files compatible with treeing programs capable of using different models for each gene. See, for example, [iqtree's info here](http://www.iqtree.org/doc/Advanced-Tutorial).

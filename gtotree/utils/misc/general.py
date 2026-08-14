@@ -436,10 +436,10 @@ class SCGset:
     id: str
     remaining: bool = None
     gene_length_filtered: bool = None
-    num_genomes_with_any_hit: int = None            # incl. multi-copy hits
-    num_genomes_with_hits: int = None               # contributing a usable seq
-    num_genomes_with_hits_after_len_filtering: int = 0
-    num_genomes_with_hits_after_genome_filtering: int = None
+    num_genomes_with_hit: int = None              # >= 1 hit, incl. multi-copy
+    num_genomes_after_copy_filtering: int = None  # contributed a usable seq (see `-B`)
+    num_genomes_after_length_filtering: int = 0
+    num_genomes_after_genome_filtering: int = None
     aligned: bool = None
     trimmed: bool = None
     ready_for_cat: bool = None
@@ -680,6 +680,7 @@ class RunData:
             "derep_rank": selection.effective_derep_rank,
             "num_selected": len(selection.accessions),
             "num_added": num_added,
+            "warnings": list(getattr(selection, "warnings", []) or []),
         })
 
         return self
@@ -838,6 +839,22 @@ def adopt_genome_progress(run_data, previous):
     return carried
 
 
+def wanted_ref_tax_source_line(source):
+    """
+    The "Genome source being used for `-w` input: ..." line, or None
+    """
+    # imported here rather than at module scope: the taxonomy layer reaches back into
+    # the GTDB/NCBI asset modules, and this module is imported by almost everything
+    from gtotree.utils.taxonomy.wanted_ref_tax import describe_source_version
+
+    source_desc = describe_source_version(source)
+    if not source_desc:
+        return None
+
+    return (f"      Genome source being used for `-w` input: "
+            f"{color_text(source_desc, 'green')}")
+
+
 def resolve_input_genomes(args, run_data, error_cls):
     """
     Phase 1 for every program that takes the four genome inputs plus `-w`: fold in any
@@ -845,8 +862,7 @@ def resolve_input_genomes(args, run_data, error_cls):
     """
     # imported here rather than at module scope: the taxonomy layer reaches back into
     # the GTDB/NCBI asset modules, and this module is imported by almost everything
-    from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
-                                                       describe_source_version)
+    from gtotree.utils.taxonomy.wanted_ref_tax import resolve_wanted_ref_tax_accessions
     from gtotree.utils.misc.messaging import (input_genome_source_lines,
                                               total_input_genomes_line,
                                               spinner)
@@ -855,10 +871,10 @@ def resolve_input_genomes(args, run_data, error_cls):
     wanted = wanted_ref_tax_list(args)
 
     if wanted:
-        source_desc = describe_source_version(args.source)
-        if source_desc:
-            print(f"      Genome source being used for `-w` input: "
-                  f"{color_text(source_desc, 'green')}\n")
+        source_line = wanted_ref_tax_source_line(args.source)
+        if source_line:
+            # trailing blank: the spinner that follows prints straight onto its own line
+            print(f"{source_line}\n")
 
         for taxon in wanted:
             with spinner(f"Selecting reference genomes for '{taxon}'...",

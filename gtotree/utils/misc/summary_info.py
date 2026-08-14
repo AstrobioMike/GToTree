@@ -12,9 +12,10 @@ from gtotree.utils.misc.messaging import (REMOVED_GENOMES_FILENAME,
 
 SCG_INFO_COLUMNS = (
     "target_SCG",
-    "num_genomes_with_any_hit",
-    "num_genomes_with_hits",
-    "perc_genomes_with_hits",
+    "num_genomes_with_hit",
+    "perc_genomes_with_hit",
+    "num_genomes_after_copy_filtering",
+    "perc_genomes_after_copy_filtering",
     "num_genomes_after_length_filtering",
     "perc_genomes_after_length_filtering",
     "num_genomes_after_genome_filtering",
@@ -114,13 +115,14 @@ def write_SCG_info_table(run_data):
     def _write(f):
         f.write("\t".join(SCG_INFO_COLUMNS) + "\n")
         for scg in run_data.SCG_targets:
-            after_len = scg.num_genomes_with_hits_after_len_filtering
-            after_genome = scg.num_genomes_with_hits_after_genome_filtering
+            after_len = scg.num_genomes_after_length_filtering
+            after_genome = scg.num_genomes_after_genome_filtering
             f.write("\t".join([
                 scg.id,
-                _na(scg.num_genomes_with_any_hit),
-                _na(scg.num_genomes_with_hits),
-                _perc(scg.num_genomes_with_hits, searched),
+                _na(scg.num_genomes_with_hit),
+                _perc(scg.num_genomes_with_hit, searched),
+                _na(scg.num_genomes_after_copy_filtering),
+                _perc(scg.num_genomes_after_copy_filtering, searched),
                 _na(after_len),
                 _perc(after_len, searched),
                 _na(after_genome),
@@ -151,7 +153,7 @@ def SCG_sets_below_representation_cutoff(run_data):
 
     below = []
     for scg in run_data.get_all_SCG_targets_remaining():
-        after_genome = scg.num_genomes_with_hits_after_genome_filtering
+        after_genome = scg.num_genomes_after_genome_filtering
         if after_genome is None:
             continue
         if after_genome / retained < cutoff:

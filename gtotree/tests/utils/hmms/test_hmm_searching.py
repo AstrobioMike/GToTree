@@ -395,5 +395,5 @@ class TestCombinedTableAlignment:
         rebuild_combined_SCG_outputs(rd)
 
         by_id = {s.id: s for s in rd.SCG_targets}
-        assert by_id["SCG_A"].num_genomes_with_any_hit == 0
-        assert by_id["SCG_C"].num_genomes_with_any_hit == 2
+        assert by_id["SCG_A"].num_genomes_with_hit == 0
+        assert by_id["SCG_C"].num_genomes_with_hit == 2

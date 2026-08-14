@@ -365,10 +365,6 @@ def _select_rows(table_path, args):
         rows = _apply_source_prefix(rows, prefixes)
         return _NcbiSelection(rows, f"taxid {target}", None, f"taxid-{target}")
 
-    # taxon name -> shared core (taxon resolution + optional dereplication).
-    # --source scopes the candidate pool BY ACCESSION PREFIX up front (inside the
-    # core, before dereplication), so a best-per-rank pick is made within the
-    # requested pool rather than dropped afterward.
     try:
         selection = select_ref_genomes(
             table_path, "ncbi", target,

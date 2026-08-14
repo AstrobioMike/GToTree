@@ -481,9 +481,9 @@ class TestSCGGenomeFilteringReporting:
             gd.mark_removed("too few unique SCG hits",
                             GenomeRemovalStage.SCG_HIT_FILTER)
         for scg in rd.SCG_targets:
-            scg.num_genomes_with_hits_after_len_filtering = 50
-            scg.num_genomes_with_hits_after_genome_filtering = 55
-        rd.SCG_targets[0].num_genomes_with_hits_after_genome_filtering = kept
+            scg.num_genomes_after_length_filtering = 50
+            scg.num_genomes_after_genome_filtering = 55
+        rd.SCG_targets[0].num_genomes_after_genome_filtering = kept
         return rd
 
     def test_a_clean_genome_filtering_stage_says_nothing(self, _no_early_exit):

@@ -15,6 +15,8 @@ from gtotree.utils.misc.messaging import (color_text,
                                      report_missing_mapping_file,
                                      report_problem_with_mapping_file,
                                      report_notice,
+                                     report_run_info_banner,
+                                     RUN_INFO_BANNER,
                                      many_genomes_notice,
                                      few_genomes_notice,
                                      absurd_number_of_genomes_notice,
@@ -41,6 +43,7 @@ from gtotree.utils.misc.general import (ToolsUsed,
                                    SOURCE_AMINO_ACID,
                                    populate_run_data,
                                    read_run_data,
+                                   wanted_ref_tax_source_line,
                                    wanted_ref_tax_list)
 from gtotree.utils.misc.stages import PipelineStage
 from gtotree.utils.misc.resume_state import (ResumeProfile, hash_file_contents,
@@ -56,6 +59,7 @@ def preflight_checks(args):
     args = primary_args_validation(args)
     previous_run_data = load_previous_run_data(args)
     check_for_required_dbs(args, previous_run_data)
+    report_run_info_banner()
     selections = select_wanted_ref_tax(args, previous_run_data)
     args = resolve_hmm(args, selections, previous_run_data)
     args, run_data = setup_run_data(args, previous_run_data)
@@ -336,9 +340,6 @@ def select_wanted_ref_tax(args, previous_run_data=None):
         except (WantedRefTaxError, ValueError) as err:
             report_message(str(err))
             report_very_early_exit(suggest_help=True)
-
-        for warning in selection.warnings:
-            report_message(warning, "yellow")
 
         selections.append(selection)
 
@@ -911,6 +912,7 @@ def final_setups(args, run_data):
     full_execution_command = f"{' '.join(sys.argv)}"
     stdout_and_log(gtotree_header(), log_file=args.log_file, log_only=True, restart_log=True)
     stdout_and_log("    Command entered:\n       ", full_execution_command, log_file=args.log_file, log_only=True)
+    stdout_and_log(RUN_INFO_BANNER, log_file=args.log_file, log_only=True)
 
     args, run_data = setup_tmp_dir(args, run_data)
 

@@ -405,10 +405,10 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
         if group not in best or k < keyfn(best[group], spec):
             best[group] = row
 
-    if n_na_group:
-        warnings.append(
-            f"{n_na_group:,} genome(s) have no assigned '{derep_rank}' and were "
-            f"skipped (unnamed/unclassified at that rank).")
+    # if n_na_group:
+    #     warnings.append(
+    #         f"{n_na_group:,} genome(s) have no assigned '{derep_rank}' and were "
+    #         f"skipped (unnamed/unclassified at that rank).")
 
     accs = [best[g][spec.acc_col] for g in sorted(best)]
     return accs, len(best), warnings
@@ -420,15 +420,15 @@ class RefGenomeSelection:
     came from, and the resolution details each caller needs to report.
 
     Attributes:
-        accessions   -- list of ncbi_genbank_assembly_accession strings (order stable)
-        rows         -- list of dict rows (the selected genomes' metadata) for the
-                        accessions above; same order. Suitable for a metadata TSV.
-        canonical    -- the taxon name as it appears in the asset (may differ in case
-                        from what the user typed)
-        resolved_rank-- the rank the taxon was resolved to
-        effective_derep_rank -- the rank dereplication collapsed to, or None if derep
-                        was off (all genomes under the taxon kept)
-        warnings     -- human-facing advisory strings (empty list if none)
+        accessions           : list of ncbi_genbank_assembly_accession strings (order stable)
+        rows                 : list of dict rows (the selected genomes' metadata) for the
+                               accessions above; same order. Suitable for a metadata TSV.
+        canonical            : the taxon name as it appears in the asset (may differ in case
+                               from what the user typed)
+        resolved_rank        : the rank the taxon was resolved to
+        effective_derep_rank : the rank dereplication collapsed to, or None if derep
+                               was off (all genomes under the taxon kept)
+        warnings             : human-facing advisory strings (empty list if none)
     """
 
     def __init__(self, accessions, rows, canonical, resolved_rank,

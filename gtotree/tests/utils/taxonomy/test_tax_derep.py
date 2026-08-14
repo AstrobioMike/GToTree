@@ -87,7 +87,7 @@ class TestSizeAdvice:
     def test_huge_selection_with_derep_off_suggests_turning_it_on(self):
         advice = size_advice(200_000, "phylum", None)
         assert len(advice) == 1
-        assert "--derep-rank" in advice[0] or "dereplication off" in advice[0]
+        assert "--derep-rank" in advice[0] or "--derep-rank off" in advice[0]
 
     def test_species_target_with_derep_off_explains_there_is_nothing_finer(self):
         advice = size_advice(200_000, "species", None)

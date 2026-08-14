@@ -101,12 +101,12 @@ class TestWriteSCGInfoTable:
         different outcome from "genome filtering hasn't happened yet".
         """
         rd = _run_data(tmp_path, scg_ids=("A",))
-        rd.SCG_targets[0].num_genomes_with_hits = 8
+        rd.SCG_targets[0].num_genomes_after_copy_filtering = 8
 
         write_SCG_info_table(rd)
 
         _header, rows = _rows(tmp_path)
-        assert rows[0]["num_genomes_with_hits"] == "8"
+        assert rows[0]["num_genomes_after_copy_filtering"] == "8"
         assert rows[0]["num_genomes_after_genome_filtering"] == "NA"
         assert rows[0]["perc_genomes_after_genome_filtering"] == "NA"
 
@@ -123,15 +123,15 @@ class TestWriteSCGInfoTable:
                             GenomeRemovalStage.SCG_HIT_FILTER)
 
         scg = rd.SCG_targets[0]
-        scg.num_genomes_with_hits = 10
-        scg.num_genomes_with_hits_after_len_filtering = 10
-        scg.num_genomes_with_hits_after_genome_filtering = 5
+        scg.num_genomes_after_copy_filtering = 10
+        scg.num_genomes_after_length_filtering = 10
+        scg.num_genomes_after_genome_filtering = 5
 
         write_SCG_info_table(rd)
 
         _header, rows = _rows(tmp_path)
         # 10 of the 10 that were searched
-        assert rows[0]["perc_genomes_with_hits"] == "100.0"
+        assert rows[0]["perc_genomes_after_copy_filtering"] == "100.0"
         assert rows[0]["perc_genomes_after_length_filtering"] == "100.0"
         # 5 of the 5 retained -- not 5 of 10
         assert rows[0]["perc_genomes_after_genome_filtering"] == "100.0"
@@ -147,8 +147,8 @@ class TestWriteSCGInfoTable:
                             GenomeRemovalStage.SCG_HIT_FILTER)
 
         scg = rd.SCG_targets[0]
-        scg.num_genomes_with_hits_after_len_filtering = 50
-        scg.num_genomes_with_hits_after_genome_filtering = 5
+        scg.num_genomes_after_length_filtering = 50
+        scg.num_genomes_after_genome_filtering = 5
 
         write_SCG_info_table(rd)
 
@@ -189,8 +189,8 @@ class TestSCGSetsBelowRepresentationCutoff:
         for gd in rd.all_input_genomes[:45]:
             gd.mark_removed("too few unique SCG hits",
                             GenomeRemovalStage.SCG_HIT_FILTER)
-        rd.SCG_targets[0].num_genomes_with_hits_after_len_filtering = 50
-        rd.SCG_targets[0].num_genomes_with_hits_after_genome_filtering = kept_after_genome_filter
+        rd.SCG_targets[0].num_genomes_after_length_filtering = 50
+        rd.SCG_targets[0].num_genomes_after_genome_filtering = kept_after_genome_filter
         return rd
 
     def test_flags_a_set_that_fell_below_the_cutoff(self, tmp_path):
@@ -213,7 +213,7 @@ class TestSCGSetsBelowRepresentationCutoff:
 
     def test_sets_that_have_not_reached_genome_filtering_are_not_flagged(self, tmp_path):
         rd = self._eroded(tmp_path, kept_after_genome_filter=5)
-        rd.SCG_targets[0].num_genomes_with_hits_after_genome_filtering = None
+        rd.SCG_targets[0].num_genomes_after_genome_filtering = None
         assert SCG_sets_below_representation_cutoff(rd) == []
 
 
@@ -236,8 +236,8 @@ class TestCompletedStageIsNotRecomputed:
         rd.gene_representation_cutoff = 0.5
         for scg in rd.SCG_targets:
             scg.gene_length_filtered = True
-            scg.num_genomes_with_hits_after_len_filtering = 8
-            scg.num_genomes_with_hits = 8
+            scg.num_genomes_after_length_filtering = 8
+            scg.num_genomes_after_copy_filtering = 8
         rd.mark_stage_complete(PipelineStage.FILTER_GENES)
         return rd
 

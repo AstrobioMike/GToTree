@@ -145,8 +145,8 @@ class TestPostGenomeFilterCounts:
         filter_genomes(_Args(), rd)
 
         by_id = {s.id: s for s in rd.SCG_targets}
-        assert by_id["SCG_A"].num_genomes_with_hits_after_genome_filtering == 4
-        assert by_id["SCG_C"].num_genomes_with_hits_after_genome_filtering == 0
+        assert by_id["SCG_A"].num_genomes_after_genome_filtering == 4
+        assert by_id["SCG_C"].num_genomes_after_genome_filtering == 0
 
     def test_the_no_removals_fast_path_still_records_a_count(self, tmp_path):
         """
@@ -161,5 +161,5 @@ class TestPostGenomeFilterCounts:
         filter_genomes(_Args(), rd)
 
         assert not any(g.removed for g in rd.all_input_genomes)
-        assert all(s.num_genomes_with_hits_after_genome_filtering == 4
+        assert all(s.num_genomes_after_genome_filtering == 4
                    for s in rd.SCG_targets)

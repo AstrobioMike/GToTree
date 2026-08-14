@@ -51,7 +51,7 @@ def filter_genomes(args, run_data):
             return filter_seqs_by_genome_ids(inpath, genome_ids_to_remove, outpath)
 
         def apply_result(scg, num_genomes_remaining, run_data):
-            scg.num_genomes_with_hits_after_genome_filtering = num_genomes_remaining
+            scg.num_genomes_after_genome_filtering = num_genomes_remaining
 
         run_data = run_pooled_stage(scgs, worker, apply_result, args, run_data)
 

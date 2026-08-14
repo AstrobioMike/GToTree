@@ -41,7 +41,7 @@ def filter_genes(args, run_data):
 
         def apply_result(scg, genomes_with_hits, run_data):
             scg.gene_length_filtered = True
-            scg.num_genomes_with_hits_after_len_filtering = len(genomes_with_hits)
+            scg.num_genomes_after_length_filtering = len(genomes_with_hits)
             for genome_id in genomes_with_hits:
                 if genome_id in count_dict:
                     count_dict[genome_id] += 1
@@ -63,7 +63,7 @@ def filter_genes(args, run_data):
 
     removed_any = False
     for scg in run_data.get_all_SCG_targets_remaining():
-        count = getattr(scg, 'num_genomes_with_hits_after_len_filtering', 0)
+        count = getattr(scg, 'num_genomes_after_length_filtering', 0)
         if count < min_genomes_required:
             scg.mark_removed(
                 f"too few genomes with hits ({count} < {min_genomes_required} required)",

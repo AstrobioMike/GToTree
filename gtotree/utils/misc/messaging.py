@@ -343,11 +343,11 @@ def _wanted_ref_tax_detail_lines(selection, indent):
     derep = selection.get("derep_rank")
 
     if rank and derep:
-        lines.append(f'{indent}- input rank "{rank}" was dereplicated to one genome '
+        lines.append(f'{indent}- input-rank {rank} was dereplicated to one genome '
                      f'per {derep}')
     elif rank:
-        lines.append(f'{indent}- all genomes under the input rank "{rank}" were kept '
-                     f'(dereplication off)')
+        lines.append(f'{indent}- all genomes under the input-rank {rank} were kept '
+                     f'(--derep-rank off)')
 
     already_had = selection.get("num_selected", 0) - selection.get("num_added", 0)
     if already_had > 0:
@@ -368,21 +368,21 @@ def input_genome_source_lines(args, run_data, indent=INPUT_SOURCE_INDENT):
     for selection in getattr(run_data, "wanted_ref_tax_selections", None) or []:
         lines.append(f"{indent}- NCBI accessions selected for --wanted-ref-tax "
                      f"'{selection.get('taxon')}' "
-                     f"({selection.get('num_added', 0)} genomes)")
+                     f"({selection.get('num_added', 0):,} genomes)")
         lines.extend(_wanted_ref_tax_detail_lines(selection, sub_indent))
 
     if args.ncbi_accessions:
         lines.append(f"{indent}- NCBI accessions listed in {args.ncbi_accessions} "
-                     f"({len(run_data.get_user_provided_ncbi_accs())} genomes)")
+                     f"({len(run_data.get_user_provided_ncbi_accs()):,} genomes)")
     if args.fasta_files:
         lines.append(f"{indent}- Fasta files listed in {args.fasta_files} "
-                     f"({len(run_data.get_input_fasta_ids())} genomes)")
+                     f"({len(run_data.get_input_fasta_ids()):,} genomes)")
     if args.amino_acid_files:
         lines.append(f"{indent}- Amino-acid files listed in {args.amino_acid_files} "
-                     f"({len(run_data.get_input_amino_acid_ids())} genomes)")
+                     f"({len(run_data.get_input_amino_acid_ids()):,} genomes)")
     if args.genbank_files:
         lines.append(f"{indent}- Genbank files listed in {args.genbank_files} "
-                     f"({len(run_data.get_input_genbank_ids())} genomes)")
+                     f"({len(run_data.get_input_genbank_ids()):,} genomes)")
 
     return lines
 
@@ -391,17 +391,43 @@ def total_input_genomes_line(run_data, indent=TOTAL_LINE_INDENT):
     return f"{indent}Total input genomes: {len(run_data.all_input_genomes):,}"
 
 
+RUN_INFO_BANNER = " ----------------------------------- RUN INFO ----------------------------------- "
+
+
+def report_run_info_banner():
+    print(f"\n{RUN_INFO_BANNER}\n", flush=True)
+
+
+def report_wanted_ref_tax_info(args, run_data):
+    """
+    The `-w` provenance block that opens RUN INFO: which taxonomy asset the reference
+    genomes came from, and anything worth flagging about how they were selected
+    """
+    if not getattr(args, "wanted_ref_tax", None):
+        return
+
+    from gtotree.utils.misc.general import wanted_ref_tax_source_line
+
+    source_line = wanted_ref_tax_source_line(args.source)
+    if source_line:
+        print(source_line, flush=True)
+
+    for selection in run_data.wanted_ref_tax_selections or []:
+        for warning in selection.get("warnings") or []:
+            report_message(warning, "yellow", ii="    ", si="    ")
+
+    print(flush=True)
+
+
 @capture_stdout_to_log(lambda: log_file_var.get())
 def display_initial_run_info(args, run_data):
+
+    # time.sleep(1)
 
     # this is here instead of above to prevent circular import problems (in other words, i suck at this)
     from gtotree.utils.misc.preflight_checks import check_input_genomes_amount
 
-    # time.sleep(1)
-
-    print("\n ----------------------------------- RUN INFO ----------------------------------- \n", flush=True)
-
-    # time.sleep(1)
+    report_wanted_ref_tax_info(args, run_data)
 
     report_message("  Input-genome sources include:")
 
@@ -416,7 +442,8 @@ def display_initial_run_info(args, run_data):
     auto_selected = getattr(args, "hmm_auto_selected", None)
     if auto_selected is not None:
         if auto_selected:
-            print(f"          (auto-selected; {auto_selected})", flush=True)
+            wprint(f"(auto-selected; {auto_selected})",
+                   ii=" " * 10, si=" " * 10)
         else:
             print("          (auto-selected)", flush=True)
     # time.sleep(1)
@@ -461,12 +488,9 @@ SCG_INFO_FILENAME = "SCG-info.tsv"
 def removed_genomes_pointer(run_data, stage):
     """
     Point at the one removals file, and say which rows this report is about
-
-    Every stage that drops genomes now writes into the same table, so the stage value
-    is what narrows it down rather than a per-stage filename
     """
-    return (f"        {run_data.run_files_dir_rel}/{REMOVED_GENOMES_FILENAME}"
-            f"  (stage_removed = {stage})\n\n")
+    return (f"        {run_data.run_files_dir_rel}/{REMOVED_GENOMES_FILENAME}\n"
+            f"        (stage_removed = {stage})\n\n")
 
 
 @capture_stdout_to_log(lambda: log_file_var.get())
@@ -527,7 +551,7 @@ def check_and_report_any_changed_default_behavior(args, run_data):
     elif args.add_ncbi_tax:
         lines.append("NCBI taxonomic info will be added to labels where possible")
 
-    if args.lineage != "Domain,Phylum,Class,Genus,Species":
+    if args.lineage != "domain,phylum,class,genus,species":
         lines.append(f"Lineage info added to labels will be: \"{args.lineage}\"")
 
     if args.tree_program != "FastTreeMP":

@@ -194,7 +194,7 @@ ENTRIES = [
          Keeps a single best genome per unique value of this rank within the `-w`
          taxon's rank (to control tree size/complexity). For example, "-w Bacteria
          --derep-rank class" keeps one genome per bacterial class. The default
-         "auto" uses a rank two levels finer than the taxon's own rank. Pass "none"
+         "auto" uses a rank two levels finer than the taxon's own rank. Pass "off"
          to disable dereplication and include all genomes under the requested taxon.
 
          Note: a `--derep-rank` set equal to the `-w` taxon's rank returns a single
