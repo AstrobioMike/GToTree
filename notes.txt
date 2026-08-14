@@ -13,6 +13,12 @@
         # gtt gen-scg-hmms
 
 
+    # do some benchmarks between gtotree v1 and v2 timing-wise, nothing extensive, just to be able to say it's like X% faster
+        # on my altermonas ~90 genomes, v2 is 80 seconds, v1 is 130 (~40% or 1.6x faster)
+        # check a larger number of genomes also
+        # if i want to go crazy, i could benchmark cpu/memory/time like i did for gen-mg
+
+
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
         # same for pfam, that they start with PF, and a note that says
         # something like "these don't match the expected format (e.g., ...). Are you sure you passed the right file to the right parameter?"
@@ -26,11 +32,10 @@
 
     # think about bioconda recipe, that will still need to be maintained separately from the conda-recipe in this repo
     # revisit all pages on the gtotree wiki and update them as needed
+        # highlight the new functionality like --wanted-ref-tax and new subcommands
     # sync the CHANGELOG.md overall with the latest in the master gtotree v1 branch
         # just copy the v1 over and add the new v2 changes at the top
     # make the CHANGELOG.md v2 section (and release notes) really comprehensive about the v1 to v2 changes, and put a link to the initial release notes somewhere on the wiki maybe
-    # add a page to the wiki about differences between GToTree v1 and v2
-        # new features, but also particularly including command-line changes
 
 
 ########################################

@@ -393,9 +393,11 @@ def total_input_genomes_line(run_data, indent=TOTAL_LINE_INDENT):
 
 RUN_INFO_BANNER = " ----------------------------------- RUN INFO ----------------------------------- "
 
+RUN_INFO_BANNER_TRAILING_BLANKS = 2
+
 
 def report_run_info_banner():
-    print(f"\n{RUN_INFO_BANNER}\n", flush=True)
+    print(f"\n{RUN_INFO_BANNER}" + "\n" * RUN_INFO_BANNER_TRAILING_BLANKS, flush=True)
 
 
 def report_wanted_ref_tax_info(args, run_data):
@@ -415,8 +417,6 @@ def report_wanted_ref_tax_info(args, run_data):
     for selection in run_data.wanted_ref_tax_selections or []:
         for warning in selection.get("warnings") or []:
             report_message(warning, "yellow", ii="    ", si="    ")
-
-    print(flush=True)
 
 
 @capture_stdout_to_log(lambda: log_file_var.get())

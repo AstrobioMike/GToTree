@@ -17,6 +17,7 @@ from gtotree.utils.misc.messaging import (color_text,
                                      report_notice,
                                      report_run_info_banner,
                                      RUN_INFO_BANNER,
+                                     RUN_INFO_BANNER_TRAILING_BLANKS,
                                      many_genomes_notice,
                                      few_genomes_notice,
                                      absurd_number_of_genomes_notice,
@@ -912,7 +913,8 @@ def final_setups(args, run_data):
     full_execution_command = f"{' '.join(sys.argv)}"
     stdout_and_log(gtotree_header(), log_file=args.log_file, log_only=True, restart_log=True)
     stdout_and_log("    Command entered:\n       ", full_execution_command, log_file=args.log_file, log_only=True)
-    stdout_and_log(RUN_INFO_BANNER, log_file=args.log_file, log_only=True)
+    stdout_and_log(RUN_INFO_BANNER, log_file=args.log_file, log_only=True,
+                   end="\n" * (RUN_INFO_BANNER_TRAILING_BLANKS + 1))
 
     args, run_data = setup_tmp_dir(args, run_data)
 
