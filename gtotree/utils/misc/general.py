@@ -895,12 +895,7 @@ def resolve_input_genomes(args, run_data, error_cls):
 
 def wanted_ref_tax_list(args):
     """
-    `args.wanted_ref_tax` as a list of taxa, however the parser declared it.
-
-    `-w` is `action="append"` in gen-scg-hmms / search-pfams / search-kos and a plain
-    string in the main driver, and a programmatic caller may pass either. The lone
-    string is wrapped rather than iterated, so "Bacteria" doesn't silently become eight
-    single-character taxa.
+    `args.wanted_ref_tax` as a list of taxa
     """
     wanted = getattr(args, "wanted_ref_tax", None)
     if not wanted:

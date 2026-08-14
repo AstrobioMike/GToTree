@@ -24,9 +24,7 @@ import argparse
 from gtotree.utils.misc.general import (GenomeData, RunData, ToolsUsed,
                                         SOURCE_GENBANK, SOURCE_FASTA,
                                         SOURCE_AMINO_ACID,
-                                        prepare_output_dir,
-                                        adopt_genome_progress)
-from gtotree.utils.misc.messaging import report_message
+                                        prepare_output_dir)
 
 
 class TargetSearchError(Exception):

@@ -18,11 +18,11 @@ import argparse
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.general import (read_run_data, write_run_data, CorruptRunData,
-                                        OutputDirExistsError)
+                                        OutputDirExistsError, adopt_genome_progress)
 from gtotree.utils.misc.resume_state import (ResumeProfile, hash_strings,
                                         hash_local_genomes, hash_file_contents,
                                         STATE_VERSION)
-from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
+from gtotree.utils.misc.messaging import (report_message, color_text,
                                      report_phase_header, report_very_early_exit)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
@@ -38,7 +38,6 @@ from gtotree.utils.target_search.target_search_setup import (
     check_env_vars,
     setup_output_dir,
     build_run_data,
-    adopt_genome_progress,
     ensure_processing_dirs,
     ensure_reference_data,
     validate_input_files,
@@ -226,6 +225,7 @@ def build_parser(spec, parent_subparsers=None):
 
     optional.add_argument(
         "--target-rank",
+        type=str.lower,
         choices=list(RANKS),
         help=("Target rank, if needed to disambiguate a taxon name that exists at "
               "multiple ranks"),
@@ -235,6 +235,7 @@ def build_parser(spec, parent_subparsers=None):
     optional.add_argument(
         "--derep-rank",
         default="auto",
+        type=str.lower,
         choices=["auto", "off"] + list(RANKS),
         help=("Dereplicate `-w`-selected genomes down to one per unique value of this "
               "rank (default: auto, which uses two ranks finer than the target). Use "
@@ -243,7 +244,7 @@ def build_parser(spec, parent_subparsers=None):
     )
 
     optional.add_argument(
-        "-o", "--output-directory",
+        "-o", "--output-dir",
         metavar="<DIR>",
         default=spec.default_output_dir,
         dest="output_dir",

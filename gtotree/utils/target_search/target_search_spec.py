@@ -35,7 +35,7 @@ class TargetSearchSpec:
     target_label: str                # singular, for prose: "Pfam"
     target_label_plural: str         # "Pfams"
     targets_flag: str                # "-p"
-    targets_flag_long: str           # "--target-pfams-file"
+    targets_flag_long: str           # "--target-pfams"
     targets_dest: str                # "target_pfams_file"
     default_output_dir: str          # "gtt-pfam-search-output"
     example_target: str              # shown in help, e.g. "PF00789"
@@ -128,7 +128,7 @@ def _pfam_spec():
         target_label="Pfam",
         target_label_plural="Pfams",
         targets_flag="-p",
-        targets_flag_long="--target-pfams-file",
+        targets_flag_long="--target-pfams",
         targets_dest="target_pfams_file",
         default_output_dir="gtt-pfam-search-output",
         example_target="PF00789",
@@ -182,7 +182,7 @@ def _ko_spec():
         target_label="KO",
         target_label_plural="KOs",
         targets_flag="-K",
-        targets_flag_long="--target-kos-file",
+        targets_flag_long="--target-kos",
         targets_dest="target_kos_file",
         default_output_dir="gtt-ko-search-output",
         example_target="K01601",

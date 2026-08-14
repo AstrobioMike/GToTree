@@ -72,10 +72,10 @@ class TestSelectWantedRefTax:
 
     def test_resuming_skips_resolution_entirely(self, _never_resolves):
         args = _Args(wanted_ref_tax="Alteromonas")
-        assert select_wanted_ref_tax(args, _previous_run_data()) is None
+        assert select_wanted_ref_tax(args, _previous_run_data()) == []
 
     def test_no_w_flag_skips_resolution_regardless(self, _never_resolves):
-        assert select_wanted_ref_tax(_Args(), None) is None
+        assert select_wanted_ref_tax(_Args(), None) == []
 
     def test_a_fresh_run_still_resolves(self, monkeypatch):
         called = {}
@@ -91,7 +91,7 @@ class TestSelectWantedRefTax:
         monkeypatch.setattr(preflight_checks, "resolve_wanted_ref_tax_accessions", _fake)
 
         args = _Args(wanted_ref_tax="Alteromonas")
-        assert select_wanted_ref_tax(args, None) is not None
+        assert len(select_wanted_ref_tax(args, None)) == 1
         assert called
 
 

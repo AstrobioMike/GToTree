@@ -7,7 +7,10 @@ from importlib.metadata import version
 @dataclass
 class CitationsInfo:
     gtotree = "Lee MD. GToTree: a user-friendly workflow for phylogenomics. Bioinformatics. 2019; (March):1-3. doi.org/10.1093/bioinformatics/btz188\n\n"
-    hmmer = "Eddy SR. Accelerated profile HMM searches. PLoS Comput. Biol. 2011; (7)10. doi.org/10.1371/journal.pcbi.1002195\n\n"
+    hmmer = (
+        "Eddy SR. Accelerated profile HMM searches. PLoS Comput. Biol. 2011; (7)10. doi.org/10.1371/journal.pcbi.1002195\n"
+        "Larralde, M., et al. PyHMMER: a Python library binding to HMMER for efficient profile hidden Markov model search. Bioinformatics. 2023. doi.org/10.1093/bioinformatics/btad214\n\n"
+    )
     muscle = "Edgar RC. MUSCLE v5 enables improved estimates of phylogenetic tree confidence by ensemble bootstrapping. bioRxiv. 2021.06.20.449169. doi.org/10.1101/2021.06.20.449169\n\n"
     trimal = "Gutierrez SC. et al. TrimAl: a Tool for automatic alignment trimming. Bioinformatics. 2009; 25, 1972-1973. doi.org/10.1093/bioinformatics/btp348\n\n"
     prodigal = "Hyatt, D. et al. Gene and translation initiation site prediction in metagenomic sequences. Bioinformatics. 2010; 28, 2223-2230. doi.org/10.1186/1471-2105-11-119\n\n"
@@ -34,7 +37,7 @@ def generate_citations_info(run_data):
         outfile.write(f"GToTree v{version('GToTree')}\n")
         outfile.write(citations_info.gtotree)
 
-        outfile.write(f"HMMER v{get_hmmer_version()}\n")
+        outfile.write(f"{get_hmmer_label()}\n")
         outfile.write(citations_info.hmmer)
 
         outfile.write(f"MUSCLE v{get_muscle_version()}\n")
@@ -80,13 +83,27 @@ def get_hmmer_version():
     """
     The HMMER version actually used for searching comes from pyhmmer now
     (hmmer is still in the conda recipe for kofamscan)
+
+    Returns None when pyhmmer doesn't expose it, so the caller can word the line
+    differently rather than printing "HMMER v(via pyhmmer ...)".
     """
     import pyhmmer  # type: ignore
 
     version = getattr(pyhmmer, "HMMER_VERSION", None)
+    return str(version) if version else None
+
+
+def get_hmmer_label():
+    """
+    The citations.txt heading for HMMER, which has to read properly whether or not
+    the underlying HMMER version is available to us.
+    """
+    import pyhmmer  # type: ignore
+
+    version = get_hmmer_version()
     if version:
-        return str(version)
-    return f"(via pyhmmer {pyhmmer.__version__})"
+        return f"HMMER v{version}"
+    return f"HMMER (via pyhmmer v{pyhmmer.__version__})"
 
 def get_muscle_version():
     muscle_version = subprocess.run('muscle -version | tr -s " " "\t" | cut -f 2 | head -n 1',

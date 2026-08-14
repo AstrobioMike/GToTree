@@ -48,6 +48,7 @@ def validate_derep_rank(wanted_rank, derep_rank):
     d = rank_index(derep_rank)
     if d < w:
         return (f"--derep-rank '{derep_rank}' is a broader rank than "
-                f"the target taxon's rank '{wanted_rank}'. The per-rank rank must "
-                f"be the same or finer (e.g., target 'domain' + per-rank 'class').")
+                f"the target taxon's rank '{wanted_rank}'. The --derep-rank rank "
+                f"must be the same or finer (e.g., target 'domain' + "
+                f"--derep-rank 'class').")
     return None

@@ -228,6 +228,7 @@ def build_parser(parent_subparsers=None):
 
     optional.add_argument(
         "--target-rank",
+        type=str.lower,
         choices=list(RANKS),
         help=("Target rank, if needed to disambiguate a taxon name that exists at "
               "multiple ranks"),
@@ -237,6 +238,7 @@ def build_parser(parent_subparsers=None):
     optional.add_argument(
         "--derep-rank",
         default="off",
+        type=str.lower,
         choices=["auto", "off"] + list(RANKS),
         help=("Dereplicate the selected genomes down to one per unique value of this "
               "rank (default: off). Use 'auto' for two ranks finer than the target."),
@@ -264,7 +266,7 @@ def build_parser(parent_subparsers=None):
     )
 
     optional.add_argument(
-        "-o", "--output-directory",
+        "-o", "--output-dir",
         metavar="<DIR>",
         default=DEFAULT_OUTPUT_DIR,
         dest="output_dir",

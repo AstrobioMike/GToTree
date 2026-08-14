@@ -111,7 +111,7 @@ def report_available_scg_sets(hmm_data_dir, df):
 
     print_footer(hmm_data_dir)
 
-    print(f"    And see `gtt gen-scg-hmms -h` if you'd like to make your own!\n")
+    print("    And see `gtt gen-scg-hmms -h` if you'd like to make your own!\n")
 
 
 
@@ -292,11 +292,11 @@ def report_available_scg_sets_grouped(hmm_data_dir, df):
     for line in layout_lines(cross_domain, domains):
         print(line)
 
-    print(f"\n\n    Any of these can be passed to a main gtotree run, e.g., `gtotree -H Bacteria ...`")
+    print("\n\n    Any of these can be passed to a main gtotree run, e.g., `gtotree -H Bacteria ...`")
 
     print_footer(hmm_data_dir)
 
-    print(f"    And see `gtt gen-scg-hmms -h` if you'd like to make your own!\n")
+    print("    And see `gtt gen-scg-hmms -h` if you'd like to make your own!\n")
 
 
 def print_footer(hmm_data_dir):

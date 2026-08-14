@@ -26,8 +26,8 @@ def update_headers(args, run_data):
         except FileNotFoundError as e:
             report_early_exit(
                 run_data,
-                "We were about to swap in the more informative headers for some "
-                f"reason. If the output directory was modified since the previous "
+                "We couldn't swap in the more informative headers because "
+                f"{e}. If the output directory was modified since the previous "
                 "run, your best bet is to start fresh with `-F`.")
 
         run_data.mark_stage_complete(PipelineStage.UPDATE_HEADERS)

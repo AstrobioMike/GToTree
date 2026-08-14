@@ -158,10 +158,13 @@ ENTRIES = [
          reference genomes will be added to the tree in addition to any genomes
          provided through the other input parameters.
 
-         Note: If `-H` is not specified, the SCG-set will be auto-selected based on
-         a taxon provided here. The lower rank pre-packaged set covering this taxon will
-         be used. Be sure to specify `-H` specifically if you want to override this
-         behavior.
+         May be given more than once to pool several taxa (e.g., `-w Bacteria
+         -w Archaea`); each is resolved and dereplicated on its own, then merged.
+
+         Note: If `-H` is not specified, but `-w` is, the SCG-set will be auto-selected based on
+         the taxa provided here. The lowest-rank pre-packaged set covering all of the
+         requested taxa will be used. Be sure to specify `-H` specifically if you want to
+         override this behavior.
          """,
          FULL),
 

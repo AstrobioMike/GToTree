@@ -50,7 +50,7 @@ def build_parser(parent_subparsers=None):
         "get",
         help="Download or update a GToTree-utilized database",
         description=get_desc,
-        epilog="Ex. usage: `gtt data get gtdb`",
+        epilog="Ex. usage: `gtt data get gtdb-data`",
         formatter_class=CustomRichHelpFormatter,
         add_help=False,
     )

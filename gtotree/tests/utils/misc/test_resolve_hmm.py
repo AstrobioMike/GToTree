@@ -43,8 +43,8 @@ def picks(monkeypatch):
     calls = []
 
     def install(name, reason="of a reason"):
-        def fake(source, selection):
-            calls.append((source, selection))
+        def fake(source, selections):
+            calls.append((source, selections))
             return AutoPickedSCGSet(name, reason=reason)
         monkeypatch.setattr(P, "autopick_scg_set", fake)
         return calls
@@ -60,7 +60,7 @@ def test_an_explicit_hmm_is_never_second_guessed(picks):
     calls = picks("Bacteria")
     args = make_args(hmm="Universal-Hug-et-al", wanted_ref_tax="Nitrospirota")
 
-    args = P.resolve_hmm(args, selection=object())
+    args = P.resolve_hmm(args, selections=object())
 
     assert args.hmm == "Universal-Hug-et-al"
     assert args.hmm_auto_selected is None
@@ -72,7 +72,7 @@ def test_a_missing_hmm_is_auto_selected_from_the_taxon(picks, capsys):
     args = make_args(wanted_ref_tax="Nitrospirota")
     selection = object()
 
-    args = P.resolve_hmm(args, selection=selection)
+    args = P.resolve_hmm(args, selections=selection)
 
     assert args.hmm == "Nitrospirota"
     assert args.hmm_auto_selected == "'Nitrospirota' has a pre-built set of its own"
@@ -82,7 +82,7 @@ def test_the_selection_and_source_are_what_gets_handed_to_the_picker(picks):
     calls = picks("Archaea")
     selection = object()
 
-    P.resolve_hmm(make_args(source="ncbi", wanted_ref_tax="Archaea"), selection=selection)
+    P.resolve_hmm(make_args(source="ncbi", wanted_ref_tax="Archaea"), selections=selection)
 
     assert calls == [("ncbi", selection)]
 
@@ -100,7 +100,7 @@ def test_a_resume_carries_the_original_runs_set_forward(picks):
     calls = picks("Bacteria")
     args = make_args(wanted_ref_tax="Nitrospirota")
 
-    args = P.resolve_hmm(args, selection=object(),
+    args = P.resolve_hmm(args, selections=object(),
                          previous_run_data=FakeRunData("Nitrospirota"))
 
     assert args.hmm == "Nitrospirota"
@@ -111,7 +111,7 @@ def test_a_resume_carries_the_original_runs_set_forward(picks):
 def test_a_resume_with_nothing_recorded_falls_back_to_picking(picks):
     calls = picks("Bacteria")
 
-    args = P.resolve_hmm(make_args(wanted_ref_tax="Bacteria"), selection=object(),
+    args = P.resolve_hmm(make_args(wanted_ref_tax="Bacteria"), selections=object(),
                          previous_run_data=FakeRunData(None))
 
     assert args.hmm == "Bacteria"
@@ -141,7 +141,7 @@ def test_an_auto_selected_name_goes_through_the_same_canonicalization(picks):
     """
     picks("universal")
 
-    args = P.resolve_hmm(make_args(wanted_ref_tax="Ascomycota"), selection=object())
+    args = P.resolve_hmm(make_args(wanted_ref_tax="Ascomycota"), selections=object())
 
     assert args.hmm == "Universal-Hug-et-al"
 

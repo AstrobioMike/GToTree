@@ -14,9 +14,16 @@ import pyhmmer #type: ignore
 # aliases that aren't simply the file stem of a packaged set
 HMM_SET_ALIASES = {"universal": "Universal-Hug-et-al"}
 
-# this is what auto-selection picks when the target has no place in the GTDB taxonomy that
-# the pre-built sets are built from, or when it straddles domains
+# this is what auto-selection picks when the target reaches outside the Bacteria/Archaea
+# taxonomy the pre-built sets are built from. so basically anytime eukaryotes are involved
 UNIVERSAL_SCG_SET = "Universal-Hug-et-al"
+
+# what auto-selection picks when the target taxa span bacteria and archaea
+CROSS_DOMAIN_SCG_SET = "Bacteria-and-Archaea"
+
+# the domains the pre-built sets span. A selection reporting anything else is outside what any
+# pre-built set covers, so it falls to the universal set (there is no auto-selection for viruses)
+PREBUILT_DOMAINS = {"bacteria", "archaea"}
 
 # how much of a linked reference set has to agree on a taxon before that taxon is
 # treated as the target group (this is relevant only for --source ncbi -w <taxon> situations where
@@ -238,81 +245,227 @@ def consensus_lineage(lineages, threshold=CONSENSUS_THRESHOLD):
     return agreed, deepest
 
 
-def autopick_scg_set(source, selection):
+def domains_outside_prebuilt_scope(lineages):
     """
-    Choose an SCG-set for a `-w` input that ALSO has no `-H` specified
+    The domain names in `lineages` that no pre-built set covers, lowercased.
+
+    On the GTDB path this is always empty: GTDB only classifies Bacteria and Archaea.
+    It earns its keep on the NCBI path, where the selection's own rows carry NCBI's
+    superkingdom, so e.g., `-w Ascomycota --source ncbi` reports 'eukaryota' here
+    """
+    found = set()
+    for lineage in lineages:
+        domain = str(lineage.get("domain") or "").strip()
+        if not domain or domain == NA:
+            continue
+        if domain.lower() not in PREBUILT_DOMAINS:
+            found.add(domain.lower())
+    return found
+
+
+def intersect_lineages(resolved):
+    """
+    Collapse several INDEPENDENTLY resolved taxa into the lineage they share
+
+    `resolved` is [(lineage, deepest_rank), ...], one entry per `-w` taxon. Returns
+    (agreed_lineage, deepest_agreed_rank), or ({}, None) when they don't even share a
+    domain.
+
+    This is deliberately NOT consensus_lineage(). That tolerates a minority
+    disagreeing, which is right within a single provided taxon. But when multiple are
+    provided to -w, we want agreement to be unanimous (e.g., pooling `-w Escherichia
+    -w Nanoarchaeum` and taking a 90% vote would let the thousands of Escherichia genomes
+    outvote the archaea entirely and pick a bacterial set to score them with. Now, with this
+    approach, that would select the bacteria-and-archaea set
+
+    """
+    if not resolved:
+        return {}, None
+
+    limit = min(RANKS.index(rank) for _lineage, rank in resolved
+                if rank in RANKS) if all(rank in RANKS for _l, rank in resolved) else -1
+    if limit < 0:
+        return {}, None
+
+    agreed = {}
+    deepest = None
+
+    for rank in RANKS[:limit + 1]:
+        values = {str(lineage.get(rank) or "").strip() for lineage, _rank in resolved}
+        if len(values) != 1:
+            break
+        value = values.pop()
+        if not value or value == NA:
+            break
+        agreed[rank] = value
+        deepest = rank
+
+    return agreed, deepest
+
+
+def autopick_scg_set(source, selections):
+    """
+    Choose an SCG-set for `-w` input that ALSO has no `-H` specified
+
+    `selections` is one RefGenomeSelection or a list of them
 
     GTDB source: the selection's rows already carry the GTDB lineage, so the walk needs
     no further lookup, and the answer is exact
 
-    NCBI source: NCBI's names don't line up with GTDB's, so i can't map by name. Instead,
-    the selected accessions are linked back to GTDB instead, where possible, and their
-    lineages collapsed to a consensus.
+    NCBI source: since NCBI's names don't line up with GTDB's, the selected accessions
+    are linked back to GTDB, where possible, and their lineages collapsed to a consensus.
 
-    Anything GTDB doesn't cover links to nothing and we fall back to the universal set
+    Reaching outside Bacteria/Archaea is checked FIRST and takes the universal set if
+    it involved eukarya, and blocks viruses from being auto-selected at all. Spanning
+    both prokaryote domains but going no further takes 'Bacteria-and-Archaea'
 
     Returns an AutoPickedSCGSet. Never raises: no answer is a fallback, not an error.
     """
-    if selection is None:
+    selections = _as_selection_list(selections)
+
+    if not selections:
         return AutoPickedSCGSet(UNIVERSAL_SCG_SET,
                                 reason="there was no taxon to select one from")
 
-    if str(source).strip().lower() == "gtdb":
-        return _autopick_from_gtdb_selection(selection)
+    label = _describe_taxa(selections)
+    via_genomes = str(source).strip().lower() != "gtdb"
+    subject = f"the genomes selected for {label}" if via_genomes else label
+    # "'Bacteria' spans" but "'Bacteria' and 'Archaea' span", and "the genomes ... span"
+    plural = via_genomes or len(selections) > 1
 
-    return _autopick_from_ncbi_selection(selection)
-
-
-def _autopick_from_gtdb_selection(selection):
-    lineage = selection.rows[0] if selection.rows else {}
-
-    name, rank, taxon = pick_set_for_lineage(lineage, selection.resolved_rank)
-
-    if name is None:
-        # shouldn't be reachable: every GTDB lineage has a domain, and both domains have
-        # a set. Falling back rather than raising in case the summary table is unreadable
+    # eukaryotes (or anything else outside the pre-built sets' scope) win outright, and
+    # are read off the selection's OWN rows -- on the NCBI path the GTDB join below
+    # would just drop those genomes and quietly pick a set from whatever was left
+    outside = set()
+    for selection in selections:
+        outside |= domains_outside_prebuilt_scope(selection.rows or [])
+    if outside:
         return AutoPickedSCGSet(
             UNIVERSAL_SCG_SET,
-            reason=f"no pre-built set was found covering '{selection.canonical}'")
+            reason=(f"{subject} {'reach' if plural else 'reaches'} outside Bacteria "
+                    "and Archaea, which the pre-built sets are built from"))
 
-    if rank == selection.resolved_rank:
-        reason = f"'{selection.canonical}' has a pre-built set of its own"
+    if via_genomes:
+        resolved, unplaced = _resolve_ncbi_selections(selections)
     else:
-        reason = f"'{selection.canonical}' sits within {rank} {taxon} in GTDB"
+        resolved, unplaced = _resolve_gtdb_selections(selections)
 
-    return AutoPickedSCGSet(name, rank, taxon, reason)
-
-
-def _autopick_from_ncbi_selection(selection):
-    from gtotree.utils.gtdb.handle_gtdb_tax_info import gtdb_lineages_for_accessions
-
-    lineages = list(gtdb_lineages_for_accessions(selection.accessions).values())
-
-    if not lineages:
+    if unplaced:
         return AutoPickedSCGSet(
             UNIVERSAL_SCG_SET,
-            reason=(f"none of the genomes selected for '{selection.canonical}' have a "
-                    "counterpart in GTDB, which the pre-built sets are built from"))
+            reason=(f"{_join_names(unplaced)} {'has' if len(unplaced) == 1 else 'have'} "
+                    "no counterpart in GTDB, which the pre-built sets are built from"))
 
-    lineage, deepest = consensus_lineage(lineages)
+    lineage, deepest = intersect_lineages(resolved)
 
     if deepest is None:
+        # they agree on nothing, so they span both domains -- which is precisely what
+        # the cross-domain set is for. Eukaryotes were already ruled out above
         return AutoPickedSCGSet(
-            UNIVERSAL_SCG_SET,
-            reason=(f"the genomes selected for '{selection.canonical}' span more than "
-                    "one domain in GTDB"))
+            CROSS_DOMAIN_SCG_SET,
+            reason=(f"{subject} {'span' if plural else 'spans'} both domains "
+                    "(Bacteria and Archaea)"))
 
     name, rank, taxon = pick_set_for_lineage(lineage, deepest)
 
     if name is None:
         return AutoPickedSCGSet(
             UNIVERSAL_SCG_SET,
-            reason=f"no pre-built set was found covering '{selection.canonical}'")
+            reason=f"no pre-built set was found covering {label}")
 
-    reason = (f"the genomes selected for '{selection.canonical}' fall in "
-              f"{rank} {taxon} in GTDB")
+    return AutoPickedSCGSet(name, rank, taxon,
+                            _pick_reason(selections, rank, taxon, via_genomes))
 
-    return AutoPickedSCGSet(name, rank, taxon, reason)
+
+def _as_selection_list(selections):
+    """One selection, a list of them, or None -- always out as a list."""
+    if selections is None:
+        return []
+    if isinstance(selections, (list, tuple)):
+        return [s for s in selections if s is not None]
+    return [selections]
+
+
+def _join_names(names):
+    names = list(names)
+    if len(names) == 1:
+        return f"'{names[0]}'"
+    return ", ".join(f"'{n}'" for n in names[:-1]) + f" and '{names[-1]}'"
+
+
+def _describe_taxa(selections):
+    return _join_names([s.canonical for s in selections])
+
+
+def _pick_reason(selections, rank, taxon, via_genomes):
+    """
+    Why a set was chosen, phrased for one taxon or several
+
+    The NCBI phrasing says the genomes got there, not the name: NCBI's names don't line
+    up with GTDB's, so 'Nitrososphaerota' landing on the Thermoproteota set only makes
+    sense to a user if it's clear the match ran through the genomes' GTDB placement.
+    """
+    label = _describe_taxa(selections)
+
+    if via_genomes:
+        return f"the genomes selected for {label} fall in {rank} {taxon} in GTDB"
+
+    if len(selections) == 1:
+        selection = selections[0]
+        if (rank == selection.resolved_rank
+                and str(taxon).lower() == str(selection.canonical).lower()):
+            return f"'{selection.canonical}' has a pre-built set of its own"
+        return f"'{selection.canonical}' sits within {rank} {taxon} in GTDB"
+
+    return f"{label} sit within {rank} {taxon} in GTDB"
+
+
+def _resolve_gtdb_selections(selections):
+    """
+    ([(lineage, deepest_rank), ...], [taxa with no usable lineage]) for GTDB input.
+
+    The rows already carry the GTDB lineage, and every genome under the taxon shares it
+    down to the rank the taxon resolved to, so the first row speaks for the selection.
+    """
+    resolved, unplaced = [], []
+
+    for selection in selections:
+        lineage = selection.rows[0] if selection.rows else {}
+        if not lineage or selection.resolved_rank not in RANKS:
+            unplaced.append(selection.canonical)
+            continue
+        resolved.append((lineage, selection.resolved_rank))
+
+    return resolved, unplaced
+
+
+def _resolve_ncbi_selections(selections):
+    """
+    ([(lineage, deepest_rank), ...], [taxa GTDB has never heard of]) for NCBI input.
+
+    Each taxon is collapsed on its own, so a taxon's internal noise stays internal and
+    can't leak into the across-taxa agreement.
+    """
+    from gtotree.utils.gtdb.handle_gtdb_tax_info import gtdb_lineages_for_accessions
+
+    resolved, unplaced = [], []
+
+    for selection in selections:
+        lineages = list(gtdb_lineages_for_accessions(selection.accessions).values())
+        if not lineages:
+            unplaced.append(selection.canonical)
+            continue
+
+        lineage, deepest = consensus_lineage(lineages)
+        if deepest is None:
+            # this one taxon's own genomes straddle the domains: it constrains nothing
+            # below domain, which intersect_lineages() reads as a cross-domain span
+            resolved.append(({}, RANKS[0]))
+            continue
+
+        resolved.append((lineage, deepest))
+
+    return resolved, unplaced
 
 
 def check_gathering_cutoffs(hmm_path, hmm_arg):
@@ -342,7 +495,8 @@ def check_gathering_cutoffs(hmm_path, hmm_arg):
         "GToTree identifies target genes using each profile's gathering threshold, so "
         "every profile needs a `GA` line. If you built this HMM yourself, you can add "
         "gathering thresholds with `hmmbuild --cut_ga` inputs or by editing the `GA` "
-        "lines in directly.")
+        "lines in directly in the HMM file. You may need to do some testing to figure out "
+        "what those cutoffs should be!")
     report_early_exit(None, copy_log=False)
 
 

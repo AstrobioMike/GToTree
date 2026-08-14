@@ -1,5 +1,4 @@
 import argparse
-import sys
 from gtotree.cli.helpmenu import print_helpmenu
 from gtotree.utils.misc.messaging import get_version
 
@@ -49,7 +48,8 @@ def parser():
     # --- Primary Inputs ---
     primary = parser.add_argument_group("Primary Inputs")
 
-    primary.add_argument("-w", "--wanted-ref-tax", metavar="<str>", type=str, default=None)
+    primary.add_argument("-w", "--wanted-ref-tax", metavar="<str>", type=str,
+                         action="append", default=None)
     primary.add_argument("-a", "--ncbi-accessions", metavar="<file>", type=str)
     primary.add_argument("-g", "--genbank-files", metavar="<file>", type=str)
     primary.add_argument("-f", "--fasta-files", metavar="<file>", type=str)

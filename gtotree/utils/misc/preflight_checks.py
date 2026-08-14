@@ -38,7 +38,8 @@ from gtotree.utils.misc.general import (ToolsUsed,
                                    SOURCE_ACCESSION, SOURCE_GENBANK, SOURCE_FASTA,
                                    SOURCE_AMINO_ACID,
                                    populate_run_data,
-                                   read_run_data)
+                                   read_run_data,
+                                   wanted_ref_tax_list)
 from gtotree.utils.misc.stages import PipelineStage
 from gtotree.utils.misc.resume_state import (ResumeProfile, hash_file_contents,
                                         STATE_VERSION)
@@ -53,10 +54,10 @@ def preflight_checks(args):
     args = primary_args_validation(args)
     previous_run_data = load_previous_run_data(args)
     check_for_required_dbs(args, previous_run_data)
-    selection = select_wanted_ref_tax(args, previous_run_data)
-    args = resolve_hmm(args, selection, previous_run_data)
+    selections = select_wanted_ref_tax(args, previous_run_data)
+    args = resolve_hmm(args, selections, previous_run_data)
     args, run_data = setup_run_data(args, previous_run_data)
-    run_data = merge_wanted_ref_tax(run_data, selection)
+    run_data = merge_wanted_ref_tax(run_data, selections)
     check_for_genome_id_collisions(run_data)
     check_for_min_input_genomes(run_data)
     run_data = track_tools_used(args, run_data)
@@ -83,9 +84,9 @@ RESUME = ResumeProfile(
         "source": "--source",
         "add_gtdb_tax": "-D/--add-gtdb-tax",
         "add_ncbi_tax": "-t/--add-ncbi-tax",
-        "lineage": "-L/--lineage",
+        "lineage": "-L/--lineage-ranks",
         "seq_length_cutoff": "-c/--seq-length-cutoff",
-        "gene_representation_cutoff": "-r/--gene-representation-cutoff",
+        "gene_representation_cutoff": "-r/--gene-rep-cutoff",
         "genome_hits_cutoff": "-G/--genome-hits-cutoff",
         "best_hit_mode": "-B/--best-hit-mode",
         "no_super5": "-X/--no-super5",
@@ -128,6 +129,8 @@ def build_fingerprint(args):
         if field in fingerprint:
             continue
         fingerprint[field] = getattr(args, field, None)
+
+    fingerprint["wanted_ref_tax"] = sorted(wanted_ref_tax_list(args)) or None
 
     return fingerprint
 
@@ -296,57 +299,66 @@ def wanted_ref_tax_already_resolved(previous_run_data):
 
 def select_wanted_ref_tax(args, previous_run_data=None):
     """
-    Resolve `-w` to a set of reference accessions, or reuse the previous run's
+    Resolve `-w` to reference accessions, or reuse the previous run's
+
+    `-w` may be given more than once. Each taxon is resolved and dereplicated on its
+    own, then merged
+
+    Returns a list of RefGenomeSelection (empty when there's nothing to resolve).
     """
     if not args.wanted_ref_tax:
-        return None
+        return []
 
     if wanted_ref_tax_already_resolved(previous_run_data):
-        return None
+        return []
 
-    try:
-        with spinner("Gathering references...", "", clear_on_done=True):
-            _accessions, selection = resolve_wanted_ref_tax_accessions(
-                args.source, args.wanted_ref_tax,
-                target_rank=args.target_rank, derep_rank=args.derep_rank,
-                building_tree=True)
-    except AmbiguousTaxon:
-        report_message(f"Since the `-w` taxon '{args.wanted_ref_tax}' occurs at more than "
-                       "one rank, you'll need to specify which rank is wanted with "
-                       "`--target-rank`.")
-        report_very_early_exit(suggest_help=True)
-    except TaxonNotFound:
-        report_message(f"The `-w` taxon '{args.wanted_ref_tax}' doesn't seem to exist at any "
-                       f"rank in the {args.source} taxonomy :(")
-        report_very_early_exit(suggest_help=True)
-    except (WantedRefTaxError, ValueError) as err:
-        report_message(str(err))
-        report_very_early_exit(suggest_help=True)
+    selections = []
 
-    for warning in selection.warnings:
-        report_message(warning, "yellow")
+    for taxon in wanted_ref_tax_list(args):
+        try:
+            with spinner(f"Gathering references for '{taxon}'...", "",
+                         clear_on_done=True):
+                _accessions, selection = resolve_wanted_ref_tax_accessions(
+                    args.source, taxon,
+                    target_rank=args.target_rank, derep_rank=args.derep_rank,
+                    building_tree=True)
+        except AmbiguousTaxon:
+            report_message(f"Since the `-w` taxon '{taxon}' occurs at more than "
+                           "one rank, you'll need to specify which rank is wanted with "
+                           "`--target-rank`.")
+            report_very_early_exit(suggest_help=True)
+        except TaxonNotFound:
+            report_message(f"The `-w` taxon '{taxon}' doesn't seem to exist at any "
+                           f"rank in the {args.source} taxonomy :(")
+            report_very_early_exit(suggest_help=True)
+        except (WantedRefTaxError, ValueError) as err:
+            report_message(str(err))
+            report_very_early_exit(suggest_help=True)
 
-    return selection
+        for warning in selection.warnings:
+            report_message(warning, "yellow")
+
+        selections.append(selection)
+
+    return selections
 
 
-def merge_wanted_ref_tax(run_data, selection):
+def merge_wanted_ref_tax(run_data, selections):
     """
-    Fold a `-w` selection's accessions into run_data's NCBI-accession input pool
-    (deduping against user-provided accessions). The run_data half of the job
-    select_wanted_ref_tax() starts.
+    Fold each `-w` selection's accessions into run_data's NCBI-accession input pool
+    (deduping against user-provided accessions, and against each other). The run_data
+    half of the job select_wanted_ref_tax() starts.
     """
-    if selection is None:
-        return run_data
-
-    added = run_data.merge_wanted_ref_tax_accessions(selection.accessions,
-                                                     taxon=selection.canonical)
-    run_data.record_wanted_ref_tax_selection(selection, taxon=selection.canonical,
-                                             num_added=added)
+    for selection in selections or []:
+        added = run_data.merge_wanted_ref_tax_accessions(selection.accessions,
+                                                         taxon=selection.canonical)
+        run_data.record_wanted_ref_tax_selection(selection, taxon=selection.canonical,
+                                                 num_added=added)
 
     return run_data
 
 
-def resolve_hmm(args, selection=None, previous_run_data=None):
+def resolve_hmm(args, selections=None, previous_run_data=None):
     """
     Figure out `-H` being used
 
@@ -362,7 +374,7 @@ def resolve_hmm(args, selection=None, previous_run_data=None):
             args.hmm = carried_over
             args.hmm_auto_selected = "carried over from the run being resumed"
         else:
-            picked = autopick_scg_set(args.source, selection)
+            picked = autopick_scg_set(args.source, selections)
             args.hmm = picked.name
             args.hmm_auto_selected = picked.reason
 

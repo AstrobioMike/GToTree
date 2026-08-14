@@ -252,14 +252,14 @@ def test_a_target_gtdb_has_never_heard_of_falls_back_to_universal(linked):
     assert "counterpart in GTDB" in picked.reason
 
 
-def test_a_target_straddling_the_domains_falls_back_to_universal(linked):
+def test_a_target_straddling_the_domains_takes_the_cross_domain_set(linked):
     linked([lineage(domain="Bacteria", phylum="Pseudomonadota"),
             lineage(domain="Archaea", phylum="Thermoproteota")])
     picked = S.autopick_scg_set("ncbi", FakeSelection("Whatever", "phylum",
                                                       accessions=["a", "b"]))
 
-    assert picked.name == S.UNIVERSAL_SCG_SET
-    assert "more than one domain" in picked.reason
+    assert picked.name == S.CROSS_DOMAIN_SCG_SET
+    assert "both domains" in picked.reason
 
 
 def test_genomes_that_agree_only_on_a_domain_get_that_domains_set(linked):
@@ -283,3 +283,142 @@ def test_an_empty_summary_table_falls_back_to_universal(monkeypatch):
                               rows=[lineage(domain="Bacteria", phylum="Pseudomonadota")])
 
     assert S.autopick_scg_set("gtdb", selection).name == S.UNIVERSAL_SCG_SET
+
+
+################################################################################
+# several -w taxa at once
+################################################################################
+
+def test_two_taxa_under_one_phylum_get_that_phylums_set():
+    picked = S.autopick_scg_set("gtdb", [
+        FakeSelection("Alphaproteobacteria", "class",
+                      rows=[lineage(domain="Bacteria", phylum="Pseudomonadota",
+                                    **{"class": "Alphaproteobacteria"})]),
+        FakeSelection("Gammaproteobacteria", "class",
+                      rows=[lineage(domain="Bacteria", phylum="Pseudomonadota",
+                                    **{"class": "Gammaproteobacteria"})]),
+    ])
+
+    assert picked.name == "Pseudomonadota"
+    assert "sit within phylum Pseudomonadota" in picked.reason
+
+
+def test_two_phyla_in_one_domain_climb_to_that_domains_set():
+    picked = S.autopick_scg_set("gtdb", [
+        FakeSelection("Pseudomonadota", "phylum",
+                      rows=[lineage(domain="Bacteria", phylum="Pseudomonadota")]),
+        FakeSelection("Bacillota_I", "phylum",
+                      rows=[lineage(domain="Bacteria", phylum="Bacillota_I")]),
+    ])
+
+    assert picked.name == "Bacteria"
+
+
+def test_bacteria_plus_archaea_takes_the_cross_domain_set():
+    picked = S.autopick_scg_set("gtdb", [
+        FakeSelection("Bacteria", "domain", rows=[lineage(domain="Bacteria")]),
+        FakeSelection("Archaea", "domain", rows=[lineage(domain="Archaea")]),
+    ])
+
+    assert picked.name == S.CROSS_DOMAIN_SCG_SET
+    assert "both domains" in picked.reason
+
+
+def test_a_broad_taxon_is_not_dragged_below_its_own_rank_by_a_narrow_one():
+    """
+    `-w Bacteria -w Pseudomonadota` has to cover Bacteria, so the answer is the domain
+    set -- a taxon can't constrain ranks below the one it resolved to.
+    """
+    picked = S.autopick_scg_set("gtdb", [
+        FakeSelection("Bacteria", "domain", rows=[lineage(domain="Bacteria")]),
+        FakeSelection("Pseudomonadota", "phylum",
+                      rows=[lineage(domain="Bacteria", phylum="Pseudomonadota")]),
+    ])
+
+    assert picked.name == "Bacteria"
+
+
+def test_a_single_selection_still_works_unwrapped():
+    """One selection, passed bare rather than in a list, as the driver may still do."""
+    selection = FakeSelection(
+        "Pseudomonadota", "phylum",
+        rows=[lineage(domain="Bacteria", phylum="Pseudomonadota")])
+
+    assert S.autopick_scg_set("gtdb", selection).name == "Pseudomonadota"
+    assert S.autopick_scg_set("gtdb", [selection]).name == "Pseudomonadota"
+
+
+def test_an_empty_list_of_selections_falls_back_to_universal():
+    assert S.autopick_scg_set("gtdb", []).name == S.UNIVERSAL_SCG_SET
+
+
+################################################################################
+# eukaryotes are the one thing that still takes the universal set
+################################################################################
+
+def test_a_eukaryotic_selection_falls_back_to_universal():
+    picked = S.autopick_scg_set("ncbi", FakeSelection(
+        "Ascomycota", "phylum",
+        rows=[lineage(domain="Eukaryota", phylum="Ascomycota")],
+        accessions=["GCA_x"]))
+
+    assert picked.name == S.UNIVERSAL_SCG_SET
+    assert "outside Bacteria and Archaea" in picked.reason
+
+
+def test_eukaryotes_alongside_bacteria_still_take_the_universal_set(linked):
+    """
+    The case the GTDB join would hide: linking drops the eukaryotes, and what's left
+    would otherwise look like a clean bacterial pick.
+    """
+    linked([lineage(domain="Bacteria", phylum="Pseudomonadota")] * 20)
+    picked = S.autopick_scg_set("ncbi", [
+        FakeSelection("Pseudomonadota", "phylum",
+                      rows=[lineage(domain="Bacteria", phylum="Pseudomonadota")],
+                      accessions=["GCA_x"] * 20),
+        FakeSelection("Ascomycota", "phylum",
+                      rows=[lineage(domain="Eukaryota", phylum="Ascomycota")],
+                      accessions=["GCA_y"]),
+    ])
+
+    assert picked.name == S.UNIVERSAL_SCG_SET
+    assert "outside Bacteria and Archaea" in picked.reason
+
+
+def test_a_gtdb_selection_never_looks_eukaryotic():
+    """GTDB classifies only Bacteria and Archaea, so the check is a no-op there."""
+    assert S.domains_outside_prebuilt_scope(
+        [lineage(domain="Bacteria"), lineage(domain="Archaea")]) == set()
+    assert S.domains_outside_prebuilt_scope([lineage(domain="NA"), lineage()]) == set()
+
+
+################################################################################
+# intersecting independently resolved taxa
+################################################################################
+
+def test_intersecting_taxa_is_unanimous_not_a_vote():
+    """
+    A 90% vote would let the big taxon swallow the small one. Nineteen bacterial taxa
+    and one archaeal one still have to come out cross-domain.
+    """
+    resolved = ([(lineage(domain="Bacteria", phylum="Bacillota"), "phylum")] * 19
+                + [(lineage(domain="Archaea", phylum="Thermoproteota"), "phylum")])
+
+    assert S.intersect_lineages(resolved) == ({}, None)
+
+
+def test_intersecting_stops_at_the_coarsest_taxons_rank():
+    resolved = [(lineage(domain="Bacteria"), "domain"),
+                (lineage(domain="Bacteria", phylum="Pseudomonadota"), "phylum")]
+    agreed, deepest = S.intersect_lineages(resolved)
+
+    assert deepest == "domain"
+    assert "phylum" not in agreed
+
+
+def test_intersecting_nothing_agrees_on_nothing():
+    assert S.intersect_lineages([]) == ({}, None)
+
+
+def test_intersecting_an_unknown_rank_agrees_on_nothing():
+    assert S.intersect_lineages([(lineage(domain="Bacteria"), "kingdom")]) == ({}, None)

@@ -22,7 +22,6 @@ from gtotree.utils.target_search.target_search_setup import (
     check_env_vars,
     setup_output_dir,
     build_run_data,
-    adopt_genome_progress,
     ensure_processing_dirs,
     ensure_reference_data,
     validate_input_files,
@@ -31,7 +30,7 @@ from gtotree.utils.target_search.target_search_setup import (
     RUN_DATA_FILENAME,
 )
 from gtotree.utils.target_search.target_search_spec import get_spec
-from gtotree.utils.misc.general import OutputDirExistsError
+from gtotree.utils.misc.general import OutputDirExistsError, adopt_genome_progress
 
 
 @pytest.fixture

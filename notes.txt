@@ -18,6 +18,16 @@
 
 
 
+    # right now main_stages/update_headers.py exits if there is an error, maybe we want that to proceed,
+        # note that part failed, but still make the final tree?
+
+
+    # put a block for viruses -> no auto-selection, no using prepackaged HMMs, and require the user provide their own HMM set
+
+
+    # check that running a lot of genomes, e.g. 10,000 doesn't hard stop things and REQUIRE user input (a fix i made in v1 at 1.8.19)
+
+
     # run the following with all 5 input types and make sure all messages make sense
         # main gtotree
             # do some mapping-file tests, and make sure that's covered by unit tests
@@ -104,7 +114,6 @@
     # (this was always just "free" info, but checkm2 is a much better way to do this, so i made the decision to stop providing it at all)
 # taxids are no longer searched for in input genbank files, they will only be found/used for provided input ncbi-accessions
     # due to the nature of genbank files, this was always a little messy and hacky. If this is actually a feature that benefitted anyone, i'll try adding it back in upon request :)
-# the order of processing changed slightly from v1 to v2, so the output report messages vary a little
 # there are no longer separate summary tables for each input-genome source (accessions, fasta files, genbank files, and amino-acid files)
     # they are all represented in the primary "genomes-summary-info.tsv" table, which includes a "source" column
 # references are slimmed down and hosted on GToTree's (or bit's) github as assets now, this will help users who had trouble accessing ftp or other sites due to firewalls or other restrictions
@@ -126,6 +135,18 @@
     # in tandem scanning of target KOs or pfams, files for added vizualization in iToL
     # partitions.txt and partitions.nex files produced suitable for mixed-model treeing with programs like iqtree
     # auto-generation of citations.txt of all tools used in a run
+
+
+## Facilitating citing all tools
+    # citations.txt (find what year I added this to GToTree and note it)
+        # example output from a run
+
+
+## Use of AI in code development
+    # Anthropic's Claude was frequently used through its web interface (claude.ai) for help on
+    # individual modules, functions, and writing unit tests when converting GToTree v1 to v2.
+    # All AI-assisted code was manually inspected and tested prior to being incorporating into the
+    # codebase.
 
 
 ### """

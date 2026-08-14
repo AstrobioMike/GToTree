@@ -1,5 +1,192 @@
 # Change Log
 
+## v2.0.0 (DD-MMM-2026)
+
+### MAJOR VERSION INCREASE!
+GToTree v2 is a complete rewrite from the ground up. It used to be an ~5,000-line bash runner 
+with a large collection of standalone bash and python scripts. Now it's a python package. 
+
+Why did I do this? I don't know. It worked fine, and I've successfully maintained it for almost 7 years and
+700 citations the way it was. But here we are, and I think it's much better now :) 
+
+There will likely be some snags I missed that will need to be worked out. If you hit any problems 
+or find yourself struggling to find something you used to use, please post an issue, and I will do 
+my best to rapidly address anything!
+
+### Added
+
+#### Reference genomes by taxonomy (`-w`)!
+
+- the new `-w`/`--wanted-ref-tax` parameter takes a taxon name at any rank (e.g. `-w Bacteria`,
+  `-w Nitrospirota`, `-w "Escherichia coli"`) and adds that taxon's reference genomes to
+  the run, so gathering an accession list up front is no longer necessary :)
+  - may be given more than once to pool several taxa (e.g. `-w Bacteria -w Archaea`);
+    each is resolved and dereplicated on its own, then merged
+  - `--source` selects which taxonomy the genomes are drawn from, `gtdb` (default) or `ncbi`
+  - `--derep-rank` dereplicates the selection down to one genome per unique value of a
+    rank (default `auto`, which uses two ranks finer than the target; `off` keeps them all)
+    - this is particularly helpful when trying to make broad-level trees where you don't need 
+      a bajillion of the same species
+
+
+#### More pre-packaged single-copy gene-sets!
+
+- 46 pre-packaged SCG-sets now ship, newly built from GTDB r232
+  - run `gtt hmms` to see them all
+  - the original NCBI-taxonomy-based sets are still available via manual download from here
+
+
+#### Make your own SCG-sets
+
+- `gtt gen-scg-hmms` is available to produce your own new single-copy gene HMMs for any group of input genomes,
+  that can then be passed to GToTree for treeing
+
+
+#### SCG-set auto-selection
+
+- when `-w | --wanted-ref-tax` is used and a single-copy gene-set isn't specified with `-H`, 
+  an appropriate pre-packaged SCG-set is now selected automatically
+  - the lowest-rank pre-built set that covers all the requested taxa will be used
+    - e.g., if given multiple wanted reference taxa including some bacteria and archaea, 
+      the prebuilt `Bacteria-and-Archaea` HMM will be set; if eukaryotes were passed to `-w`, 
+      the `Universal-Hug-et-al` set will be used
+  - the set chosen and the reason for it are reported in the run's opening banner
+  - passing `-H` explicitly always overrides this
+
+
+#### Resuming interrupted runs
+
+- the new `-R`/`--resume` flag attempts to continue an interrupted run
+  - this is available on `gtt gen-scg-hmms`, `gtt search-pfams`, and `gtt search-kos` too
+
+#### New helper subcommands
+
+- All prior helper commands are now grouped under `gtt` as subcommands. Run `gtt` by itself to
+  see an overview. Main ones include:
+  - `gtt hmms` - list all available pre-packaged SCG-HMMs
+  - `gtt gen-scg-hmms` — build a new SCG-HMM set from any set of input genomes
+  - `gtt get-accs-from-gtdb` / `gtt get-accs-from-ncbi` - pull accessions based on taxonomy if you want them (though the main `gtotree` program does this for you now)
+  - `gtt search-pfams` — search input genomes for a set of target Pfams
+  - `gtt search-kos` — search input genomes for a set of target KOs
+  - `gtt data get` / `gtt data locations` — download or update the databases GToTree uses,
+    and check or set the data-location environment variables (this is all handled automatically anyway)
+  - `gtt test` — a quick end-to-end test of the installed environment
+
+
+### Parameter changes or additions
+
+#### Defaults
+
+- `-j`/`--num-jobs` now defaults to 4 (was 1)
+- default output directory is now `gtotree-output`
+- `-L`/`--lineage-ranks` now defaults to `domain,phylum,class,genus,species` (strain is
+  no longer included)
+
+
+#### Filtering
+
+- added a gene-representation cutoff (`-r`/`--gene-rep-cutoff`, default 0.1) parameter
+  - this sets the minimum proportion of genomes that must have hits to a target gene 
+    for that gene to be retained
+  - it's calculated on the genomes remaining after initial genome processing but before 
+    genome-level filtering
+- the genome-hits cutoff (`-G`/`--genome-hits-cutoff`, default 0.5) is now calculated
+  against the number of target genes remaining/that will actually contribute to the final tree,
+  rather than the starting total
+  - e.g., starting from 100 target genes with 20 filtered out for too few hits, the
+    percentage is now taken against 80 rather than 100. Meaning, a genome needs to have 
+    >= 40 genes in order to meet the 0.5 default, rather than 50
+
+
+#### Output files
+
+- per-source summary tables (accessions, fasta files, genbank files, amino-acid files)
+  have been consolidated into one `genomes-summary-info.tsv` with a `source` column
+- every genome dropped at any stage is now recorded in a single `removed-genomes.tsv`
+  (`genome_id`, `input`, `source`, `stage_removed`, `reason_removed`) rather than in
+  scattered per-stage files
+- output files and directories that used underscores now use dashes (sorry, i've grown to hate underscores when they aren't necessary)
+- estimated percent completion and redundancy are no longer reported
+  - that was basically "free" information before, but tools like CheckM2 do this way better, so I'd rather not spit out naive numbers anymore even if they're free
+
+#### Behavior
+
+- taxids are no longer pulled from input GenBank files; taxonomy can only be added for those pulled in 
+  via `-w | --wanted-ref-tax` or provided as input accessions (`-a`)
+  - this was always somewhat hacky given the variability of GenBank files. If this was
+    actually useful to anyone, open an issue and I'll look into adding it back in
+- all reference data is now fetched over http rather than ftp, which helps users behind firewalls that might block ftp
+- reference datasets are drastically slimmed down and hosted as GitHub release assets, greatly speeding up any needed downloads
+- console output has more progress bars and fewer walls of text, and more steps are logged
+
+
+---
+
+
+## v1.8.19 (16-Jul-2026)
+
+- removed high-genome notice that *required* user interaction to proceed (https://github.com/AstrobioMike/GToTree/issues/83#issuecomment-4989358508)
+  - there is already a for the aligner used if there are a lot of genomes, and if they shut that off explicitly, they already saw my notice and suggestion
+- added support for bailing on slow connections and restarting downloads for the gtdb/ncbi data tables (since they are hosted on github now and this happens from time-to-time)
+
+--- 
+
+
+## v1.8.18 (4-Jul-2026)
+
+- robustness improvements to assembly downloading
+- downloads pre-packaged, slimmed ncbi assembly summary and gtdb metadata tables now (much faster)
+  - --use-ecogenomics flag dropped from gtt-get-accessions-from-GTDB as it's not longer relevant
+
+--- 
+
+## v1.8.17 (11-May-2026)
+
+### Fixed
+- minor updates to `gtt-gen-SCG-HMMs` for things that may have caused it to fail sometimes, re-uses the main GToTree-stored NCBI assembly data now, and also unlocked the PFam version again since the interpro folks added back in the data we needed (see https://github.com/AstrobioMike/GToTree/issues/104)
+
+---
+
+## v1.8.16 (09-Jul-2025)
+
+### Fixed
+- Fix to gtt-get-accessions-from-GTDB erroring out after initial use
+
+---
+
+## v1.8.15 (27-Jun-2025)
+
+### Added
+- added a flag to `gtt-get-accessions-from-GTDB` (`--use-ecogenomics`) to allow specifing to download from [data.gtdb.ecogenomic.org/releases](https://data.gtdb.ecogenomic.org/releases/) instead of the default [data.ace.uq.edu.au/public/gtdb/data/releases](https://data.ace.uq.edu.au/public/gtdb/data/releases/) thanks to the suggestion from @Stian-2rz (https://github.com/AstrobioMike/GToTree/issues/107)
+- a partitions file in nexus format (`<outdir>/run_files/Partitions.nex`) is produced in addition to the regular text-formatted one (`<outdir>/run_files/Partitions.txt`), because for some iqtree model settings the txt format has leads to a bug – also thanks to @Stian-2rz! (https://github.com/AstrobioMike/GToTree/issues/108)
+
+### Changed
+- currently skipping certificate checking on GTDB downloads (prompted from https://github.com/AstrobioMike/GToTree/issues/107)
+  - this impacts `gtt-get-accessions-from-GTDB` and the internally used `gtt-check-or-setup-GTDB-files`
+
+---
+
+## v1.8.14 (21-Apr-2025)
+
+### Changed
+- change to taxonkit call when adding NCBI tax info (now using `reformat2` and a pattern) in order to deal with NCBI tax-structure update
+
+---
+
+## v1.8.13 (18-Mar-2025)
+
+### Changed
+- changed `gtt-gen-SCG-HMMs` to only use Pfam 37.0 for now (as later versions don't have one of the required files currently; see https://github.com/AstrobioMike/GToTree/issues/104)
+
+---
+
+## v1.8.12 (11-Mar-2025)
+
+### Changed
+- changed GTDB download links from https://data.gtdb.ecogenomic.org/releases/ to https://data.ace.uq.edu.au/public/gtdb/data/releases/ due to the former becoming prohibitively slow recently
+
+---
+
 ## v1.8.11 (10-Mar-2025)
 
 ### Added

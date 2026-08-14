@@ -11,7 +11,6 @@ from gtotree.utils.misc.general import (run_pooled_stage,
                                    resolve_input_genomes as shared_resolve_input_genomes,
                                    SOURCE_ACCESSION, SOURCE_GENBANK, SOURCE_FASTA,
                                    SOURCE_AMINO_ACID,
-                                   GTT_PROGRESS_BAR_FORMAT_INDENTED,
                                    GTT_PROGRESS_BAR_FORMAT_INDENTED_6,
                                    GTT_PROGRESS_SMOOTHING)
 from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
