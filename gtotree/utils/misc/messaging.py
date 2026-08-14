@@ -600,7 +600,7 @@ def check_and_report_any_changed_default_behavior(args, run_data):
 
 def many_genomes_notice(total_input_genomes):
     return (
-    f"""    We seem to be aiming to work with {total_input_genomes} genomes. This is quite a bit, and
+    f"""    We seem to be aiming to work with {total_input_genomes:,} genomes. This is quite a bit, and
     the time individual gene alignments can take can quickly become prohibitive
     with many genomes like this.
 
@@ -722,7 +722,7 @@ def report_ncbi_update(run_data):
     num_prepared = num_input - num_removed
 
     if num_removed == 0:
-        message = (f"{color_text(f"All {num_input} input accessions were successfully downloaded and prepared!".center(82), "green")}")
+        message = (f"{color_text(f"All {num_input} input accessions were successfully downloaded and searched!".center(82), "green")}")
     else:
         message = f"    Of the input genomes provided as {color_text("NCBI accessions", "yellow")}:\n\n"
         if num_not_found_at_ncbi > 0:
@@ -732,7 +732,7 @@ def report_ncbi_update(run_data):
             message += (f"      {color_text(f"{num_not_downloaded} found but not successfully downloaded", "yellow")}, reported in:\n"
                         + removed_genomes_pointer(run_data, GenomeRemovalStage.NCBI_DOWNLOAD))
 
-        message += (f"    {color_text(f"Overall, {num_prepared} of the input {num_input} accessions were successfully downloaded and\n    prepared.", "yellow")}")
+        message += (f"    {color_text(f"Overall, {num_prepared} of the input {num_input} accessions were successfully downloaded and\n    searched.", "yellow")}")
 
     report_update(message)
 
@@ -746,7 +746,7 @@ def report_genbank_update(run_data):
                      "so prodigal was used on the nucleotide sequences.")
 
     if num_failed == 0:
-        message = color_text(f"All {num_input} input genbank files were successfully parsed and prepared!".center(82), "green")
+        message = color_text(f"All {num_input} input genbank files were successfully parsed and searched!".center(82), "green")
         if num_prodigal_used > 0:
             message += f"\n\n    {prodigal_note}"
     else:
@@ -755,7 +755,7 @@ def report_genbank_update(run_data):
             message += f"      {prodigal_note}\n\n"
         message += (f"      {color_text(f"{num_failed} failed to be successfully parsed", "yellow")}, reported in:\n"
                     + removed_genomes_pointer(run_data, GenomeRemovalStage.GENBANK_PREP))
-        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} genbank files were successfully parsed and\n    prepared.", "yellow")}")
+        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} genbank files were successfully parsed and\n    searched.", "yellow")}")
 
     report_update(message)
 
@@ -765,12 +765,12 @@ def report_fasta_update(run_data):
     num_failed = len(run_data.get_failed_fasta_ids())
 
     if num_failed == 0:
-        message = (f"{color_text(f"All {num_input} input fasta files were successfully prepared!".center(82), "green")}")
+        message = (f"{color_text(f"All {num_input} input fasta files were successfully prepared and searched!".center(82), "green")}")
     else:
         message = f"    Of the input genomes provided as {color_text("fasta files", "yellow")}:\n\n"
-        message += (f"      {color_text(f"{num_failed} failed to be successfully processed", "yellow")}, reported in:\n"
+        message += (f"      {color_text(f"{num_failed} failed to be successfully processed and searched", "yellow")}, reported in:\n"
                     + removed_genomes_pointer(run_data, GenomeRemovalStage.FASTA_PREP))
-        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} fasta files were successfully processed.", "yellow")}")
+        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} fasta files were successfully processed and \n    searched.", "yellow")}")
 
     report_update(message)
 
@@ -779,12 +779,12 @@ def report_AA_update(run_data):
     num_failed = len(run_data.get_failed_amino_acid_ids())
 
     if num_failed == 0:
-        message = (f"{color_text(f"All {num_input} input amino-acid files were successfully prepared!".center(82), "green")}")
+        message = (f"{color_text(f"All {num_input} input amino-acid files were successfully searched!".center(82), "green")}")
     else:
         message = f"    Of the input genomes provided as {color_text("amino-acid files", "yellow")}:\n\n"
-        message += (f"      {color_text(f"{num_failed} failed to be successfully processed", "yellow")}, reported in:\n"
+        message += (f"      {color_text(f"{num_failed} failed to be successfully searched", "yellow")}, reported in:\n"
                     + removed_genomes_pointer(run_data, GenomeRemovalStage.AMINO_ACID_PREP))
-        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} amino-acid files were successfully processed.", "yellow")}")
+        message += (f"    {color_text(f"Overall, {num_input - num_failed} of the input {num_input} amino-acid files were successfully searched.", "yellow")}")
 
     report_update(message)
 

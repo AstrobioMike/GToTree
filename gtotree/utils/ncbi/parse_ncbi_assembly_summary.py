@@ -1,4 +1,5 @@
 import re
+import pyarrow as pa # type: ignore
 import pyarrow.compute as pc # type: ignore
 import pyarrow.dataset as ds # type: ignore
 from gtotree.utils.misc.general import REASON_NOT_FOUND_AT_NCBI
@@ -11,6 +12,8 @@ _NEEDED_COLUMNS = [
     "assembly_accession", "asm_name", "taxid", "organism_name",
     "infraspecific_name", "version_status", "assembly_level", "ftp_path",
 ]
+
+_ACCESSION_ROOT_REGEX = r'^([^.]+)\..*$'
 
 
 def sanitize_assembly_name(name):
@@ -58,6 +61,21 @@ def _clean(value):
     return value if value else "NA"
 
 
+def _matched_accession_filter(dataset, wanted_dict):
+    """
+    Build the scanner filter that selects the wanted accessions, or None if there
+    are none
+    """
+    if not wanted_dict:
+        return None
+
+    acc_col = dataset.to_table(columns=["assembly_accession"]).column(0)
+    roots = pc.replace_substring_regex(acc_col, _ACCESSION_ROOT_REGEX, r"\1")
+    mask = pc.is_in(roots, value_set=pa.array(sorted(wanted_dict)))
+
+    return ds.field("assembly_accession").isin(pc.filter(acc_col, mask))
+
+
 def parse_assembly_summary(assembly_summary_file, run_data):
     """
     Look up the wanted NCBI accessions in the hosted NCBI Parquet table and write the
@@ -89,11 +107,7 @@ def parse_assembly_summary(assembly_summary_file, run_data):
     ncbi_sub_table_path = run_data.tmp_dir + "/ncbi-accessions-info.tsv"
 
     dataset = ds.dataset(str(assembly_summary_file), format="parquet")
-    acc_field = ds.field("assembly_accession")
-    predicate = None
-    for root in wanted_dict:
-        cond = pc.starts_with(acc_field, root)
-        predicate = cond if predicate is None else (predicate | cond)
+    predicate = _matched_accession_filter(dataset, wanted_dict)
 
     with open(ncbi_sub_table_path, "w") as out_file:
 
