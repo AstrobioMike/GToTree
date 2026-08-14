@@ -14,16 +14,18 @@ import pyhmmer #type: ignore
 # aliases that aren't simply the file stem of a packaged set
 HMM_SET_ALIASES = {"universal": "Universal-Hug-et-al"}
 
-# this is what auto-selection picks when the target reaches outside the Bacteria/Archaea
-# taxonomy the pre-built sets are built from. so basically anytime eukaryotes are involved
+# this is what auto-selection picks when the target reaches outside the Bacteria/Archaea into
+# euks, but NOT viruses
 UNIVERSAL_SCG_SET = "Universal-Hug-et-al"
 
 # what auto-selection picks when the target taxa span bacteria and archaea
 CROSS_DOMAIN_SCG_SET = "Bacteria-and-Archaea"
 
-# the domains the pre-built sets span. A selection reporting anything else is outside what any
-# pre-built set covers, so it falls to the universal set (there is no auto-selection for viruses)
 PREBUILT_DOMAINS = {"bacteria", "archaea"}
+
+# domain names that mean the target is viral, eventually matched as substrings (these get no auto-selection and
+# can't use any of the pre-built ones)
+VIRAL_DOMAIN_MARKERS = ("virus", "viroid", "viral")
 
 # how much of a linked reference set has to agree on a taxon before that taxon is
 # treated as the target group (this is relevant only for --source ncbi -w <taxon> situations where
@@ -377,6 +379,65 @@ def autopick_scg_set(source, selections):
                             _pick_reason(selections, rank, taxon, via_genomes))
 
 
+################################################################################
+# viral targets: bring your own HMMs
+################################################################################
+
+
+class ViralTaxonNeedsOwnHMMs(Exception):
+    """
+    `-w` reached into viruses, and `-H` isn't pointing at the user's own HMM file.
+    """
+
+
+def _selection_is_viral(selection):
+    """
+    Whether a selection's domain places it in viruses
+    """
+    for lineage in (getattr(selection, "rows", None) or []):
+        domain = str(lineage.get("domain") or "").strip()
+        if not domain or domain == NA:
+            continue
+        if any(marker in domain.lower() for marker in VIRAL_DOMAIN_MARKERS):
+            return True
+    return False
+
+
+def viral_selections(selections):
+    """
+    The subset of `selections` that resolved into viruses (empty list if none did).
+    """
+    return [s for s in _as_selection_list(selections) if _selection_is_viral(s)]
+
+
+def check_viruses_have_their_own_hmms(args, selections):
+    """
+    Viral `-w` targets require the user's own `-H` file
+    """
+    viral = viral_selections(selections)
+    if not viral:
+        return
+
+    if args.hmm and find_local_hmm_file(args.hmm) is not None:
+        return
+
+    label = _join_names([getattr(s, "canonical", str(s)) for s in viral])
+    target, is_are = ("target", "is") if len(viral) == 1 else ("targets", "are")
+
+    message = (f"The `-w` {target} {label} {is_are} viral, and none of GToTree's "
+               "pre-built single-copy gene HMM sets are built for viral genomes.")
+
+    if args.hmm:
+        message += (f" '{args.hmm}' is one of those pre-built sets, so it can't be "
+                    "used for this either.")
+
+    message += (" To build a viral tree, point `-H` at your own HMM file of "
+                "single-copy genes suitable for the group (e.g., "
+                "`-H my-viral-SCGs.hmm`).")
+
+    raise ViralTaxonNeedsOwnHMMs(message)
+
+
 def _as_selection_list(selections):
     """One selection, a list of them, or None -- always out as a list."""
     if selections is None:
@@ -404,6 +465,9 @@ def _pick_reason(selections, rank, taxon, via_genomes):
     The NCBI phrasing says the genomes got there, not the name: NCBI's names don't line
     up with GTDB's, so 'Nitrososphaerota' landing on the Thermoproteota set only makes
     sense to a user if it's clear the match ran through the genomes' GTDB placement.
+
+    An empty string means "no reason worth printing", like when the set carries the taxon's
+    own name
     """
     label = _describe_taxa(selections)
 
@@ -414,7 +478,7 @@ def _pick_reason(selections, rank, taxon, via_genomes):
         selection = selections[0]
         if (rank == selection.resolved_rank
                 and str(taxon).lower() == str(selection.canonical).lower()):
-            return f"'{selection.canonical}' has a pre-built set of its own"
+            return ""
         return f"'{selection.canonical}' sits within {rank} {taxon} in GTDB"
 
     return f"{label} sit within {rank} {taxon} in GTDB"

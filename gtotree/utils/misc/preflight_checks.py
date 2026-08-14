@@ -22,6 +22,8 @@ from gtotree.utils.misc.messaging import (color_text,
                                      stdout_and_log,
                                      spinner)
 from gtotree.utils.hmms.scg_hmms_setup import (autopick_scg_set,
+                                          check_viruses_have_their_own_hmms,
+                                          ViralTaxonNeedsOwnHMMs,
                                           resolve_hmm_arg,
                                           resolve_hmm_source,
                                           populate_SCG_targets)
@@ -366,6 +368,13 @@ def resolve_hmm(args, selections=None, previous_run_data=None):
     `-H universal` and an auto-selected `Universal-Hug-et-al` the same string in the
     fingerprint, in the reporting, and as a filename under GToTree_HMM_dir.
     """
+    # ahead of both routes: a viral `-w` target can't take a pre-built set by either one
+    try:
+        check_viruses_have_their_own_hmms(args, selections)
+    except ViralTaxonNeedsOwnHMMs as err:
+        report_message(str(err))
+        report_very_early_exit(suggest_help=True)
+
     if not args.hmm:
         carried_over = (previous_run_data.fingerprint.get("hmm")
                         if previous_run_data is not None else None)

@@ -343,10 +343,10 @@ def _wanted_ref_tax_detail_lines(selection, indent):
     derep = selection.get("derep_rank")
 
     if rank and derep:
-        lines.append(f'{indent}- wanted rank "{rank}" was dereplicated to one genome '
+        lines.append(f'{indent}- input rank "{rank}" was dereplicated to one genome '
                      f'per {derep}')
     elif rank:
-        lines.append(f'{indent}- all genomes under the wanted rank "{rank}" were kept '
+        lines.append(f'{indent}- all genomes under the input rank "{rank}" were kept '
                      f'(dereplication off)')
 
     already_had = selection.get("num_selected", 0) - selection.get("num_added", 0)
@@ -413,8 +413,12 @@ def display_initial_run_info(args, run_data):
 
     report_message("  Single-copy gene HMM source to be used:")
     print(f"      - {args.hmm} ({len(run_data.get_all_SCG_targets())} targets)", flush=True)
-    if getattr(args, "hmm_auto_selected", None):
-        print(f"          (auto-selected; {args.hmm_auto_selected})", flush=True)
+    auto_selected = getattr(args, "hmm_auto_selected", None)
+    if auto_selected is not None:
+        if auto_selected:
+            print(f"          (auto-selected; {auto_selected})", flush=True)
+        else:
+            print("          (auto-selected)", flush=True)
     # time.sleep(1)
 
     check_and_report_any_changed_default_behavior(args, run_data)
@@ -1007,6 +1011,13 @@ def summarize_results(args, run_data):
 
     final_alignment_path = get_path_rel_to_outdir(run_data.final_alignment_path, args)
     print(f"    Alignment written to:\n        {color_text(final_alignment_path, 'green')}\n")
+
+    if run_data.header_update_error:
+        wprint(color_text("Note: more informative headers failed swapping in for some reason, "
+                          "so the alignment and tree above hold the original genome "
+                          "IDs. See the log for why.", "yellow"),
+               ii="    ", si="    ")
+        print("")
 
     if args.keep_gene_alignments:
         gene_alignments_path = run_data.individual_gene_alignments_dir_rel

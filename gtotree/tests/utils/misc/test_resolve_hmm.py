@@ -163,3 +163,53 @@ def test_no_hmm_is_fine_when_a_taxon_was_given():
 def test_no_input_genomes_at_all_is_still_an_error():
     with pytest.raises(SystemExit):
         P.check_for_minimum_args(make_args(hmm="Bacteria"))
+
+
+################################################################################
+# viral targets never reach the picker
+################################################################################
+
+class FakeSelection:
+    def __init__(self, canonical, rows):
+        self.canonical = canonical
+        self.resolved_rank = "class"
+        self.rows = rows
+        self.accessions = []
+
+
+def test_a_viral_target_exits_before_anything_is_picked(picks, capsys):
+    """
+    The refusal has to come ahead of BOTH routes through resolve_hmm, so it lands the
+    same whether -H was left off or pointed at a pre-built set.
+    """
+    calls = picks("Bacteria")
+    args = make_args(wanted_ref_tax="Caudoviricetes")
+    selection = FakeSelection("Caudoviricetes", [{"domain": "Viruses"}])
+
+    with pytest.raises(SystemExit):
+        P.resolve_hmm(args, selections=[selection])
+
+    assert calls == []
+    assert "Caudoviricetes" in capsys.readouterr().out
+
+
+def test_a_viral_target_with_an_explicit_pre_built_set_exits_too(capsys):
+    args = make_args(hmm="Universal-Hug-et-al", wanted_ref_tax="Caudoviricetes")
+    selection = FakeSelection("Caudoviricetes", [{"domain": "Viruses"}])
+
+    with pytest.raises(SystemExit):
+        P.resolve_hmm(args, selections=[selection])
+
+    assert "Universal-Hug-et-al" in capsys.readouterr().out
+
+
+def test_a_viral_target_with_the_users_own_hmm_file_carries_on(tmp_path):
+    hmm_file = tmp_path / "viral-SCGs.hmm"
+    hmm_file.write_text("HMMER3/f\n")
+
+    args = make_args(hmm=str(hmm_file), wanted_ref_tax="Caudoviricetes")
+    selection = FakeSelection("Caudoviricetes", [{"domain": "Viruses"}])
+
+    args = P.resolve_hmm(args, selections=[selection])
+
+    assert args.hmm == str(hmm_file)

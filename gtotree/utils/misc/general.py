@@ -508,6 +508,7 @@ class RunData:
     general_ext: str = ""
     concatenated_alignment_path: str = ""
     final_alignment_path: str = ""
+    header_update_error: str = ""
     final_alignment_length: int = 0
     original_tree_path: str = ""
     final_tree_path: str = ""

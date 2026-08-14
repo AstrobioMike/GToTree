@@ -556,7 +556,7 @@ def _apply_amino_acid_status(AA, status, run_data):
 
 
 PRODIGAL_TOO_SHORT_EXIT = 10
-PRODIGAL_TOO_SHORT_REASON = ("prodigal failed: genome too short for gene calling")
+PRODIGAL_TOO_SHORT_REASON = ("prodigal failed: genome too short for gene-calling")
 
 
 def run_prodigal(id, run_data, full_inpath = None, group = None):

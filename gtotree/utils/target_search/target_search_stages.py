@@ -36,7 +36,7 @@ from gtotree.utils.misc.processing_genomes import (
 from gtotree.utils.target_search.target_search_setup import TargetSearchError
 
 
-def _removals_pointer(run_data):
+def removals_pointer(run_data):
     return f"{run_data.run_files_dir_rel}/{REMOVED_GENOMES_FILENAME}"
 
 
@@ -93,7 +93,7 @@ def lookup_ncbi_accessions(run_data):
         report_message(
             f"{len(not_found):,} accession(s) not found at NCBI. Reported in:",
             "yellow", ii="      ", si="      ")
-        print(f"        {color_text(_removals_pointer(run_data), 'yellow')}")
+        print(f"        {color_text(removals_pointer(run_data), 'yellow')}")
 
         remaining = len([gd for gd in run_data.all_input_genomes if not gd.removed])
         if not remaining:
@@ -290,12 +290,12 @@ def phase_search_genomes(args, run_data, spec, plan):
         report_message(
             f"{len(failed_here):,} genome(s) failed the search phase. Reported in:",
             "yellow", ii="      ", si="      ")
-        print(f"        {color_text(_removals_pointer(run_data), 'yellow')}")
+        print(f"        {color_text(removals_pointer(run_data), 'yellow')}")
 
     if not searched:
         raise TargetSearchError(
             "None of the input genomes made it through to a completed search. The "
-            f"reason for each is in {_removals_pointer(run_data)}.")
+            f"reason for each is in {removals_pointer(run_data)}.")
 
     return run_data
 

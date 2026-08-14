@@ -343,17 +343,37 @@ def gen_partitions_file(run_data, SCG_IDs, dict_of_genomes):
                       lambda f: f.writelines(nex_lines))
 
 
+def concatenated_alignment_locations(run_data):
+    """
+    The two places the original-ID concatenated alignment legitimately lives
+
+    It sits in the output dir on a first pass, and moves to run-files/ once
+    swap_labels_in_alignment() has put the relabeled copy in its place.
+    """
+    ext = run_data.general_ext
+    return (os.path.join(run_data.output_dir, f"aligned-SCGs{ext}"),
+            os.path.join(run_data.run_files_dir, f"aligned-SCGs{ext}"))
+
+
+def usable_concatenated_alignment_path(run_data):
+    """
+    Whichever of the two locations actually holds the alignment, or None if neither
+    does. None means there's nothing to tree from at all, relabeled or not.
+    """
+    for path in concatenated_alignment_locations(run_data):
+        if os.path.dirname(path) and file_is_usable_else_clear(path):
+            return path
+    return None
+
+
 def swap_labels_in_alignment(run_data):
     ext = run_data.general_ext
-    orig_alignment_path = os.path.join(run_data.output_dir, f"aligned-SCGs{ext}")
-    backup_alignment_path = os.path.join(run_data.run_files_dir, f"aligned-SCGs{ext}")
+    orig_alignment_path, backup_alignment_path = concatenated_alignment_locations(run_data)
     new_alignment_path = os.path.join(run_data.output_dir, f"aligned-SCGs-mod-names{ext}")
 
-    if file_is_usable_else_clear(orig_alignment_path):
-        source_path = orig_alignment_path
-    elif file_is_usable_else_clear(backup_alignment_path):
-        source_path = backup_alignment_path
-    else:
+    source_path = usable_concatenated_alignment_path(run_data)
+
+    if source_path is None:
         raise FileNotFoundError(
             "the concatenated alignment couldn't be found at either "
             f'"{orig_alignment_path}" or "{backup_alignment_path}"')

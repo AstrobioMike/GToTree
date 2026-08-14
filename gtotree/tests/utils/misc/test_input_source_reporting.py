@@ -104,7 +104,7 @@ class TestInputGenomeSourceLines:
         lines = input_genome_source_lines(
             _args(wanted_ref_tax=["Methanobacteria"]), rd)
 
-        assert lines[1].strip() == ('- wanted rank "class" was dereplicated to one '
+        assert lines[1].strip() == ('- input rank "class" was dereplicated to one '
                                     'genome per family')
 
     def test_derep_off_says_so_rather_than_going_quiet(self):

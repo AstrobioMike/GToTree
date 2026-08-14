@@ -165,6 +165,10 @@ ENTRIES = [
          the taxa provided here. The lowest-rank pre-packaged set covering all of the
          requested taxa will be used. Be sure to specify `-H` specifically if you want to
          override this behavior.
+
+         Viruses are the exception: none of the pre-packaged sets are built for viruses,
+         so a viral taxon here isn't auto-selected for and can't use a pre-packaged set.
+         Pass your own HMM file to `-H` if trying to work with viruses.
          """,
          FULL),
 

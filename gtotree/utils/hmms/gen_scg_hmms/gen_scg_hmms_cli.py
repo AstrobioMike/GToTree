@@ -805,7 +805,7 @@ def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_versio
 
     if any(gd.removed for gd in run_data.all_input_genomes):
         report_message("Any input genomes that didn't make it through are reported in:",
-                       "yellow", ii="      ", si="      ")
+                       "yellow", ii="      ", si="      ", newline=False)
         print(f"        {color_text(removed_genomes_path(run_data), 'yellow')}\n")
     print()
 

@@ -421,3 +421,105 @@ def test_intersecting_nothing_agrees_on_nothing():
 
 def test_intersecting_an_unknown_rank_agrees_on_nothing():
     assert S.intersect_lineages([(lineage(domain="Bacteria"), "kingdom")]) == ({}, None)
+
+
+################################################################################
+# viral targets bring their own HMMs
+################################################################################
+
+def viral_args(hmm=None):
+    import argparse
+    return argparse.Namespace(hmm=hmm)
+
+
+def test_a_viral_selection_is_spotted_from_its_own_rows():
+    selection = FakeSelection("Caudoviricetes", "class",
+                              rows=[lineage(domain="Viruses", phylum="Uroviricota")])
+
+    assert S.viral_selections(selection) == [selection]
+
+
+@pytest.mark.parametrize("domain", ["Viruses", "viruses", "Viroids", "viral metagenome"])
+def test_the_viral_domain_names_that_count(domain):
+    selection = FakeSelection("Something", "phylum", rows=[lineage(domain=domain)])
+
+    assert S.viral_selections(selection)
+
+
+@pytest.mark.parametrize("domain", ["Bacteria", "Archaea", "Eukaryota", "NA", ""])
+def test_nothing_cellular_is_mistaken_for_viral(domain):
+    selection = FakeSelection("Something", "phylum", rows=[lineage(domain=domain)])
+
+    assert S.viral_selections(selection) == []
+
+
+def test_a_viral_target_with_no_hmm_given_is_refused():
+    selection = FakeSelection("Caudoviricetes", "class",
+                              rows=[lineage(domain="Viruses")])
+
+    with pytest.raises(S.ViralTaxonNeedsOwnHMMs) as excinfo:
+        S.check_viruses_have_their_own_hmms(viral_args(), selection)
+
+    assert "Caudoviricetes" in str(excinfo.value)
+    assert "-H" in str(excinfo.value)
+
+
+def test_a_viral_target_cannot_take_a_pre_built_set_either():
+    """
+    Naming a pre-built set is refused just as flatly as naming none: the point is that
+    no set built from bacterial and archaeal genomes means anything for a viral tree.
+    """
+    selection = FakeSelection("Caudoviricetes", "class",
+                              rows=[lineage(domain="Viruses")])
+
+    with pytest.raises(S.ViralTaxonNeedsOwnHMMs) as excinfo:
+        S.check_viruses_have_their_own_hmms(viral_args(hmm="Universal-Hug-et-al"),
+                                            selection)
+
+    assert "Universal-Hug-et-al" in str(excinfo.value)
+
+
+def test_a_viral_target_with_the_users_own_hmm_file_is_allowed(tmp_path):
+    hmm_file = tmp_path / "my-viral-SCGs.hmm"
+    hmm_file.write_text("HMMER3/f\n")
+
+    selection = FakeSelection("Caudoviricetes", "class",
+                              rows=[lineage(domain="Viruses")])
+
+    S.check_viruses_have_their_own_hmms(viral_args(hmm=str(hmm_file)), selection)
+
+
+def test_one_viral_taxon_among_several_is_enough_to_refuse():
+    bacterial = FakeSelection("Pseudomonadota", "phylum",
+                              rows=[lineage(domain="Bacteria", phylum="Pseudomonadota")])
+    viral = FakeSelection("Caudoviricetes", "class", rows=[lineage(domain="Viruses")])
+
+    with pytest.raises(S.ViralTaxonNeedsOwnHMMs) as excinfo:
+        S.check_viruses_have_their_own_hmms(viral_args(), [bacterial, viral])
+
+    # only the offending taxon is named, not the innocent one alongside it
+    assert "Caudoviricetes" in str(excinfo.value)
+    assert "Pseudomonadota" not in str(excinfo.value)
+
+
+def test_nothing_viral_means_nothing_to_check():
+    selection = FakeSelection("Pseudomonadota", "phylum",
+                              rows=[lineage(domain="Bacteria", phylum="Pseudomonadota")])
+
+    S.check_viruses_have_their_own_hmms(viral_args(), selection)
+    S.check_viruses_have_their_own_hmms(viral_args(), None)
+
+
+def test_a_set_named_for_the_taxon_itself_gives_no_reason():
+    """
+    The banner prints the taxon and the set it picked on the line above, so a reason
+    saying 'Bacteria' got the 'Bacteria' set would only repeat it. Empty means the
+    banner falls back to a bare '(auto-selected)'.
+    """
+    selection = FakeSelection(
+        "Pseudomonadota", "phylum",
+        rows=[lineage(domain="Bacteria", phylum="Pseudomonadota")])
+    picked = S.autopick_scg_set("gtdb", selection)
+
+    assert picked.name == "Pseudomonadota"
+    assert picked.reason == ""

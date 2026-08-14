@@ -329,13 +329,7 @@ def report_finish(out_dir, run_data, spec, summary_path, targets_with_hits):
     print(border)
 
     print(f"\n      {color_text(f'{searched:,}', 'green')} genome(s) searched for "
-          f"{color_text(f'{num_targets:,}', 'green')} {spec.target_label} target(s).")
-
-    if removed or failed:
-        dropped = removed + failed
-        report_message(
-            f"{dropped:,} input genome(s) didn't make it through; see summary table.", "yellow", ii="      ", si="      ")
-        print()
+          f"{color_text(f'{num_targets:,}', 'green')} {spec.target_label} target(s).\n")
 
     if not targets_with_hits:
         report_message(
@@ -350,7 +344,12 @@ def report_finish(out_dir, run_data, spec, summary_path, targets_with_hits):
     print(f"        {color_text(spec.counts_filename, 'green')}")
     if targets_with_hits:
         print(f"        {color_text(spec.hit_seqs_subdir + '/', 'green')}")
-    print(f"        {color_text(os.path.basename(summary_path), 'green')}")
+    print(f"        {color_text(os.path.basename(summary_path), 'green')}\n")
+
+    if removed or failed:
+        report_message("Any input genomes that didn't make it through are reported in:",
+                       "yellow", ii="      ", si="      ", newline=False)
+        print(f"        {color_text(stages.removals_pointer(run_data), 'yellow')}\n")
     print()
 
 
