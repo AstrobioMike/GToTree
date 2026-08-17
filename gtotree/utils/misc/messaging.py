@@ -61,14 +61,73 @@ def gtotree_header():
     return header
 
 
+ansi_prefix_pattern = re.compile(r'^(?:\x1B\[[0-9;]*m)+')
+bullet_pattern = re.compile(r'^(?:[-*\u2022]|\d+[.)])\s+')
+
+
 def wprint(text, width = 80, ii = "  ", si = "  "):
-    wrapper = textwrap.TextWrapper(width=width,
-                                   initial_indent=ii,
-                                   subsequent_indent=si,
-                                   break_on_hyphens=False)
-    paragraphs = text.splitlines()
-    wrapped_paragraphs = [wrapper.fill(par) if par.strip() else par for par in paragraphs]
-    print("\n".join(wrapped_paragraphs), flush=True)
+    """
+    Wrap and print text, treating each line of the input as its own paragraph
+
+    Two things beyond plain wrapping, so multi-line messages don't come out
+    ragged:
+
+      - a line's own leading whitespace is kept on its wrapped continuation
+        lines, instead of them falling back to the base indent
+      - a line that starts with a bullet marker ("- ", "* ", "1. ") gets a
+        hanging indent, so continuation lines sit under the bullet's text
+        rather than under the marker
+
+    So this input (with ii = si = "  "):
+
+        Some flags changed:
+                - -L/--lineage-ranks changed ('class,genus' -> 'class,order,family,genus')
+
+    prints as:
+
+          Some flags changed:
+                  - -L/--lineage-ranks changed ('class,genus' ->
+                    'class,order,family,genus')
+    """
+    out_lines = []
+
+    for line in text.splitlines():
+        if not line.strip():
+            out_lines.append(line)
+            continue
+
+        # color_text() wraps a whole message, so an escape code can be sitting
+        # in front of the indentation we want to measure
+        ansi_match = ansi_prefix_pattern.match(line)
+        ansi = ansi_match.group(0) if ansi_match else ""
+        body = line[len(ansi):]
+
+        lead = body[:len(body) - len(body.lstrip())]
+        body = body.lstrip()
+
+        bullet_match = bullet_pattern.match(body)
+        hang = " " * len(bullet_match.group(0)) if bullet_match else ""
+
+        wrapper = textwrap.TextWrapper(width=width,
+                                       initial_indent=ii + lead,
+                                       subsequent_indent=si + lead + hang,
+                                       break_on_hyphens=False)
+        out_lines.append(wrapper.fill(ansi + body))
+
+    print("\n".join(out_lines), flush=True)
+
+
+def bullet_list(items, indent = 8, marker = "-"):
+    """
+    Format items as a bullet block to drop into a message string.
+
+    Just the block itself, surrounding blank lines are up to the caller, e.g.:
+
+        report_message(f"Some things changed:\\n\\n{bullet_list(changes)}\\n\\n"
+                       "Here's what to do about it.")
+    """
+    pad = " " * indent
+    return "\n".join(f"{pad}{marker} {item}" for item in items)
 
 
 class Tee:

@@ -33,6 +33,7 @@ import os
 import json
 import hashlib
 import tempfile
+from gtotree.utils.misc.messaging import bullet_list
 
 
 STATE_FILENAME = "run-state.json"
@@ -393,8 +394,8 @@ class ResumeProfile:
         assembling its own bullet list.
         """
         return (f"{flag} was specified, but this run doesn't match the previous one in "
-                "that directory:\n        - " + "\n        - ".join(differences)
-                + "\n\n      Resuming would mix results from two different runs. Use a "
+                f"that directory:\n\n{bullet_list(differences)}\n\n"
+                "Resuming would mix results from two different runs. Use a "
                 "new output directory, or start over with `-F`.")
 
     # --- state file -----------------------------------------------------------

@@ -13,6 +13,27 @@
         # gtt gen-scg-hmms
 
 
+    # gtt get-accs-from-* --get-taxon-counts DOES NOT currently take into account derep-rank (IT SHOULD)
+
+
+    # gtt get-accs-from-* doesn't give a message or error out if you pass --get-rank-counts with a wanted taxon
+        # it should do at least one of those, at best, maybe give counts for all ranks below the wanted taxon rank (which may supersede --get-taxon-counts)
+        # current behaviour output below:
+
+            # gtt get-accs-from-gtdb -w Vibrionaceae --get-rank-counts
+
+            #     Using GTDB v232: Apr 15, 2026
+
+            #     Rank       Num. Unique Taxa
+            #     domain     2
+            #     phylum     197
+            #     class      645
+            #     order      2351
+            #     family     6747
+            #     genus      37503
+            #     species    199923
+
+
     # make gen-scg-hmms take an option of using pfams or KOs...
         # don't need to filter by coverage on KOs
         # then i can do some benchmarking and see if we get more genes/longer alignments with KO-based SCG sets than with the current pfam ones

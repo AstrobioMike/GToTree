@@ -6,6 +6,7 @@ import pandas as pd # type: ignore
 import tempfile
 from collections import Counter
 from gtotree.utils.misc.messaging import (color_text,
+                                     bullet_list,
                                      report_message,
                                      report_very_early_exit,
                                      report_run_already_complete,
@@ -441,8 +442,8 @@ def setup_run_data(args, previous_run_data=None):
         if differences:
             report_message(
                 "We are trying to resume a previous run (specified by the `-R` or "
-                "`--resume` flag), but this run doesn't match the previous one:\n"
-                "        - " + "\n        - ".join(differences) + "\n\n"
+                "`--resume` flag), but this run doesn't match the previous one:\n\n"
+                f"{bullet_list(differences)}\n\n"
                 "Resuming would mix results from two different runs. Your best "
                 "bet is to start a fresh run by adding the `-F` flag to "
                 "force-overwrite the previous outputs or specify a new output dir.")

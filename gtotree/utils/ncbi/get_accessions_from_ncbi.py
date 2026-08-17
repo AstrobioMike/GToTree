@@ -62,8 +62,8 @@ def build_parser(parent_subparsers=None):
     optional = parser.add_argument_group("Optional Parameters")
 
     required.add_argument(
-        "-t",
-        "--target-taxon",
+        "-w",
+        "--wanted-ref-tax",
         metavar="<STR>",
         help=("Target taxon (a name, an NCBI taxid, or 'all'). Not needed with "
               "`--get-rank-counts`."),
@@ -183,7 +183,7 @@ def get_accessions_from_ncbi(args):
         print("")
         sys.exit(0)
 
-    target = str(args.target_taxon)
+    target = str(args.wanted_ref_tax)
     if args.get_taxon_counts and target.lower() != "all" and not target.isdigit():
         _report_taxon_counts_or_exit(table_path, target, args, assembly_levels)
         sys.exit(0)
@@ -214,13 +214,13 @@ def get_accessions_from_ncbi(args):
 
 def preflight_checks(args):
 
-    if args.get_taxon_counts and not args.target_taxon:
+    if args.get_taxon_counts and not args.wanted_ref_tax:
         report_message("A specific taxon needs to also be provided to the `-t` flag "
                        "in order to use `--get-taxon-counts`.", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
-    if not args.get_rank_counts and not args.get_table and not args.target_taxon:
+    if not args.get_rank_counts and not args.get_table and not args.wanted_ref_tax:
         report_message("A target taxon needs to be provided to `-t` (a name, a taxid, or 'all').", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
@@ -350,7 +350,7 @@ def _select_rows(table_path, args):
     --source scoping (refseq/genbank -> GCF_/GCA_ prefix) is applied up front in every
     mode: inside the core for the taxon path, and at read time for all/taxid.
     """
-    target = str(args.target_taxon)
+    target = str(args.wanted_ref_tax)
     reps_only = args.refseq_reference_genomes_only
     prefixes = _source_prefixes(args.source)
 

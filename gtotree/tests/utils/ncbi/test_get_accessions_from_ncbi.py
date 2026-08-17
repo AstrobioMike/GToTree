@@ -66,7 +66,7 @@ def in_ncbi(tmp_path, monkeypatch):
 
 
 def _args(**kw):
-    d = dict(target_taxon=None, target_rank=None, derep_rank="off", source="refseq",
+    d = dict(wanted_ref_tax=None, target_rank=None, derep_rank="off", source="refseq",
              assembly_level=None, refseq_reference_genomes_only=False,
              get_rank_counts=False, get_taxon_counts=False, get_table=False)
     d.update(kw)
@@ -88,7 +88,7 @@ def _read_accs(pattern):
 
 
 def test_taxon_refseq_derep_off(in_ncbi):
-    _run(_args(target_taxon="Testophyla", source="refseq"))
+    _run(_args(wanted_ref_tax="Testophyla", source="refseq"))
     accs = _read_accs("ncbi-testophyla-phylum-refseq-accs.txt")
     assert sorted(accs) == ["GCF_000000001.1", "GCF_000000003.1"]  # only GCF
 
@@ -100,7 +100,7 @@ def test_source_scoping_precedes_derep(in_ncbi):
     best genome is a GCA would be dropped entirely rather than represented by its best
     GCF.
     """
-    _run(_args(target_taxon="Testophyla", source="refseq", derep_rank="family"))
+    _run(_args(wanted_ref_tax="Testophyla", source="refseq", derep_rank="family"))
     accs = _read_accs("ncbi-testophyla-phylum-refseq-accs.txt")
     # one per family, and both must be GCF (the refseq-pool winners)
     assert len(accs) == 2
@@ -108,14 +108,14 @@ def test_source_scoping_precedes_derep(in_ncbi):
 
 
 def test_genbank_source_scopes_to_gca(in_ncbi):
-    _run(_args(target_taxon="Testophyla", source="genbank", derep_rank="family"))
+    _run(_args(wanted_ref_tax="Testophyla", source="genbank", derep_rank="family"))
     accs = _read_accs("ncbi-testophyla-phylum-genbank-accs.txt")
     assert len(accs) == 2
     assert all(a.startswith("GCA_") for a in accs)
 
 
 def test_both_source_derep_picks_best_regardless_of_prefix(in_ncbi):
-    _run(_args(target_taxon="Testophyla", source="both", derep_rank="family"))
+    _run(_args(wanted_ref_tax="Testophyla", source="both", derep_rank="family"))
     accs = _read_accs("ncbi-testophyla-phylum-accs.txt")
     # FamB's best by quality is the 99.9-complete GCA_...004
     assert "GCA_000000004.1" in accs
@@ -123,26 +123,26 @@ def test_both_source_derep_picks_best_regardless_of_prefix(in_ncbi):
 
 
 def test_all_mode(in_ncbi):
-    _run(_args(target_taxon="all", source="both"))
+    _run(_args(wanted_ref_tax="all", source="both"))
     accs = _read_accs("ncbi-all-accs.txt")
     assert len(accs) == 4
 
 
 def test_taxid_mode(in_ncbi):
-    _run(_args(target_taxon="5100", source="both"))  # FamA taxid
+    _run(_args(wanted_ref_tax="5100", source="both"))  # FamA taxid
     accs = _read_accs("ncbi-taxid-5100-accs.txt")
     assert sorted(accs) == ["GCA_000000002.1", "GCF_000000001.1"]
 
 
 def test_assembly_level_filter(in_ncbi):
     # only GCA_...004 is Scaffold; the rest Complete Genome
-    _run(_args(target_taxon="Testophyla", source="both", assembly_level="scaffold"))
+    _run(_args(wanted_ref_tax="Testophyla", source="both", assembly_level="scaffold"))
     accs = _read_accs("ncbi-testophyla-phylum-accs.txt")
     assert accs == ["GCA_000000004.1"]
 
 
 def test_refseq_reference_genomes_only(in_ncbi):
-    _run(_args(target_taxon="Testophyla", source="both",
+    _run(_args(wanted_ref_tax="Testophyla", source="both",
                refseq_reference_genomes_only=True))
     accs = _read_accs("ncbi-testophyla-phylum-refseq-ref-accs.txt")
     # only GCF_...001 is a "reference genome"
@@ -150,19 +150,19 @@ def test_refseq_reference_genomes_only(in_ncbi):
 
 
 def test_not_found_exits_cleanly(in_ncbi, capsys):
-    code = _run(_args(target_taxon="Nonexistent", source="both"))
+    code = _run(_args(wanted_ref_tax="Nonexistent", source="both"))
     assert code == 0
     assert "doesn't seem to exist" in capsys.readouterr().out
 
 
 def test_bad_assembly_level_rejected(in_ncbi, capsys):
-    code = _run(_args(target_taxon="Testophyla", assembly_level="banana"))
+    code = _run(_args(wanted_ref_tax="Testophyla", assembly_level="banana"))
     assert code == 0
     assert "unrecognised" in capsys.readouterr().out.lower()
 
 
 def test_coarser_derep_rank_rejected(in_ncbi, capsys):
-    code = _run(_args(target_taxon="GenA", source="both", derep_rank="phylum"))
+    code = _run(_args(wanted_ref_tax="GenA", source="both", derep_rank="phylum"))
     assert code == 0
     assert capsys.readouterr().out  # friendly message emitted
 
@@ -177,35 +177,35 @@ def test_rank_counts(in_ncbi, capsys):
 def test_taxon_counts_is_case_insensitive(in_ncbi, capsys):
     # --get-taxon-counts routes through the shared resolver, so lowercase input
     # resolves to the canonical taxon rather than falling through to "no genomes"
-    _run(_args(target_taxon="testophyla", source="both", get_taxon_counts=True))
+    _run(_args(wanted_ref_tax="testophyla", source="both", get_taxon_counts=True))
     out = capsys.readouterr().out
     assert "No genomes were found" not in out
     assert "Testophyla" in out                    # canonical casing echoed back
 
 
 def test_taxon_counts_proper_case_no_match_note(in_ncbi, capsys):
-    _run(_args(target_taxon="Testophyla", source="both", get_taxon_counts=True))
+    _run(_args(wanted_ref_tax="Testophyla", source="both", get_taxon_counts=True))
     out = capsys.readouterr().out
     assert "Matched input" not in out
 
 
 def test_taxon_counts_reports_per_rank_breakdown(in_ncbi, capsys):
     # GTDB-style format: "The rank 'X' has N <taxon> entries."
-    _run(_args(target_taxon="Testophyla", source="both", get_taxon_counts=True))
+    _run(_args(wanted_ref_tax="Testophyla", source="both", get_taxon_counts=True))
     out = capsys.readouterr().out
     assert "The rank 'phylum' has 4 Testophyla entries." in out
 
 
 def test_taxon_counts_applies_source_filter(in_ncbi, capsys):
     # source refseq -> only the 2 GCF rows under Testophyla; scope note names the source
-    _run(_args(target_taxon="Testophyla", source="refseq", get_taxon_counts=True))
+    _run(_args(wanted_ref_tax="Testophyla", source="refseq", get_taxon_counts=True))
     out = capsys.readouterr().out
     assert "The rank 'phylum' has 2 Testophyla entries (in refseq)." in out
 
 
 def test_taxon_counts_applies_assembly_level_filter(in_ncbi, capsys):
     # only GCA_...004 is Scaffold under Testophyla; scope note names the level
-    _run(_args(target_taxon="Testophyla", source="both", assembly_level="scaffold",
+    _run(_args(wanted_ref_tax="Testophyla", source="both", assembly_level="scaffold",
                get_taxon_counts=True))
     out = capsys.readouterr().out
     assert "The rank 'phylum' has 1 Testophyla entries (at assembly level Scaffold)." in out
@@ -213,7 +213,7 @@ def test_taxon_counts_applies_assembly_level_filter(in_ncbi, capsys):
 
 def test_taxon_counts_reps_block(in_ncbi, capsys):
     # RefSeq-reference block, like GTDB's reps block
-    _run(_args(target_taxon="Testophyla", source="both",
+    _run(_args(wanted_ref_tax="Testophyla", source="both",
                refseq_reference_genomes_only=True, get_taxon_counts=True))
     out = capsys.readouterr().out
     assert "The rank 'phylum' has 4 Testophyla entries." in out         # base pool (source both -> no scope note)
@@ -223,7 +223,7 @@ def test_taxon_counts_reps_block(in_ncbi, capsys):
 
 def test_taxon_counts_ignores_derep(in_ncbi, capsys):
     # --derep-rank must NOT collapse the count (derep is a pull-time reduction)
-    _run(_args(target_taxon="Testophyla", source="both", derep_rank="family",
+    _run(_args(wanted_ref_tax="Testophyla", source="both", derep_rank="family",
                get_taxon_counts=True))
     out = capsys.readouterr().out
     assert "The rank 'phylum' has 4 Testophyla entries." in out   # all 4, not 2 families
@@ -236,7 +236,7 @@ def test_taxon_counts_multi_rank_breakdown(in_ncbi, capsys, tmp_path):
         _rec("GCF_000000011.1", ("Bacteria", "PhyY", "Dualname", "OrdY", "FamY", "GenY", "GenY sp1")),
     ]
     _write_mock_ncbi(tmp_path / PARQUET_FILENAME, records)
-    _run(_args(target_taxon="Dualname", source="both", get_taxon_counts=True))
+    _run(_args(wanted_ref_tax="Dualname", source="both", get_taxon_counts=True))
     out = capsys.readouterr().out
     assert "The rank 'phylum' has 1 Dualname entries." in out
     assert "The rank 'class' has 1 Dualname entries." in out

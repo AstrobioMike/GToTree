@@ -60,7 +60,7 @@ def in_gtdb(tmp_path, monkeypatch):
 
 
 def _args(**kw):
-    d = dict(target_taxon=None, target_rank=None, derep_rank="off",
+    d = dict(wanted_ref_tax=None, target_rank=None, derep_rank="off",
              get_rank_counts=False, get_taxon_counts=False,
              gtdb_representatives_only=False, refseq_reference_genomes_only=False,
              get_table=False)
@@ -83,14 +83,14 @@ def _read_accs(pattern):
 
 
 def test_plain_taxon_pull_derep_off(in_gtdb):
-    _run(_args(target_taxon="Testophyla"))
+    _run(_args(wanted_ref_tax="Testophyla"))
     accs = _read_accs("gtdb-testophyla-phylum-accs.txt")
     assert len(accs) == 4  # all 4 genomes
     assert os.path.exists("gtdb-testophyla-phylum-metadata.tsv")
 
 
 def test_derep_by_class_keeps_one_per_class(in_gtdb):
-    _run(_args(target_taxon="Testophyla", derep_rank="class"))
+    _run(_args(wanted_ref_tax="Testophyla", derep_rank="class"))
     accs = _read_accs("gtdb-testophyla-phylum-accs.txt")
     assert len(accs) == 2  # one best per class (ClassA, ClassB)
     # ClassA's best by quality is the 99.0-complete GCA_000000001.1
@@ -98,7 +98,7 @@ def test_derep_by_class_keeps_one_per_class(in_gtdb):
 
 
 def test_gtdb_representatives_only_filters(in_gtdb):
-    _run(_args(target_taxon="Testophyla", gtdb_representatives_only=True))
+    _run(_args(wanted_ref_tax="Testophyla", gtdb_representatives_only=True))
     accs = _read_accs("gtdb-testophyla-phylum-gtdb-rep-accs.txt")
     # GCA_000000004.1 has gtdb_representative="f" -> excluded
     assert "GCA_000000004.1" not in accs
@@ -106,7 +106,7 @@ def test_gtdb_representatives_only_filters(in_gtdb):
 
 
 def test_all_taxon_bulk_dump(in_gtdb):
-    _run(_args(target_taxon="all"))
+    _run(_args(wanted_ref_tax="all"))
     accs = _read_accs("gtdb-arc-and-bac-accs.txt")
     assert len(accs) == 4
 
@@ -119,20 +119,20 @@ def test_rank_counts(in_gtdb, capsys):
 
 
 def test_not_found_taxon_exits_cleanly(in_gtdb, capsys):
-    code = _run(_args(target_taxon="Nonexistent"))
+    code = _run(_args(wanted_ref_tax="Nonexistent"))
     assert code == 0
     assert "doesn't seem to exist" in capsys.readouterr().out
 
 
 def test_coarser_derep_rank_is_rejected(in_gtdb, capsys):
     # target at genus, derep at phylum (coarser) -> ValueError translated
-    code = _run(_args(target_taxon="GenA", derep_rank="phylum"))
+    code = _run(_args(wanted_ref_tax="GenA", derep_rank="phylum"))
     assert code == 0
     assert capsys.readouterr().out  # some friendly message emitted
 
 
 def test_reps_flags_mutually_exclusive(in_gtdb, capsys):
-    code = _run(_args(target_taxon="Testophyla",
+    code = _run(_args(wanted_ref_tax="Testophyla",
                       gtdb_representatives_only=True,
                       refseq_reference_genomes_only=True))
     assert code == 1

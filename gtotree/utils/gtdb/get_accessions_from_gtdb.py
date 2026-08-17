@@ -47,8 +47,8 @@ def build_parser(parent_subparsers=None):
     optional = parser.add_argument_group("Optional Parameters")
 
     required.add_argument(
-        "-t",
-        "--target-taxon",
+        "-w",
+        "--wanted-ref-tax",
         metavar="<STR>",
         help=("Target taxon (enter 'all' for all). Not needed with `--get-rank-counts`."),
         action="store",
@@ -148,14 +148,14 @@ def get_accessions_from_gtdb(args):
             gtdb_path, representatives_source=representatives_source)
         sys.exit(0)
 
-    if not args.target_taxon:
+    if not args.wanted_ref_tax:
         return
 
     if args.get_taxon_counts:
-        _report_taxon_counts_or_exit(gtdb_path, args.target_taxon, representatives_source)
+        _report_taxon_counts_or_exit(gtdb_path, args.wanted_ref_tax, representatives_source)
         sys.exit(0)
 
-    if args.target_taxon.lower() == "all":
+    if args.wanted_ref_tax.lower() == "all":
         _write_all(gtdb_path, representatives_source)
         sys.exit(0)
 
@@ -165,13 +165,13 @@ def get_accessions_from_gtdb(args):
 
 
 def preflight_checks(args):
-    if args.get_taxon_counts and not args.target_taxon:
+    if args.get_taxon_counts and not args.wanted_ref_tax:
         report_message("A specific taxon needs to also be provided to the `-t` flag "
                        "in order to use `--get-taxon-counts`.", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
-    if not args.get_rank_counts and not args.get_table and not args.target_taxon:
+    if not args.get_rank_counts and not args.get_table and not args.wanted_ref_tax:
         report_message("A target taxon needs to be provided to `-t` (or 'all').", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
@@ -208,17 +208,17 @@ def _select_rows(gtdb_path, args, representatives_source):
 
     try:
         selection = select_ref_genomes(
-            gtdb_path, "gtdb", args.target_taxon,
+            gtdb_path, "gtdb", args.wanted_ref_tax,
             target_rank=args.target_rank, derep_rank=args.derep_rank,
             reps_only=reps_only)
     except AmbiguousTaxon:
-        report_message(f"Since the input taxon '{args.target_taxon}' occurs at more than 1 rank, "
+        report_message(f"Since the input taxon '{args.wanted_ref_tax}' occurs at more than 1 rank, "
                         "you'll need to specify which rank is wanted as well before we pull the "
                         "accessions. This can be done with the `-r` parameter.", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
     except TaxonNotFound:
-        report_message(f"Input taxon '{args.target_taxon}' doesn't seem to exist at any rank :(", "yellow",
+        report_message(f"Input taxon '{args.wanted_ref_tax}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
     except ValueError as err:
@@ -226,8 +226,8 @@ def _select_rows(gtdb_path, args, representatives_source):
         sys.exit(0)
 
     # can use this if i want to notify about case-insensitive matching (thought i wanted it, but don't feel like it's really needed ATM)
-    # if selection.canonical != args.target_taxon:
-    #     report_message(f"Matched input '{args.target_taxon}' to GTDB taxon '{selection.canonical}'.",
+    # if selection.canonical != args.wanted_ref_tax:
+    #     report_message(f"Matched input '{args.wanted_ref_tax}' to GTDB taxon '{selection.canonical}'.",
     #                    "yellow", ii="    ", si="    ", width=100)
 
     for warning in selection.warnings:
