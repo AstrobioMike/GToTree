@@ -251,7 +251,7 @@ How many threads each individual muscle alignment job is given.
 ### Overriding the super5 alignment algorithm
 * **[-X ] default: false**
 
-With more than 1,000 input genomes, GToTree uses muscle's [super5](https://drive5.com/muscle5/manual/super5_algo.html) algorithm to keep alignment times reasonable. Provide **`-X`** to use the regular [PPP](https://drive5.com/muscle5/manual/ppp_algo.html) algorithm anyway – see [here](https://github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes) for more.
+With more than 500 input genomes, GToTree uses muscle's [super5](https://drive5.com/muscle5/manual/super5_algo.html) algorithm to keep alignment times reasonable. Provide **`-X`** to use the regular [PPP](https://drive5.com/muscle5/manual/ppp_algo.html) algorithm anyway – see [here](https://github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes) for more.
 
 ---
 
@@ -322,7 +322,7 @@ GToTree fingerprints the inputs and settings of each run. On a resume, if anythi
 HMM searches are performed in-process with [pyhmmer](https://pyhmmer.readthedocs.io/), rather than by shelling out to `hmmsearch`. The searches use the gathering thresholds (`--cut_ga`-equivalent) stored in the HMM profiles being used for cutoff values, as before. GToTree will exit up front if a provided HMM file has profiles lacking gathering thresholds.
 
 ## muscle
-[Muscle](https://www.drive5.com/muscle/downloads.htm) is run with default settings using the [`-align` PPP algorithm](https://drive5.com/muscle5/manual/ppp_algo.html) when working with fewer than 1,000 target genomes. When run with greater than 1,000 input genomes, the [`-super5` algorithm](https://drive5.com/muscle5/manual/super5_algo.html) is used. This can be overridden by adding `-X` to the GToTree call – see [here](https://github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes) for more on this. The number of threads given to each alignment job is set with `-M` (default 5).
+[Muscle](https://www.drive5.com/muscle/downloads.htm) is run with default settings using the [`-align` PPP algorithm](https://drive5.com/muscle5/manual/ppp_algo.html) when working with fewer than 1,000 target genomes. When run with greater than 500 input genomes, the [`-super5` algorithm](https://drive5.com/muscle5/manual/super5_algo.html) is used. This can be overridden by adding `-X` to the GToTree call – see [here](https://github.com/AstrobioMike/GToTree/wiki/things-to-consider#working-with-many-genomes) for more on this. The number of threads given to each alignment job is set with `-M` (default 5).
 
 ## trimal
 [Trimal](http://trimal.cgenomics.org/downloads) is run with default settings other than setting the `-automated1` flag, which performs "a heuristic selection of the automatic method based on similarity statistics. (Optimized for Maximum Likelihood phylogenetic tree reconstruction)."

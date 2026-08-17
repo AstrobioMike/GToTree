@@ -378,7 +378,7 @@ ENTRIES = [
         ("-X | --no-super5",
          "override super5 alignment",
          """
-         If working with greater than 1,000 target genomes, GToTree will by default
+         If working with greater than 500 target genomes, GToTree will by default
          use the 'super5' muscle alignment algorithm to increase the speed of the
          alignments. Provide this flag if you want to prevent that from happening and
          use the standard muscle alignment instead.

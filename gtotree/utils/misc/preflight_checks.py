@@ -224,7 +224,7 @@ def check_lineage(args):
 
     if args.lineage != "domain,phylum,class,genus,species" and not args.add_ncbi_tax and not args.add_gtdb_tax:
         report_message("You've specified a custom lineage (`-L`), but neither the "
-                       "`-t` nor `-D` flags were provided to indicate which taxonomy to use.")
+                       "`--add-gtdb-tax` or `--add-ncbi-tax` flags were provided to indicate which taxonomy to use.")
         report_very_early_exit(suggest_help=True)
 
     if args.add_ncbi_tax and args.add_gtdb_tax:
@@ -887,7 +887,7 @@ def track_tools_used(args, run_data):
 
 
 def check_input_genomes_amount(total_input_genomes, args):
-    if total_input_genomes >= 1000 and total_input_genomes < 12500 and not args.no_super5:
+    if total_input_genomes >= 500 and total_input_genomes < 12500 and not args.no_super5:
         message = many_genomes_notice(total_input_genomes)
         report_notice(message)
         time.sleep(30)
@@ -965,7 +965,7 @@ def final_setups(args, run_data):
     run_data.gene_representation_cutoff = args.gene_representation_cutoff
 
     num_all_input_genomes = len(run_data.get_all_input_genome_ids())
-    if num_all_input_genomes > 1000 and not args.no_super5:
+    if num_all_input_genomes > 500 and not args.no_super5:
         run_data.use_muscle_super5 = True
 
     run_data.num_muscle_threads = args.num_muscle_threads

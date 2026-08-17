@@ -13,10 +13,20 @@
         # gtt gen-scg-hmms
 
 
+    # make gen-scg-hmms take an option of using pfams or KOs...
+        # don't need to filter by coverage on KOs
+        # then i can do some benchmarking and see if we get more genes/longer alignments with KO-based SCG sets than with the current pfam ones
+
+
     # do some benchmarks between gtotree v1 and v2 timing-wise, nothing extensive, just to be able to say it's like X% faster
         # on my altermonas ~90 genomes, v2 is 80 seconds, v1 is 130 (~40% or 1.6x faster)
         # check a larger number of genomes also
         # if i want to go crazy, i could benchmark cpu/memory/time like i did for gen-mg
+
+
+    # it would be nice to be able to re-run a finished tree and add taxonomy only
+        # so change the labels in the tree, the alignment, and update the genomes-summary tsv
+        # either when the user added --add-gtdb-tax or --add-ncbi-tax, and/or if they added a mapping file on a --resume run
 
 
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
@@ -146,6 +156,13 @@
 #### paper examples
     # new tree of life
     # vibrionacaea with luxA search/highlighed (K00494)
+
+
+#### paper discussion
+    # "Where does this fit in with your analysis?"
+        # MAG recovery -> taxonomic classification -> tree (--wanted-ref-tax, -f <list-of-my-mags>)
+        # I want a tree of Alteromonas (--wanted-ref-tax Alteromonas)
+
 
 
 ##### accs that don't have enough hits for random testing #####

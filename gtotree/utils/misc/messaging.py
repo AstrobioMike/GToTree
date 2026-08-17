@@ -343,10 +343,10 @@ def _wanted_ref_tax_detail_lines(selection, indent):
     derep = selection.get("derep_rank")
 
     if rank and derep:
-        lines.append(f'{indent}- input-rank {rank} was dereplicated to one genome '
+        lines.append(f'{indent}- input rank, {rank}, was dereplicated to one genome '
                      f'per {derep}')
     elif rank:
-        lines.append(f'{indent}- all genomes under the input-rank {rank} were kept '
+        lines.append(f'{indent}- all genomes under the input rank, {rank}, were kept '
                      f'(--derep-rank off)')
 
     already_had = selection.get("num_selected", 0) - selection.get("num_added", 0)
@@ -490,7 +490,7 @@ def removed_genomes_pointer(run_data, stage):
     Point at the one removals file, and say which rows this report is about
     """
     return (f"        {run_data.run_files_dir_rel}/{REMOVED_GENOMES_FILENAME}\n"
-            f"        (stage_removed = {stage})\n\n")
+            f"          (stage_removed = {stage})\n\n")
 
 
 @capture_stdout_to_log(lambda: log_file_var.get())
@@ -576,7 +576,7 @@ def check_and_report_any_changed_default_behavior(args, run_data):
         lines.append(f"The number of threads used for `muscle` calls will be: {args.num_muscle_threads}")
 
     if args.no_super5:
-        lines.append("The 'super5' muscle algorithm will not be used even with greater than 1,000 input genomes")
+        lines.append("The 'super5' muscle algorithm will not be used even with greater than 500 input genomes")
 
     if args.keep_gene_alignments:
         lines.append("Individual protein-alignment files will retained, due to the `-k` flag being provided")
@@ -601,19 +601,15 @@ def check_and_report_any_changed_default_behavior(args, run_data):
 def many_genomes_notice(total_input_genomes):
     return (
     f"""    We seem to be aiming to work with {total_input_genomes:,} genomes. This is quite a bit, and
-    the time individual gene alignments can take can quickly become prohibitive
-    with many genomes like this.
+    the time individual gene alignments can take can quickly become
+    prohibitive with many genomes like this.
 
-    By default, GToTree is going to use the 'super5' muscle algorithm to help speed
-    up the alignments for this run. If you don't want this to happen, you should
-    cancel this run with `ctrl + c` now, and then add the `-X` flag to the GToTree
-    command and re-run it.
+    By default, GToTree is going to use the 'super5' muscle algorithm to help
+    speed up the alignments for this run. If you don't want this to happen,
+    you should cancel this run with `ctrl + c` now, and then add the `-X` flag
+    to the GToTree command and re-run it.
 
     More info can be found here:
-      github.com/AstrobioMike/GToTree/wiki/things-to-consider
-
-    And while we're chatting, you may also want to consider using \"representative\" genomes
-    if you're not already. More info on that can be found here:
       github.com/AstrobioMike/GToTree/wiki/things-to-consider
 
     We will wait 30 seconds before continuing with our regularly scheduled program :)"""
@@ -638,8 +634,8 @@ def few_genomes_notice(total_input_genomes, args):
 def absurd_number_of_genomes_notice(total_input_genomes):
     return (
     f"""    The alignment and treeing steps, particularly the alignments, can become
-    prohibitively computationally heavy with many input genomes. With {total_input_genomes:,} genomes,
-    this job may not be feasible :(
+    prohibitively computationally heavy with many input genomes. With {total_input_genomes:,}
+    genomes, this job may not be feasible :(
 
     Often it is useful to slim down how many genomes of closely related organisms
     we are including when looking across a broad level of diversity, as having many
@@ -833,7 +829,7 @@ def report_pfam_searching_update(run_data):
     num_pfams_failed = len(run_data.failed_pfam_targets)
 
     if num_pfams_found == num_pfam_targets:
-        message = f"    {color_text(f"Genomes were searched for all {num_pfam_targets} input Pfam targets.", 'green')}"
+        message = f"    {color_text(f"Genomes were searched for {num_pfam_targets} input Pfam target(s).", 'green')}"
     elif num_pfams_found == 0:
         message = f"    {color_text("None of the input Pfam targets were found in the Pfam database", 'yellow')}, reported in:\n"
         message += f"      {run_data.run_files_dir_rel}/failed-pfam-targets.txt\n\n"
@@ -841,7 +837,7 @@ def report_pfam_searching_update(run_data):
     else:
         message = f"    {color_text(f"{num_pfams_failed} target Pfam(s) failed to be found in the Pfam database", "yellow")}, reported in:\n"
         message += f"      {run_data.run_files_dir_rel}/failed-pfam-targets.txt\n\n"
-        message += f"    {color_text(f"Genomes were searched for the remaining {num_pfams_found} specified Pfams.", 'yellow')}"
+        message += f"    {color_text(f"Genomes were searched for the remaining {num_pfams_found} specified Pfam(s).", 'yellow')}"
 
     report_section_info(message)
 
@@ -853,7 +849,7 @@ def report_ko_searching_update(run_data):
     num_kos_failed = len(run_data.failed_ko_targets)
 
     if num_kos_found == num_ko_targets:
-        message = f"    {color_text(f"Genomes were searched for all {num_ko_targets} input KO targets.", 'green')}"
+        message = f"    {color_text(f"Genomes were searched for {num_ko_targets} input KO target(s).", 'green')}"
     elif num_kos_found == 0:
         message = f"    {color_text("None of the input KO targets were found in the KO database", 'yellow')}, reported in:\n"
         message += f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n"
@@ -861,7 +857,7 @@ def report_ko_searching_update(run_data):
     else:
         message = f"    {color_text(f"{num_kos_failed} target KO(s) failed to be found in the KO database", "yellow")}, reported in:\n"
         message += f"      {run_data.run_files_dir_rel}/failed-ko-targets.txt\n\n"
-        message += f"    {color_text(f"Genomes were searched for the remaining {num_kos_found} specified KOs.", 'yellow')}"
+        message += f"    {color_text(f"Genomes were searched for the remaining {num_kos_found} specified KO(s).", 'yellow')}"
 
     report_section_info(message)
 
@@ -993,7 +989,7 @@ def report_SCG_set_filtering_update(run_data):
     num_SCG_targets_remaining = total_SCG_targets - num_SCG_targets_dropped
 
     if num_SCG_targets_dropped == 0:
-        message = f"{color_text(f"All {total_SCG_targets} SCG-targets were successfully aligned and prepared!".center(82), 'green')}"
+        message = f"{color_text(f"None of the {total_SCG_targets:,} SCG-targets were filtered out!".center(82), 'green')}"
     else:
         message = (f"    Of the initial {total_SCG_targets} SCG-targets:\n\n")
         message += (f"        {color_text(f"{num_SCG_targets_dropped} had no hits or were filtered out", 'yellow')}, reported in:\n")
@@ -1023,7 +1019,10 @@ def summarize_results(args, run_data):
     num_initial_genomes = len(run_data.get_all_input_genome_ids())
     num_remaining_genomes = len(run_data.get_all_remaining_input_genome_ids())
 
-    print(f"\n  Overall, {num_remaining_genomes:,} of the initial {num_initial_genomes:,} genomes were retained (see notes below).\n")
+    if num_remaining_genomes == num_initial_genomes:
+        print(f"\n  All {num_initial_genomes:,} input genomes were retained through the workflow!\n")
+    else:
+        print(f"\n  Overall, {num_remaining_genomes:,} of the initial {num_initial_genomes:,} genomes were retained (see notes below).\n")
 
     num_genes = len(run_data.get_all_SCG_targets_remaining())
     num_sites = run_data.final_alignment_length
