@@ -29,6 +29,10 @@
         # either when the user added --add-gtdb-tax or --add-ncbi-tax, and/or if they added a mapping file on a --resume run
 
 
+        # in that vein, maybe a separate `gtt update-headers` subcommand
+            # takes a finished run and either tax info to add or a mapping file, and creates new outputs in a new directory
+
+
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
         # same for pfam, that they start with PF, and a note that says
         # something like "these don't match the expected format (e.g., ...). Are you sure you passed the right file to the right parameter?"

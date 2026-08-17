@@ -443,7 +443,7 @@ def setup_run_data(args, previous_run_data=None):
                 "We are trying to resume a previous run (specified by the `-R` or "
                 "`--resume` flag), but this run doesn't match the previous one:\n"
                 "        - " + "\n        - ".join(differences) + "\n\n"
-                "  Resuming would mix results from two different runs. Your best "
+                "Resuming would mix results from two different runs. Your best "
                 "bet is to start a fresh run by adding the `-F` flag to "
                 "force-overwrite the previous outputs or specify a new output dir.")
             report_very_early_exit()
