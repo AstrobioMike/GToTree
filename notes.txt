@@ -16,7 +16,7 @@
     # gtt get-accs-from-* --get-taxon-counts DOES NOT currently take into account derep-rank (IT SHOULD)
 
 
-    # gtt get-accs-from-* doesn't give a message or error out if you pass --get-rank-counts with a wanted taxon
+    # gtt get-accs-from-* doesn't give a message or error out if you pass --get-rank-counts with a wanted taxon (it just ignores the wanted taxon arg)
         # it should do at least one of those, at best, maybe give counts for all ranks below the wanted taxon rank (which may supersede --get-taxon-counts)
         # current behaviour output below:
 
@@ -34,9 +34,8 @@
             #     species    199923
 
 
-    # make gen-scg-hmms take an option of using pfams or KOs...
-        # don't need to filter by coverage on KOs
-        # then i can do some benchmarking and see if we get more genes/longer alignments with KO-based SCG sets than with the current pfam ones
+    # for main gtotree, should i make -w take a comma or space-delimited list for multiple instead of multiple -w's?
+        # in that vein, right now i don't support multiple --derep-rank's, but maybe i should (required in the same order as the -w's)?
 
 
     # do some benchmarks between gtotree v1 and v2 timing-wise, nothing extensive, just to be able to say it's like X% faster
@@ -44,14 +43,6 @@
         # check a larger number of genomes also
         # if i want to go crazy, i could benchmark cpu/memory/time like i did for gen-mg
 
-
-    # it would be nice to be able to re-run a finished tree and add taxonomy only
-        # so change the labels in the tree, the alignment, and update the genomes-summary tsv
-        # either when the user added --add-gtdb-tax or --add-ncbi-tax, and/or if they added a mapping file on a --resume run
-
-
-        # in that vein, maybe a separate `gtt update-headers` subcommand
-            # takes a finished run and either tax info to add or a mapping file, and creates new outputs in a new directory
 
 
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K

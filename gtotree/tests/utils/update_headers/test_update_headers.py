@@ -448,8 +448,8 @@ class TestItolRegeneration:
         out_dir, _args_out, _rd = _outputs(
             tmp_path, source, mapping_file=str(mapping))
 
-        itol_file = os.path.join(out_dir, "pfam-search-results", "iToL-files",
-                                 "PF00789-iToL.txt")
+        itol_file = os.path.join(out_dir, "pfam-search-results", "itol-files",
+                                 "PF00789-itol.txt")
         assert "K12" in open(itol_file).read()
 
     def test_nothing_is_written_when_the_run_had_no_searches(self, tmp_path,

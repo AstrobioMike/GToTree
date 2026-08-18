@@ -13,6 +13,7 @@ SUBCOMMAND_MAP = {
     "search-pfams":        "gtotree.utils.pfam.search_pfams_cli",
     "update-headers":      "gtotree.utils.update_headers.update_headers_cli",
     "midpoint-root-tree":  "gtotree.utils.helper_scripts.gtt_midpoint_root_tree",
+    "itol":                "gtotree.cli.itol",
     "data":                "gtotree.cli.data",
     "test":                "gtotree.tests.smoke",
 }
@@ -68,6 +69,10 @@ PROGRAM_GROUPS = [
             {
                 "name": "midpoint-root-tree",
                 "desc": "midpoint-root a newick tree",
+            },
+            {
+                "name": "itol",
+                "desc": "generate iToL files for annotating a tree at itol.embl.de",
             },
         ],
     },

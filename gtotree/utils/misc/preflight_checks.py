@@ -1002,7 +1002,7 @@ def setup_pfam_dirs(run_data):
             run_data.tmp_pfam_results_dir,
             os.path.join(run_data.pfam_results_dir, "info"),
             os.path.join(run_data.pfam_results_dir, "individual-genome-results"),
-            os.path.join(run_data.pfam_results_dir, "iToL-files"),
+            os.path.join(run_data.pfam_results_dir, "itol-files"),
             os.path.join(run_data.pfam_results_dir, "pfam-hit-seqs"),
             os.path.join(run_data.pfam_results_dir, "target-pfam-profiles")]
 
@@ -1020,7 +1020,7 @@ def setup_ko_dirs(run_data):
     dirs = [run_data.ko_results_dir,
             run_data.tmp_ko_results_dir,
             os.path.join(run_data.ko_results_dir, "individual-genome-results"),
-            os.path.join(run_data.ko_results_dir, "iToL-files"),
+            os.path.join(run_data.ko_results_dir, "itol-files"),
             os.path.join(run_data.ko_results_dir, "ko-hit-seqs"),
             os.path.join(run_data.ko_results_dir, "target-ko-profiles")]
 

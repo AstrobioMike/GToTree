@@ -270,9 +270,9 @@ PF05400
 > If you want these searches *without* building a tree, `gtt search-pfams` (and `gtt search-kos`) do exactly this part on their own, taking the same genome inputs.
 
 ## Visualizing the tree
-When that finishes, our output `flit-bacterial-tree/` directory holds the final tree, `flit-bacterial-tree.tre`, and a subdirectory `pfam-search-results/` holding the Pfam results — including `pfam-hit-counts.tsv` and an `iToL-files/` directory with one file per target.
+When that finishes, our output `flit-bacterial-tree/` directory holds the final tree, `flit-bacterial-tree.tre`, and a subdirectory `pfam-search-results/` holding the Pfam results — including `pfam-hit-counts.tsv` and an `itol-files/` directory with one file per target.
 
-To get the figure pictured at the start of this example, we just need to drag-and-drop the `flit-bacterial-tree.tre` file onto the [Interactive Tree of Life upload page](https://itol.embl.de/upload.cgi), and then after that loads we can drag-and-drop our `pfam-search-results/iToL-files/PF05400-iToL.txt` file over the page to color the branches. Then I clicked "Unrooted", Labels "Off", and set the color of the regular branches to gray. That gets us to this point:
+To get the figure pictured at the start of this example, we just need to drag-and-drop the `flit-bacterial-tree.tre` file onto the [Interactive Tree of Life upload page](https://itol.embl.de/upload.cgi), and then after that loads we can drag-and-drop our `pfam-search-results/itol-files/PF05400-itol.txt` file over the page to color the branches. Then I clicked "Unrooted", Labels "Off", and set the color of the regular branches to gray. That gets us to this point:
 
 <!-- TODO(Mike): iToL screenshot here -->
 

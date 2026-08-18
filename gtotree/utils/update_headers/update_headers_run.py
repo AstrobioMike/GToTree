@@ -356,9 +356,15 @@ def regenerate_itol_files(run_data, summary_path, out_dir):
     it's the summary that carries the labels -- so pointing the same generator at the
     new summary and the original counts is all this takes.
     """
-    from gtotree.utils.misc.itol import generate_search_itol_files
+    from gtotree.utils.misc.itol import (generate_input_source_itol_files,
+                                         generate_search_itol_files)
 
     written = []
+
+    source_itol_dir = os.path.join(out_dir, "itol-files")
+    if generate_input_source_itol_files(summary_path=summary_path,
+                                        itol_dir=source_itol_dir):
+        written.append(source_itol_dir)
 
     sources = []
     if run_data.target_pfams_file:
@@ -371,7 +377,7 @@ def regenerate_itol_files(run_data, summary_path, out_dir):
     for counts_path, subdir in sources:
         if not _is_usable(counts_path):
             continue
-        itol_dir = os.path.join(out_dir, subdir, "iToL-files")
+        itol_dir = os.path.join(out_dir, subdir, "itol-files")
         targets = generate_search_itol_files(counts_path=counts_path,
                                              summary_path=summary_path,
                                              itol_dir=itol_dir)

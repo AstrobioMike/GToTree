@@ -76,9 +76,16 @@ my best to rapidly address anything!
   - `gtt get-accs-from-gtdb` / `gtt get-accs-from-ncbi` - pull accessions based on taxonomy if you want them (though the main `gtotree` program does this for you now)
   - `gtt search-pfams` — search input genomes for a set of target Pfams
   - `gtt search-kos` — search input genomes for a set of target KOs
+  - `gtt itol` - various subcommands for generating iToL-compatible files that can be drag-and-dropped onto a tree in the iToL web interface
   - `gtt data get` / `gtt data locations` — download or update the databases GToTree uses,
     and check or set the data-location environment variables (this is all handled automatically anyway)
   - `gtt test` — a quick end-to-end test of the installed environment
+
+
+#### New outputs
+
+- auto-creates iToL-compatible files for different input sources
+  - so you can, e.g., drag-and-drop an iToL file right onto the tree in iToL to highlight all your MAGs that came in as nucleotide fasta files alongside references
 
 
 ### Parameter changes or additions
