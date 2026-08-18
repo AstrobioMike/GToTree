@@ -11,6 +11,7 @@ SUBCOMMAND_MAP = {
     "gen-scg-hmms":        "gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli",
     "search-kos":          "gtotree.utils.ko.search_kos_cli",
     "search-pfams":        "gtotree.utils.pfam.search_pfams_cli",
+    "update-headers":      "gtotree.utils.update_headers.update_headers_cli",
     "midpoint-root-tree":  "gtotree.utils.helper_scripts.gtt_midpoint_root_tree",
     "data":                "gtotree.cli.data",
     "test":                "gtotree.tests.smoke",
@@ -60,6 +61,10 @@ PROGRAM_GROUPS = [
     {
         "title": "Misc",
         "programs": [
+            {
+                "name": "update-headers",
+                "desc": "re-label a completed GToTree run's output tree and alignment",
+            },
             {
                 "name": "midpoint-root-tree",
                 "desc": "midpoint-root a newick tree",

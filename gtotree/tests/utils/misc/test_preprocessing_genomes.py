@@ -338,3 +338,64 @@ def test_nucleotide_mode_skips_the_protein_attempt_without_raising(tmp_path):
 
     assert (done, nt) == (True, True)
     assert len(calls) == 1 and calls[0].endswith("_genomic.fna.gz")
+
+
+# ---------------------------------------------------------------------------
+# the base-link map is read through run_data.ncbi_sub_table_path
+# ---------------------------------------------------------------------------
+
+def _write_sub_table(path, rows):
+    with open(path, "w") as f:
+        f.write("input_accession\tfound_accession\ttaxid\thttp_base_link\n")
+        for acc, link in rows.items():
+            f.write(f"{acc}\t{acc}\t0\t{link}\n")
+
+
+class _SubTableRunData:
+    def __init__(self, sub_table_path, tmp_dir=""):
+        self.ncbi_sub_table_path = sub_table_path
+        self.tmp_dir = tmp_dir
+
+
+def test_the_base_link_map_is_read_from_the_recorded_sub_table_path(tmp_path):
+    """
+    `parse_assembly_summary` early-returns on `ncbi_sub_table_path`, so that field is
+    the single source of truth for where the table is. Rebuilding the path from
+    `tmp_dir` instead let the two drift -- a run whose recorded path pointed elsewhere
+    would skip the lookup and then read a different file, or none.
+    """
+    elsewhere = tmp_path / "somewhere-else"
+    elsewhere.mkdir()
+    sub_table = elsewhere / "ncbi-accessions-info.tsv"
+    _write_sub_table(sub_table, {"GCF_000005845.2": "http://example/GCF_000005845.2_ASM"})
+
+    # tmp_dir deliberately points somewhere with no sub-table in it
+    rd = _SubTableRunData(str(sub_table), tmp_dir=str(tmp_path / "working-dir"))
+
+    assert P.build_base_link_map(rd) == {
+        "GCF_000005845.2": "http://example/GCF_000005845.2_ASM"}
+
+
+def test_a_missing_sub_table_is_a_clear_error(tmp_path):
+    rd = _SubTableRunData(str(tmp_path / "not-there.tsv"))
+    with pytest.raises(FileNotFoundError, match="no download links"):
+        P.build_base_link_map(rd)
+
+
+def test_an_unset_sub_table_path_is_a_clear_error():
+    """
+    The shape a stale-state resume produces: the lookup was skipped, so there's no
+    table, and the old code failed several layers later with an unrelated message.
+    """
+    rd = _SubTableRunData("")
+    with pytest.raises(FileNotFoundError, match="no download links"):
+        P.build_base_link_map(rd)
+
+
+def test_get_base_link_normalizes_spaces_and_trailing_slashes():
+    base_link, acc_assembly_str = P.get_base_link(
+        "GCF_000005845.2",
+        {"GCF_000005845.2": "http://example/GCF_000005845.2_ASM 584 v2/"})
+
+    assert base_link == "http://example/GCF_000005845.2_ASM_584_v2"
+    assert acc_assembly_str == "GCF_000005845.2_ASM_584_v2"

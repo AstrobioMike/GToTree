@@ -89,6 +89,7 @@
 # - HMM can be auto-selected based on the `--wanted-ref-tax` specification
 # - resume interrupted runs with `--resume`
 # - all helpers are subcommands under `gtt` now (run `gtt` or `gtt -h` for an overview)
+    # - this includes `gtt update-headers`, allowing you to modify headers of a previously completed run now!
 # - main program callable with lowercase `gtotree` or original `GToTree` now
 
 

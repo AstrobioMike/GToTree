@@ -162,3 +162,53 @@ def test_parse_idempotent_if_subtable_already_set(tmp_path):
 
     out = parse_assembly_summary(str(summary), rd)
     assert out.ncbi_sub_table_path == "already/done.tsv"   # unchanged, no work
+
+
+################################################################################
+# taxid propagation onto GenomeData
+################################################################################
+
+def test_parse_records_the_taxid_on_the_genome_data(tmp_path):
+    """
+    The sub-table lives in the working directory, which a finished run deletes, so
+    the summary table reads the taxid off the GenomeData instead -- where it also
+    survives into run-data.json and is still there for `gtt update-headers`.
+    """
+    summary = tmp_path / "ncbi-data.parquet"
+    _write_parquet(summary, [_row("GCF_000005845.2", taxid="511145")])
+    rd = FakeRunData(["GCF_000005845.2"], tmp_path)
+
+    parse_assembly_summary(str(summary), rd)
+
+    by_id = {gd.id: gd for gd in rd.ncbi_accs}
+    assert by_id["GCF_000005845.2"].taxid == "511145"
+
+
+def test_the_taxid_on_genome_data_matches_the_sub_table(tmp_path):
+    """
+    The two are written from the same row, and the summary table's taxid column
+    switched from one source to the other -- so they must not drift.
+    """
+    summary = tmp_path / "ncbi-data.parquet"
+    _write_parquet(summary, [_row("GCF_000005845.2", taxid="511145"),
+                             _row("GCA_000009065.1", taxid="83333")])
+    rd = FakeRunData(["GCF_000005845.2", "GCA_000009065.1"], tmp_path)
+
+    parse_assembly_summary(str(summary), rd)
+
+    _header, rows = _read_subtable(rd)
+    from_sub_table = {r["input_accession"]: r["taxid"] for r in rows}
+    from_genome_data = {gd.id: gd.taxid for gd in rd.ncbi_accs}
+
+    assert from_genome_data == from_sub_table
+
+
+def test_a_not_found_accession_has_no_taxid(tmp_path):
+    summary = tmp_path / "ncbi-data.parquet"
+    _write_parquet(summary, [_row("GCF_000005845.2")])
+    rd = FakeRunData(["GCF_000005845.2", "GCF_999999999.1"], tmp_path)
+
+    parse_assembly_summary(str(summary), rd)
+
+    by_id = {gd.id: gd for gd in rd.ncbi_accs}
+    assert by_id["GCF_999999999.1"].taxid is None

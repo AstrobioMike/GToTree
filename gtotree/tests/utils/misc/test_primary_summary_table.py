@@ -197,3 +197,64 @@ def test_helper_is_the_one_the_subcommands_use():
     from gtotree.utils.target_search import target_search_outputs
 
     assert target_search_outputs.search_completed_value is search_completed_value
+
+
+################################################################################
+# the taxid column
+################################################################################
+
+class TestTaxidColumn:
+    """
+    The taxid comes off the GenomeData, not the NCBI sub-table. That sub-table lives
+    in the working directory a finished run deletes, so reading it here meant the
+    table could only ever be built before cleanup -- which `gtt update-headers`,
+    rebuilding it for a finished run, can't be.
+    """
+
+    def test_the_taxid_comes_from_the_genome_data(self, tmp_path):
+        rd = _run_data(tmp_path)
+        gd = _add(rd, "GCF_000005845.2")
+        gd.taxid = "511145"
+
+        generate_primary_summary_table(_args(), rd)
+
+        _header, rows = _table(tmp_path)
+        assert rows["GCF_000005845.2"]["taxid"] == "511145"
+
+    def test_a_genome_with_no_taxid_reads_na(self, tmp_path):
+        rd = _run_data(tmp_path)
+        _add(rd, "local-genome-1")
+
+        generate_primary_summary_table(_args(), rd)
+
+        _header, rows = _table(tmp_path)
+        assert rows["local-genome-1"]["taxid"] == "NA"
+
+    def test_a_dangling_sub_table_path_is_not_consulted(self, tmp_path):
+        """
+        A finished run's recorded sub-table path points at a deleted directory.
+        Reading it would raise; the taxid must come from the GenomeData regardless.
+        """
+        rd = _run_data(tmp_path,
+                       ncbi_sub_table_path=str(tmp_path / "gone" / "sub-table.tsv"))
+        gd = _add(rd, "GCF_000005845.2")
+        gd.taxid = "511145"
+
+        generate_primary_summary_table(_args(), rd)
+
+        _header, rows = _table(tmp_path)
+        assert rows["GCF_000005845.2"]["taxid"] == "511145"
+
+    def test_the_table_can_be_written_to_another_path(self, tmp_path):
+        """`out_path` is what lets update-headers rebuild this without overwriting."""
+        rd = _run_data(tmp_path)
+        _add(rd, "GCF_000005845.2")
+
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        out = elsewhere / "renamed-summary.tsv"
+
+        generate_primary_summary_table(_args(), rd, out_path=str(out))
+
+        assert out.is_file()
+        assert not (tmp_path / "genomes-summary-info.tsv").exists()

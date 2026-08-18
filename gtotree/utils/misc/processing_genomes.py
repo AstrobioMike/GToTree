@@ -151,7 +151,7 @@ def _apply_ncbi_accession_status(acc_gd, status, run_data):
 
 
 def prepare_accession(acc, run_data, base_link_map=None):
-    base_link, acc_assembly_str = get_base_link(acc, run_data, base_link_map=base_link_map)
+    base_link, acc_assembly_str = get_base_link(acc, base_link_map)
 
     # an unresolvable download directory (no ftp_path and nothing to rebuild
     # from) comes through as "na" -> there's nothing to download
@@ -349,7 +349,16 @@ def _is_throttle(err):
 
 
 def build_base_link_map(run_data):
-    df = pd.read_csv(run_data.tmp_dir + "/ncbi-accessions-info.tsv", sep="\t",
+    """
+    {input accession -> its download base link}, from the NCBI sub-table
+    """
+    path = run_data.ncbi_sub_table_path
+    if not path or not os.path.isfile(path):
+        raise FileNotFoundError(
+            "the NCBI accession info table couldn't be found at "
+            f'"{path or "<unset>"}", so there are no download links to work from')
+
+    df = pd.read_csv(path, sep="\t",
                      usecols=["input_accession", "http_base_link"])
     return dict(zip(df["input_accession"], df["http_base_link"], strict=True))
 
@@ -361,9 +370,8 @@ def _normalize_base_link(raw_base_link):
     return base_link, acc_assembly_str
 
 
-def get_base_link(acc, run_data, base_link_map=None):
-    raw_base_link = base_link_map[acc]
-    return _normalize_base_link(raw_base_link)
+def get_base_link(acc, base_link_map):
+    return _normalize_base_link(base_link_map[acc])
 
 
 def _process_one_genbank_file(gb, run_data):

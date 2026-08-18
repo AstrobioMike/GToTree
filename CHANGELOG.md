@@ -59,12 +59,20 @@ my best to rapidly address anything!
 - the new `-R`/`--resume` flag attempts to continue an interrupted run
   - this is available on `gtt gen-scg-hmms`, `gtt search-pfams`, and `gtt search-kos` too
 
+
 #### New helper subcommands
 
 - All prior helper commands are now grouped under `gtt` as subcommands. Run `gtt` by itself to
   see an overview. Main ones include:
   - `gtt hmms` - list all available pre-packaged SCG-HMMs
   - `gtt gen-scg-hmms` — build a new SCG-HMM set from any set of input genomes
+  - `gtt update-headers` - modify the headers/labels in a previously complete GToTree run to add taxonomy info or labels from a mapping file
+    - takes the output directory of a completed GToTree run and writes out a 
+      new tree, alignment, and `genomes-summary-info.tsv` carrying updated genome labels
+    - can accept `-m`, `--add-gtdb-tax`, `--add-ncbi-tax`, and `-lineage-ranks` just like the main program
+    - puts new outputs in a new directory, it does not overwrite the originals
+    - creates a "label-map.tsv" tracking changed labels
+    - regenerates any iToL files for any Pfam/KO searches the original run did
   - `gtt get-accs-from-gtdb` / `gtt get-accs-from-ncbi` - pull accessions based on taxonomy if you want them (though the main `gtotree` program does this for you now)
   - `gtt search-pfams` — search input genomes for a set of target Pfams
   - `gtt search-kos` — search input genomes for a set of target KOs

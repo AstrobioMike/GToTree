@@ -161,14 +161,10 @@ def SCG_sets_below_representation_cutoff(run_data):
     return below
 
 
-def generate_primary_summary_table(args, run_data):
-
-    if run_data.ncbi_sub_table_path:
-        ncbi_df     = pd.read_csv(run_data.ncbi_sub_table_path, sep="\t", header=0)
-        taxid_map   = dict(zip(ncbi_df["input_accession"], ncbi_df["taxid"], strict=True))
-    else:
-        taxid_map   = {}
-
+def generate_primary_summary_table(args, run_data, out_path=None):
+    """
+    Write genomes-summary-info.tsv
+    """
     m = run_data.mapping_dict
 
     report_pfam = bool(run_data.target_pfams_file)
@@ -178,8 +174,7 @@ def generate_primary_summary_table(args, run_data):
     for g in run_data.all_input_genomes:
         label = m.get(g.id) or g.id
 
-        # lookup taxid only if an NCBI sub-table was produced
-        taxid = taxid_map.get(g.id, "NA") if run_data.ncbi_sub_table_path else "NA"
+        taxid = g.taxid or "NA"
 
         row = {
             "genome_id":                     g.id,
@@ -210,7 +205,7 @@ def generate_primary_summary_table(args, run_data):
     if args.add_gtdb_tax or args.add_ncbi_tax:
         df = add_tax_info(df, run_data, args)
 
-    out = f"{run_data.output_dir}/genomes-summary-info.tsv"
+    out = out_path or f"{run_data.output_dir}/genomes-summary-info.tsv"
     df.to_csv(out, sep="\t", index=False, na_rep="NA")
 
 

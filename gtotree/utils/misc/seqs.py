@@ -366,6 +366,27 @@ def usable_concatenated_alignment_path(run_data):
     return None
 
 
+def relabel_fasta(source_path, out_path, label_for):
+    """
+    Copy `source_path` to `out_path` with each header replaced by `label_for(header)`
+    """
+    counts = {"total": 0, "changed": 0}
+
+    def _write_relabeled(fh):
+        for seq in SeqIO.parse(source_path, "fasta"):
+            counts["total"] += 1
+            label = label_for(seq.id)
+            if label is None:
+                label = seq.id
+            elif label != seq.id:
+                counts["changed"] += 1
+            fh.write(f">{label}\n{seq.seq}\n")
+
+    atomic_write_text(out_path, _write_relabeled)
+
+    return counts["total"], counts["changed"]
+
+
 def swap_labels_in_alignment(run_data):
     ext = run_data.general_ext
     orig_alignment_path, backup_alignment_path = concatenated_alignment_locations(run_data)
@@ -378,12 +399,8 @@ def swap_labels_in_alignment(run_data):
             "the concatenated alignment couldn't be found at either "
             f'"{orig_alignment_path}" or "{backup_alignment_path}"')
 
-    def _write_relabeled(fh):
-        for seq in SeqIO.parse(source_path, "fasta"):
-            label = run_data.mapping_dict.get(seq.id, seq.id)
-            fh.write(f">{label}\n{seq.seq}\n")
-
-    atomic_write_text(new_alignment_path, _write_relabeled)
+    relabel_fasta(source_path, new_alignment_path,
+                  lambda header: run_data.mapping_dict.get(header, header))
 
     if source_path == orig_alignment_path:
         os.replace(orig_alignment_path, backup_alignment_path)

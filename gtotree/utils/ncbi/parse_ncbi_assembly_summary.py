@@ -104,6 +104,8 @@ def parse_assembly_summary(assembly_summary_file, run_data):
 
     found = set()
 
+    gd_by_acc = {gd.id: gd for gd in run_data.ncbi_accs}
+
     ncbi_sub_table_path = run_data.tmp_dir + "/ncbi-accessions-info.tsv"
 
     dataset = ds.dataset(str(assembly_summary_file), format="parquet")
@@ -134,6 +136,10 @@ def parse_assembly_summary(assembly_summary_file, run_data):
                 infra_name = _clean(row.get("infraspecific_name"))
                 version_status = _clean(row.get("version_status"))
                 assembly_level = _clean(row.get("assembly_level"))
+
+                matched_gd = gd_by_acc.get(wanted_dict[root])
+                if matched_gd is not None:
+                    matched_gd.taxid = taxid
 
                 # prefer the real ftp_path (normalized to https), else rebuild it,
                 # else "na" (this is the base_link consumed downstream).
