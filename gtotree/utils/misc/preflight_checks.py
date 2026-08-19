@@ -43,6 +43,8 @@ from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_access
                                                    describe_all_expansion,
                                                    WantedRefTaxError)
 from gtotree.utils.misc.general import (ToolsUsed,
+                                   read_single_column_file,
+                                   duplicate_entries,
                                    CorruptRunData,
                                    SOURCE_ACCESSION, SOURCE_GENBANK, SOURCE_FASTA,
                                    SOURCE_AMINO_ACID,
@@ -50,6 +52,8 @@ from gtotree.utils.misc.general import (ToolsUsed,
                                    read_run_data,
                                    wanted_ref_tax_source_line,
                                    wanted_ref_tax_list)
+from gtotree.utils.misc.target_id_checks import (check_target_id_file,
+                                                 TargetIDFormatError)
 from gtotree.utils.misc.stages import PipelineStage
 from gtotree.utils.misc.resume_state import (ResumeProfile, hash_file_contents,
                                         STATE_VERSION)
@@ -170,9 +174,35 @@ def primary_args_validation(args):
     check_tree_program(args)
     checks_for_nucleotide_mode(args)
     check_wanted_ref_tax_args(args)
-    args = check_output_dir(args)
+    check_target_id_formats(args)
     args = check_input_genome_files(args)
+    args = check_output_dir(args)
     return args
+
+
+TARGET_ID_FILES = (
+    ("target_pfams_file", "-p", "pfam"),
+    ("target_kos_file", "-K", "ko"),
+)
+
+
+def check_target_id_formats(args):
+    """
+    Confirm any `-p`/`-K` file actually holds IDs of the type its flag expects
+    """
+    for dest, flag, key in TARGET_ID_FILES:
+        path = getattr(args, dest, None)
+        if not path:
+            continue
+
+        check_path(path, flag)
+        check_for_whitespace(path, flag)
+
+        try:
+            check_target_id_file(path, key)
+        except TargetIDFormatError as err:
+            report_message(str(err))
+            report_very_early_exit(suggest_help=True)
 
 
 def check_for_minimum_args(args):
@@ -610,17 +640,16 @@ def check_path(path, flag):
 
 
 def check_expected_single_column_input(path, flag, get_count=False):
-
+    """
+    Validate one single-column input file, returning the path unchanged
+    """
     check_path(path, flag)
     check_for_whitespace(path, flag)
-    path = check_line_endings(path, flag)
-    path = check_for_duplicates(path, flag)
+    report_duplicate_entries(path, flag)
     check_inputs_exist(path, flag)
 
     if get_count:
-        with open(path) as f:
-            lines = [line.strip() for line in f if line.strip()]
-        return path, len(lines)
+        return path, len(read_single_column_file(path))
 
     return path
 
@@ -644,8 +673,15 @@ def check_for_whitespace(path, flag):
 
 
 def check_line_endings(path, flag):
+    """
+    Rewrite a CRLF file as LF, returning the path to use
 
-    # checking for any CLRF line endings and creating a new file if so
+    Only the mapping file (`-m`) needs this. The single-column inputs are read
+    through `read_single_column_file()`, whose `.strip()` absorbs a trailing `\r`; the
+    mapping file goes through `pd.read_csv(sep="\t")`, where the `\r` ends up inside
+    the last field of every row and silently corrupts the output labels.
+    """
+
     with open(path, 'rb') as f:
         content = f.read()
 
@@ -664,36 +700,38 @@ def check_line_endings(path, flag):
     return path
 
 
-def check_for_duplicates(path, flag):
+# how many repeated entries to name before summarizing the rest
+MAX_REPORTED_DUPLICATES = 10
 
-    # checking for duplicates in the input file
-    with open(path) as f:
-        lines = [line.strip() for line in f if line.strip()]
 
-    if len(lines) != len(set(lines)):
-        new_filename = f"{path}-unique"
-        new_lines = list(dict.fromkeys(lines))
-        with open(new_filename, 'w') as f:
-            f.write("\n".join(new_lines))
+def report_duplicate_entries(path, flag):
+    """
+    Tell the user about repeated entries
+    (`read_single_column_file()` drops them, so no action needed and no new file created anymore)
+    """
+    duplicates = duplicate_entries(path)
+    if not duplicates:
+        return
 
-        report_message(f'Input file "{path}" (passed to `{flag}`) had duplicate entries that would have caused problems. '
-                       f'A modified version was created, "{new_filename}", which will be used.')
+    plural = "y" if len(duplicates) == 1 else "ies"
+    shown = duplicates[:MAX_REPORTED_DUPLICATES]
+    lines = list(shown)
+    remaining = len(duplicates) - len(shown)
+    if remaining:
+        lines.append(f"...and {remaining} more.")
 
-        path = new_filename
-        time.sleep(2)
-
-    return path
+    report_message(f'Input file "{path}" (passed to `{flag}`) has {len(duplicates):,} '
+                   f'repeated entr{plural}, which will only be used once:')
+    report_message("\n".join(lines), ii="    ", si="    ")
 
 
 def check_inputs_exist(path, flag):
     if flag in ["-g", "-f", "-A"]:
         # checking that all the input files actually exist
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if not os.path.exists(line):
-                    report_message(f'The specified input-genome file "{line}" (passed to `{flag}`) does not exist.')
-                    report_very_early_exit()
+        for entry in read_single_column_file(path):
+            if not os.path.exists(entry):
+                report_message(f'The specified input-genome file "{entry}" (passed to `{flag}`) does not exist.')
+                report_very_early_exit()
 
 
 def check_mapping_file(args, run_data, flag = "-m"):

@@ -1,6 +1,7 @@
 import os
 import sys
-from gtotree.utils.misc.general import concat_files, decode_pyhmmer_text
+from gtotree.utils.misc.general import (concat_files, decode_pyhmmer_text,
+                                        read_single_column_file)
 from gtotree.utils.misc.messaging import wprint, color_text, spinner
 from gtotree.utils.pfam.get_pfam_data import HMM_FILENAME, INFO_FILENAME
 import pyhmmer  # type: ignore
@@ -51,13 +52,9 @@ def get_additional_pfam_targets(run_data):
     # read requested targets, keyed by version-less accession
     pfam_dict = {}            # key: input_id (as given), value: pulled full acc or None
     wanted_by_core = {}       # key: version-less acc, value: input_id
-    with open(run_data.target_pfams_file) as pfam_file:
-        for line in pfam_file:
-            input_id = line.strip()
-            if not input_id:
-                continue
-            pfam_dict[input_id] = None
-            wanted_by_core[input_id.split(".")[0]] = input_id
+    for input_id in read_single_column_file(run_data.target_pfams_file):
+        pfam_dict[input_id] = None
+        wanted_by_core[input_id.split(".")[0]] = input_id
 
     profiles_dir = f"{run_data.pfam_results_dir}/target-pfam-profiles"
     os.makedirs(profiles_dir, exist_ok=True)

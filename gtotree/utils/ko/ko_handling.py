@@ -2,6 +2,7 @@ import os
 import pandas as pd # type: ignore
 import shutil
 
+from gtotree.utils.misc.general import read_single_column_file
 from gtotree.utils.misc.messaging import spinner, report_message
 
 def parse_kofamscan_targets(run_data):
@@ -33,19 +34,18 @@ def parse_kofamscan_targets(run_data):
 
 
 def get_wanted_KOs(run_data):
-    wanted_KOs = []
-    with open(run_data.target_kos_file) as target_KOs_file:
-        for line in target_KOs_file:
-            KO = line.strip()
-            wanted_KOs.append(KO)
-    return wanted_KOs
+    """
+    The KO IDs listed in the `-K` file
+    """
+    return read_single_column_file(run_data.target_kos_file)
 
 
 def get_target_KOs_tab(full_KO_list_tsv, wanted_KOs, target_KOs_tsv):
     full_KO_tab = pd.read_csv(full_KO_list_tsv, sep="\t", header=0)
     target_KOs_tab = full_KO_tab[full_KO_tab["knum"].isin(wanted_KOs)]
     found_KOs = target_KOs_tab["knum"].tolist()
-    missing_KOs = list(set(wanted_KOs) - set(full_KO_tab["knum"].tolist()))
+    available = set(full_KO_tab["knum"])
+    missing_KOs = [KO for KO in wanted_KOs if KO not in available]
 
     target_KOs_tab.to_csv(target_KOs_tsv, sep="\t", index=False)
 

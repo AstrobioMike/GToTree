@@ -772,25 +772,21 @@ def populate_run_data(args):
     run_data = RunData()
 
     if args.ncbi_accessions:
-        with open(args.ncbi_accessions) as f:
-            entries_list = f.read().splitlines()
+        entries_list = read_single_column_file(args.ncbi_accessions)
         run_data.ncbi_accs = [GenomeData.from_acc(entry) for entry in entries_list]
 
     if args.genbank_files:
-        with open(args.genbank_files) as f:
-            entries_list = f.read().splitlines()
+        entries_list = read_single_column_file(args.genbank_files)
         run_data.genbank_files = [GenomeData.from_path(entry, SOURCE_GENBANK) for entry in entries_list]
 
     if args.fasta_files:
-        with open(args.fasta_files) as f:
-            entries_list = f.read().splitlines()
+        entries_list = read_single_column_file(args.fasta_files)
         run_data.fasta_files = [GenomeData.from_path(entry, SOURCE_FASTA) for entry in entries_list]
         for gd in run_data.fasta_files:
             gd.prodigal_used = True
 
     if args.amino_acid_files:
-        with open(args.amino_acid_files) as f:
-            entries_list = f.read().splitlines()
+        entries_list = read_single_column_file(args.amino_acid_files)
         run_data.amino_acid_files = [GenomeData.from_path(entry, SOURCE_AMINO_ACID) for entry in entries_list]
 
     run_data.update_all_input_genomes()
@@ -1247,6 +1243,40 @@ def file_is_usable_else_clear(path):
     except FileNotFoundError:
         pass
     return False
+
+
+def read_single_column_file(path):
+    """
+    The entries of a single-column input file -> stripped, blanks dropped, duplicates
+    removed, first-seen order preserved
+    """
+    entries = []
+    seen = set()
+    with open(path) as f:
+        for line in f:
+            entry = line.strip()
+            if not entry or entry in seen:
+                continue
+            seen.add(entry)
+            entries.append(entry)
+    return entries
+
+
+def duplicate_entries(path):
+    """
+    The entries appearing more than once in a single-column file, in first-seen order
+    """
+    seen = set()
+    duplicates = []
+    with open(path) as f:
+        for line in f:
+            entry = line.strip()
+            if not entry:
+                continue
+            if entry in seen and entry not in duplicates:
+                duplicates.append(entry)
+            seen.add(entry)
+    return duplicates
 
 
 def concat_files(file_list, output_file):

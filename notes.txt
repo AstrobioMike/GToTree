@@ -19,13 +19,6 @@
         # if i want to go crazy, i could benchmark cpu/memory/time like i did for gen-mg
 
 
-    # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K
-        # same for pfam, that they start with PF, and a note that says
-        # something like "these don't match the expected format (e.g., ...). Are you sure you passed the right file to the right parameter?"
-        # also, doublecheck how it handles if a target KO/PFam isn't found
-
-
-
 ################################################
 ### other things to do prior to final launch ###
 ################################################
@@ -34,19 +27,12 @@
     # revisit all pages on the gtotree wiki and update them as needed
         # highlight the new functionality like --wanted-ref-tax and new subcommands
     # sync the CHANGELOG.md overall with the latest in the master gtotree v1 branch
-        # just copy the v1 over and add the new v2 changes at the top
     # make the CHANGELOG.md v2 section (and release notes) really comprehensive about the v1 to v2 changes, and put a link to the initial release notes somewhere on the wiki maybe
 
 
 ########################################
 ### Overview of change from v1 to v2 ###
 ########################################
-# The codebase has been virtually entirely rewritten from an ~5,000 line bash runner and X disparate
-# python scripts that was a total of XX,XXX lines of code into a python package now with XXX modules
-# and XX,XXX lines of code.
-
-# Why did i do this? I don't know. It worked fine and I've successfully maintained it for 6 years and over 600 citations.
-
 
 ### v2 HIGHLIGHTS ###
 # - can specify reference genomes to include by taxonomy instead of needing to gather your own accessions now (e.g., `--wanted-ref-tax "bacteria"` or `--wanted-ref-tax "pseudomonadota"`)
@@ -55,6 +41,8 @@
 # - resume interrupted runs with `--resume`
 # - all helpers are subcommands under `gtt` now (run `gtt` or `gtt -h` for an overview)
     # - this includes `gtt update-headers`, allowing you to modify headers of a previously completed run now!
+# - itol-compatible annotation files produced automatically for any target KOs/pfams, and for input source (so you can, e.g., easily highlight all your MAGs in a ref tree)
+    # `gtt itol` helper exists for creating more itol annotation files
 # - main program callable with lowercase `gtotree` or original `GToTree` now
 
 

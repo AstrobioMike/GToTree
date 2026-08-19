@@ -39,6 +39,9 @@ class TargetSearchSpec:
     targets_dest: str                # "target_pfams_file"
     default_output_dir: str          # "gtt-pfam-search-output"
     example_target: str              # shown in help, e.g. "PF00789"
+    # key into gtotree.utils.misc.target_id_checks.FORMATS, naming the ID shape a
+    # targets file for this type has to have ("pfam" / "ko")
+    target_id_format: str
 
     # --- run_data wiring -------------------------------------------------------
     results_dir_attr: str            # "pfam_results_dir"
@@ -132,6 +135,7 @@ def _pfam_spec():
         targets_dest="target_pfams_file",
         default_output_dir="gtt-pfam-search-output",
         example_target="PF00789",
+        target_id_format="pfam",
 
         results_dir_attr="pfam_results_dir",
         results_dir_rel_attr="pfam_results_dir_rel",
@@ -186,6 +190,7 @@ def _ko_spec():
         targets_dest="target_kos_file",
         default_output_dir="gtt-ko-search-output",
         example_target="K01601",
+        target_id_format="ko",
 
         results_dir_attr="ko_results_dir",
         results_dir_rel_attr="ko_results_dir_rel",

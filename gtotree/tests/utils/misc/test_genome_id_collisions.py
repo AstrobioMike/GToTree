@@ -4,8 +4,9 @@ gtotree/utils/misc/preflight_checks.py.
 
 The genome ID is derived from the input filename and then used as both a filename and a
 sequence-header prefix, so two inputs resolving to one ID silently clobber each other
-during preprocessing while every count downstream still reports both. `check_for_duplicates`
-doesn't cover this -- it only collapses identical lines within a single input file.
+during preprocessing while every count downstream still reports both. The
+de-duplication in `read_single_column_file()` doesn't cover this -- it only collapses
+identical lines within a single input file.
 """
 
 import pytest  # type: ignore
@@ -45,8 +46,8 @@ class TestCollectGenomeIDCollisions:
 
     def test_same_basename_in_different_directories(self):
         """
-        The case `check_for_duplicates` can't see: the two lines differ, so it passes
-        them both through, but they reduce to one ID.
+        The case de-duplication can't see: the two lines differ, so both are kept,
+        but they reduce to one ID.
         """
         rd = _run_data(fasta_files=["set_A/genome_1.fa", "set_B/genome_1.fa"])
         assert _collision_ids(rd) == ["genome_1"]

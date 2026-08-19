@@ -24,8 +24,11 @@ import argparse
 from gtotree.utils.misc.general import (GenomeData, RunData, ToolsUsed,
                                         SOURCE_GENBANK, SOURCE_FASTA,
                                         SOURCE_AMINO_ACID,
-                                        prepare_output_dir)
+                                        prepare_output_dir,
+                                        read_single_column_file)
 from gtotree.utils.taxonomy.tax_targets import is_all_target
+from gtotree.utils.misc.target_id_checks import (check_target_id_file,
+                                                 TargetIDFormatError)
 
 
 class TargetSearchError(Exception):
@@ -354,8 +357,11 @@ def _populate_input_genomes(args, run_data):
 
 
 def _read_entries(path):
-    with open(path) as f:
-        return [line.strip() for line in f if line.strip()]
+    """
+    Thin alias for the shared reader, so this program and a full GToTree run agree on
+    what a listing file contains (blanks dropped, duplicates removed, order preserved).
+    """
+    return read_single_column_file(path)
 
 
 ################################################################################
@@ -386,8 +392,19 @@ def validate_input_files(args, spec):
             targets_path, spec.targets_flag, get_count=True)
         setattr(args, spec.targets_dest, checked)
         args.total_targets = total
+        _check_target_id_formats(checked, spec)
 
     return args
+
+
+def _check_target_id_formats(path, spec):
+    """
+    Confirm the targets file holds IDs of the type this subcommand searches for
+    """
+    try:
+        check_target_id_file(path, spec.target_id_format)
+    except TargetIDFormatError as err:
+        raise TargetSearchError(str(err)) from err
 
 
 ################################################################################
