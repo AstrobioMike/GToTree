@@ -332,20 +332,15 @@ def autopick_scg_set(source, selections):
     label = _describe_taxa(selections)
     via_genomes = str(source).strip().lower() != "gtdb"
     subject = f"the genomes selected for {label}" if via_genomes else label
-    # "'Bacteria' spans" but "'Bacteria' and 'Archaea' span", and "the genomes ... span"
     plural = via_genomes or len(selections) > 1
 
-    # eukaryotes (or anything else outside the pre-built sets' scope) win outright, and
-    # are read off the selection's OWN rows -- on the NCBI path the GTDB join below
-    # would just drop those genomes and quietly pick a set from whatever was left
     outside = set()
     for selection in selections:
         outside |= domains_outside_prebuilt_scope(selection.rows or [])
     if outside:
         return AutoPickedSCGSet(
             UNIVERSAL_SCG_SET,
-            reason=(f"{subject} {'reach' if plural else 'reaches'} outside Bacteria "
-                    "and Archaea, which the pre-built sets are built from"))
+            reason=(f""))
 
     if via_genomes:
         resolved, unplaced = _resolve_ncbi_selections(selections)

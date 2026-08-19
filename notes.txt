@@ -13,44 +13,32 @@
         # gtt gen-scg-hmms
 
 
-    # does `all` work as being passed to `-w` for everything?
-        # in main gtotree, when --source gtdb, it should auto do `-w bacteria -w archaea` for the user
-        # in main gtotree, when --source ncbi, it should auto do `-w bacteria -w archaea -w eukaryota` for the user
-            # we should accept aliases for eukaryota everywhere (e.g., eukaryota, eukarya, eukaryotes, eukaryote)
+
+    # fix extra line spacing in these ending note:
+
+        # Date NCBI assembly-data retrieved: Jul 20, 2026
+
+        # Rank       Num. Unique Taxa (refseq)
+        # domain     3
+        # phylum     121
+        # class      280
+        # order      754
+        # family     1,762
+        # genus      6,157
+        # species    80,351
 
 
-    # check 'all' is doing --derep-rank class (i think that's what i want)
+        # Counts are scoped to what `-w all` pulls, so each is also how many accessions `-w all
+        # --derep-rank <rank>` returns.
+
+
+        # 15,705 genome(s) in the NCBI table have no assigned domain (likely viral and/or
+        # uncultured entries) and so aren't included in 'all'. They can still be pulled by name explicitly
+        # if you're looking for something like that (e.g., `-w Uroviricota`).
+
 
 
     # if the user wanted refseq AND genbank, i should probably add a printed out note saying there is a ton of overlap and they may want just genbank
-
-
-    # a lot of shared functions (and arguments/parameters) between gtt get-accs-from-gtdb and gtt get-accs-from-ncbi, maybe they should be in a shared module?
-
-
-    # gtt get-accs-from-* --get-taxon-counts DOES NOT currently take into account derep-rank (IT SHOULD)
-
-
-    # gtt get-accs-from-* doesn't give a message or error out if you pass --get-rank-counts with a wanted taxon (it just ignores the wanted taxon arg)
-        # it should do at least one of those, at best, maybe give counts for all ranks below the wanted taxon rank (which may supersede --get-taxon-counts)
-        # current behaviour output below:
-
-            # gtt get-accs-from-gtdb -w Vibrionaceae --get-rank-counts
-
-            #     Using GTDB v232: Apr 15, 2026
-
-            #     Rank       Num. Unique Taxa
-            #     domain     2
-            #     phylum     197
-            #     class      645
-            #     order      2351
-            #     family     6747
-            #     genus      37503
-            #     species    199923
-
-
-    # for main gtotree, should i make -w take a comma or space-delimited list for multiple instead of multiple -w's?
-        # in that vein, right now i don't support multiple --derep-rank's, but maybe i should (required in the same order as the -w's)?
 
 
     # do some benchmarks between gtotree v1 and v2 timing-wise, nothing extensive, just to be able to say it's like X% faster

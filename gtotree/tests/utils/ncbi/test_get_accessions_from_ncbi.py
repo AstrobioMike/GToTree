@@ -366,3 +366,92 @@ def test_derep_rank_with_a_taxid_is_refused(in_ncbi, capsys):
 def test_derep_rank_off_with_a_taxid_still_works(in_ncbi):
     _run(_args(wanted_ref_tax="5000", source="both"))
     assert len(_read_accs("ncbi-taxid-5000-accs.txt")) == 4
+
+
+################################################################################
+# 'all' and the genomes it can't reach
+#
+# The NCBI table carries rows with NO assigned domain (viral and
+# metagenome/uncultured entries). 'all' is expanded to the table's DOMAINS, so those
+# rows are unreachable by it -- which is correct for GToTree, but has to be both
+# CONSISTENT (the same pool with and without --derep-rank) and REPORTED (an unscoped
+# --get-rank-counts otherwise quotes a number no pull will produce).
+################################################################################
+
+# two viral rows: no domain, and a class that exists nowhere else in the table
+_VIRAL_RECORDS = [
+    _rec("GCF_000000030.1", ("NA", "Uroviricota", "Caudoviricetes", "NA", "NA", "NA",
+                             "Phage sp1")),
+    _rec("GCF_000000031.1", ("NA", "Uroviricota", "Caudoviricetes", "NA", "NA", "NA",
+                             "Phage sp2")),
+]
+
+
+@pytest.fixture
+def in_ncbi_with_viruses(tmp_path, monkeypatch):
+    monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
+    _write_mock_ncbi(tmp_path / PARQUET_FILENAME, _RECORDS + _VIRAL_RECORDS)
+    (tmp_path / DATE_FILENAME).write_text("2026,01,05\n")
+    monkeypatch.chdir(tmp_path)
+    with patch(f"{MODPATH}.get_ncbi_assembly_data", return_value=None):
+        yield tmp_path
+
+
+def test_all_without_derep_excludes_domainless_genomes(in_ncbi_with_viruses):
+    """
+    'all' has to mean the same pool whether or not --derep-rank is set. It used to be
+    a whole-table dump without derep (viruses in) and a domain walk with it (viruses
+    out), so an unrelated flag decided whether viral genomes appeared.
+    """
+    _run(_args(wanted_ref_tax="all", source="both"))
+    accs = _read_accs("ncbi-all-accs.txt")
+    assert len(accs) == 4
+    assert not any(a in accs for a in ("GCF_000000030.1", "GCF_000000031.1"))
+
+
+def test_all_reports_the_genomes_it_left_behind(in_ncbi_with_viruses, capsys):
+    _run(_args(wanted_ref_tax="all", source="both", derep_rank="class"))
+    out = capsys.readouterr().out
+    assert "2 genome(s)" in out
+    assert "no assigned domain" in out
+
+
+def test_rank_counts_with_all_are_scoped_to_what_all_pulls(in_ncbi_with_viruses, capsys):
+    """
+    The reconciliation: the class count reported for `-w all` must equal the number of
+    accessions `-w all --derep-rank class` writes. Unscoped it counted the viral class
+    too, which is the shape of "--get-rank-counts says 326 but we get 280".
+    """
+    _run(_args(wanted_ref_tax="all", source="both", get_rank_counts=True))
+    counts_out = capsys.readouterr().out
+    assert "class      2" in counts_out          # ClassA + ClassB, not Caudoviricetes
+
+    _run(_args(wanted_ref_tax="all", source="both", derep_rank="class"))
+    assert len(_read_accs("ncbi-all-accs.txt")) == 2
+
+
+def test_rank_counts_without_a_taxon_still_counts_the_whole_table(in_ncbi_with_viruses,
+                                                                 capsys):
+    """Unscoped `--get-rank-counts` is documented as the whole database -- unchanged."""
+    _run(_args(get_rank_counts=True, source="both"))
+    assert "class      3" in capsys.readouterr().out   # includes Caudoviricetes
+
+
+def test_domainless_genomes_are_still_reachable_by_name(in_ncbi_with_viruses):
+    """They're excluded from 'all', not from the tool."""
+    _run(_args(wanted_ref_tax="Uroviricota", source="both"))
+    accs = _read_accs("ncbi-uroviricota-phylum-accs.txt")
+    assert sorted(accs) == ["GCF_000000030.1", "GCF_000000031.1"]
+
+
+def test_eukaryote_alias_resolves(in_ncbi, tmp_path):
+    """`-w eukarya` (and friends) resolve to Eukaryota wherever a taxon is taken."""
+    records = _RECORDS + [
+        _rec("GCF_000000020.1", ("Eukaryota", "Ascomycota", "Saccharomycetes",
+                                 "Saccharomycetales", "Saccharomycetaceae",
+                                 "Saccharomyces", "Saccharomyces cerevisiae")),
+    ]
+    _write_mock_ncbi(tmp_path / PARQUET_FILENAME, records)
+    _run(_args(wanted_ref_tax="eukarya", source="both"))
+    accs = _read_accs("ncbi-eukaryota-domain-accs.txt")
+    assert accs == ["GCF_000000020.1"]

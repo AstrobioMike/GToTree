@@ -37,7 +37,10 @@ from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data
 from gtotree.utils.pfam.get_pfam_data import get_pfam_data
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import AmbiguousTaxon, TaxonNotFound
+from gtotree.utils.taxonomy.tax_targets import is_all_target
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
+                                                   expand_wanted_ref_tax,
+                                                   describe_all_expansion,
                                                    WantedRefTaxError)
 from gtotree.utils.misc.general import (ToolsUsed,
                                    CorruptRunData,
@@ -282,6 +285,14 @@ def check_wanted_ref_tax_args(args):
             report_very_early_exit(suggest_help=True)
         return
 
+    if args.target_rank is not None and any(is_all_target(t)
+                                            for t in wanted_ref_tax_list(args)):
+        report_message("You passed `-w all` along with `--target-rank`, but 'all' is "
+                       "expanded to the source's domains, so there is no name left "
+                       "for `--target-rank` to disambiguate. Drop `--target-rank`, or "
+                       "name the taxon you want instead of 'all'.")
+        report_very_early_exit(suggest_help=True)
+
     if args.target_rank is not None and args.target_rank.strip().lower() not in ranks:
         report_message(f'You specified "{args.target_rank}" to `--target-rank`, but that '
                        "is not an accepted taxonomic rank.")
@@ -322,7 +333,19 @@ def select_wanted_ref_tax(args, previous_run_data=None):
 
     selections = []
 
-    for taxon in wanted_ref_tax_list(args):
+    try:
+        wanted, domains = expand_wanted_ref_tax(args.source,
+                                                wanted_ref_tax_list(args))
+    except WantedRefTaxError as err:
+        report_message(str(err))
+        report_very_early_exit(suggest_help=True)
+
+    note = describe_all_expansion(args.source, domains)
+    if note:
+        report_message(note, color=None, ii="    ", si="    ", newline=False)
+        print("")
+
+    for taxon in wanted:
         try:
             with spinner(f"Gathering references for '{taxon}'...", "",
                          clear_on_done=True):

@@ -27,6 +27,26 @@ def accession_core(acc):
     return s.split(".")[0].split("_")[-1]
 
 
+# ---------------------------------------------------------------------------
+# taxon-name aliases
+# ---------------------------------------------------------------------------
+
+# Names users reach for that aren't the string in the asset
+TAXON_ALIASES = {
+    "eukarya": "Eukaryota",
+    "eukaryote": "Eukaryota",
+    "eukaryotes": "Eukaryota",
+}
+
+
+def normalize_taxon_name(taxon):
+    """
+    Map a user-supplied taxon name onto the name to actually look up
+    """
+    s = str(taxon).strip()
+    return TAXON_ALIASES.get(s.lower(), s)
+
+
 def rank_index(rank):
     """0 for domain ... 6 for species. Raises ValueError on an unknown rank."""
     r = str(rank).strip().lower()

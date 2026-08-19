@@ -3,11 +3,15 @@ Genome/accession dereplication and quality-picking from the GTDB / NCBI Parquet
 assets
 """
 
+import pyarrow as pa # type: ignore
+import pyarrow.compute as pc # type: ignore
+
 from gtotree.utils.taxonomy.tax_ranks import (RANKS, NA, REFERENCE_VALUE, accession_core,
                                               rank_index, validate_derep_rank)
 from gtotree.utils.taxonomy.tax_select import (SOURCES, select, resolve_taxon,
                                                live_accession_cores)
-from gtotree.utils.taxonomy.tax_counts import distinct_taxa
+from gtotree.utils.taxonomy.tax_targets import (domains_in_asset,
+                                                unassigned_domain_summary)
 
 # Thresholds for the size_advice() nudges
 SANE_LOW = 20
@@ -368,7 +372,9 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
             cols.append(extra)
 
     tab = select(path, source, wanted_rank, wanted_taxon,
-                 reps_only=reps_only, columns=cols)
+                 reps_only=reps_only, columns=cols,
+                 accession_prefixes=accession_prefixes,
+                 assembly_levels=assembly_levels)
 
     if screen_against:
         live = live_accession_cores(screen_against)
@@ -383,11 +389,6 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
         tab = None
     else:
         rows = tab.to_pylist()
-
-    if accession_prefixes:
-        rows = _restrict_by_prefix(rows, spec.acc_col, accession_prefixes)
-
-    rows = _restrict_by_assembly_level(rows, spec, assembly_levels)
 
     rows, n_below, n_missing = apply_quality_floor(
         rows, spec, min_completeness, max_contamination)
@@ -500,13 +501,10 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
         # screened), preserving full metadata rows for the caller's TSV
         cols = _selection_columns(spec, extra_rank=None)
         tab = select(path, source, resolved_rank, canonical,
-                     reps_only=reps_only, columns=cols)
+                     reps_only=reps_only, columns=cols,
+                     accession_prefixes=accession_prefixes,
+                     assembly_levels=assembly_levels)
         rows = tab.to_pylist()
-
-        if accession_prefixes:
-            rows = _restrict_by_prefix(rows, spec.acc_col, accession_prefixes)
-
-        rows = _restrict_by_assembly_level(rows, spec, assembly_levels)
 
         if screen_against:
             live = live_accession_cores(screen_against)
@@ -539,9 +537,9 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
     warnings.extend(derep_warnings)
 
     rows = _rows_for_accessions(path, source, resolved_rank, canonical,
-                                effective_derep_rank, reps_only, set(accessions))
-    if accession_prefixes:
-        rows = _restrict_by_prefix(rows, spec.acc_col, accession_prefixes)
+                                effective_derep_rank, reps_only, set(accessions),
+                                accession_prefixes=accession_prefixes,
+                                assembly_levels=assembly_levels)
 
     return RefGenomeSelection(accessions, rows, canonical, resolved_rank,
                               effective_derep_rank, warnings)
@@ -559,9 +557,9 @@ def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="qu
     Returns a RefGenomeSelection whose `canonical` is "all" and whose `domains` lists
     the domains that were walked.
     """
-    domains = distinct_taxa(path, source, RANKS[0],
-                            accession_prefixes=accession_prefixes,
-                            assembly_levels=assembly_levels)
+    domains = domains_in_asset(path, source,
+                               accession_prefixes=accession_prefixes,
+                               assembly_levels=assembly_levels)
 
     accessions, rows, warnings = [], [], []
     seen_accessions, seen_warnings = set(), set()
@@ -591,27 +589,16 @@ def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="qu
                 seen_warnings.add(warning)
                 warnings.append(warning)
 
+    # what walking the domains cannot reach (the domain-less viral / metagenome rows).
+    # Attached rather than warned about here: the CLIs decide the wording, and the
+    # main driver never sees it, since it expands 'all' into per-domain targets.
     merged = RefGenomeSelection(accessions, rows, "all", None,
                                 effective_derep_rank, warnings)
     merged.domains = domains
+    merged.unassigned = unassigned_domain_summary(
+        path, source, rank=effective_derep_rank,
+        accession_prefixes=accession_prefixes, assembly_levels=assembly_levels)
     return merged
-
-
-def _restrict_by_prefix(rows, acc_col, prefixes):
-    """Keep only rows whose accession starts with one of `prefixes`."""
-    prefixes = tuple(prefixes)
-    return [r for r in rows
-            if str(r.get(acc_col) or "").startswith(prefixes)]
-
-
-def _restrict_by_assembly_level(rows, spec, assembly_levels):
-    """
-    Keep only rows at one of `assembly_levels`
-    """
-    if not assembly_levels or not spec.level_col:
-        return rows
-    wanted = set(assembly_levels)
-    return [r for r in rows if r.get(spec.level_col) in wanted]
 
 
 def _selection_columns(spec, extra_rank=None):
@@ -625,15 +612,23 @@ def _selection_columns(spec, extra_rank=None):
 
 
 def _rows_for_accessions(path, source, wanted_rank, wanted_taxon, derep_rank,
-                         reps_only, wanted_accessions):
+                         reps_only, wanted_accessions, accession_prefixes=None,
+                         assembly_levels=None):
     """
     Re-read the taxon slice and return only the rows whose accession is in
-    `wanted_accessions` (the derep-kept set), in sorted-accession order.
+    `wanted_accessions` (the derep-kept set), in sorted-accession order
     """
     spec = SOURCES[source]
     cols = _selection_columns(spec, extra_rank=derep_rank)
     tab = select(path, source, wanted_rank, wanted_taxon,
-                 reps_only=reps_only, columns=cols)
-    kept = [r for r in tab.to_pylist() if r.get(spec.acc_col) in wanted_accessions]
+                 reps_only=reps_only, columns=cols,
+                 accession_prefixes=accession_prefixes,
+                 assembly_levels=assembly_levels)
+
+    acc_col = tab.column(spec.acc_col)
+    wanted = pa.array(list(wanted_accessions), type=acc_col.type)
+    tab = tab.filter(pc.fill_null(pc.is_in(acc_col, value_set=wanted), False))
+
+    kept = tab.to_pylist()
     kept.sort(key=lambda r: r.get(spec.acc_col) or "")
     return kept

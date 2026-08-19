@@ -1,18 +1,9 @@
 """
-Driver-side --wanted-ref-tax (-w) resolution.
-
-This is the GToTree driver's counterpart to the standalone get-accs-from-*
-helpers: it turns a `-w <taxon>` request (scoped by `--source {gtdb,ncbi}`, and honouring
-`--target-rank` / `--derep-rank`) into a list of assembly accessions to fold into the
-user's other input genomes
-
-Library/CLI seam: everything here RAISES (WantedRefTaxError, or the taxonomy core's
-TaxonNotFound / AmbiguousTaxon / ValueError). The CLI translation -- friendly message
-+ early exit -- lives in preflight_checks.resolve_wanted_ref_tax(), so this module can
-stay thin and be exercised without a process exit.
+Driver-side --wanted-ref-tax (-w) resolution
 """
 
 from gtotree.utils.taxonomy.tax_derep import select_ref_genomes, size_advice
+from gtotree.utils.taxonomy.tax_targets import expand_all_targets, is_all_target
 from gtotree.utils.gtdb.get_gtdb_data import (gtdb_data_table_path,
                                               check_gtdb_location_var_is_set,
                                               report_gtdb_version_info)
@@ -21,9 +12,6 @@ from gtotree.utils.ncbi.get_ncbi_assembly_data import (ncbi_data_table_path,
                                                        read_date_retrieved)
 
 
-# source-of-taxonomy (--source) -> (core source name, table-path resolver). The driver's
-# --source is gtdb/ncbi (which asset supplies the reference genomes), distinct from the NCBI
-# helper's --source (refseq/genbank accession-prefix scoping).
 _SOURCE_ASSETS = {
     "gtdb": ("gtdb", gtdb_data_table_path),
     "ncbi": ("ncbi", ncbi_data_table_path),
@@ -34,17 +22,36 @@ class WantedRefTaxError(Exception):
     """A --wanted-ref-tax request that resolved to nothing usable."""
 
 
+def _table_path_for_source(source):
+    """The asset path for a driver `--source` value. Raises WantedRefTaxError."""
+    key = str(source).strip().lower()
+    if key not in _SOURCE_ASSETS:
+        raise WantedRefTaxError(
+            f"'{source}' is not a recognized --source for --wanted-ref-tax "
+            f"(expected one of: {', '.join(s.upper() for s in _SOURCE_ASSETS)}).")
+    core_source, table_path_fn = _SOURCE_ASSETS[key]
+    return core_source, table_path_fn()
+
+
+def expand_wanted_ref_tax(source, taxa):
+    taxa = list(taxa or [])
+    if not any(is_all_target(t) for t in taxa):
+        return taxa, []
+
+    core_source, table_path = _table_path_for_source(source)
+
+    return expand_all_targets(table_path, core_source, taxa)
+
+
+def describe_all_expansion(source, domains):
+    """The one-line 'this is what all meant' note, or None."""
+    if not domains:
+        return None
+    return (f"`-w all` was expanded to the domains in the {str(source).upper()} "
+            f"table: {', '.join(domains)}.")
+
+
 def describe_source_version(source):
-    """
-    Best-effort one-line description of the taxonomy source actually in use, for the
-    Phase 1 banner (the counterpart to Phase 3's "Pfam version being used: ...").
-
-    GTDB -> "GTDB <release> (released <date>)"; NCBI -> "NCBI (accessed <date>)".
-
-    Returns None if the source is unknown or its version/date sidecar can't be read.
-    This is a display label, so a missing sidecar shouldn't abort the run -- the caller
-    just skips the line.
-    """
     try:
         if source == "gtdb":
             location = check_gtdb_location_var_is_set()
@@ -101,14 +108,8 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
     TaxonNotFound, AmbiguousTaxon, ValueError
         Propagated from the taxonomy core for the CLI layer to translate.
     """
-    key = str(source).strip().lower()
-    if key not in _SOURCE_ASSETS:
-        raise WantedRefTaxError(
-            f"'{source}' is not a recognized --source for --wanted-ref-tax "
-            f"(expected one of: {', '.join(s.upper() for s in _SOURCE_ASSETS)}).")
 
-    core_source, table_path_fn = _SOURCE_ASSETS[key]
-    table_path = table_path_fn()
+    core_source, table_path = _table_path_for_source(source)
 
     # liveness screening: ensuring what we pick from gtdb is still present in ncbi (e.g., not suppressed)
     screen_against = ncbi_data_table_path() if core_source == "gtdb" else None

@@ -863,19 +863,27 @@ def resolve_input_genomes(args, run_data, error_cls):
     """
     # imported here rather than at module scope: the taxonomy layer reaches back into
     # the GTDB/NCBI asset modules, and this module is imported by almost everything
-    from gtotree.utils.taxonomy.wanted_ref_tax import resolve_wanted_ref_tax_accessions
+    from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
+                                                       expand_wanted_ref_tax,
+                                                       describe_all_expansion)
     from gtotree.utils.misc.messaging import (input_genome_source_lines,
                                               total_input_genomes_line,
                                               spinner)
 
     selections = []
-    wanted = wanted_ref_tax_list(args)
+    wanted, all_domains = expand_wanted_ref_tax(args.source,
+                                                wanted_ref_tax_list(args))
 
     if wanted:
         source_line = wanted_ref_tax_source_line(args.source)
         if source_line:
             # trailing blank: the spinner that follows prints straight onto its own line
             print(f"{source_line}\n")
+
+        expansion_note = describe_all_expansion(args.source, all_domains)
+        if expansion_note:
+            report_message(expansion_note, color=None, ii="      ", si="      ")
+            print("")
 
         for taxon in wanted:
             with spinner(f"Selecting reference genomes for '{taxon}'...",

@@ -10,7 +10,10 @@ differs between sources; that difference is isolated in SourceSpec / SOURCES.
 import pyarrow.compute as pc # type: ignore
 import pyarrow.parquet as pq # type: ignore
 
-from gtotree.utils.taxonomy.tax_ranks import RANKS, NA, REFERENCE_VALUE, accession_core, rank_index
+import pyarrow as pa # type: ignore
+
+from gtotree.utils.taxonomy.tax_ranks import (RANKS, NA, REFERENCE_VALUE, accession_core,
+                                              normalize_taxon_name, rank_index)
 
 
 class SourceSpec:
@@ -82,7 +85,7 @@ def find_ranks_for_taxon(path, taxon):
     Returns (canonical_name, [ranks]). Reads one column at a time, so this stays
     cheap even on the 4M-row NCBI table.
     """
-    target = str(taxon).strip().lower()
+    target = normalize_taxon_name(taxon).lower()
     canonical = None
     found = []
     for rank in RANKS:
@@ -126,24 +129,53 @@ def resolve_taxon(path, taxon, rank=None):
 # selection
 # ---------------------------------------------------------------------------
 
-def select(path, source, rank, taxon, reps_only=False, columns=None):
-    """
-    All rows under `taxon` at `rank`. Returns a pyarrow Table.
+UNASSIGNED = (NA, "")
 
-    The rank predicate is pushed down to Parquet, so on the lineage-sorted assets
-    this skips whole row groups rather than scanning.
+
+def prefix_mask(acc_col, prefixes):
+    mask = None
+    for p in prefixes:
+        m = pc.starts_with(acc_col, p)
+        mask = m if mask is None else pc.or_(mask, m)
+    return mask
+
+
+def assigned_mask(col, assigned=True):
+    """
+    Mask for rows whose value in `col` is (or isn't) an actually-assigned taxon.
+
+    Null, 'NA' and '' all mean "nothing assigned at this rank"
+    """
+    unassigned = pa.array(list(UNASSIGNED), type=col.type)
+    is_assigned = pc.and_(pc.is_valid(col),
+                          pc.invert(pc.fill_null(pc.is_in(col, value_set=unassigned),
+                                                 False)))
+    return is_assigned if assigned else pc.invert(is_assigned)
+
+
+def select(path, source, rank, taxon, reps_only=False, columns=None,
+           accession_prefixes=None, assembly_levels=None):
+    """
+    All rows under `taxon` at `rank`. Returns a pyarrow Table
     """
     spec = SOURCES[source]
     filters = [(rank, "=", taxon)]
     if reps_only:
         filters.append((spec.rep_filter[0], "=", spec.rep_filter[1]))
+    if assembly_levels and spec.level_col:
+        filters.append((spec.level_col, "in", set(assembly_levels)))
 
     cols = columns or [spec.acc_col]
     # always need the accession back
     if spec.acc_col not in cols:
         cols = [spec.acc_col] + list(cols)
 
-    return pq.read_table(path, columns=cols, filters=filters)
+    tab = pq.read_table(path, columns=cols, filters=filters)
+
+    if accession_prefixes:
+        tab = tab.filter(prefix_mask(tab.column(spec.acc_col), accession_prefixes))
+
+    return tab
 
 
 def select_accessions(path, source, rank, taxon, reps_only=False):

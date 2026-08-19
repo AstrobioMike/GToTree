@@ -25,6 +25,7 @@ from gtotree.utils.misc.general import (GenomeData, RunData, ToolsUsed,
                                         SOURCE_GENBANK, SOURCE_FASTA,
                                         SOURCE_AMINO_ACID,
                                         prepare_output_dir)
+from gtotree.utils.taxonomy.tax_targets import is_all_target
 
 
 class TargetSearchError(Exception):
@@ -76,10 +77,18 @@ def check_args(args, spec):
 
 def _check_dangling_ref_tax_args(args):
     """
-    `--target-rank` and `--derep-rank` only mean something alongside `-w`. Caught up
+    `--target-rank` and `--derep-rank` only mean something alongside `-w`, and
+    `--target-rank` additionally can't mean anything alongside `-w all`. Caught up
     front so a misunderstanding fails before any dataset is fetched.
     """
     if args.wanted_ref_tax:
+        if args.target_rank is not None and any(is_all_target(t)
+                                                for t in args.wanted_ref_tax):
+            raise TargetSearchError(
+                "You provided `-w all` along with `--target-rank`, but 'all' is "
+                "expanded to the source's domains, so there is no name left for "
+                "`--target-rank` to disambiguate. Drop `--target-rank`, or name the "
+                "taxon you want instead of 'all'.")
         return
 
     dangling = []

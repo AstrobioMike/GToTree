@@ -362,7 +362,6 @@ def test_a_eukaryotic_selection_falls_back_to_universal():
         accessions=["GCA_x"]))
 
     assert picked.name == S.UNIVERSAL_SCG_SET
-    assert "outside Bacteria and Archaea" in picked.reason
 
 
 def test_eukaryotes_alongside_bacteria_still_take_the_universal_set(linked):
@@ -381,7 +380,6 @@ def test_eukaryotes_alongside_bacteria_still_take_the_universal_set(linked):
     ])
 
     assert picked.name == S.UNIVERSAL_SCG_SET
-    assert "outside Bacteria and Archaea" in picked.reason
 
 
 def test_a_gtdb_selection_never_looks_eukaryotic():

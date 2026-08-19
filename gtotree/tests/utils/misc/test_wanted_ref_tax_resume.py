@@ -114,3 +114,67 @@ class TestReusedAccessionsSurviveTheSkip:
         merge_wanted_ref_tax(rd, None)
         assert rd.get_wanted_ref_tax_accs() == ["GCF_1"]
         assert rd.get_user_provided_ncbi_accs() == ["GCF_9"]
+
+
+class TestAllExpansionInTheDriver:
+    """
+    `-w all` is expanded to the source's domains before anything is resolved, so each
+    domain arrives at resolution as an ordinary target. Before this, 'all' was passed
+    straight to the name lookup and the run died with "'all' doesn't seem to exist at
+    any rank in the gtdb taxonomy".
+    """
+
+    def test_all_resolves_one_selection_per_domain(self, monkeypatch):
+        resolved = []
+
+        class _Selection:
+            accessions = ["GCF_1"]
+            warnings = []
+            canonical = "X"
+
+        monkeypatch.setattr(preflight_checks, "expand_wanted_ref_tax",
+                            lambda source, taxa: (["Archaea", "Bacteria"],
+                                                  ["Archaea", "Bacteria"]))
+
+        def _fake(source, taxon, **kw):
+            resolved.append(taxon)
+            return ["GCF_1"], _Selection()
+
+        monkeypatch.setattr(preflight_checks, "resolve_wanted_ref_tax_accessions", _fake)
+
+        selections = select_wanted_ref_tax(_Args(wanted_ref_tax=["all"]), None)
+
+        assert resolved == ["Archaea", "Bacteria"]
+        assert len(selections) == 2
+
+    def test_the_expansion_is_reported(self, monkeypatch, capsys):
+        class _Selection:
+            accessions = ["GCF_1"]
+            warnings = []
+            canonical = "X"
+
+        monkeypatch.setattr(preflight_checks, "expand_wanted_ref_tax",
+                            lambda source, taxa: (["Archaea", "Bacteria"],
+                                                  ["Archaea", "Bacteria"]))
+        monkeypatch.setattr(preflight_checks, "resolve_wanted_ref_tax_accessions",
+                            lambda *a, **kw: (["GCF_1"], _Selection()))
+
+        select_wanted_ref_tax(_Args(wanted_ref_tax=["all"]), None)
+
+        out = capsys.readouterr().out
+        assert "Archaea, Bacteria" in out
+
+    def test_a_named_taxon_is_not_announced_as_an_expansion(self, monkeypatch, capsys):
+        class _Selection:
+            accessions = ["GCF_1"]
+            warnings = []
+            canonical = "Alteromonas"
+
+        monkeypatch.setattr(preflight_checks, "resolve_wanted_ref_tax_accessions",
+                            lambda *a, **kw: (["GCF_1"], _Selection()))
+        monkeypatch.setattr(preflight_checks, "expand_wanted_ref_tax",
+                            lambda source, taxa: (list(taxa), []))
+
+        select_wanted_ref_tax(_Args(wanted_ref_tax=["Alteromonas"]), None)
+
+        assert "expanded" not in capsys.readouterr().out
