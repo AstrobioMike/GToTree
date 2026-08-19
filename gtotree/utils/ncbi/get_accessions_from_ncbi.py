@@ -397,7 +397,7 @@ def _select_rows(table_path, args, assembly_levels=None):
                 accession_prefixes=prefixes, assembly_levels=assembly_levels)
             report_message(f"Dereplicating within each domain "
                            f"({', '.join(selection.domains)}).", "yellow",
-                           ii="    ", si="    ", width=100, trailing_newline=True)
+                           ii="    ", si="    ", width=100, trailing_newline=False)
             _report_unassigned_domains(getattr(selection, "unassigned", None))
             for warning in selection.warnings:
                 report_message(warning, "yellow", ii="    ", si="    ", width=100,
@@ -534,7 +534,7 @@ def report_unique_taxa_counts_of_all_ranks(table_path, source="refseq", reps_onl
 
     if scoped_to_all:
         report_message(scoped_counts_note("-w"), "yellow", ii="    ", si="    ",
-                       width=100, trailing_newline=True)
+                       width=100, trailing_newline=False)
         _report_unassigned_domains(unassigned_domain_summary(
             table_path, "ncbi", rep_filter=_rep_filter(reps_only),
             accession_prefixes=prefixes, assembly_levels=assembly_levels))

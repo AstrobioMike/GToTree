@@ -13,36 +13,10 @@
         # gtt gen-scg-hmms
 
 
-
-    # fix extra line spacing in these ending note:
-
-        # Date NCBI assembly-data retrieved: Jul 20, 2026
-
-        # Rank       Num. Unique Taxa (refseq)
-        # domain     3
-        # phylum     121
-        # class      280
-        # order      754
-        # family     1,762
-        # genus      6,157
-        # species    80,351
-
-
-        # Counts are scoped to what `-w all` pulls, so each is also how many accessions `-w all
-        # --derep-rank <rank>` returns.
-
-
-        # 15,705 genome(s) in the NCBI table have no assigned domain (likely viral and/or
-        # uncultured entries) and so aren't included in 'all'. They can still be pulled by name explicitly
-        # if you're looking for something like that (e.g., `-w Uroviricota`).
-
-
-
     # do some benchmarks between gtotree v1 and v2 timing-wise, nothing extensive, just to be able to say it's like X% faster
         # on my altermonas ~90 genomes, v2 is 80 seconds, v1 is 130 (~40% or 1.6x faster)
         # check a larger number of genomes also
         # if i want to go crazy, i could benchmark cpu/memory/time like i did for gen-mg
-
 
 
     # add a preflight check when the user provides an additional-ko-targets file (-K) that the entries start with K

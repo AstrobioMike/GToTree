@@ -258,7 +258,7 @@ def _write_all_dereplicated(gtdb_path, args, representatives_source):
 
     report_message(f"Dereplicating within each domain "
                    f"({', '.join(selection.domains)}).", "yellow",
-                   ii="    ", si="    ", width=100, trailing_newline=True)
+                   ii="    ", si="    ", width=100, trailing_newline=False)
 
     _report_unassigned_domains(getattr(selection, "unassigned", None))
 
@@ -522,7 +522,7 @@ def report_unique_taxa_counts_of_all_ranks(gtdb_path, representatives_source=Non
         report_message("(The `--gtdb-representatives-only` flag doesn't change these counts: "
                        "every GTDB taxon has a representative genome, so the number of unique "
                        "taxa per rank is the same with or without it.)",
-                       "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
+                       "yellow", ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
     elif representatives_source == "refseq":
         rep_rows = rank_counts(gtdb_path, "gtdb",
                                rep_filter=_rep_filter_for("refseq"))
