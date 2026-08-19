@@ -22,7 +22,7 @@ my best to rapidly address anything!
   the run, so gathering an accession list up front is no longer necessary :)
   - may be given more than once to pool several taxa (e.g. `-w Bacteria -w Archaea`);
     each is resolved and dereplicated on its own, then merged
-  - `--source` selects which taxonomy the genomes are drawn from, `gtdb` (default) or `ncbi`
+  - `--source` specifies which taxonomy the genomes are drawn from, `gtdb` (default) or `ncbi`
   - `--derep-rank` dereplicates the selection down to one genome per unique value of a
     rank (default `auto`, which uses two ranks finer than the target; `off` keeps them all)
     - this is particularly helpful when trying to make broad-level trees where you don't need 
