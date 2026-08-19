@@ -1,17 +1,22 @@
 import sys
 import os
 import argparse
-import pyarrow.compute as pc # type: ignore
 import pyarrow.parquet as pq # type: ignore
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.misc.messaging import wprint, color_text, report_message, spinner
+from gtotree.utils.misc.general import (write_table_tsv, write_accessions,
+                                        atomic_write_text)
 from gtotree.utils.gtdb.get_gtdb_data import (get_gtdb_data, gtdb_data_table_path,
                                               report_gtdb_version_info as _read_gtdb_version_info)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import (TaxonNotFound, AmbiguousTaxon,
                                                find_ranks_for_taxon as _resolve_ranks)
-from gtotree.utils.taxonomy.tax_derep import select_ref_genomes
+from gtotree.utils.taxonomy.tax_derep import (select_ref_genomes, select_all_domains,
+                                              resolve_derep_rank)
+from gtotree.utils.taxonomy.tax_counts import (representatives_filter, count_genomes,
+                                               derep_size, distinct_taxa, rank_counts,
+                                               render_rank_count_table)
 
 
 _RANK_COLUMNS = list(RANKS)
@@ -89,15 +94,17 @@ def build_parser(parent_subparsers=None):
     optional.add_argument(
         "--get-taxon-counts",
         action="store_true",
-        help=("Provide this flag along with a specified taxon to `-t` to see how many "
-              "genomes match the set parameters (excluding --derep-rank)"),
+        help=("Provide this flag along with a specified taxon to `-w` to see how many "
+              "genomes match the set parameters. If `--derep-rank` is also set, the "
+              "number of genomes following dereplication is reported too."),
     )
 
     optional.add_argument(
         "--get-rank-counts",
         action="store_true",
-        help=("Provide just this flag alone to see counts of how many unique taxa there "
-              "are for each rank."),
+        help=("Provide this flag to see counts of how many unique taxa there are for each rank. "
+              "By itself, that'd be the whole database, but it can also be combined with "
+              "`-w` and `--derep-rank`."),
     )
 
     optional.add_argument(
@@ -143,20 +150,30 @@ def get_accessions_from_gtdb(args):
 
     representatives_source = _representatives_source(args)
 
+    named_taxon = bool(args.wanted_ref_tax) and str(args.wanted_ref_tax).lower() != "all"
+
     if args.get_rank_counts:
-        report_unique_taxa_counts_of_all_ranks(
-            gtdb_path, representatives_source=representatives_source)
+        if named_taxon:
+            _report_rank_counts_for_taxon_or_exit(
+                gtdb_path, args.wanted_ref_tax, representatives_source)
+        else:
+            report_unique_taxa_counts_of_all_ranks(
+                gtdb_path, representatives_source=representatives_source)
         sys.exit(0)
 
     if not args.wanted_ref_tax:
         return
 
     if args.get_taxon_counts:
-        _report_taxon_counts_or_exit(gtdb_path, args.wanted_ref_tax, representatives_source)
+        _report_taxon_counts_or_exit(gtdb_path, args.wanted_ref_tax,
+                                     representatives_source, args)
         sys.exit(0)
 
     if args.wanted_ref_tax.lower() == "all":
-        _write_all(gtdb_path, representatives_source)
+        if _derep_is_on(args):
+            _write_all_dereplicated(gtdb_path, args, representatives_source)
+        else:
+            _write_all(gtdb_path, representatives_source)
         sys.exit(0)
 
     selection = _select_rows(gtdb_path, args, representatives_source)
@@ -166,13 +183,13 @@ def get_accessions_from_gtdb(args):
 
 def preflight_checks(args):
     if args.get_taxon_counts and not args.wanted_ref_tax:
-        report_message("A specific taxon needs to also be provided to the `-t` flag "
+        report_message("A specific taxon needs to also be provided to the `-w` flag "
                        "in order to use `--get-taxon-counts`.", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
     if not args.get_rank_counts and not args.get_table and not args.wanted_ref_tax:
-        report_message("A target taxon needs to be provided to `-t` (or 'all').", "yellow",
+        report_message("A target taxon needs to be provided to `-w` (or 'all').", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
@@ -195,15 +212,8 @@ def _representatives_source(args):
 def _select_rows(gtdb_path, args, representatives_source):
     """
     Resolve the target taxon through the shared taxonomy core and return the
-    RefGenomeSelection (accessions + metadata rows + resolved rank/canonical). Writing
-    is done separately by _write_outputs -- this mirrors the NCBI helper's
-    _select_rows / _write_outputs split so the two orchestrators read the same.
-
-    The 'all' taxon is handled by the caller (a bulk dump the core doesn't cover).
+    RefGenomeSelection (accessions + metadata rows + resolved rank/canonical)
     """
-    # reps-only requested -> pass through to the core; RefSeq maps to the NCBI-style
-    # reference-genome filter that SOURCES['gtdb'] understands via reps_only, while GTDB
-    # representatives are the core's default representative pool.
     reps_only = representatives_source is not None
 
     try:
@@ -224,11 +234,6 @@ def _select_rows(gtdb_path, args, representatives_source):
     except ValueError as err:
         report_message(str(err), "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
-
-    # can use this if i want to notify about case-insensitive matching (thought i wanted it, but don't feel like it's really needed ATM)
-    # if selection.canonical != args.wanted_ref_tax:
-    #     report_message(f"Matched input '{args.wanted_ref_tax}' to GTDB taxon '{selection.canonical}'.",
-    #                    "yellow", ii="    ", si="    ", width=100)
 
     for warning in selection.warnings:
         report_message(warning, "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
@@ -256,10 +261,53 @@ def _write_outputs(selection, representatives_source):
     acc_out_filename = f"gtdb-{taxon_for_filename}-{rank}{suffix}-accs.txt"
     tab_out_filename = f"gtdb-{taxon_for_filename}-{rank}{suffix}-metadata.tsv"
 
-    with open(acc_out_filename, "w") as out:
-        for acc in selection.accessions:
-            out.write(acc + "\n")
+    write_accessions(acc_out_filename, selection.accessions)
+    _write_metadata_tsv(selection.rows, tab_out_filename)
 
+    print("")
+    wprint(f"Wrote {len(selection.accessions):,} accession(s) to:")
+    wprint("  " + color_text(acc_out_filename))
+    print("")
+    wprint("Associated taxonomy and metadata of these targets written to:")
+    wprint("  " + color_text(tab_out_filename))
+    print("")
+
+
+def _derep_is_on(args):
+    """True when --derep-rank asks for actual dereplication."""
+    return getattr(args, "derep_rank", "off") not in (None, "off", "none", "None")
+
+
+def _write_all_dereplicated(gtdb_path, args, representatives_source):
+    """`-w all` WITH --derep-rank: one selection per domain, merged."""
+    reps_only = representatives_source is not None
+
+    try:
+        selection = select_all_domains(gtdb_path, "gtdb", derep_rank=args.derep_rank,
+                                       reps_only=reps_only)
+    except ValueError as err:
+        report_message(str(err), "yellow", ii="    ", si="    ", width=100,
+                       trailing_newline=True)
+        sys.exit(0)
+
+    report_message(f"Dereplicating within each domain "
+                   f"({', '.join(selection.domains)}).", "yellow",
+                   ii="    ", si="    ", width=100, trailing_newline=True)
+
+    for warning in selection.warnings:
+        report_message(warning, "yellow", ii="    ", si="    ", width=100,
+                       trailing_newline=True)
+
+    if not selection.accessions:
+        report_message("No accessions were found :(", "yellow",
+                       ii="    ", si="    ", width=100, trailing_newline=True)
+        sys.exit(0)
+
+    suffix = f"-{representatives_source}-rep" if representatives_source else ""
+    acc_out_filename = f"gtdb-arc-and-bac{suffix}-accs.txt"
+    tab_out_filename = f"gtdb-arc-and-bac{suffix}-metadata.tsv"
+
+    write_accessions(acc_out_filename, selection.accessions)
     _write_metadata_tsv(selection.rows, tab_out_filename)
 
     print("")
@@ -272,13 +320,13 @@ def _write_outputs(selection, representatives_source):
 
 
 def _write_all(gtdb_path, representatives_source):
-    """Bulk dump of every accession (optionally reps-only), plus a metadata TSV."""
-    if representatives_source == "gtdb":
-        filt = [("gtdb_representative", "=", "t")]
-    elif representatives_source == "RefSeq":
-        filt = [("ncbi_refseq_category", "=", "reference genome")]
-    else:
-        filt = None
+    """
+    Bulk dump of every accession (optionally reps-only), plus a metadata TSV.
+
+    The representatives predicate comes from _rep_filter_for()
+    """
+    rep_filter = _rep_filter_for(representatives_source)
+    filt = [(rep_filter[0], "=", rep_filter[1])] if rep_filter else None
 
     if filt:
         table = pq.read_table(gtdb_path, filters=filt)
@@ -290,14 +338,12 @@ def _write_all(gtdb_path, representatives_source):
     if representatives_source:
         acc_out_filename = "gtdb-arc-and-bac-" + representatives_source + "-rep-accs.txt"
         tab_out_filename = "gtdb-arc-and-bac-" + representatives_source + "-rep-metadata.tsv"
-        table.to_pandas().to_csv(tab_out_filename, sep="\t", index=False)
+        write_table_tsv(table, tab_out_filename)
     else:
         acc_out_filename = "gtdb-arc-and-bac-accs.txt"
         tab_out_filename = None
 
-    with open(acc_out_filename, "w") as out:
-        for acc in accessions:
-            out.write(str(acc) + "\n")
+    write_accessions(acc_out_filename, accessions)
 
     print("")
     wprint(f"Wrote {len(accessions):,} accession(s) to:")
@@ -312,16 +358,19 @@ def _write_all(gtdb_path, representatives_source):
 def _write_metadata_tsv(rows, out_filename):
     """Write selected genome rows to a TSV, columns in the asset's natural order."""
     if not rows:
-        open(out_filename, "w").close()
+        atomic_write_text(out_filename, lambda f: None)
         return
     # preserve a stable, readable column order: accession + ranks first, then the rest
     first = ["ncbi_genbank_assembly_accession"] + list(RANKS)
     seen = set(first)
     header = [c for c in first if c in rows[0]] + [c for c in rows[0] if c not in seen]
-    with open(out_filename, "w") as out:
+
+    def _write(out):
         out.write("\t".join(header) + "\n")
         for r in rows:
             out.write("\t".join(str(r.get(c, "")) for c in header) + "\n")
+
+    atomic_write_text(out_filename, _write)
 
 
 ################################################################################
@@ -329,35 +378,93 @@ def _write_metadata_tsv(rows, out_filename):
 ################################################################################
 
 def _rep_filter_for(representatives_source):
-    """The Parquet predicate for a representatives source (or None for no filter)."""
+    """
+    The Parquet predicate for a representatives source (or None for no filter)
+    """
     if representatives_source == "gtdb":
-        return ("gtdb_representative", "=", "t")
-    if representatives_source == "RefSeq":
-        return ("ncbi_refseq_category", "=", "reference genome")
+        return representatives_filter("gtdb", "source")
+    if representatives_source == "refseq":
+        return representatives_filter("gtdb", "refseq")
     return None
 
 
 def _count_at_rank(gtdb_path, rank, taxon, rep_filter=None):
     """Count rows where column `rank` == `taxon` (optionally rep-filtered), via pushdown."""
-    filters = [(rank, "=", taxon)]
-    if rep_filter:
-        filters.append(rep_filter)
-    # read a single tiny column; the rank predicate is pushed down to Parquet
-    return pq.read_table(gtdb_path, columns=[rank], filters=filters).num_rows
+    return count_genomes(gtdb_path, "gtdb", rank=rank, taxon=taxon,
+                         rep_filter=rep_filter)
 
 
 def _count_total(gtdb_path, rep_filter=None):
-    filters = [rep_filter] if rep_filter else None
-    return pq.read_table(gtdb_path, columns=["ncbi_genbank_assembly_accession"],
-                         filters=filters).num_rows
+    return count_genomes(gtdb_path, "gtdb", rep_filter=rep_filter)
 
 
-def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source):
+def _derep_note(gtdb_path, rank, taxon, args, rep_filter=None):
     """
-    Report how many genomes match `taxon` at each rank it occurs at. Resolution goes
-    through the shared, case-insensitive resolver (the same one the selection path
-    uses), and counts are read straight from the Parquet via predicate pushdown -- so
-    this no longer keeps its own taxon-lookup or pandas machinery.
+    The "...dereplicated at X, that would be N" line for one rank, or None when
+    dereplication is off. Returns (line_or_None, warnings)
+    """
+    derep_rank = getattr(args, "derep_rank", "off")
+    if derep_rank in (None, "off", "none", "None"):
+        return None, []
+
+    try:
+        effective, warnings = resolve_derep_rank(rank, derep_rank)
+    except ValueError as err:
+        # an explicit rank coarser than this one, so we can't dereplicate it
+        return str(err), []
+
+    if effective is None:
+        return None, warnings
+
+    n = derep_size(gtdb_path, "gtdb", rank, taxon, effective, rep_filter=rep_filter)
+    return f"Dereplicated at '{effective}', that would be {n:,} genome(s).", warnings
+
+
+def _report_derep_note(gtdb_path, rank, taxon, args, rep_filter=None):
+    """Print the dereplicated-count line (and any 'auto' advisory) for one rank."""
+    line, warnings = _derep_note(gtdb_path, rank, taxon, args, rep_filter=rep_filter)
+    if line:
+        wprint("    " + line)
+    for warning in warnings:
+        report_message(warning, "yellow", ii="      ", si="      ", width=100,
+                       newline=False, trailing_newline=True)
+
+
+def _report_rank_counts_for_taxon_or_exit(gtdb_path, taxon, representatives_source):
+    """
+    `--get-rank-counts` scoped to a taxon, how many unique taxa sit under it at each
+    rank from its own rank down
+    """
+    rep_filter = _rep_filter_for(representatives_source)
+
+    try:
+        canonical, ranks_found_in = _resolve_ranks(gtdb_path, taxon)
+    except TaxonNotFound:
+        report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank :(", "yellow",
+                       ii="    ", si="    ", width=100)
+        print("")
+        sys.exit(0)
+
+    for rank in ranks_found_in:
+        total = _count_at_rank(gtdb_path, rank, canonical, rep_filter)
+        rows = rank_counts(gtdb_path, "gtdb", scope_rank=rank, scope_taxon=canonical,
+                           rep_filter=rep_filter)
+        print("")
+        wprint(f"  The rank '{rank}' has {total:,} {canonical} entries.")
+        print("")
+        print(render_rank_count_table(
+            rows, count_header=f"Num. Unique Taxa under '{canonical}'"))
+
+    print("")
+    report_message("Each count above is also how many genomes `--derep-rank <rank>` "
+                   "would return, since dereplication keeps one genome per unique "
+                   "taxon at that rank.", "yellow",
+                   ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
+
+
+def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source, args=None):
+    """
+    Report how many genomes match `taxon` at each rank it occurs at
     """
     rep_filter = _rep_filter_for(representatives_source)
 
@@ -365,6 +472,9 @@ def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source):
         count = _count_total(gtdb_path)
         print("")
         wprint(f"  There are {count:,} total genomes in the database.")
+        if args is not None and _derep_is_on(args):
+            wprint(f"    Dereplicated within each domain, that would be "
+                   f"{_all_derep_size(gtdb_path, 'gtdb', args):,} genome(s).")
         print("")
         if representatives_source:
             rep_type = _rep_type_label(representatives_source)
@@ -384,17 +494,14 @@ def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source):
         print("")
         sys.exit(0)
 
-    # can use this if i want to notify about case-insensitive matching (thought i wanted it, but don't feel like it's really needed ATM)
-    # if canonical != taxon:
-    #     report_message(f"Matched input '{taxon}' to GTDB taxon '{canonical}'.",
-    #                    "yellow", ii="    ", si="    ", width=100)
-
     taxon = canonical
 
     print("")
     for rank in ranks_found_in:
         count = _count_at_rank(gtdb_path, rank, taxon)
         wprint(f"  The rank '{rank}' has {count:,} {taxon} entries.")
+        if args is not None:
+            _report_derep_note(gtdb_path, rank, taxon, args)
     print("")
 
     if representatives_source:
@@ -407,6 +514,9 @@ def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source):
             if count:
                 any_rep = True
                 wprint(f"  The rank '{rank}' has {count:,} {taxon} {rep_type} genome entries.")
+                if args is not None:
+                    _report_derep_note(gtdb_path, rank, taxon, args,
+                                       rep_filter=rep_filter)
                 print("")
         if not any_rep:
             wprint(color_text("Input taxon '" + taxon + "' doesn't seem to exist at any "
@@ -415,23 +525,30 @@ def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source):
             sys.exit(0)
 
 
+def _all_derep_size(path, source, args, rep_filter=None):
+    """
+    How many genomes `-w all --derep-rank X` would return
+    """
+    total = 0
+    for domain in distinct_taxa(path, source, RANKS[0], rep_filter=rep_filter):
+        effective, _warnings = resolve_derep_rank(RANKS[0], args.derep_rank)
+        if effective is None:
+            return count_genomes(path, source, rep_filter=rep_filter)
+        total += derep_size(path, source, RANKS[0], domain, effective,
+                            rep_filter=rep_filter)
+    return total
+
+
 def _rep_type_label(representatives_source):
     return "refseq reference" if representatives_source == "refseq" else "gtdb representative"
 
 
 def report_unique_taxa_counts_of_all_ranks(gtdb_path, representatives_source=None):
     """
-    Print, for each of the 7 ranks, how many unique taxa exist in the GTDB table.
-    Reads the rank columns straight from Parquet and counts distinct values with
-    Arrow (matching the NCBI helper's --get-rank-counts), rather than loading pandas.
+    Print, for each of the 7 ranks, how many unique taxa exist in the GTDB table
     """
-    ranks = list(RANKS)
-    tab = pq.read_table(gtdb_path, columns=ranks)
-
-    print("\n    {:<10} {:}".format("Rank", "Num. Unique Taxa"))
-    for rank in ranks:
-        n = pc.count_distinct(tab.column(rank)).as_py()
-        print(f"    {rank:<10} {str(n)}")
+    print("")
+    print(render_rank_count_table(rank_counts(gtdb_path, "gtdb")))
     print("")
 
     if representatives_source == "gtdb":
@@ -439,15 +556,12 @@ def report_unique_taxa_counts_of_all_ranks(gtdb_path, representatives_source=Non
                        "every GTDB taxon has a representative genome, so the number of unique "
                        "taxa per rank is the same with or without it.)",
                        "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
-    elif representatives_source == "RefSeq":
-        rep = pq.read_table(gtdb_path, columns=ranks,
-                            filters=[("ncbi_refseq_category", "=", "reference genome")])
+    elif representatives_source == "refseq":
+        rep_rows = rank_counts(gtdb_path, "gtdb",
+                               rep_filter=_rep_filter_for("refseq"))
         wprint(color_text("  In considering only RefSeq reference genomes:", "yellow"))
         print("")
-        print("    {:<10} {:}".format("Rank", "Num. Unique Ref. Taxa"))
-        for rank in ranks:
-            n = pc.count_distinct(rep.column(rank)).as_py()
-            print(f"    {rank:<10} {str(n)}")
+        print(render_rank_count_table(rep_rows, count_header="Num. Unique Ref. Taxa"))
         print("")
 
 
@@ -465,7 +579,7 @@ def copy_gtdb_table(gtdb_path):
     out_name = "gtdb-arc-and-bac-metadata.tsv"
     print("")
     with spinner("Writing GTDB table...", "", clear_on_done=True):
-        pq.read_table(gtdb_path).to_pandas().to_csv(out_name, sep="\t", index=False)
+        write_table_tsv(pq.read_table(gtdb_path), out_name)
     wprint("  GTDB table written to:")
     print(color_text("      " + out_name + "\n"))
 

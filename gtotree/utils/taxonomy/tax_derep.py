@@ -1,19 +1,15 @@
 """
-Genome/accession DEREPLICATION and quality-picking from the GTDB / NCBI Parquet
+Genome/accession dereplication and quality-picking from the GTDB / NCBI Parquet
 assets
-
-The dereplication piece of the taxonomy toolkit. We need "one best genome per
-rank" for tree building, which the filter piece (tax_select.py) doesn't do on its own
 """
 
-from gtotree.utils.taxonomy.tax_ranks import (
-    RANKS, NA, REFERENCE_VALUE, accession_core, rank_index, validate_derep_rank)
-from gtotree.utils.taxonomy.tax_select import (
-    SOURCES, select, resolve_taxon, live_accession_cores)
+from gtotree.utils.taxonomy.tax_ranks import (RANKS, NA, REFERENCE_VALUE, accession_core,
+                                              rank_index, validate_derep_rank)
+from gtotree.utils.taxonomy.tax_select import (SOURCES, select, resolve_taxon,
+                                               live_accession_cores)
+from gtotree.utils.taxonomy.tax_counts import distinct_taxa
 
-# Thresholds for the size_advice() nudges at the tails of a selection. A tree far
-# above SANE_HIGH is unwieldy; far below SANE_LOW is probably too sparse to be useful.
-# Advisory only -- they gate warning messages, never the selection itself.
+# Thresholds for the size_advice() nudges
 SANE_LOW = 20
 SANE_HIGH = 5000
 
@@ -27,12 +23,12 @@ ASSEMBLY_LEVEL_ORDER = {
 
 # A RefSeq "reference genome" is preferred over a merely higher-checkm genome,
 # but only if it is not actually bad. These gates are deliberately loose, here to
-# catch junk, not to replace all "reference" genomes
+# catch junk, not to regularly replace "reference" genomes
 REF_MIN_COMPLETENESS = 85.0
 REF_MAX_CONTAMINATION = 10.0
 MISSING_CONTAMINATION = float("inf")
 
-# How many ranks FINER than the target the default derep-rank
+# How many ranks FINER than the target the default --derep-rank uses
 DEREP_STEPS = 2
 
 def _derive_default_derep(target_rank):
@@ -293,7 +289,8 @@ def _quality_floor_warnings(n_below, n_missing, min_completeness, max_contaminat
 
 def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
           reps_only=None, pick="quality", screen_against=None,
-          accession_prefixes=None, min_completeness=None, max_contamination=None):
+          accession_prefixes=None, assembly_levels=None,
+          min_completeness=None, max_contamination=None):
     """
     One genome per unique value of `derep_rank`, within `wanted_taxon`
 
@@ -318,6 +315,14 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
     screen_against:
         Path to the NCBI Parquet asset. When given, the candidate pool is
         pre-filtered to assemblies that still exist at NCBI BEFORE grouping.
+
+    assembly_levels:
+        Optional set/list of assembly_level values (the NCBI strings, e.g.
+        "Complete Genome") restricting the candidate pool BEFORE grouping. Like
+        accession_prefixes, this MUST be applied up front: filtering afterwards
+        would let a group's best genome be picked and then deleted, so a group with a
+        perfectly good qualifying genome contributes nothing at all. Ignored for a
+        source with no assembly-level column.
 
     min_completeness / max_contamination:
         Optional checkm quality floor (see apply_quality_floor). Both default to None
@@ -382,6 +387,8 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
     if accession_prefixes:
         rows = _restrict_by_prefix(rows, spec.acc_col, accession_prefixes)
 
+    rows = _restrict_by_assembly_level(rows, spec, assembly_levels)
+
     rows, n_below, n_missing = apply_quality_floor(
         rows, spec, min_completeness, max_contamination)
     warnings.extend(_quality_floor_warnings(
@@ -443,8 +450,8 @@ class RefGenomeSelection:
 
 def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                        reps_only=None, pick="quality", screen_against=None,
-                       accession_prefixes=None, min_completeness=None,
-                       max_contamination=None):
+                       accession_prefixes=None, assembly_levels=None,
+                       min_completeness=None, max_contamination=None):
     """
     The one selection entry point shared by every surface that adds reference genomes
     by taxonomy: the standalone get-accessions helpers and the main GToTree driver's
@@ -461,6 +468,12 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
         for GenBank) restricting the candidate pool BEFORE selection/dereplication. This
         is applied up front so a best-per-rank pick is made within the requested pool,
         not dropped after the fact
+
+    assembly_levels:
+        Optional assembly_level restriction (NCBI strings, e.g. "Complete Genome"),
+        applied up front for the same reason as accession_prefixes: post-filtering a
+        dereplicated set silently deletes whole groups whose best genome happened to be
+        at another level, rather than picking the best QUALIFYING genome in the group.
 
     min_completeness / max_contamination:
         Optional checkm quality floor, applied to the candidate pool before any
@@ -493,6 +506,8 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
         if accession_prefixes:
             rows = _restrict_by_prefix(rows, spec.acc_col, accession_prefixes)
 
+        rows = _restrict_by_assembly_level(rows, spec, assembly_levels)
+
         if screen_against:
             live = live_accession_cores(screen_against)
             before = len(rows)
@@ -519,7 +534,7 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
     accessions, _groups, derep_warnings = derep(
         path, source, resolved_rank, canonical, effective_derep_rank,
         reps_only=reps_only, pick=pick, screen_against=screen_against,
-        accession_prefixes=accession_prefixes,
+        accession_prefixes=accession_prefixes, assembly_levels=assembly_levels,
         min_completeness=min_completeness, max_contamination=max_contamination)
     warnings.extend(derep_warnings)
 
@@ -532,11 +547,71 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                               effective_derep_rank, warnings)
 
 
+def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="quality",
+                       screen_against=None, accession_prefixes=None,
+                       assembly_levels=None, min_completeness=None, max_contamination=None):
+    """
+    Dereplicate across the whole asset, by running one selection per domain and
+    merging the results
+
+    The domain list is READ FROM THE ASSET rather than hardcoded
+
+    Returns a RefGenomeSelection whose `canonical` is "all" and whose `domains` lists
+    the domains that were walked.
+    """
+    domains = distinct_taxa(path, source, RANKS[0],
+                            accession_prefixes=accession_prefixes,
+                            assembly_levels=assembly_levels)
+
+    accessions, rows, warnings = [], [], []
+    seen_accessions, seen_warnings = set(), set()
+    effective_derep_rank = None
+
+    for domain in domains:
+        selection = select_ref_genomes(
+            path, source, domain, target_rank=RANKS[0], derep_rank=derep_rank,
+            reps_only=reps_only, pick=pick, screen_against=screen_against,
+            accession_prefixes=accession_prefixes,
+            assembly_levels=assembly_levels,
+            min_completeness=min_completeness, max_contamination=max_contamination)
+
+        effective_derep_rank = effective_derep_rank or selection.effective_derep_rank
+
+        for acc in selection.accessions:
+            if acc not in seen_accessions:
+                seen_accessions.add(acc)
+                accessions.append(acc)
+
+        rows.extend(selection.rows)
+
+        # each domain raises the same advisories (they depend on the target RANK, which
+        # is 'domain' every time), so the user should see each one once, not per domain
+        for warning in selection.warnings:
+            if warning not in seen_warnings:
+                seen_warnings.add(warning)
+                warnings.append(warning)
+
+    merged = RefGenomeSelection(accessions, rows, "all", None,
+                                effective_derep_rank, warnings)
+    merged.domains = domains
+    return merged
+
+
 def _restrict_by_prefix(rows, acc_col, prefixes):
     """Keep only rows whose accession starts with one of `prefixes`."""
     prefixes = tuple(prefixes)
     return [r for r in rows
             if str(r.get(acc_col) or "").startswith(prefixes)]
+
+
+def _restrict_by_assembly_level(rows, spec, assembly_levels):
+    """
+    Keep only rows at one of `assembly_levels`
+    """
+    if not assembly_levels or not spec.level_col:
+        return rows
+    wanted = set(assembly_levels)
+    return [r for r in rows if r.get(spec.level_col) in wanted]
 
 
 def _selection_columns(spec, extra_rank=None):

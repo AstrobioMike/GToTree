@@ -221,12 +221,14 @@ def test_taxon_counts_reps_block(in_ncbi, capsys):
     assert "has 1 Testophyla RefSeq reference genome entries." in out    # only GCF_...003
 
 
-def test_taxon_counts_ignores_derep(in_ncbi, capsys):
-    # --derep-rank must NOT collapse the count (derep is a pull-time reduction)
+def test_taxon_counts_reports_matches_and_the_dereplicated_size(in_ncbi, capsys):
+    # the match count must NOT be collapsed by --derep-rank, but the dereplicated size
+    # is reported alongside it -- it used to be omitted entirely
     _run(_args(wanted_ref_tax="Testophyla", source="both", derep_rank="family",
                get_taxon_counts=True))
     out = capsys.readouterr().out
     assert "The rank 'phylum' has 4 Testophyla entries." in out   # all 4, not 2 families
+    assert "Dereplicated at 'family', that would be 2 genome(s)." in out
 
 
 def test_taxon_counts_multi_rank_breakdown(in_ncbi, capsys, tmp_path):
@@ -256,3 +258,111 @@ def test_get_table_writes_full_metadata_tsv(in_ncbi, capsys):
     # is the full table
     assert len(rows) == len(_RECORDS)
     assert "phylum_taxid" in rows[0]
+
+
+def test_assembly_level_is_applied_before_dereplication(in_ncbi):
+    """
+    FamB holds a Complete Genome (GCF_...003) and a higher-quality Scaffold
+    (GCA_...004). Filtering on level AFTER dereplication picked the Scaffold as FamB's
+    best and then deleted it, so FamB contributed nothing at all -- instead of
+    contributing the best genome that actually meets the requested level.
+    """
+    _run(_args(wanted_ref_tax="Testophyla", source="both", derep_rank="family",
+               assembly_level=["complete"]))
+    accs = _read_accs("ncbi-testophyla-phylum-accs.txt")
+    assert sorted(accs) == ["GCF_000000001.1", "GCF_000000003.1"]
+
+
+def test_assembly_level_still_filters_with_derep_off(in_ncbi):
+    _run(_args(wanted_ref_tax="Testophyla", source="both", assembly_level=["scaffold"]))
+    assert _read_accs("ncbi-testophyla-phylum-accs.txt") == ["GCA_000000004.1"]
+
+
+def test_assembly_level_still_filters_for_all(in_ncbi):
+    _run(_args(wanted_ref_tax="all", source="both", assembly_level=["scaffold"]))
+    assert _read_accs("ncbi-all-accs.txt") == ["GCA_000000004.1"]
+
+
+def test_assembly_level_still_filters_for_a_taxid(in_ncbi):
+    _run(_args(wanted_ref_tax="5000", source="both", assembly_level=["scaffold"]))
+    assert _read_accs("ncbi-taxid-5000-accs.txt") == ["GCA_000000004.1"]
+
+
+def test_taxon_counts_derep_size_matches_what_a_pull_returns(in_ncbi, capsys):
+    _run(_args(wanted_ref_tax="Testophyla", source="both", derep_rank="family",
+               get_taxon_counts=True))
+    reported = capsys.readouterr().out
+
+    _run(_args(wanted_ref_tax="Testophyla", source="both", derep_rank="family"))
+    accs = _read_accs("ncbi-testophyla-phylum-accs.txt")
+    assert f"that would be {len(accs)} genome(s)." in reported
+
+
+def test_taxon_counts_derep_size_respects_the_source_filter(in_ncbi, capsys):
+    # only 2 GCF rows under Testophyla, one per family -> 2 either way, but the
+    # dereplicated number must come from the refseq-scoped pool
+    _run(_args(wanted_ref_tax="Testophyla", source="refseq", derep_rank="genus",
+               get_taxon_counts=True))
+    reported = capsys.readouterr().out
+
+    _run(_args(wanted_ref_tax="Testophyla", source="refseq", derep_rank="genus"))
+    accs = _read_accs("ncbi-testophyla-phylum-refseq-accs.txt")
+    assert f"that would be {len(accs)} genome(s)." in reported
+
+
+def test_taxon_counts_without_derep_rank_says_nothing_about_derep(in_ncbi, capsys):
+    _run(_args(wanted_ref_tax="Testophyla", source="both", get_taxon_counts=True))
+    assert "Dereplicated at" not in capsys.readouterr().out
+
+
+def test_rank_counts_are_scoped_to_a_wanted_taxon(in_ncbi, capsys):
+    # -w used to be ignored here, printing whole-database counts
+    _run(_args(wanted_ref_tax="Testophyla", source="both", get_rank_counts=True))
+    out = capsys.readouterr().out
+    assert "under 'Testophyla'" in out
+    assert "domain" not in out          # coarser than the taxon's own rank
+    assert "family     2" in out
+
+
+def test_rank_counts_without_a_taxon_still_covers_the_database(in_ncbi, capsys):
+    _run(_args(get_rank_counts=True, source="both"))
+    out = capsys.readouterr().out
+    assert "domain" in out
+    assert "under" not in out
+
+
+def test_all_with_derep_rank_dereplicates_within_each_domain(in_ncbi, capsys):
+    _run(_args(wanted_ref_tax="all", source="both", derep_rank="family"))
+    accs = _read_accs("ncbi-all-accs.txt")
+    assert len(accs) == 2      # one per family, within the one domain present
+    assert "Dereplicating within each domain (Bacteria)" in capsys.readouterr().out
+
+
+def test_all_with_derep_rank_includes_eukaryotes(in_ncbi, tmp_path, capsys):
+    """
+    The domain list is read from the table, not hardcoded to the prokaryotic pair --
+    NCBI carries eukaryotes and they must not be silently dropped.
+    """
+    records = _RECORDS + [
+        _rec("GCF_000000020.1", ("Eukaryota", "Ascomycota", "Saccharomycetes",
+                                 "Saccharomycetales", "Saccharomycetaceae",
+                                 "Saccharomyces", "Saccharomyces cerevisiae")),
+    ]
+    _write_mock_ncbi(tmp_path / PARQUET_FILENAME, records)
+    _run(_args(wanted_ref_tax="all", source="both", derep_rank="domain"))
+    accs = _read_accs("ncbi-all-accs.txt")
+    assert len(accs) == 2      # one bacterium, one eukaryote
+    assert "GCF_000000020.1" in accs
+    assert "Bacteria, Eukaryota" in capsys.readouterr().out
+
+
+def test_derep_rank_with_a_taxid_is_refused(in_ncbi, capsys):
+    code = _run(_args(wanted_ref_tax="5000", source="both", derep_rank="family"))
+    assert code == 0
+    assert "`--derep-rank` can't be applied with a taxid" in capsys.readouterr().out
+    assert not glob.glob("ncbi-*accs.txt")
+
+
+def test_derep_rank_off_with_a_taxid_still_works(in_ncbi):
+    _run(_args(wanted_ref_tax="5000", source="both"))
+    assert len(_read_accs("ncbi-taxid-5000-accs.txt")) == 4

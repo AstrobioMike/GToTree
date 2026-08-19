@@ -13,6 +13,21 @@
         # gtt gen-scg-hmms
 
 
+    # does `all` work as being passed to `-w` for everything?
+        # in main gtotree, when --source gtdb, it should auto do `-w bacteria -w archaea` for the user
+        # in main gtotree, when --source ncbi, it should auto do `-w bacteria -w archaea -w eukaryota` for the user
+            # we should accept aliases for eukaryota everywhere (e.g., eukaryota, eukarya, eukaryotes, eukaryote)
+
+
+    # check 'all' is doing --derep-rank class (i think that's what i want)
+
+
+    # if the user wanted refseq AND genbank, i should probably add a printed out note saying there is a ton of overlap and they may want just genbank
+
+
+    # a lot of shared functions (and arguments/parameters) between gtt get-accs-from-gtdb and gtt get-accs-from-ncbi, maybe they should be in a shared module?
+
+
     # gtt get-accs-from-* --get-taxon-counts DOES NOT currently take into account derep-rank (IT SHOULD)
 
 

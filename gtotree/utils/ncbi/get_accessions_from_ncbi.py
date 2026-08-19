@@ -2,17 +2,22 @@ import sys
 import os
 import argparse
 from collections import namedtuple
-import pyarrow.compute as pc # type: ignore
 import pyarrow.parquet as pq # type: ignore
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.misc.messaging import report_message, wprint, color_text, spinner
+from gtotree.utils.misc.general import (write_table_tsv, write_accessions,
+                                        atomic_write_text)
 from gtotree.utils.ncbi.get_ncbi_assembly_data import (get_ncbi_assembly_data,
                                                        ncbi_data_table_path,
                                                        read_date_retrieved)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import (TaxonNotFound, AmbiguousTaxon,
                                                find_ranks_for_taxon as _resolve_ranks)
-from gtotree.utils.taxonomy.tax_derep import select_ref_genomes
+from gtotree.utils.taxonomy.tax_derep import (select_ref_genomes, select_all_domains,
+                                              resolve_derep_rank)
+from gtotree.utils.taxonomy.tax_counts import (representatives_filter, count_genomes,
+                                               derep_size, rank_counts,
+                                               render_rank_count_table)
 
 
 _COLUMNS = [
@@ -84,8 +89,7 @@ def build_parser(parent_subparsers=None):
         default="off",
         help=("Dereplicate the pulled genomes down to a single best genome per unique "
               "value of this rank (default: off). E.g., '--derep-rank family' keeps one genome per "
-              "family within the target taxon). Use 'auto' for two ranks finer than the target. "
-              "Only applies to a taxon-name search (not a taxid or 'all')."),
+              "family within the target taxon). Use 'auto' for two ranks finer than the target."),
         action="store",
     )
 
@@ -118,15 +122,17 @@ def build_parser(parent_subparsers=None):
     optional.add_argument(
         "--get-taxon-counts",
         action="store_true",
-        help=("Provide this flag along with a specified taxon to `-t` to see how many "
-              "genomes match the set parameters (excluding --derep-rank)"),
+        help=("Provide this flag along with a specified taxon to `-w` to see how many "
+              "genomes match the set parameters. If `--derep-rank` is also set, the "
+              "number of genomes following dereplication is reported too."),
     )
 
     optional.add_argument(
         "--get-rank-counts",
         action="store_true",
-        help=("Provide just this flag alone to see counts of how many unique taxa there "
-              "are for each rank."),
+        help=("Provide this flag to see counts of how many unique taxa there are for each rank. "
+              "By itself, that'd be the whole database, but it can also be combined with "
+              "`-w` and `--derep-rank`."),
     )
 
     optional.add_argument(
@@ -170,12 +176,6 @@ def get_accessions_from_ncbi(args):
         copy_ncbi_table(table_path)
         sys.exit(0)
 
-    if args.get_rank_counts:
-        report_unique_taxa_counts_of_all_ranks(
-            table_path, source=args.source,
-            reps_only=args.refseq_reference_genomes_only)
-        sys.exit(0)
-
     try:
         assembly_levels = parse_assembly_levels(args.assembly_level)
     except ValueError as err:
@@ -183,18 +183,26 @@ def get_accessions_from_ncbi(args):
         print("")
         sys.exit(0)
 
-    target = str(args.wanted_ref_tax)
-    if args.get_taxon_counts and target.lower() != "all" and not target.isdigit():
+    target = str(args.wanted_ref_tax) if args.wanted_ref_tax else ""
+    named_taxon = bool(target) and target.lower() != "all" and not target.isdigit()
+
+    if args.get_rank_counts:
+        if named_taxon:
+            _report_rank_counts_for_taxon_or_exit(table_path, target, args,
+                                                  assembly_levels)
+        else:
+            report_unique_taxa_counts_of_all_ranks(
+                table_path, source=args.source,
+                reps_only=args.refseq_reference_genomes_only,
+                assembly_levels=assembly_levels)
+        sys.exit(0)
+
+    if args.get_taxon_counts and named_taxon:
         _report_taxon_counts_or_exit(table_path, target, args, assembly_levels)
         sys.exit(0)
 
-    selection = _select_rows(table_path, args)
+    selection = _select_rows(table_path, args, assembly_levels)
     rows, label = selection.rows, selection.label
-
-    # assembly-level is the only post-filter left; --source scoping already happened
-    # up front inside _select_rows (before any dereplication)
-    if assembly_levels:
-        rows = [r for r in rows if r.get("assembly_level") in assembly_levels]
 
     if args.get_taxon_counts:
         print("")
@@ -215,64 +223,109 @@ def get_accessions_from_ncbi(args):
 def preflight_checks(args):
 
     if args.get_taxon_counts and not args.wanted_ref_tax:
-        report_message("A specific taxon needs to also be provided to the `-t` flag "
+        report_message("A specific taxon needs to also be provided to the `-w` flag "
                        "in order to use `--get-taxon-counts`.", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
     if not args.get_rank_counts and not args.get_table and not args.wanted_ref_tax:
-        report_message("A target taxon needs to be provided to `-t` (a name, a taxid, or 'all').", "yellow",
+        report_message("A target taxon needs to be provided to `-w` (a name, a taxid, or 'all').", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
+
+    check_derep_rank_is_applicable(args)
+
+
+def check_derep_rank_is_applicable(args):
+    """
+    A taxid's rank is known only after the lookup, and the taxid path doesn't run
+    through the selection core, so there is no resolved rank to group beneath. So it's
+    not applicable with --derep-rank
+    """
+    target = str(args.wanted_ref_tax or "")
+    derep_rank = getattr(args, "derep_rank", "off")
+
+    if derep_rank in (None, "off", "none", "None"):
+        return
+
+    if not target.isdigit():
+        return
+
+    report_message(
+        f"`--derep-rank` can't be applied with a taxid. Pass the taxon "
+        f"name instead if you also want to dereplicate",
+        "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
+    sys.exit(0)
+
+
+def _derep_is_on(args):
+    """True when --derep-rank asks for actual dereplication."""
+    return getattr(args, "derep_rank", "off") not in (None, "off", "none", "None")
 
 
 def _count_at_rank(table_path, rank, taxon, prefixes=None, reps_only=False,
                    assembly_levels=None):
     """
     Count rows where column `rank` == `taxon`, with the set POOL filters applied
-    (source prefix, RefSeq-reference-only, assembly level). --derep-rank is
-    intentionally NOT applied: counts report how many genomes MATCH the filters, not
-    how many survive dereplication (a pull-time reduction). Reads via pushdown where
-    possible, then applies the prefix / level filters in Arrow.
+    (source prefix, RefSeq-reference-only, assembly level). This is the number of
+    genomes that MATCH. What a --derep-rank pull would return is reported separately
+    by _derep_count_at_rank(), since the two are different questions.
     """
-    filters = [(rank, "=", taxon)]
-    if reps_only:
-        filters.append(("refseq_category", "=", "reference genome"))
-    if assembly_levels:
-        filters.append(("assembly_level", "in", set(assembly_levels)))
-
-    cols = [rank, "assembly_accession"]
-    tab = pq.read_table(table_path, columns=cols, filters=filters)
-
-    if prefixes:
-        tab = tab.filter(_prefix_mask(tab.column("assembly_accession"), prefixes))
-
-    return tab.num_rows
+    return count_genomes(table_path, "ncbi", rank=rank, taxon=taxon,
+                         rep_filter=_rep_filter(reps_only),
+                         accession_prefixes=prefixes,
+                         assembly_levels=assembly_levels)
 
 
-def _prefix_mask(acc_col, prefixes):
-    mask = None
-    for p in prefixes:
-        m = pc.starts_with(acc_col, p)
-        mask = m if mask is None else pc.or_(mask, m)
-    return mask
+def _rep_filter(reps_only):
+    """The RefSeq-reference-genome predicate, or None."""
+    return representatives_filter("ncbi", "refseq" if reps_only else None)
 
 
-def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
+def _derep_count_at_rank(table_path, rank, taxon, derep_rank, prefixes=None,
+                         reps_only=False, assembly_levels=None):
+    """How many genomes survive dereplication at `derep_rank`, under the same pool."""
+    return derep_size(table_path, "ncbi", rank, taxon, derep_rank,
+                      rep_filter=_rep_filter(reps_only),
+                      accession_prefixes=prefixes,
+                      assembly_levels=assembly_levels)
+
+
+def _derep_note(table_path, rank, taxon, args, prefixes, assembly_levels,
+                reps_only=False):
     """
-    Report how many genomes match `taxon` at each rank it occurs at, matching the GTDB
-    helper's format: a primary per-rank block for the base pool (scoped by --source and
-    --assembly-level), then if --refseq-reference-genomes-only is set a separate
-    "In considering only RefSeq reference genomes:" block, like GTDB's reps block.
+    The "...and dereplicated at X, that would be N" line for one rank, or None when
+    dereplication is off. Any advisory from resolving 'auto' is returned alongside so
+    the caller can print it (e.g. auto on a species target turns derep off).
 
-    The wording is explicit about WHICH filters each block reflects: the primary block
-    reflects --source and --assembly-level (but not the reference-genome filter, which
-    is applied only in the second block), so the two numbers aren't confused.
+    Returns (line_or_None, warnings).
+    """
+    derep_rank = getattr(args, "derep_rank", "off")
+    if derep_rank in (None, "off", "none", "None"):
+        return None, []
+
+    try:
+        effective, warnings = resolve_derep_rank(rank, derep_rank)
+    except ValueError as err:
+        # an explicit rank coarser than this one -- can't dereplicate to it
+        return str(err), []
+
+    if effective is None:
+        return None, warnings
+
+    n = _derep_count_at_rank(table_path, rank, taxon, effective, prefixes=prefixes,
+                             reps_only=reps_only, assembly_levels=assembly_levels)
+    return (f"Dereplicated at '{effective}', that would be {n:,} genome(s).",
+            warnings)
+
+
+def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_levels):
+    """
+    `--get-rank-counts` scoped to a taxon, how many unique taxa sit under it at each
+    rank from its own rank down
     """
     prefixes = _source_prefixes(args.source)
-
-    # a short human description of the filters folded into the PRIMARY block, so the
-    # count line says what it actually reflects rather than a vague "any filters"
+    reps_only = args.refseq_reference_genomes_only
     scope_note = _counts_scope_note(args, assembly_levels)
 
     try:
@@ -282,10 +335,44 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
-    # can use this if i want to notify about case-insensitive matching (thought i wanted it, but don't feel like it's really needed ATM)
-    # if canonical != taxon:
-    #     report_message(f"Matched input '{taxon}' to NCBI taxon '{canonical}'.", "yellow",
-    #                    ii="    ", si="    ", width=100)
+    for rank in ranks_found_in:
+        total = _count_at_rank(table_path, rank, canonical, prefixes=prefixes,
+                               reps_only=reps_only, assembly_levels=assembly_levels)
+        rows = rank_counts(table_path, "ncbi", scope_rank=rank, scope_taxon=canonical,
+                           rep_filter=_rep_filter(reps_only),
+                           accession_prefixes=prefixes,
+                           assembly_levels=assembly_levels)
+
+        print("")
+        report_message(f"The rank '{rank}' has {total:,} {canonical} entries{scope_note}.",
+                       color=None, ii="    ", si="    ", width=100, newline=False)
+        print("")
+        print(render_rank_count_table(
+            rows, count_header=f"Num. Unique Taxa under '{canonical}'"))
+
+    print("")
+    report_message("Each count above is also how many genomes `--derep-rank <rank>` "
+                   "would return, since dereplication keeps one genome per unique "
+                   "taxon at that rank.", "yellow",
+                   ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
+
+
+def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
+    """
+    Report how many genomes match `taxon` at each rank it occurs at
+
+    """
+    prefixes = _source_prefixes(args.source)
+
+    scope_note = _counts_scope_note(args, assembly_levels)
+
+    try:
+        canonical, ranks_found_in = _resolve_ranks(table_path, taxon)
+    except TaxonNotFound:
+        report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank :(", "yellow",
+                       ii="    ", si="    ", width=100, trailing_newline=True)
+        sys.exit(0)
+
     taxon = canonical
 
     print("")
@@ -294,6 +381,7 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
                                assembly_levels=assembly_levels)
         report_message(f"The rank '{rank}' has {count:,} {taxon} entries{scope_note}.", color=None,
                        ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
+        _report_derep_note(table_path, rank, taxon, args, prefixes, assembly_levels)
 
     if args.refseq_reference_genomes_only:
         report_message("Of those, in considering only RefSeq reference genomes:", "yellow",
@@ -306,10 +394,25 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
                 any_rep = True
                 report_message(f"The rank '{rank}' has {count:,} {taxon} RefSeq reference genome entries.", color=None,
                                ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
+                _report_derep_note(table_path, rank, taxon, args, prefixes,
+                                   assembly_levels, reps_only=True)
         if not any_rep:
             report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank as a RefSeq reference genome :(", "yellow",
                            ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
             sys.exit(0)
+
+
+def _report_derep_note(table_path, rank, taxon, args, prefixes, assembly_levels,
+                       reps_only=False):
+    """Print the dereplicated-count line (and any 'auto' advisory) for one rank."""
+    line, warnings = _derep_note(table_path, rank, taxon, args, prefixes,
+                                 assembly_levels, reps_only=reps_only)
+    if line:
+        report_message(line, color=None, ii="      ", si="      ", width=100,
+                       newline=False, trailing_newline=True)
+    for warning in warnings:
+        report_message(warning, "yellow", ii="      ", si="      ", width=100,
+                       newline=False, trailing_newline=True)
 
 
 def _counts_scope_note(args, assembly_levels):
@@ -335,33 +438,40 @@ def _source_prefixes(source):
     return None
 
 
-def _select_rows(table_path, args):
+def _select_rows(table_path, args, assembly_levels=None):
     """
     Resolve the target and return an _NcbiSelection(rows, label, rank, taxon) where
-    `rank` is the resolved rank for a taxon-name search (None for 'all'/taxid, which
-    don't resolve to a single rank) and `taxon` is the canonical name used for output
-    filenames. Three modes:
-      - 'all'          -> every genome (optionally reps-only)
-      - a numeric taxid-> lineage-taxid lookup
-      - a taxon name   -> the shared select_ref_genomes core (honours --derep-rank)
-    Only the taxon-name mode dereplicates; taxid and 'all' don't resolve to a single
-    rank, so derep (a one-per-finer-rank operation) doesn't apply there.
-
-    --source scoping (refseq/genbank -> GCF_/GCA_ prefix) is applied up front in every
-    mode: inside the core for the taxon path, and at read time for all/taxid.
+    `rank` is the resolved rank for a taxon-name search
     """
     target = str(args.wanted_ref_tax)
     reps_only = args.refseq_reference_genomes_only
     prefixes = _source_prefixes(args.source)
 
     if target.lower() == "all":
-        filters = [("refseq_category", "=", "reference genome")] if reps_only else None
-        tab = pq.read_table(table_path, columns=_COLUMNS, filters=filters)
+        if _derep_is_on(args):
+            selection = select_all_domains(
+                table_path, "ncbi", derep_rank=args.derep_rank, reps_only=reps_only,
+                accession_prefixes=prefixes, assembly_levels=assembly_levels)
+            report_message(f"Dereplicating within each domain "
+                           f"({', '.join(selection.domains)}).", "yellow",
+                           ii="    ", si="    ", width=100, trailing_newline=True)
+            for warning in selection.warnings:
+                report_message(warning, "yellow", ii="    ", si="    ", width=100,
+                               trailing_newline=True)
+            label = ("all genomes (dereplicated within each domain: "
+                     + ", ".join(selection.domains) + ")")
+            return _NcbiSelection(selection.rows, label, None, "all")
+
+        filters = [("refseq_category", "=", "reference genome")] if reps_only else []
+        if assembly_levels:
+            filters.append(("assembly_level", "in", set(assembly_levels)))
+        tab = pq.read_table(table_path, columns=_COLUMNS, filters=filters or None)
         rows = _apply_source_prefix(tab.to_pylist(), prefixes)
         return _NcbiSelection(rows, "all genomes", None, "all")
 
     if target.isdigit():
-        rows = _select_by_taxid(table_path, target, reps_only=reps_only)
+        rows = _select_by_taxid(table_path, target, reps_only=reps_only,
+                                assembly_levels=assembly_levels)
         rows = _apply_source_prefix(rows, prefixes)
         return _NcbiSelection(rows, f"taxid {target}", None, f"taxid-{target}")
 
@@ -370,7 +480,8 @@ def _select_rows(table_path, args):
             table_path, "ncbi", target,
             target_rank=args.target_rank, derep_rank=args.derep_rank,
             reps_only=reps_only,
-            accession_prefixes=_source_prefixes(args.source))
+            accession_prefixes=_source_prefixes(args.source),
+            assembly_levels=assembly_levels)
     except AmbiguousTaxon as e:
         report_message(f"Since the input taxon '{e.taxon}' occurs at more than 1 rank, "
                        "you'll need to specify which rank is wanted as well before we pull the "
@@ -386,11 +497,6 @@ def _select_rows(table_path, args):
         report_message(str(err), "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
-    # can use this if i want to notify about case-insensitive matching (thought i wanted it, but don't feel like it's really needed ATM)
-    # if selection.canonical != target:
-    #     report_message(f"Matched input '{target}' to NCBI taxon '{selection.canonical}'.",
-    #                    "yellow", ii="    ", si="    ", width=100)
-
     for warning in selection.warnings:
         report_message(warning, "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
 
@@ -404,12 +510,14 @@ def _select_rows(table_path, args):
                           selection.resolved_rank, selection.canonical)
 
 
-def _select_by_taxid(table_path, taxid, reps_only=False):
+def _select_by_taxid(table_path, taxid, reps_only=False, assembly_levels=None):
     """
     Select rows whose lineage carries `taxid` at any rank (checking each rank's
     *_taxid column, then the row's own taxid), returning full metadata rows.
     """
     base_filters = [("refseq_category", "=", "reference genome")] if reps_only else []
+    if assembly_levels:
+        base_filters = base_filters + [("assembly_level", "in", set(assembly_levels))]
     for rank in list(RANKS) + [None]:
         col = f"{rank}_taxid" if rank else "taxid"
         tab = pq.read_table(table_path, columns=_COLUMNS,
@@ -442,41 +550,30 @@ def _apply_source_prefix(rows, prefixes):
             if str(r.get("assembly_accession") or "").startswith(prefixes)]
 
 
-def report_unique_taxa_counts_of_all_ranks(table_path, source="refseq", reps_only=False):
+def report_unique_taxa_counts_of_all_ranks(table_path, source="refseq", reps_only=False,
+                                           assembly_levels=None):
     """
     Print, for each of the 7 ranks, how many unique taxa exist in the NCBI table,
     scoped to `source` (refseq -> GCF_ only, genbank -> GCA_ only, both -> no filter).
     If reps_only, also print counts among RefSeq reference genomes.
     """
-    ranks = list(RANKS)
-    tab = pq.read_table(table_path, columns=ranks + ["assembly_accession"])
-    tab = _filter_table_by_source(tab, source)
-
+    prefixes = _source_prefixes(source)
     label = {"refseq": "refseq", "genbank": "genbank", "both": "all"}.get(source, source)
-    print("\n    {:<10} {:}".format("Rank", f"Num. Unique Taxa ({label})"))
-    for rank in ranks:
-        n = pc.count_distinct(tab.column(rank)).as_py()
-        print(f"    {rank:<10} {str(n)}")
+
+    rows = rank_counts(table_path, "ncbi", accession_prefixes=prefixes,
+                       assembly_levels=assembly_levels)
+    print("")
+    print(render_rank_count_table(rows, count_header=f"Num. Unique Taxa ({label})"))
     print("")
 
     if reps_only:
-        rep = pq.read_table(table_path, columns=ranks,
-                            filters=[("refseq_category", "=", "reference genome")])
+        rep_rows = rank_counts(table_path, "ncbi", accession_prefixes=prefixes,
+                               rep_filter=_rep_filter(True),
+                               assembly_levels=assembly_levels)
         wprint(color_text("In considering only RefSeq reference genomes:", "yellow"))
         print("")
-        print("    {:<10} {:}".format("Rank", "Num. Unique Ref. Taxa"))
-        for rank in ranks:
-            n = pc.count_distinct(rep.column(rank)).as_py()
-            print(f"    {rank:<10} {str(n)}")
+        print(render_rank_count_table(rep_rows, count_header="Num. Unique Ref. Taxa"))
         print("")
-
-
-def _filter_table_by_source(tab, source):
-    """Arrow-table variant of the source prefix filter (for the counts path)."""
-    if source in ("refseq", "genbank"):
-        prefix = "GCF_" if source == "refseq" else "GCA_"
-        tab = tab.filter(pc.starts_with(tab.column("assembly_accession"), prefix))
-    return tab
 
 
 def _report_ncbi_date(table_path):
@@ -488,7 +585,7 @@ def copy_ncbi_table(table_path):
     out_name = "ncbi-assembly-summary-metadata.tsv"
     print("")
     with spinner("Writing NCBI table...", "", clear_on_done=True):
-        pq.read_table(table_path).to_pandas().to_csv(out_name, sep="\t", index=False)
+        write_table_tsv(pq.read_table(table_path), out_name)
     wprint("  NCBI table written to:")
     print(color_text("      " + out_name + "\n"))
 
@@ -512,9 +609,7 @@ def _write_outputs(rows, args, selection):
     _write_metadata_tsv(rows, tab_out)
 
     accs = [r.get("assembly_accession") for r in rows if r.get("assembly_accession")]
-    with open(acc_out, "w") as out:
-        for acc in accs:
-            out.write(acc + "\n")
+    write_accessions(acc_out, accs)
 
     print("")
     wprint(f"Wrote {len(accs):,} accession(s) to:")
@@ -528,15 +623,18 @@ def _write_outputs(rows, args, selection):
 def _write_metadata_tsv(rows, out_filename):
     """Write selected genome rows to a TSV, accession + ranks first then the rest."""
     if not rows:
-        open(out_filename, "w").close()
+        atomic_write_text(out_filename, lambda f: None)
         return
     first = ["assembly_accession"] + list(RANKS)
     seen = set(first)
     header = [c for c in first if c in rows[0]] + [c for c in rows[0] if c not in seen]
-    with open(out_filename, "w") as out:
+
+    def _write(out):
         out.write("\t".join(header) + "\n")
         for r in rows:
             out.write("\t".join(str(r.get(c, "")) for c in header) + "\n")
+
+    atomic_write_text(out_filename, _write)
 
 
 if __name__ == "__main__":

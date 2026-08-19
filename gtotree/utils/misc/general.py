@@ -9,6 +9,7 @@ from typing import List
 from tqdm import tqdm # type: ignore
 import urllib.request
 import urllib.error
+import pyarrow as pa # type: ignore
 from datetime import datetime
 from gtotree.utils.misc.messaging import (report_message, color_text, wprint)
 from gtotree.utils.misc.resume_state import invalidate_completed_from
@@ -1256,3 +1257,44 @@ def cleanup(args, run_data):
     if not args.keep_working_dir:
         shutil.rmtree(run_data.tmp_dir, ignore_errors=True)
         run_data.tmp_dir = ""
+
+
+def write_table_tsv(table, out_path):
+    """
+    Write a pyarrow Table to a TSV, atomically
+    """
+    import pyarrow.csv as pacsv # type: ignore
+
+    tmp = f"{out_path}.part"
+    try:
+        try:
+            with open(tmp, "wb") as out:
+                out.write(("\t".join(table.column_names) + "\n").encode())
+                pacsv.write_csv(
+                    table, out,
+                    write_options=pacsv.WriteOptions(delimiter="\t",
+                                                     include_header=False,
+                                                     quoting_style="none"))
+        except pa.ArrowInvalid:
+            # a value carries a structural character; pandas quotes it instead
+            table.to_pandas().to_csv(tmp, sep="\t", index=False)
+        os.replace(tmp, out_path)
+    except BaseException:
+        # BaseException so Ctrl-C also cleans up the partial file
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def write_accessions(out_path, accessions):
+    """
+    Write an accession list, one per line, atomically. Shared by every
+    get-accs-from-* surface so they can't drift in how the file is produced.
+    """
+    def _write(f):
+        for acc in accessions:
+            f.write(str(acc) + "\n")
+
+    atomic_write_text(out_path, _write)

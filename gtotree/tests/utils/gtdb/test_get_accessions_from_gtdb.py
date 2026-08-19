@@ -137,3 +137,100 @@ def test_reps_flags_mutually_exclusive(in_gtdb, capsys):
                       refseq_reference_genomes_only=True))
     assert code == 1
     assert "Only one of" in capsys.readouterr().out
+
+
+def test_taxon_counts_reports_the_dereplicated_size(in_gtdb, capsys):
+    # --get-taxon-counts used to ignore --derep-rank entirely, so the number it quoted
+    # was not the number a pull would return
+    _run(_args(wanted_ref_tax="Testophyla", derep_rank="class", get_taxon_counts=True))
+    out = capsys.readouterr().out
+    assert "The rank 'phylum' has 4 Testophyla entries." in out   # matches, unchanged
+    assert "Dereplicated at 'class', that would be 2 genome(s)." in out
+
+
+def test_taxon_counts_derep_size_matches_what_a_pull_returns(in_gtdb, capsys):
+    _run(_args(wanted_ref_tax="Testophyla", derep_rank="class", get_taxon_counts=True))
+    reported = capsys.readouterr().out
+
+    _run(_args(wanted_ref_tax="Testophyla", derep_rank="class"))
+    accs = _read_accs("gtdb-testophyla-phylum-accs.txt")
+    assert f"that would be {len(accs)} genome(s)." in reported
+
+
+def test_taxon_counts_without_derep_rank_says_nothing_about_derep(in_gtdb, capsys):
+    _run(_args(wanted_ref_tax="Testophyla", get_taxon_counts=True))
+    assert "Dereplicated at" not in capsys.readouterr().out
+
+
+def test_rank_counts_are_scoped_to_a_wanted_taxon(in_gtdb, capsys):
+    # -w used to be ignored here, printing whole-database counts
+    _run(_args(wanted_ref_tax="Testophyla", get_rank_counts=True))
+    out = capsys.readouterr().out
+    assert "under 'Testophyla'" in out
+    assert "domain" not in out          # coarser than the taxon's own rank
+    assert "class      2" in out
+
+
+def test_rank_counts_without_a_taxon_still_covers_the_database(in_gtdb, capsys):
+    _run(_args(get_rank_counts=True))
+    out = capsys.readouterr().out
+    assert "domain" in out
+    assert "under" not in out
+
+
+def test_refseq_reference_only_counts_are_actually_filtered(in_gtdb, capsys):
+    # the reps block was built against a literal "RefSeq" that never matched the
+    # "refseq" value in play, so it silently reported UNFILTERED counts
+    _run(_args(wanted_ref_tax="Testophyla", refseq_reference_genomes_only=True,
+               get_taxon_counts=True))
+    out = capsys.readouterr().out
+    assert "has 1 Testophyla refseq reference genome entries." in out
+
+
+def test_all_with_refseq_reference_only_writes_only_reference_genomes(in_gtdb):
+    # same stale literal: this used to write EVERY accession into a file named for
+    # reference genomes
+    _run(_args(wanted_ref_tax="all", refseq_reference_genomes_only=True))
+    accs = _read_accs("gtdb-arc-and-bac-refseq-rep-accs.txt")
+    assert accs == ["GCA_000000003.1"]
+
+
+def test_all_with_derep_rank_dereplicates_within_each_domain(in_gtdb, capsys):
+    """
+    'all' has no rank of its own to group beneath, so it used to reject --derep-rank
+    (and before that, silently ignore it). It now runs the per-domain selection and
+    merges -- the fixture is one domain with 2 classes.
+    """
+    _run(_args(wanted_ref_tax="all", derep_rank="class"))
+    accs = _read_accs("gtdb-arc-and-bac-accs.txt")
+    assert len(accs) == 2
+    assert "Dereplicating within each domain (Bacteria)" in capsys.readouterr().out
+    assert os.path.exists("gtdb-arc-and-bac-metadata.tsv")
+
+
+def test_all_with_derep_rank_spans_every_domain_present(tmp_path, monkeypatch, capsys):
+    """The domain list comes from the asset, so nothing gets left behind."""
+    records = _RECORDS + [
+        _rec("GCA_000000005.1", ("Archaea", "ArcPhy", "ArcCls", "ArcOrd", "ArcFam",
+                                 "ArcGen", "ArcGen sp1")),
+    ]
+    monkeypatch.setenv("GTDB_DIR", str(tmp_path))
+    _write_mock_gtdb(tmp_path / PARQUET_FILENAME, records)
+    (tmp_path / VERSION_FILENAME).write_text("r220\n2024-04-24\n")
+    monkeypatch.chdir(tmp_path)
+    with patch(f"{MODPATH}.get_gtdb_data", return_value=str(tmp_path)):
+        _run(_args(wanted_ref_tax="all", derep_rank="domain"))
+    accs = _read_accs("gtdb-arc-and-bac-accs.txt")
+    assert len(accs) == 2      # one genome per domain
+    assert "Archaea, Bacteria" in capsys.readouterr().out
+
+
+def test_all_taxon_counts_report_the_dereplicated_size(in_gtdb, capsys):
+    _run(_args(wanted_ref_tax="all", derep_rank="class", get_taxon_counts=True))
+    out = capsys.readouterr().out
+    assert "Dereplicated within each domain, that would be 2 genome(s)." in out
+
+
+def test_derep_rank_off_with_all_still_works(in_gtdb):
+    _run(_args(wanted_ref_tax="all", derep_rank="off"))
+    assert len(_read_accs("gtdb-arc-and-bac-accs.txt")) == 4
