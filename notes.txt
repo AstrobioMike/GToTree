@@ -5,7 +5,7 @@
 ### TO DO STILL ###
 
 
-    # run the following with all 5 input types and make sure all messages make sense
+    # run the following with all 5 input types, and ko/pfam targets, and make sure all messages make sense
         # main gtotree
             # do some mapping-file tests, and make sure that's covered by unit tests
         # gtt search-pfams
