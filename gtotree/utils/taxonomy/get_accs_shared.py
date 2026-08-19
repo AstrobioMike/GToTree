@@ -207,7 +207,7 @@ def add_common_get_accs_args(required, optional, source_label,
                              taxon_flags=("-w", "--wanted-ref-tax"),
                              taxon_help=None):
     """
-    Declare the flags both helpers take, once.
+    Declare the flags both helpers take
     """
     required.add_argument(
         *taxon_flags,

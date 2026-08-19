@@ -59,8 +59,7 @@ def rank_index(rank):
 def validate_derep_rank(wanted_rank, derep_rank):
     """
     The --derep-rank rank must be the SAME as, or FINER than, the rank
-    of --wanted-ref-tax. Asking for one genome per family within a genus is
-    incoherent (the genus sits below family).
+    of --wanted-ref-tax
 
     Returns None if OK, else an explanatory string.
     """
