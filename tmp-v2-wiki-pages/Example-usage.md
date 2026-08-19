@@ -311,24 +311,31 @@ iqtree -s alteromonas-example/aligned-SCGs-mod-names.faa \
 # ToL Example
 Here we generate a 3-domain tree like the one in the [original GToTree paper](https://doi.org/10.1093/bioinformatics/btz188).
 
-In v2 this is close to a one-liner, since we can ask for both domains directly:
+In v2 this is close a one-liner, since we can ask for all domains directly:
 
 ```bash
-gtotree -w Bacteria -w Archaea --derep-rank order -D -j 4 -G 0.4 -o ToL
+gtotree -w Bacteria -w Archaea -w Eukarya --source ncbi --derep-rank order --add-ncbi-tax -j 10 -G 0.4
 ```
 
 > **Code Breakdown:**
->  * **-w Bacteria -w Archaea** – both domains; each is gathered and dereplicated separately, then merged  
->  * **--derep-rank order** – one genome per order, to keep this a reasonable size  
->  * **-D** – add GTDB lineage info to the labels  
->  * **-G 0.4** – relax the genome-hits cutoff, which is worth doing on a tree this broad (see [here](https://github.com/AstrobioMike/GToTree/wiki/things-to-consider#filtering-genomes-by-fraction-of-hits-to-targets))  
+>  * **-w Bacteria -w Archaea -w Eukarya** – all domains; each is gathered and dereplicated separately, then merged  
+>  * **--source ncbi** - setting NCBI as the source of genomes since we want to include eukaryotes
+>  * **--derep-rank order** – subset to one genome per order, to keep the tree a reasonable size that still shows the breadth of diversity we care about
+>  * **--add-ncbi-tax** – add NCBI lineage info to the labels
+>  * **-j 10** - set up to 10 jobs to run in parallel where possible
+>  * **-G 0.4** – relax the genome-hits cutoff, so more genomes make it through to the final tree at this broad level of diversity
 
-No `-H` again: with `-w Bacteria -w Archaea` spanning both domains, GToTree auto-selects the `Bacteria-and-Archaea` SCG-set, which is built for exactly this case. (In v1 this example used the 16-gene `Universal` set; `Bacteria-and-Archaea` has 30 targets and is the better choice unless eukaryotes are involved.)
+No `-H` needed: with `-w Bacteria -w Archaea -w Eukarya` spanning all 3 domains, GToTree auto-selects the `Universal` SCG-set, which is built for exactly this case.
 
-<!-- TODO(Mike): runtime and genome count when you run it -->
+**MIKE ADD RUNTIME AND GENOME COUNT INFO WHEN I DO THIS**
+
 
 Taking the output tree file `ToL/ToL.tre` and loading it into a tree viewer/editor such as the web-hosted [Interactive Tree of Life](https://itol.embl.de/upload.cgi) gives us this view:
 
-<!-- TODO(Mike): ToL figure here -->
+**MIKE ADD THE INITIAL TREE FIGURE HERE**
 
-The [iToL](https://itol.embl.de/) is a pretty stellar program for viewing/editing trees. I also use [Dendroscope](http://dendroscope.org/) pretty regularly. 
+And then after some beautification in iToL and Affinity Designer, here's the tree that went in the paper:
+
+**MIKE ADD THE BEAUTIFIED TREE FIGURE HERE**
+
+The [iToL](https://itol.embl.de/) site is pretty stellar for viewing/editing trees. I also use [Dendroscope](http://dendroscope.org/) pretty regularly. 

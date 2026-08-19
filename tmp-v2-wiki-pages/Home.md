@@ -33,10 +33,10 @@
 conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda gtotree
 ```
 
-**And a tree can be as quick as naming the group you want:**
+**And making a phylogenomic tree can be as easy as naming the group you want:**
 
 ```
-gtotree -w Nitrospirota -D -j 4 -o nitrospirota-tree
+gtotree -w Nitrospirota --add-gtdb-tax
 ```
 
 ---

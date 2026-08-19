@@ -11,6 +11,9 @@ The following line will create a gtotree conda environment and install GToTree, 
 
 ```bash
 conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda gtotree
+
+# IF you are on mac, and aren't sure if you installed an x86_64 miniconda, then do this
+CONDA_SUBDIR=osx-64 conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda gtotree
 ```
 
 **DONE!**
@@ -23,15 +26,29 @@ gtt hmms
 
 It will print out where the GToTree default HMMs directory is located, and list the available pre-built SCG-sets. Running `gtotree -h` gives the condensed help menu, and `gtotree -s` the detailed one.
 
-Running `gtt` by itself gives an overview of all the packaged helper subcommands.
+Running `gtt` by itself gives an overview of all the helper subcommands available.
 
 ---
 
 ## Reference data
 
-GToTree uses a few reference databases (GTDB taxonomy, NCBI assembly summary, and – if you use those features – Pfam and KOFamScan profiles). These are **downloaded automatically the first time they're needed**, so for most people there is nothing to do here.
+GToTree uses a few reference databases (GTDB taxonomy, NCBI assembly summary, and Pfam and KOFamScan profiles if you use them). These are **downloaded automatically the first time they're needed**, so for most people there is nothing to do here.
 
-If you'd like to fetch or update them ahead of time, e.g. on a compute node without internet access at runtime:
+But if you'd like to find them, or fetch or update them at any time, you can access them with the following `gtt data` helpers.
+
+To see where GToTree is storing them:
+
+```bash
+gtt data locations check
+```
+
+To set where they should be stored:
+
+```bash
+gtt data locations set
+```
+
+To download any (again, will be done automatically when needed anyway, but if you need to ahead of time, here's how you can):
 
 ```bash
 gtt data get gtdb-data
@@ -40,19 +57,7 @@ gtt data get pfam-data
 gtt data get kofamscan-data
 ```
 
-Add `-f`/`--force-update` to re-download something already present.
-
-To see where GToTree is storing/looking for these:
-
-```bash
-gtt data locations check
-```
-
-And to change those locations (useful on shared systems, or where a home directory has a quota):
-
-```bash
-gtt data locations set
-```
+And adding `-f`/`--force-update` will re-download something already present, which can be good if you want to make sure you have the latest available.
 
 ---
 
@@ -63,7 +68,7 @@ You can run a quick end-to-end test of the installed environment like so:
 gtt test
 ```
 
-<!-- TODO(Mike): paste the current `gtt test` output here -->
+If that works, it will print a message saying the test completed successfully.
 
 The test cleans up after itself. Add `-k`/`--keep` if you want to poke around at the output directory it makes (`test-gtotree-output/`) afterward.
 
@@ -74,83 +79,20 @@ If wanting to update to the latest GToTree version, it is best to remove the pre
 
 ```bash
 # from outside the gtotree conda environment (assuming that's what it was named like the install above)
-conda env remove -n gtotree
 
-# then re-installing in a new environment same as above
+# then re-installing in a new environment same as above (this will remove and overwrite the prior one)
 conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda gtotree
+
+# or to be sure to grab the right stuff if on a mac, you can add this variable up front
+CONDA_SUBDIR=osx-64 conda create -y -n gtotree -c astrobiomike -c conda-forge -c bioconda gtotree
 ```
 
 Then the new environment can be activated with `conda activate gtotree`.
 
-> **Updating from v1 to v2?** v2 is a full rewrite and several commands and outputs changed names – the helper programs are now subcommands of `gtt` (e.g. `gtt-hmms` is now `gtt hmms`), and the packaged SCG-sets are rebuilt against GTDB. See the [CHANGELOG](https://github.com/AstrobioMike/GToTree/blob/master/CHANGELOG.md) before re-running old commands. Installing into a fresh environment as above is the way to go.
 
 ---
 
-## Installation without conda (not recommended)
+## Versions of utilized programs
+Every GTOtree run produces a citations.txt file that holds the versions and citation info of all primary programs used. That should be the main source of truth for version tracking and citation info for GToTree and the wonderful tools it depends on. 
 
-Again, the conda installation is **highly** recommended as it is more robust across different systems. But to try installing without conda, GToTree v2 is a python package, so it can be installed with `pip` from a release tarball (be sure to change the version below to the latest found [here](https://github.com/AstrobioMike/GToTree/releases/latest)):
-
-```bash
-curl -L https://github.com/AstrobioMike/GToTree/archive/v2.0.0.tar.gz -o GToTree-v2.0.0.tar.gz
-tar -xzvf GToTree-v2.0.0.tar.gz
-cd GToTree-2.0.0
-pip install .
-```
-
-That installs the `gtotree`/`GToTree` and `gtt` commands and their python dependencies. You will still need to install the non-python dependencies yourself – see [below](installation#installing-dependencies-without-conda).
-
-### Add path to included HMM files
-The packaged SCG-set HMMs live in the `hmm_sets` directory of the source. So that you don't need to provide a full path to them, set an environment variable pointing at it:
-
-```bash
-cd hmm_sets/ # from the unpacked source directory
-echo "export GToTree_HMM_dir=\"$(pwd)/\"" >> ~/.bash_profile
-source ~/.bash_profile
-```
-
-You can run `gtt hmms` with no arguments to make sure the default HMM directory is set, and see what taxa the currently available SCG-sets target.
-
----
-
-## Installing dependencies without conda
-By **far**, the easiest way to get all the dependencies up and running is with [conda](https://conda.io/docs/) as done above. But if you don't want to use conda, here's what's needed.
-
-The python dependencies (biopython, dendropy, pandas, pyarrow, pyhmmer, requests, rich, rich-argparse, tqdm, argcomplete) are handled by `pip install .` above. The rest are external programs that need to be on your `PATH`.
-
-### Essential dependencies
-If you use GToTree, please be sure to cite these folks – a `citations.txt` file including used programs is produced with each run to help 🙂
-
-- **[pyhmmer](https://pyhmmer.readthedocs.io/)** - [citation](https://academic.oup.com/bioinformatics/article/39/5/btad214/7131068) – HMM searching is done in-process through pyhmmer in v2, so a separate `hmmsearch` binary is not needed for the main workflow. Please also cite [HMMER3](http://hmmer.org/), which pyhmmer wraps.
-- **[Muscle](https://www.drive5.com/muscle/downloads.htm)** v5.1 - [citation](https://academic.oup.com/nar/article/32/5/1792/2380623)  
-- **[Trimal](http://trimal.cgenomics.org/downloads)** v1.4.1 - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2712344/)  
-- **[FastTree](http://www.microbesonline.org/fasttree/)** v2.1.11 - [citation](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490)  
-- **[Prodigal](https://github.com/hyattpd/Prodigal)** v2.6.3 - [citation](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2848648/)  
-  - *needed whenever genes have to be called – i.e. input genomes in fasta format, GenBank format with no CDS annotations, or NCBI accessions to genomes with no gene calls*
-
-### Optional dependencies depending on use
-If you use GToTree in a manner that uses these tools, please cite these folks – a `citations.txt` file including used programs is produced with each run to help 🙂  
-
-- **[IQ-TREE](http://www.iqtree.org/)** >=2.2.2 - [citation](https://academic.oup.com/mbe/article/37/5/1530/5721363)
-  - *if using `-T IQTREE`*
-- **[VeryFastTree](https://github.com/citiususc/veryfasttree)** - [citation](https://academic.oup.com/bioinformatics/article/36/17/4658/5843801)
-  - *if using `-T VeryFastTree`*
-- **[KOFamScan](https://github.com/takaram/kofam_scan)** v1.3.0 - [citation](https://academic.oup.com/bioinformatics/article/36/7/2251/5631907)
-  - *if searching for target KOs (`-K`, or `gtt search-kos`)*
-- **[HMMER3](http://hmmer.org/download.html)** - [citation](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1002195)
-  - *KOFamScan calls `hmmsearch` itself, so a HMMER3 binary is needed if you use the KO-searching features*
-- **[Genome Taxonomy Database](https://www.nature.com/articles/s41587-020-0501-8)** - [citation](https://academic.oup.com/nar/article/50/D1/D785/6370255)  
-  - *if adding GTDB taxonomy information (`-D`), or gathering genomes by GTDB taxonomy (`-w`)*
-- **[Pfam](https://www.ebi.ac.uk/interpro/entry/pfam/)** - [citation](https://academic.oup.com/nar/article/51/D1/D418/6825349)
-  - *if searching for target Pfams (`-p`, or `gtt search-pfams`), and cited for the packaged SCG-sets, which are Pfam-derived*
-
-> **Note on versions**  
-> The versions listed above are what the conda recipe pins or what was used at a point in GToTree's history, and are left here as a reference for anyone installing without `conda`. With the conda installation it can sometimes be better to be more flexible with regard to versions. You can check specific versions in your conda installation with `conda list`, and the `citations.txt` file produced by a GToTree run lists the versions of programs used for that specific run.
-
-<!-- TODO(Mike): worth confirming this dependency split before publishing. It's derived
-     from conda-recipe/meta.yaml plus which tools are actually invoked in the v2 code.
-     Note the recipe currently also lists entrez-direct, dos2unix, parallel, bc,
-     coreutils, sed, file, gzip, and curl — I couldn't find remaining uses of the first
-     three in the v2 codebase, and the rest only back the small shell pipelines in
-     citations.py. If those get pruned from the recipe, this section stays correct as-is.
-     The recipe also lists pytest/pytest-cov under run requirements, which means every
-     user installs the test stack. -->
+You can also check specific versions in your active conda gtotree environment with `conda list`.
