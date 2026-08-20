@@ -382,7 +382,8 @@ def _process_one_genbank_file(gb, run_data):
     mutation happens on the main thread in _apply_genbank_status.
     """
     try:
-        path, was_gzipped = gunzip_if_needed(gb.full_path)
+        path, was_gzipped = gunzip_if_needed(gb.full_path,
+                                             out_dir=run_data.genbank_processing_dir)
 
         prodigal_used = False
         final_nt_path = None
@@ -455,7 +456,8 @@ def _process_one_fasta_file(fasta, run_data):
     dict. GenomeData mutation happens on the main thread in _apply_fasta_status.
     """
     try:
-        path, was_gzipped = gunzip_if_needed(fasta.full_path)
+        path, was_gzipped = gunzip_if_needed(fasta.full_path,
+                                             out_dir=run_data.fasta_processing_dir)
 
         done, error = run_prodigal(fasta.id, run_data, path, "fasta")
 
@@ -519,7 +521,8 @@ def _process_one_amino_acid_file(AA, run_data):
     mutation happens on the main thread in _apply_amino_acid_status.
     """
     try:
-        path, was_gzipped = gunzip_if_needed(AA.full_path)
+        path, was_gzipped = gunzip_if_needed(AA.full_path,
+                                             out_dir=run_data.AA_processing_dir)
 
         done, final_AA_path, num_genes, final_nt_path = filter_and_rename_fasta(AA.id, run_data, path, full_path=True)
 

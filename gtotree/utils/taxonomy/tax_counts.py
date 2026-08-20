@@ -5,8 +5,8 @@ COUNTING genomes and unique taxa in the GTDB / NCBI Parquet assets
 import pyarrow.compute as pc # type: ignore
 import pyarrow.parquet as pq # type: ignore
 
-from gtotree.utils.taxonomy.tax_ranks import RANKS, NA, REFERENCE_VALUE, rank_index
-from gtotree.utils.taxonomy.tax_select import (SOURCES, UNASSIGNED, assigned_mask,
+from gtotree.utils.taxonomy.tax_ranks import RANKS, REFERENCE_VALUE, rank_index
+from gtotree.utils.taxonomy.tax_select import (SOURCES, assigned_mask,
                                                prefix_mask)
 
 

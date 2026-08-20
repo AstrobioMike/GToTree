@@ -12,12 +12,11 @@ from gtotree.utils.gtdb.get_gtdb_data import (get_gtdb_data, gtdb_data_table_pat
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import (TaxonNotFound, AmbiguousTaxon,
                                                find_ranks_for_taxon as _resolve_ranks)
-from gtotree.utils.taxonomy.tax_derep import (select_ref_genomes, select_all_domains,
-                                              resolve_derep_rank)
+from gtotree.utils.taxonomy.tax_derep import select_ref_genomes, select_all_domains
 from gtotree.utils.taxonomy.tax_counts import (representatives_filter, count_genomes,
-                                               derep_size, rank_counts,
+                                               rank_counts,
                                                render_rank_count_table)
-from gtotree.utils.taxonomy.tax_targets import (domains_in_asset, is_all_target,
+from gtotree.utils.taxonomy.tax_targets import (is_all_target,
                                                 unassigned_domain_summary)
 from gtotree.utils.taxonomy.get_accs_shared import (PoolSpec,
                                                     add_common_get_accs_args,

@@ -188,12 +188,12 @@ def build_message(path, fmt, bad, total):
     verdicts = {verdict for _lineno, _entry, verdict in bad}
 
     if WRONG_CASE in verdicts:
-        message += (f" They're also matched case-sensitively, so any lowercase ones "
-                    f"need to be uppercased.")
+        message += (" They're also matched case-sensitively, so any lowercase ones "
+                    "need to be uppercased.")
 
     for other_key in sorted(verdicts & set(FORMATS)):
         other = FORMATS[other_key]
-        message += (f" Some of them look like {other.label} IDs -- those go to "
+        message += (f" Some of them look like {other.label} IDs. Those go to "
                     f"`{other.flag}`/`{other.flag_long}`.")
 
     return message

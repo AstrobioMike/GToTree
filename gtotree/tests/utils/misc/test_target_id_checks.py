@@ -184,7 +184,7 @@ def test_a_mixed_file_still_names_the_other_flag_for_the_stray_ids(targets):
     with pytest.raises(TargetIDFormatError) as excinfo:
         check_target_id_file(path, "pfam")
 
-    assert "those go to `-K`/`--target-kos`" in str(excinfo.value)
+    assert "Those go to `-K`/`--target-kos`" in str(excinfo.value)
 
 
 def test_lowercase_ids_get_the_case_hint(targets):

@@ -13,8 +13,7 @@ from gtotree.utils.ncbi.get_ncbi_assembly_data import (get_ncbi_assembly_data,
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import (TaxonNotFound, AmbiguousTaxon,
                                                find_ranks_for_taxon as _resolve_ranks)
-from gtotree.utils.taxonomy.tax_derep import (select_ref_genomes, select_all_domains,
-                                              resolve_derep_rank)
+from gtotree.utils.taxonomy.tax_derep import select_ref_genomes, select_all_domains
 from gtotree.utils.taxonomy.tax_counts import (representatives_filter, count_genomes,
                                                derep_size, rank_counts, read_pool,
                                                render_rank_count_table)
@@ -206,8 +205,8 @@ def check_derep_rank_is_applicable(args):
         return
 
     report_message(
-        f"`--derep-rank` can't be applied with a taxid. Pass the taxon "
-        f"name instead if you also want to dereplicate",
+        "`--derep-rank` can't be applied with a taxid. Pass the taxon "
+        "name instead if you also want to dereplicate",
         "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
     sys.exit(0)
 

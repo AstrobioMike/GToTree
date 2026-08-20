@@ -279,8 +279,7 @@ def run_update_headers(args):
     """
     args = check_args(args)
 
-    n = _phase_counter()
-
+    # n = _phase_counter()
     # section(f"Phase {n()}: Reading the completed GToTree run...")
 
     run_data = run_lib.load_completed_run(args.input_dir)
@@ -288,7 +287,7 @@ def run_update_headers(args):
 
     previous_labels = run_lib.labels_in_completed_outputs(run_data)
 
-    num_in_tree = len(run_data.get_all_remaining_input_genome_ids())
+    # num_in_tree = len(run_data.get_all_remaining_input_genome_ids())
     # print(f"      Found a finished run of "
     #       f"{color_text(f'{len(run_data.all_input_genomes):,}', 'green')} input "
     #       f"genome(s), {color_text(f'{num_in_tree:,}', 'green')} of which made it "

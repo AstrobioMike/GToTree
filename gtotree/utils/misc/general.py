@@ -1216,9 +1216,15 @@ def run_pooled_stage(items, worker, apply_result, args, run_data,
     return run_data
 
 
-def gunzip_if_needed(path):
+def gunzip_if_needed(path, out_dir=None):
+    """
+    Decompress `path` if it's gzipped, returning (usable_path, was_gzipped)
+    """
     if path.endswith(".gz"):
-        gunzipped_path = path[:-3]
+        if out_dir is not None:
+            gunzipped_path = os.path.join(out_dir, os.path.basename(path)[:-3])
+        else:
+            gunzipped_path = path[:-3]
         with gzip.open(path, 'rb') as f_in, open(gunzipped_path, 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
         return gunzipped_path, True

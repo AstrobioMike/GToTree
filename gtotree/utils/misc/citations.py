@@ -1,4 +1,5 @@
 import os
+import re
 from dataclasses import dataclass
 import subprocess
 from importlib.metadata import version
@@ -80,13 +81,6 @@ def generate_citations_info(run_data):
 
 
 def get_hmmer_version():
-    """
-    The HMMER version actually used for searching comes from pyhmmer now
-    (hmmer is still in the conda recipe for kofamscan)
-
-    Returns None when pyhmmer doesn't expose it, so the caller can word the line
-    differently rather than printing "HMMER v(via pyhmmer ...)".
-    """
     import pyhmmer  # type: ignore
 
     version = getattr(pyhmmer, "HMMER_VERSION", None)
@@ -94,10 +88,6 @@ def get_hmmer_version():
 
 
 def get_hmmer_label():
-    """
-    The citations.txt heading for HMMER, which has to read properly whether or not
-    the underlying HMMER version is available to us.
-    """
     import pyhmmer  # type: ignore
 
     version = get_hmmer_version()
@@ -105,37 +95,49 @@ def get_hmmer_label():
         return f"HMMER v{version}"
     return f"HMMER (via pyhmmer v{pyhmmer.__version__})"
 
+def _tool_output(cmd):
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    except (OSError, ValueError):
+        return ""
+    return f"{result.stdout}\n{result.stderr}"
+
+
+_VERSION_RE = re.compile(r"\d+(?:\.\w+)+")
+
+
+def _extract_version(text, marker=None):
+    lines = text.splitlines()
+    if marker:
+        marker = marker.lower()
+        lines = [ln for ln in lines if marker in ln.lower()] or lines
+
+    for line in lines:
+        match = _VERSION_RE.search(line)
+        if match:
+            return match.group(0)
+    return ""
+
+
 def get_muscle_version():
-    muscle_version = subprocess.run('muscle -version | tr -s " " "\t" | cut -f 2 | head -n 1',
-                                    shell = True, capture_output = True, text = True)
-    return muscle_version.stdout.strip()
+    return _extract_version(_tool_output(["muscle", "-version"]))
 
 def get_trimal_version():
-    trimal_version = subprocess.run('trimal --version | grep "trim" | tr -s " " "\t" | cut -f 2',
-                                    shell = True, capture_output = True, text = True)
-    return trimal_version.stdout.strip()
+    ver = _extract_version(_tool_output(["trimal", "--version"]), marker="trim")
+    return f"v{ver}" if ver else ""
 
 def get_prodigal_version():
-    prodigal_version = subprocess.run('prodigal -v 2>&1 | grep Prodigal | tr -s " " "\t" | cut -f 2 | tr -d ":" | sed "s/V/v/"',
-                                      shell = True, capture_output = True, text = True)
-    return prodigal_version.stdout.strip()
+    ver = _extract_version(_tool_output(["prodigal", "-v"]), marker="prodigal")
+    return f"v{ver}" if ver else ""
 
 def get_fasttree_version():
-    fasttree_version = subprocess.run('FastTree -expert 2>&1 | head -n 1 | tr -s " " "\t" | cut -f 5',
-                                      shell = True, capture_output = True, text = True)
-    return fasttree_version.stdout.strip()
+    return _extract_version(_tool_output(["FastTree", "-expert"]))
 
 def get_veryfasttree_version():
-    veryfasttree_version = subprocess.run('VeryFastTree -h | head -n 1 | cut -f 2 -d " "',
-                                          shell = True, capture_output = True, text = True)
-    return veryfasttree_version.stdout.strip()
+    return _extract_version(_tool_output(["VeryFastTree", "-h"]))
 
 def get_iqtree_version():
-    iqtree_version = subprocess.run('iqtree -V | head -n 1 | tr -s " " "\t" | cut -f 4',
-                                    shell = True, capture_output = True, text = True)
-    return iqtree_version.stdout.strip()
+    return _extract_version(_tool_output(["iqtree", "-V"]), marker="version")
 
 def get_kofamscan_version():
-    kofamscan_version = subprocess.run('exec_annotation -v | cut -f 2 -d " "',
-                                       shell = True, capture_output = True, text = True)
-    return kofamscan_version.stdout.strip()
+    return _extract_version(_tool_output(["exec_annotation", "-v"]))

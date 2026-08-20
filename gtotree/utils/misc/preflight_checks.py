@@ -50,7 +50,6 @@ from gtotree.utils.misc.general import (ToolsUsed,
                                    SOURCE_AMINO_ACID,
                                    populate_run_data,
                                    read_run_data,
-                                   wanted_ref_tax_source_line,
                                    wanted_ref_tax_list)
 from gtotree.utils.misc.target_id_checks import (check_target_id_file,
                                                  TargetIDFormatError)
@@ -267,13 +266,21 @@ def check_lineage(args):
         report_very_early_exit(suggest_help=True)
 
 
+TREE_PROGRAM_EXECUTABLES = {
+    "FastTree":     "FastTree",
+    "FastTreeMP":   "FastTreeMP",
+    "VeryFastTree": "VeryFastTree",
+    "IQTREE":       "iqtree",
+}
+
+
 def check_tree_program(args):
-    accepted_programs = ["FastTree", "FastTreeMP", "VeryFastTree", "IQTREE"]
+    accepted_programs = list(TREE_PROGRAM_EXECUTABLES)
     if args.tree_program not in accepted_programs:
         report_message(f'You specified "{args.tree_program}" to the `-T` argument, but that\'s not an available treeing program.')
         print(f"\n  Available treeing programs are:\n\n        {'\n        '.join(accepted_programs)}")
         report_very_early_exit(suggest_help=True)
-    program_check(args.tree_program)
+    program_check(TREE_PROGRAM_EXECUTABLES[args.tree_program])
 
 
 def checks_for_nucleotide_mode(args):

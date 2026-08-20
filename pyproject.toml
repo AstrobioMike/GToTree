@@ -12,15 +12,11 @@ authors = [{ name = "AstrobioMike", email = "Michael.Lee0517@gmail.com" }]
 urls = { Repository = "https://github.com/astrobiomike/gtotree" }
 # dependencies handled by conda installation
 
-# [tool.setuptools]
-# packages = { find = { where = ["."], include = ["gtotree*"] } }
-# include-package-data = true
-
 [tool.setuptools.packages.find]
 include = ["gtotree*"]
 
-# [tool.setuptools.package-data]
-# gtotree = ["tests/data/*", "smk/*.smk"]
+[tool.setuptools.package-data]
+"gtotree.tests" = ["data/*"]
 
 [project.scripts]
 gtotree = "gtotree.main:main"
