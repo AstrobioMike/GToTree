@@ -1,6 +1,5 @@
 """
-`-w all` on the driver side (the main GToTree run, gen-scg-hmms, search-pfams,
-search-kos).
+`-w all` on the driver side (the main GToTree run, gen-scg-hmms, search-annotations).
 
 'all' is not a taxon and has no rank of its own, so it can't go through resolve_taxon()
 -- it used to reach it anyway and die with "doesn't exist at any rank in the gtdb

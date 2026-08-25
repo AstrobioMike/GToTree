@@ -92,7 +92,7 @@ def size_advice(n_selected, wanted_rank, derep_rank):
 
     TREE-SPECIFIC. Every message here is framed around the selection becoming the
     tree, which is only true for the main GToTree driver. The other surfaces that share
-    this selection core (`gtt gen-scg-hmms`, `gtt search-pfams`, `gtt search-kos`) use
+    this selection core (`gtt gen-scg-hmms`, `gtt search-annotations`) use
     the genomes as a search set, where a large selection is a long run rather than an
     unwieldy tree, and where "only N genomes selected" duplicates advice they already
     give in their own terms.

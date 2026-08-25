@@ -1,5 +1,5 @@
 """
-Tests for the setup layer of `gtt search-pfams` / `gtt search-kos`.
+Tests for the setup layer of `gtt search-annotations`.
 
 The two things worth pinning down here are the ones that would be easy to get subtly
 wrong and hard to notice:

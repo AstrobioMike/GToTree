@@ -1,5 +1,5 @@
 """
-The one place `gtt search-pfams` and `gtt search-kos` differ.
+The one place the two target types (`gtt search-annotations -p` vs. `-K`) differ.
 
 Everything the two subcommands do differently is a value or a callable on a
 `TargetSearchSpec`; everything else is shared code in the sibling modules. The point is
@@ -24,35 +24,34 @@ class TargetSearchSpec:
 
     Attributes fall into four groups:
 
-      * identity/CLI    -- subcommand name, flags, and the words used in output
-      * run_data wiring -- which RunData fields this target type reads and writes
-      * behavior        -- the callables that resolve targets, search, and write outputs
-      * environment     -- the external dependency and managed dataset it needs
+      * identity/CLI    : (former) subcommand name, flags, and the words used in output
+      * run_data wiring : which RunData fields this target type reads and writes
+      * behavior        : the callables that resolve targets, search, and write outputs
+      * environment     : the external dependency and managed dataset it needs
     """
 
     # --- identity and CLI ------------------------------------------------------
-    subcommand: str                  # e.g. "search-pfams"
-    target_label: str                # singular, for prose: "Pfam"
-    target_label_plural: str         # "Pfams"
-    targets_flag: str                # "-p"
-    targets_flag_long: str           # "--target-pfams"
-    targets_dest: str                # "target_pfams_file"
-    default_output_dir: str          # "gtt-pfam-search-output"
-    example_target: str              # shown in help, e.g. "PF00789"
-    # key into gtotree.utils.misc.target_id_checks.FORMATS, naming the ID shape a
-    # targets file for this type has to have ("pfam" / "ko")
+    subcommand: str                  # internal spec identity ("search-pfams"/"search-kos");
+                                     # used in the resume fingerprint, not a live CLI command
+    target_label: str
+    target_label_plural: str
+    targets_flag: str
+    targets_flag_long: str
+    targets_dest: str
+    default_output_dir: str
+    example_target: str
     target_id_format: str
 
     # --- run_data wiring -------------------------------------------------------
-    results_dir_attr: str            # "pfam_results_dir"
-    results_dir_rel_attr: str        # "pfam_results_dir_rel"
-    tmp_results_dir_attr: str        # "tmp_pfam_results_dir"
-    targets_file_attr: str           # "target_pfams_file"
-    total_targets_attr: str          # "total_pfam_targets"
-    found_targets_attr: str          # "found_pfam_targets"
-    failed_targets_attr: str         # "failed_pfam_targets"
-    searching_done_attr: str         # "additional_pfam_searching_done"
-    search_done_flag: str            # GenomeData attr: "pfam_search_done"
+    results_dir_attr: str
+    results_dir_rel_attr: str
+    tmp_results_dir_attr: str
+    targets_file_attr: str
+    total_targets_attr: str
+    found_targets_attr: str
+    failed_targets_attr: str
+    searching_done_attr: str
+    search_done_flag: str
     search_failed_flag: str
 
     # --- output layout ---------------------------------------------------------

@@ -191,7 +191,7 @@ class TestRemovedLaterThanTheSearch:
 
 def test_helper_is_the_one_the_subcommands_use():
     """
-    `search_completed` in gtt search-pfams/search-kos comes from this same helper, so
+    `search_completed` in gtt search-annotations comes from this same helper, so
     the column means the same thing in both tools.
     """
     from gtotree.utils.target_search import target_search_outputs

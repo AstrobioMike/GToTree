@@ -443,7 +443,7 @@ class TestProcessingSummaryWording:
         assert "Of all the input genomes provided" not in out
 
     def test_without_a_search_the_wording_does_not_claim_one(self, _no_early_exit):
-        """`gtt search-pfams` / `search-kos` run this stage with do_scg False."""
+        """`gtt search-annotations` runs this stage with do_scg False."""
         rd = _run_data(n_accs=6)
         rd.ncbi_accs[0].mark_removed("acc download failed",
                                      GenomeRemovalStage.NCBI_DOWNLOAD)

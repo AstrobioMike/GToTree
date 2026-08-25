@@ -57,7 +57,7 @@ my best to rapidly address anything!
 #### Resuming interrupted runs
 
 - the new `-R`/`--resume` flag attempts to continue an interrupted run
-  - this is available on `gtt gen-scg-hmms`, `gtt search-pfams`, and `gtt search-kos` too
+  - this is available on `gtt gen-scg-hmms` and `gtt search-annotations` too
 
 
 #### New helper subcommands
@@ -74,8 +74,7 @@ my best to rapidly address anything!
     - creates a "label-map.tsv" tracking changed labels
     - regenerates any iToL files for any Pfam/KO searches the original run did
   - `gtt get-accs-from-gtdb` / `gtt get-accs-from-ncbi` - pull accessions based on taxonomy if you want them (though the main `gtotree` program does this for you now)
-  - `gtt search-pfams` — search input genomes for a set of target Pfams
-  - `gtt search-kos` — search input genomes for a set of target KOs
+  - `gtt search-annotations` — search input genomes for target Pfams (`-p`) and/or KOs (`-K`)
   - `gtt itol` - various subcommands for generating iToL-compatible files that can be drag-and-dropped onto a tree in the iToL web interface
   - `gtt data get` / `gtt data locations` — download or update the databases GToTree uses,
     and check or set the data-location environment variables (this is all handled automatically anyway)

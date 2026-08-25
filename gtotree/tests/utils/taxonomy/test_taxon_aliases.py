@@ -3,8 +3,7 @@ Unit tests for the taxon-name aliases (tax_ranks.TAXON_ALIASES).
 
 These are applied in tax_select.find_ranks_for_taxon(), which is the single funnel
 every surface resolves a `-w` name through -- so specifying them here is specifying
-them for the main driver, both get-accs helpers, gen-scg-hmms, search-pfams and
-search-kos at once.
+them for the main driver, both get-accs helpers, gen-scg-hmms, search-annotations at once.
 """
 
 import pyarrow as pa  # type: ignore

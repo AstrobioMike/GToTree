@@ -93,7 +93,7 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
         selection. None (the default) means no ceiling.
     building_tree : bool
         Whether the selected genomes become a tree. Only the main GToTree driver sets
-        this; `gtt gen-scg-hmms`, `gtt search-pfams` and `gtt search-kos` share this
+        this; `gtt gen-scg-hmms` and `gtt search-annotations` share this
         entry point but use the genomes as a search set, so tree-framed advice ("that
         is a very large tree", "consider a coarser --derep-rank") is wrong for them.
 

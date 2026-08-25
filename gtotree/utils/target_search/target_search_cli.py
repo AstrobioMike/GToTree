@@ -1,5 +1,5 @@
 """
-The shared CLI and driver behind `gtt search-pfams` and `gtt search-kos`.
+The shared CLI and driver behind `gtt search-annotations`
 
 Both subcommands call into here with their `TargetSearchSpec`; the two entry-point
 modules are thin enough to read in one screen. The phased output, spinners, and

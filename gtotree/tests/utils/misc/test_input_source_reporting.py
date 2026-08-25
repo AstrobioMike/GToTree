@@ -2,7 +2,7 @@
 Unit tests for the shared "where did these genomes come from" block in
 gtotree/utils/misc/messaging.py.
 
-The main GToTree driver's RUN INFO banner and `gtt search-pfams` / `gtt search-kos`
+The main GToTree driver's RUN INFO banner and `gtt search-annotations`
 phase 1 both render this block. They used to describe the same inputs in two different
 shapes ("- NCBI accessions listed in x.txt (8 genomes)" vs "8 NCBI accession(s) read
 from x.txt"), which made the search subcommands read like a different program. Both now
@@ -10,8 +10,8 @@ go through these functions, so the two surfaces can't drift apart again.
 
 The `-w` sub-bullets are read off RunData rather than off a RefGenomeSelection because
 a resumed run doesn't re-resolve `-w` and has no selection object to ask. They are a
-LIST of selections because `-w` is repeatable in gen-scg-hmms / search-pfams /
-search-kos: each taxon is resolved and dereplicated on its own and gets its own line.
+LIST of selections because `-w` is repeatable in gen-scg-hmms / search-annotations:
+each taxon is resolved and dereplicated on its own and gets its own line.
 """
 
 import argparse
@@ -201,7 +201,7 @@ class TestGenomeSourceLabels:
 
 class TestPhaseOneIsSharedAcrossPrograms:
     """
-    `gtt gen-scg-hmms`, `gtt search-pfams`, and `gtt search-kos` all describe their
+    `gtt gen-scg-hmms` and `gtt search-annotations` all describe their
     input genomes in phase 1. They used to do it in two different shapes, which made
     gen-scg-hmms read like a different program. They now share one implementation, and
     these check that they still do -- a second hand-rolled rendering is exactly the

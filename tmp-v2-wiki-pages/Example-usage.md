@@ -267,7 +267,7 @@ PF05400
 > **NOTE**  
 > Accessions can be given with or without version numbers; the version packaged with the current Pfam release will be used.
 
-> If you want these searches *without* building a tree, `gtt search-pfams` (and `gtt search-kos`) do exactly this part on their own, taking the same genome inputs.
+> If you want these searches *without* building a tree, `gtt search-annotations` does exactly this part on its own, taking the same genome inputs (pass `-p`, `-K`, or both).
 
 ## Visualizing the tree
 When that finishes, our output `flit-bacterial-tree/` directory holds the final tree, `flit-bacterial-tree.tre`, and a subdirectory `pfam-search-results/` holding the Pfam results — including `pfam-hit-counts.tsv` and an `itol-files/` directory with one file per target.

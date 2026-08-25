@@ -1,5 +1,5 @@
 """
-Output tables for `gtt search-pfams` / `gtt search-kos`.
+Output tables for `gtt search-annotations`.
 
 The main driver's `generate_primary_summary_table` can't be reused: its columns are
 SCG-hit counts and `in_final_tree`, neither of which exists without a tree. What a

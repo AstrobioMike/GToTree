@@ -333,10 +333,10 @@ def test_input_genome_files_are_validated_before_F_removes_the_output(monkeypatc
 
 
 ################################################################################
-# wiring: gtt search-pfams / search-kos
+# wiring: target-type validation (gtt search-annotations -p / -K)
 ################################################################################
 
-def test_search_pfams_rejects_a_ko_targets_file(targets):
+def test_pfam_targets_flag_rejects_a_ko_targets_file(targets):
     from gtotree.utils.target_search.target_search_setup import (TargetSearchError,
                                                                  validate_input_files,
                                                                  make_args)
@@ -349,7 +349,7 @@ def test_search_pfams_rejects_a_ko_targets_file(targets):
         validate_input_files(args, get_spec("pfam"))
 
 
-def test_search_kos_rejects_a_pfam_targets_file(targets):
+def test_ko_targets_flag_rejects_a_pfam_targets_file(targets):
     from gtotree.utils.target_search.target_search_setup import (TargetSearchError,
                                                                  validate_input_files,
                                                                  make_args)
@@ -362,7 +362,7 @@ def test_search_kos_rejects_a_pfam_targets_file(targets):
         validate_input_files(args, get_spec("ko"))
 
 
-def test_search_pfams_accepts_a_real_pfam_targets_file(targets):
+def test_pfam_targets_flag_accepts_a_real_pfam_targets_file(targets):
     from gtotree.utils.target_search.target_search_setup import (validate_input_files,
                                                                  make_args)
     from gtotree.utils.target_search.target_search_spec import get_spec

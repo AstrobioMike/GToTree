@@ -1,5 +1,5 @@
 """
-Setup and validation for `gtt search-pfams` / `gtt search-kos`.
+Setup and validation for `gtt search-annotations`.
 
 The main driver's `preflight_checks()` can't be reused wholesale here: it requires an
 SCG-HMM set (`-H`), insists muscle and trimal are on PATH, validates a treeing program,
@@ -76,6 +76,48 @@ def check_args(args, spec):
     _check_dangling_ref_tax_args(args)
 
     return args
+
+
+def check_args_multi(args, specs):
+    """
+    Validate arguments for the combined `search-annotations` run
+    """
+    input_flags = (args.ncbi_accessions, args.genbank_files, args.fasta_files,
+                   args.amino_acid_files, args.wanted_ref_tax)
+    if not any(input_flags):
+        raise TargetSearchError(
+            "We need some input genomes to work with! Provide any combination of a "
+            "target taxon (`-w`), fasta files (`-f`), amino-acid files (`-A`), GenBank files (`-g`),"
+            "and/or an NCBI accessions file (`-a`).")
+
+    if not requested_specs(args, specs):
+        flags = " or ".join(f"`{s.targets_flag}`" for s in specs)
+        raise TargetSearchError(
+            f"We need to know what to search for! Provide a single-column file of "
+            f"target IDs with {flags} (either one, or both).")
+
+    if args.num_jobs < 1:
+        raise TargetSearchError("The `--num-jobs` (-j) parameter needs to be at least 1.")
+
+    if args.resume and args.force_overwrite:
+        raise TargetSearchError(
+            "`-R`/`--resume` and `-F`/`--force-overwrite` can't be used together, one "
+            "reuses the previous run and the other deletes it.")
+
+    _check_dangling_ref_tax_args(args)
+
+    return args
+
+
+def requested_specs(args, specs):
+    """
+    The subset of `specs` whose targets flag was actually provided, in `specs` order.
+
+    This is what makes `search-annotations` collapse to a single target type cleanly:
+    with only `-p` given, the KO spec drops out here and the whole run behaves exactly
+    like the old `search-pfams` did, minus a separate command to maintain.
+    """
+    return [spec for spec in specs if spec.targets_file(args)]
 
 
 def _check_dangling_ref_tax_args(args):
@@ -179,8 +221,18 @@ def setup_output_dir(args, spec):
 
 
 def _make_result_dirs(out_dir, spec):
+    make_spec_result_dirs(out_dir, spec)
+
+
+def make_spec_result_dirs(root, spec):
+    """
+    Create one spec's result subdirectories under `root`.
+
+    `root` is the flat output directory for a single command, or a per-type
+    subdirectory (`<out>/pfam/`) for a combined `search-annotations` run.
+    """
     for sub in spec.result_subdirs:
-        os.makedirs(os.path.join(out_dir, sub), exist_ok=True)
+        os.makedirs(os.path.join(root, sub), exist_ok=True)
 
 
 ################################################################################
@@ -236,21 +288,53 @@ def build_run_data(args, spec, out_dir, work_dir, previous=None):
     run_data.nucleotide_mode = False
     run_data.general_ext = ".faa"
 
-    setattr(run_data, spec.results_dir_attr, os.path.abspath(out_dir))
-    setattr(run_data, spec.results_dir_rel_attr, out_dir)
-    setattr(run_data, spec.tmp_results_dir_attr,
-            os.path.join(tmp_dir, "target-hit-seqs"))
+    wire_spec_results_dirs(run_data, args, spec, tmp_dir)
+
+    run_data.ready_genome_files_dir = os.path.join(tmp_dir, "ready-genome-files")
+    os.makedirs(run_data.ready_genome_files_dir, exist_ok=True)
+
+    ensure_processing_dirs(run_data)
+
+    return run_data
+
+
+def wire_spec_results_dirs(run_data, args, spec, tmp_dir, results_root=None,
+                           results_root_rel=None, tmp_subdir="target-hit-seqs",
+                           total_targets=None):
+    """
+    Point one spec's results/tmp/targets attributes at the right places on `run_data`.
+
+    Split out of `build_run_data` because the single-command path and the combined
+    `search-annotations` path need the same wiring but at different roots: a single
+    command flattens its results straight into the output directory, while a combined
+    run gives each target type its own subdirectory (`<out>/pfam/`, `<out>/ko/`) and
+    its own tmp hit-seqs area so two searches never write to the same file.
+
+    `results_root` defaults to the flat output directory, reproducing the single-command
+    layout exactly. `total_targets` likewise defaults to the single `args.total_targets`
+    the single-command validation set; the combined path passes each spec's own count.
+    """
+    if results_root is None:
+        results_root = run_data.output_dir
+    if results_root_rel is None:
+        results_root_rel = run_data.output_dir_rel
+    if total_targets is None:
+        total_targets = getattr(args, "total_targets", 0) or 0
+
+    os.makedirs(results_root, exist_ok=True)
+
+    tmp_results_dir = os.path.join(tmp_dir, tmp_subdir)
+
+    setattr(run_data, spec.results_dir_attr, os.path.abspath(results_root))
+    setattr(run_data, spec.results_dir_rel_attr, results_root_rel)
+    setattr(run_data, spec.tmp_results_dir_attr, tmp_results_dir)
     setattr(run_data, spec.targets_file_attr, spec.targets_file(args))
     # set unconditionally, including on a resumed run: it's how the reporting says
     # "N of M requested targets found", and a resumed RunData predates this run's
     # (possibly re-validated) target file
-    setattr(run_data, spec.total_targets_attr, getattr(args, "total_targets", 0) or 0)
+    setattr(run_data, spec.total_targets_attr, total_targets)
 
-    run_data.ready_genome_files_dir = os.path.join(tmp_dir, "ready-genome-files")
-    os.makedirs(getattr(run_data, spec.tmp_results_dir_attr), exist_ok=True)
-    os.makedirs(run_data.ready_genome_files_dir, exist_ok=True)
-
-    ensure_processing_dirs(run_data)
+    os.makedirs(tmp_results_dir, exist_ok=True)
 
     return run_data
 
@@ -368,13 +452,17 @@ def _read_entries(path):
 # input-file validation
 ################################################################################
 
-def validate_input_files(args, spec):
+def validate_genome_input_files(args):
     """
-    Run the shared single-column input checks over every provided input file
+    Run the shared single-column checks over the genome-listing inputs.
+
+    Split from targets validation so the combined `search-annotations` driver can
+    validate the genome files once while validating each target type's targets file
+    on its own (they're separate files with separate ID shapes).
 
     These are the same checks the main driver applies: whitespace, CRLF line endings,
     duplicate entries, and (for the file-listing flags) that every listed genome file
-    actually exists
+    actually exists.
     """
     from gtotree.utils.misc.preflight_checks import check_expected_single_column_input
 
@@ -386,14 +474,37 @@ def validate_input_files(args, spec):
         if value:
             setattr(args, dest, check_expected_single_column_input(value, flag))
 
-    targets_path = spec.targets_file(args)
-    if targets_path:
-        checked, total = check_expected_single_column_input(
-            targets_path, spec.targets_flag, get_count=True)
-        setattr(args, spec.targets_dest, checked)
-        args.total_targets = total
-        _check_target_id_formats(checked, spec)
+    return args
 
+
+def validate_targets_file(args, spec):
+    """
+    Validate one spec's targets file and return its entry count.
+
+    Rewrites `args`'s targets-file attribute to the cleaned path, confirms the IDs
+    match this target type's shape, and returns the number of targets. The single
+    command additionally mirrors the count onto `args.total_targets`; the combined
+    driver ignores that and keeps a per-spec count instead.
+    """
+    from gtotree.utils.misc.preflight_checks import check_expected_single_column_input
+
+    targets_path = spec.targets_file(args)
+    if not targets_path:
+        return 0
+
+    checked, total = check_expected_single_column_input(
+        targets_path, spec.targets_flag, get_count=True)
+    setattr(args, spec.targets_dest, checked)
+    _check_target_id_formats(checked, spec)
+    return total
+
+
+def validate_input_files(args, spec):
+    """
+    Validate genome inputs and this spec's targets file (single-command path)
+    """
+    args = validate_genome_input_files(args)
+    args.total_targets = validate_targets_file(args, spec)
     return args
 
 

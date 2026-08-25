@@ -1,5 +1,5 @@
 """
-End-to-end tests for `gtt search-pfams`.
+End-to-end tests for `gtt search-annotations`.
 
 These drive `run_search` with only the managed-Pfam *download* stubbed out; target
 collection, the fused preprocess-and-search stage, the counts matrix, and the hit-seq

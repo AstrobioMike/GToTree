@@ -228,7 +228,7 @@ Provide the **`-B`** flag with no arguments if you'd like to run GToTree in "bes
 
 Single-column files of Pfam accessions (e.g. `PF00789`) or KO IDs (e.g. `K01601`) to search the input genomes for alongside the SCGs. Results are written to `pfam-search-results/` and `ko-search-results/` in the output directory, including hit-count tables and files for visualization in [iToL](https://itol.embl.de/).
 
-> These same searches are available as standalone subcommands, `gtt search-pfams` and `gtt search-kos`, if you want them without building a tree.
+> These same searches are available as a standalone subcommand, `gtt search-annotations`, if you want them without building a tree (pass `-p`, `-K`, or both).
 
 ---
 

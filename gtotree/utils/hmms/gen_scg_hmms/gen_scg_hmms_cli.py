@@ -579,7 +579,7 @@ def _resolve_accession_downloads(run_data):
     Returns (to_fetch, download_info): the accession GenomeData still in play, and the
     accession -> download-location map the fetch stage takes.
 
-    Runs in phase 1, the way `gtt search-pfams` / `gtt search-kos` do it: an accession
+    Runs in phase 1, the way `gtt search-annotations` does it: an accession
     NCBI no longer lists is a fact about the *input set*, so it belongs next to the
     input-source listing rather than mixed in with the fetch stage's own failures.
     """

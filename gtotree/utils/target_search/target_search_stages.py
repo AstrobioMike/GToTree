@@ -1,5 +1,5 @@
 """
-The work phases behind `gtt search-pfams` / `gtt search-kos`
+The work phases behind `gtt search-annotations`
 """
 
 import os

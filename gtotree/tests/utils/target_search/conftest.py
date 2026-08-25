@@ -1,5 +1,5 @@
 """
-Fixtures for the `gtt search-pfams` / `gtt search-kos` tests.
+Fixtures for the `gtt search-annotations` tests.
 
 The Pfam fixtures reuse the mock profile set the gen-scg-hmms tests already run
 against, staged into a directory laid out like a real managed `Pfam_data_dir` so the

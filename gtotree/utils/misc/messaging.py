@@ -379,9 +379,6 @@ def stdout_and_log(*args, log_file="gtotree-runlog.txt", sep=" ", end="\n\n", fl
 # input-genome sources (shared by the main driver and the search subcommands)
 ################################################################################
 
-# bullets sit at column 6 in both surfaces, and the total sits under them at 29 --
-# `gtt search-pfams` / `gtt search-kos` are a subset of a GToTree run, so the block
-# describing their inputs should be indistinguishable from GToTree's
 INPUT_SOURCE_INDENT = " " * 6
 INPUT_SOURCE_SUB_INDENT = " " * 10
 TOTAL_LINE_INDENT = " " * 29
@@ -534,7 +531,7 @@ def add_border(extra_line=True):
 
 def report_phase_header(title, color = "yellow"):
     """
-    The phase banner used by `gtt gen-scg-hmms`, `gtt search-pfams`, and `gtt search-kos`
+    The phase banner used by `gtt gen-scg-hmms` and `gtt search-annotations`
     """
     rule = "  " + "-" * len(title)
     print(color_text(f"\n\n{rule}\n  {title}\n{rule}\n", color))

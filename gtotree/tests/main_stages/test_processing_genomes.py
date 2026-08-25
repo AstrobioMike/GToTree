@@ -159,7 +159,7 @@ def test_nucleotide_mode_yields_nucleotide_hits_and_drops_both_files(
 ################################################################################
 
 """
-`SearchPlan.do_scg` exists so `gtt search-pfams` / `gtt search-kos` can reuse this
+`SearchPlan.do_scg` exists so `gtt search-annotations` can reuse this
 module's fused preprocess-then-search worker without an SCG set or a tree. It defaults
 to True, so the main pipeline never opts in -- which is exactly why it needs testing
 from this side too: a regression that ignored the flag would leave the subcommands

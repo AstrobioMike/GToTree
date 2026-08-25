@@ -6,12 +6,11 @@
 
 
     # run the following with all 5 input types, and ko/pfam targets, and make sure all messages make sense
-        # main gtotree
-            # do some mapping-file tests, and make sure that's covered by unit tests
-        # gtt search-pfams
-        # gtt search-kos
+
         # gtt gen-scg-hmms
 
+
+    # should i combine search-kos and search-pfams into one search-functions command
 
     # do some benchmarks between gtotree v1 and v2 timing-wise, nothing extensive, just to be able to say it's like X% faster
         # on my altermonas ~90 genomes, v2 is 80 seconds, v1 is 130 (~40% or 1.6x faster)

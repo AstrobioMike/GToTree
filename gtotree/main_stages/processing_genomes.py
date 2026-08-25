@@ -56,8 +56,8 @@ class SearchPlan:
     for every genome, so they're resolved here rather than inside the worker.
 
     `do_scg` is True for the main GToTree run, which always searches the SCG set. The
-    `gtt search-pfams` / `gtt search-kos` subcommands reuse this same fused
-    preprocess-then-search machinery but have no SCG set and no tree, so they set it
+    `gtt search-annotations` subcommand reuses this same fused
+    preprocess-then-search machinery but has no SCG set and no tree, so it sets it to
     False
     """
 

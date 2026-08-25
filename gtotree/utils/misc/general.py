@@ -275,7 +275,7 @@ def genome_input_label(gd, run_data=None):
     `-w` request that produced it (which has no path to report).
 
     The taxon is read off the genome itself, because `-w` is repeatable in
-    gen-scg-hmms / search-pfams / search-kos and a run-level taxon can't say WHICH of
+    gen-scg-hmms / search-annotations and a run-level taxon can't say WHICH of
     several requests pulled a given accession in. `run_data` is still consulted as a
     fallback for genomes recorded before that field existed.
     """

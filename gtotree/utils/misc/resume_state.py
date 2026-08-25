@@ -4,10 +4,9 @@ Generic resume-state machinery.
 Every GToTree program that supports resuming uses this. The machinery is here; the
 configuration lives with each program, declared as a `ResumeProfile`:
 
-  * `GToTree`          -- gtotree/utils/preflight_checks.py
-  * `gtt gen-scg-hmms` -- gtotree/utils/hmms/gen_scg_hmms/gen_scg_hmms_cli.py
-  * `gtt search-pfams`
-    `gtt search-kos`   -- gtotree/utils/target_search/target_search_cli.py
+  * `GToTree`                 : gtotree/utils/preflight_checks.py
+  * `gtt gen-scg-hmms`        : gtotree/utils/hmms/gen_scg_hmms/gen_scg_hmms_cli.py
+  * `gtt search-annotations`  : gtotree/utils/target_search/target_search_cli.py
 
 The split is deliberate. What belongs here is program-agnostic: hashing, the state
 file, artifact validation, and turning a fingerprint mismatch into a readable
