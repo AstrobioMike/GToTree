@@ -4,7 +4,7 @@ from gtotree.utils.gtdb.handle_gtdb_tax_info import update_mapping_dict_with_gtd
 from gtotree.utils.ncbi.handle_ncbi_tax_info import update_mapping_dict_with_ncbi_tax_info
 from gtotree.utils.misc.seqs import (swap_labels_in_alignment,
                                      usable_concatenated_alignment_path)
-from gtotree.utils.misc.general import write_run_data
+from gtotree.utils.misc.general import write_run_data, apply_suffixes_to_mapping_dict
 from gtotree.utils.misc.stages import PipelineStage
 
 def update_headers(args, run_data):
@@ -25,6 +25,8 @@ def update_headers(args, run_data):
 
             if args.add_ncbi_tax:
                 run_data = update_mapping_dict_with_ncbi_tax_info(args, run_data)
+
+            run_data = apply_suffixes_to_mapping_dict(run_data)
 
             run_data = swap_labels_in_alignment(run_data)
 

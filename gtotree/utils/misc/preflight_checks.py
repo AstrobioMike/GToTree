@@ -753,14 +753,19 @@ def check_mapping_file(args, run_data, flag = "-m"):
     run_data.mapping_file_path = args.mapping_file
 
     # this is to handle when resuming runs, so that we don't overwrite the mapping_dict
-    if len(run_data.mapping_dict) == 0:
-        mapping_dict = make_mapping_dict(run_data.mapping_file_path)
+    if len(run_data.mapping_dict) == 0 and len(run_data.suffix_dict) == 0:
+        mapping_dict, suffix_dict = make_mapping_dict(run_data.mapping_file_path)
 
-        check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data)
+        check_mapping_dict_for_duplicate_labels(mapping_dict, run_data.mapping_file_path)
 
-        # rekeyed to genome ids here, at the one place the dict is built, so every
+        # every key (full-replacement and suffix-only) must map to a real input genome
+        check_all_mapping_file_entries_are_in_input_genomes(
+            {**mapping_dict, **suffix_dict}, run_data)
+
+        # rekeyed to genome ids here, at the one place the dicts are built, so every
         # consumer downstream can just look up by id
         run_data.mapping_dict = normalize_mapping_dict_keys(mapping_dict, run_data)
+        run_data.suffix_dict = normalize_mapping_dict_keys(suffix_dict, run_data)
 
     return args, run_data
 
@@ -834,18 +839,25 @@ def check_mapping_file_problem_chars_and_fields(path):
 
 def make_mapping_dict(path):
 
-    # makes a dictionary mapping input genomes to the wanted labels
-    # key = original-input-genome-label, value = wanted-label
+    # makes a dictionary mapping input genomes to the wanted labels, plus a
+    # separate dictionary of suffix-only entries to be appended later
+    # (after any taxonomy info is added)
 
     #   1. Checks that every first-column entry is unique
     #   2. Uses the first column as the key
-    #   3. If there are 2 columns, the value is the second column
-    #   4. If there are 3 columns and the second column is non-empty,
-    #      the value is "second-column_third-column" (joined with an underscore)
-    #   5. If there are 3 columns and the second column is empty,
-    #      the value is "first-column_third-column" (joined with an underscore)
+    #   3. If there are 2 columns, the value is the second column (a full
+    #      replacement label)
+    #   4. If there are 3 columns and the second column is non-empty, the value
+    #      is "second-column_third-column" (a full replacement label with the
+    #      suffix baked in)
+    #   5. If there are 3 columns and the second column is empty, the third
+    #      column is a suffix only. It is NOT baked into the mapping value here,
+    #      because the base label may still be built from taxonomy info that
+    #      isn't known yet. The suffix is stored in `suffix_dict` and appended
+    #      later (see append_pending_suffixes); if no taxonomy is added, it gets
+    #      appended to the original input label.
 
-    df = pd.read_csv(path, sep="\t", header=None, dtype=str).fillna("")
+    df = pd.read_csv(path, sep="\t", header=None, dtype=str, names=[0, 1, 2]).fillna("")
 
     # checking none of the first column entries are duplicates
     if df[0].duplicated().any():
@@ -856,22 +868,25 @@ def make_mapping_dict(path):
         report_very_early_exit()
 
     mapping_dict = {}
+    suffix_dict = {}
     for _idx, row in df.iterrows():
         key = row[0].strip()
         col2 = row[1].strip() if len(row) > 1 else ""
         col3 = row[2].strip() if len(row) > 2 else ""
 
-        if col3:
-            if col2:
-                value = f"{col2}_{col3}"
-            else:
-                value = f"{key}_{col3}"
-        else:
-            value = col2
+        if col2:
+            # full replacement label; suffix (if any) baked in now
+            value = f"{col2}_{col3}" if col3 else col2
+            mapping_dict[key] = value.replace(" ", "_")
+        elif col3:
+            # suffix only; deferred so a taxonomy-built base can be used
+            suffix_dict[key] = col3.replace(" ", "_")
+        # else: empty row for this key, nothing to do
 
-        value = value.replace(" ", "_")
-        mapping_dict[key] = value
+    return mapping_dict, suffix_dict
 
+
+def check_mapping_dict_for_duplicate_labels(mapping_dict, path):
     # checking none of the desired labels are duplicates
     counts = Counter(mapping_dict.values())
     duplicates = [val for val, count in counts.items() if count > 1]
@@ -885,8 +900,6 @@ def make_mapping_dict(path):
             'Each input genome must map to a unique label. Please address that and try again.'
         )
         report_very_early_exit()
-
-    return mapping_dict
 
 
 def check_all_mapping_file_entries_are_in_input_genomes(mapping_dict, run_data):
@@ -1041,7 +1054,7 @@ def final_setups(args, run_data):
     run_data.nucleotide_mode = args.nucleotide_mode
     run_data.general_ext = ".fasta" if run_data.nucleotide_mode else ".faa"
 
-    if len(run_data.mapping_dict) > 0 or args.add_ncbi_tax or args.add_gtdb_tax:
+    if len(run_data.mapping_dict) > 0 or len(run_data.suffix_dict) > 0 or args.add_ncbi_tax or args.add_gtdb_tax:
         run_data.updating_headers = True
     else:
         run_data.updating_headers = False

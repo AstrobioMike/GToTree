@@ -1,8 +1,10 @@
+import os
 import pytest  # type: ignore
-from gtotree.utils.misc.general import GenomeData, RunData
+from gtotree.utils.misc.general import GenomeData, RunData, apply_suffixes_to_mapping_dict
 from gtotree.utils.misc.preflight_checks import (build_mapping_key_lookup,
                                             normalize_mapping_dict_keys,
-                                            check_all_mapping_file_entries_are_in_input_genomes)
+                                            check_all_mapping_file_entries_are_in_input_genomes,
+                                            make_mapping_dict)
 
 
 def _run_data():
@@ -110,3 +112,60 @@ class TestValidationUsesTheSameAcceptedKeys:
         rd = _run_data()
         normalized = normalize_mapping_dict_keys({key: "label"}, rd)
         assert set(normalized) <= {gd.id for gd in rd.all_input_genomes}
+
+
+def _write(tmp_path, text):
+    p = tmp_path / "mapping.tsv"
+    p.write_text(text)
+    return str(p)
+
+
+def test_suffix_only_row_is_deferred_not_baked(tmp_path):
+    # column 2 empty, column 3 present -> suffix-only, must not land in mapping_dict
+    path = _write(tmp_path, "mike\tlee\t\nGCA_049325295.1\t\tsuffix\n")
+    mapping_dict, suffix_dict = make_mapping_dict(path)
+
+    assert mapping_dict == {"mike": "lee"}
+    assert suffix_dict == {"GCA_049325295.1": "suffix"}
+    # the whole point: the suffixed genome is absent from mapping_dict so the
+    # taxonomy handler is free to build a base label for it
+    assert "GCA_049325295.1" not in mapping_dict
+
+
+def test_full_replacement_with_suffix_is_still_baked(tmp_path):
+    # column 2 present alongside column 3 -> full label, suffix baked in now
+    path = _write(tmp_path, "GCA_1\tGenus species\ttag\n")
+    mapping_dict, suffix_dict = make_mapping_dict(path)
+
+    assert mapping_dict == {"GCA_1": "Genus_species_tag"}
+    assert suffix_dict == {}
+
+
+class _RD:
+    def __init__(self, mapping_dict, suffix_dict):
+        self.mapping_dict = dict(mapping_dict)
+        self.suffix_dict = dict(suffix_dict)
+
+
+def test_suffix_appends_onto_taxonomy_base():
+    # base label was built by the taxonomy handler; suffix goes on the end
+    rd = _RD(
+        {"GCA_049325295.1": "GCA_049325295.1_Bacteria_Escherichia_coli"},
+        {"GCA_049325295.1": "suffix"},
+    )
+    apply_suffixes_to_mapping_dict(rd)
+    assert rd.mapping_dict["GCA_049325295.1"] == \
+        "GCA_049325295.1_Bacteria_Escherichia_coli_suffix"
+
+
+def test_suffix_appends_onto_bare_id_when_no_taxonomy():
+    # no taxonomy label was built; suffix goes onto the genome id itself
+    rd = _RD({}, {"GCA_049325295.1": "suffix"})
+    apply_suffixes_to_mapping_dict(rd)
+    assert rd.mapping_dict["GCA_049325295.1"] == "GCA_049325295.1_suffix"
+
+
+def test_apply_suffixes_is_a_noop_without_suffix_entries():
+    rd = _RD({"GCA_1": "Whatever"}, {})
+    apply_suffixes_to_mapping_dict(rd)
+    assert rd.mapping_dict == {"GCA_1": "Whatever"}

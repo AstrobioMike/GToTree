@@ -488,6 +488,7 @@ class RunData:
     hmm_path: str = ""
     mapping_file_path: str = ""
     mapping_dict: dict = field(default_factory=dict)
+    suffix_dict: dict = field(default_factory=dict)
     tax_info_dict: dict = field(default_factory=dict)
     initial_mapping_IDs_from_user: List[str] = field(default_factory=list)
     ready_genome_files_dir: str = ""
@@ -1342,3 +1343,13 @@ def write_accessions(out_path, accessions):
             f.write(str(acc) + "\n")
 
     atomic_write_text(out_path, _write)
+
+def apply_suffixes_to_mapping_dict(run_data):
+    if not run_data.suffix_dict:
+        return run_data
+
+    for genome_id, suffix in run_data.suffix_dict.items():
+        base = run_data.mapping_dict.get(genome_id, genome_id)
+        run_data.mapping_dict[genome_id] = f"{base}_{suffix}"
+
+    return run_data

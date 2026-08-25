@@ -221,6 +221,9 @@ def build_new_mapping_dict(args, run_data):
             update_mapping_dict_with_ncbi_tax_info)
         run_data = update_mapping_dict_with_ncbi_tax_info(args, run_data)
 
+    from gtotree.utils.misc.general import apply_suffixes_to_mapping_dict
+    run_data = apply_suffixes_to_mapping_dict(run_data)
+
     return args, run_data
 
 
