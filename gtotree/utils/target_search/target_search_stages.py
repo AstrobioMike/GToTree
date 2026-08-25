@@ -154,10 +154,11 @@ def phase_collect_targets(run_data, spec, out_dir, resuming=False):
           f"{spec.target_label_plural} found and ready to search")
 
     if failed:
+        failed_rel = f"{spec.results_dir_rel(run_data)}/{spec.failed_targets_filename}"
         report_message(
             f"{len(failed):,} requested {spec.target_label} target(s) couldn't be "
             f"found, and are reported in:", "yellow", ii="        ", si="        ")
-        print(f"          {color_text(spec.failed_targets_filename, 'yellow')}")
+        print(f"          {color_text(failed_rel, 'yellow')}")
 
     if not found:
         raise TargetSearchError(
@@ -337,7 +338,8 @@ def phase_write_outputs(run_data, spec, out_dir):
 
     targets_with_hits = _count_and_prune_hit_seqs(hit_seqs_dir)
 
-    summary_path = outputs.write_genomes_summary(out_dir, run_data, spec, hit_tallies)
+    summary_path = outputs.write_spec_genomes_summary(out_dir, run_data, spec,
+                                                      hit_tallies)
 
     write_run_data(run_data)
 

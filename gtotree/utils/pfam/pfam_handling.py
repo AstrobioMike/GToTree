@@ -111,7 +111,7 @@ def get_additional_pfam_targets(run_data):
 
 def write_out_failed_pfams(run_data):
     if len(run_data.failed_pfam_targets) > 0:
-        with open(run_data.run_files_dir + "/failed-pfam-targets.txt", "w") as failed_pfams_file:
+        with open(run_data.pfam_results_dir + "/failed-pfam-targets.txt", "w") as failed_pfams_file:
             for entry in run_data.failed_pfam_targets:
                 failed_pfams_file.write(entry + "\n")
 

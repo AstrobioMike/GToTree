@@ -251,8 +251,10 @@ def test_results_dir_is_the_output_dir_itself(built, spec):
 
 def test_run_files_dir_is_also_the_output_dir(built):
     """
-    So `failed-pfam-targets.txt` (written to run_files_dir by the shared helper) lands
-    at the top level rather than in a run-files subdirectory nothing else uses.
+    So run-level files like `removed-genomes.tsv` (written to run_files_dir by the
+    shared helper) land at the top level rather than in a run-files subdirectory
+    nothing else uses. (Per-type files like failed-<type>-targets.txt go to the type's
+    results dir instead.)
     """
     _args, run_data, out_dir, _work = built
     assert run_data.run_files_dir == os.path.abspath(out_dir)

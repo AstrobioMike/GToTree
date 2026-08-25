@@ -246,7 +246,7 @@ def build_run_data(args, spec, out_dir, work_dir, previous=None):
     The directory attributes are deliberately pointed at the flattened layout:
 
         results_dir     -> <out_dir>            (not <out_dir>/pfam-search-results)
-        run_files_dir   -> <out_dir>            (so failed-targets files land on top)
+        run_files_dir   -> <out_dir>            (run-level files like removed-genomes.tsv)
         tmp_dir         -> <out_dir>/working-dir/tmp
         run_data_path   -> <out_dir>/working-dir/run-data.json
 

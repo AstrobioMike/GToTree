@@ -114,7 +114,7 @@ def write_ko_counts_table(run_data):
 
 def write_out_failed_ko_targets(run_data):
     if len(run_data.failed_ko_targets) > 0:
-        with open(run_data.run_files_dir + "/failed-ko-targets.txt", "w") as fail_file:
+        with open(run_data.ko_results_dir + "/failed-ko-targets.txt", "w") as fail_file:
             for KO in run_data.failed_ko_targets:
                 fail_file.write(KO + "\n")
 

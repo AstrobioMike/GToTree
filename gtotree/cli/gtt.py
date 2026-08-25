@@ -9,7 +9,7 @@ SUBCOMMAND_MAP = {
     "get-accs-from-ncbi":  "gtotree.utils.ncbi.get_accessions_from_ncbi",
     "hmms":                "gtotree.utils.hmms.gtt_hmms",
     "gen-scg-hmms":        "gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_cli",
-    "search-annotations":  "gtotree.utils.target_search.target_search_multi",
+    "search-annotations":  "gtotree.utils.target_search.target_search_cli",
     "update-headers":      "gtotree.utils.update_headers.update_headers_cli",
     "midpoint-root-tree":  "gtotree.utils.helper_scripts.gtt_midpoint_root_tree",
     "itol":                "gtotree.cli.itol",

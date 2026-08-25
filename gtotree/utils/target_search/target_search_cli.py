@@ -1,58 +1,92 @@
 """
-The shared CLI and driver behind `gtt search-annotations`
+The driver behind `gtt search-annotations`.
 
-Both subcommands call into here with their `TargetSearchSpec`; the two entry-point
-modules are thin enough to read in one screen. The phased output, spinners, and
-progress-bar conventions follow `gtt gen-scg-hmms` rather than the main GToTree driver.
+`search-annotations` is the one command for searching input genomes for target
+annotations -- Pfam domains (`-p`) and/or KEGG Orthologs (`-K`).
 
-The library-raises / CLI-translates split is the same as everywhere else: the stage
-functions raise `TargetSearchError` (or let a taxonomy error propagate), and `main()`
-turns those into a friendly message and a clean exit.
+How the pieces fit together:
+
+  * The per-type behavior lives entirely in `TargetSearchSpec` (one spec per target
+    type, in `target_search_spec.py`) and the shared stage/setup/output helpers. This
+    driver drives a *list* of specs; every spec-specific step -- collecting targets,
+    pressing profiles, writing the counts table, combining hit seqs -- is a call
+    through those shared helpers, so a one-type run and a full GToTree run with
+    `-p`/`-K` produce byte-for-byte the same per-type files.
+  * The genome phases (resolve inputs, look up NCBI accessions, preprocess) are
+    target-type-independent, so they run once. The fused per-genome worker already
+    dispatches on `plan.do_pfam` / `plan.do_ko`, so a plan with both flags on searches
+    a genome for both in the worker that produced its proteins.
+
+Output layout: each target type gets its own subdirectory under the output directory
+(`<out>/pfam/`, `<out>/ko/`), holding that type's counts table, hit seqs, and a
+`<type>-genomes-summary-info.tsv`. Run-level files that aren't type-specific -- the
+top-level `genomes-summary-info.tsv` (genome preprocessing only), the removed-genomes
+report, and phase-stats -- live at the top.
 """
 
 import os
 import sys
 import shutil
+import tempfile
 import argparse
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.general import (read_run_data, write_run_data, CorruptRunData,
-                                        OutputDirExistsError, adopt_genome_progress)
+                                        OutputDirExistsError, adopt_genome_progress,
+                                        run_pooled_stage,
+                                        GTT_PROGRESS_BAR_FORMAT_INDENTED_6)
 from gtotree.utils.misc.resume_state import (ResumeProfile, hash_strings,
                                         hash_local_genomes, hash_file_contents,
                                         STATE_VERSION)
-from gtotree.utils.misc.messaging import (report_message, color_text,
+from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
                                      report_phase_header, report_very_early_exit)
+from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import WantedRefTaxError
 from gtotree.utils.misc.general import wanted_ref_tax_list
+from gtotree.utils.hmms.hmm_searching_engine import press_profiles
+from gtotree.main_stages.processing_genomes import (SearchPlan, _fused,
+                                                    genomes_needing_processing)
 from gtotree.utils.target_search import target_search_stages as stages
 from gtotree.utils.target_search import target_search_outputs as outputs
+from gtotree.utils.target_search.target_search_spec import get_spec
 from gtotree.utils.target_search.target_search_setup import (
     TargetSearchError,
     RUN_DATA_FILENAME,
-    check_args,
+    check_args_multi,
+    requested_specs,
     check_dependencies,
     check_env_vars,
-    setup_output_dir,
     build_run_data,
     ensure_processing_dirs,
     ensure_reference_data,
-    validate_input_files,
+    validate_genome_input_files,
+    validate_targets_file,
     fill_in_shared_args,
+    wire_spec_results_dirs,
+    make_spec_result_dirs,
 )
 
 
+SUBCOMMAND = "search-annotations"
+DEFAULT_OUTPUT_DIR = "gtt-annotation-search-output"
 DEFAULT_NUM_JOBS = 10
+
+SPEC_NAMES = ["pfam", "ko"]
+
+SUBDIRS = {"pfam": "pfam", "ko": "ko"}
+
+
+def _all_specs():
+    return [get_spec(name) for name in SPEC_NAMES]
 
 
 ################################################################################
 # resume
 ################################################################################
 
-# stage names, in pipeline order
 STAGE_TARGETS = "targets"
 STAGE_SEARCH = "search"
 STAGE_OUTPUTS = "outputs"
@@ -60,65 +94,67 @@ STAGE_OUTPUTS = "outputs"
 STAGE_ORDER = [STAGE_TARGETS, STAGE_SEARCH, STAGE_OUTPUTS]
 
 RESUME = ResumeProfile(
-    name="target-search",
+    name="annotation-search",
     stages=STAGE_ORDER,
     field_labels={
         "state_version": "the run-state format",
         "subcommand": "the subcommand",
+        "target_types": "which annotation types are being searched (-p / -K)",
         "accessions_sha256": "the set of input NCBI accessions",
         "local_genomes_sha256": "the local genome files (contents, paths, or set)",
-        "targets_sha256": "the list of search targets",
+        "pfam_targets_sha256": "the list of target Pfams",
+        "ko_targets_sha256": "the list of target KOs",
         "source": "--source",
         "wanted_ref_tax": "--wanted-ref-tax",
         "target_rank": "--target-rank",
         "derep_rank": "--derep-rank",
-        "data_version": "the reference-database version",
+        "pfam_data_version": "the Pfam database version",
+        "ko_data_version": "the KO database version",
     },
-    # the database version isn't known until it's been fetched, so a run interrupted
-    # before then legitimately has None stored
-    deferred_fields=("data_version",),
+    deferred_fields=("pfam_data_version", "ko_data_version"),
 )
 
 
-def build_fingerprint(run_data, args, spec, data_version=None):
+def build_fingerprint(run_data, args, specs, data_versions=None):
     """
-    Everything that affects what this run produces.
+    Everything that affects what this combined run produces.
 
-    Two layers cooperate on resume, and the split is worth being explicit about:
+    Same two-layer resume as the single command (this fingerprint guards the run as a
+    whole; per-genome flags give genome-level resume), extended so each target type has
+    its own targets hash and data version. That independence is deliberate: editing the
+    Pfam list must force the Pfam targets to be recollected without touching the KO
+    side, and adding `-K` to a previously `-p`-only run is a genuine change to what the
+    run produces, caught by `target_types` here.
 
-      * this fingerprint guards the run as a whole, refusing a `-R` whose parameters
-        changed in a way that would mix results from two different runs
-      * the per-genome flags on GenomeData (`processing_done`, `pfam_search_done`,
-        `ko_search_done`) give genome-level resume, since `genomes_needing_processing`
-        filters on exactly those
-
-    So there are no per-genome stages here: run-data.json is that record.
-
-    Deliberately excludes `--num-jobs`, `--keep-working-dir`, and the output directory
-    name -- those change how the run executes, not what it produces.
-
-    The target list is hashed by CONTENTS rather than path: the meaningful unit is
-    which IDs were asked for, so moving or renaming the file shouldn't force a re-run,
-    and editing it in place absolutely should.
+    Target lists are hashed by CONTENTS, not path, so moving the file doesn't force a
+    re-run and editing it in place does.
     """
+    data_versions = data_versions or {}
+    requested = {spec.subcommand for spec in requested_specs(args, specs)}
+
     accessions = run_data.get_input_ncbi_accs()
     local_genomes = (list(run_data.genbank_files) + list(run_data.fasta_files)
                      + list(run_data.amino_acid_files))
 
+    pfam_spec = get_spec("pfam")
+    ko_spec = get_spec("ko")
+
     return {
         "state_version": STATE_VERSION,
-        "subcommand": spec.subcommand,
+        "subcommand": SUBCOMMAND,
+        "target_types": sorted(requested),
         "accessions_sha256": hash_strings(accessions),
         "num_accessions": len(set(accessions)),
         "local_genomes_sha256": hash_local_genomes(local_genomes),
         "num_local_genomes": len(local_genomes),
-        "targets_sha256": hash_file_contents(spec.targets_file(args)),
-        "num_targets": getattr(args, "total_targets", None),
+        "pfam_targets_sha256": hash_file_contents(pfam_spec.targets_file(args)),
+        "ko_targets_sha256": hash_file_contents(ko_spec.targets_file(args)),
         "source": (args.source or "").lower(),
         "wanted_ref_tax": (sorted(wanted_ref_tax_list(args)) or None),
         "target_rank": args.target_rank,
         "derep_rank": args.derep_rank,
-        "data_version": data_version,
+        "pfam_data_version": data_versions.get("pfam"),
+        "ko_data_version": data_versions.get("ko"),
     }
 
 
@@ -126,28 +162,28 @@ def build_fingerprint(run_data, args, spec, data_version=None):
 # parser
 ################################################################################
 
-def build_parser(spec, parent_subparsers=None):
+def build_parser(parent_subparsers=None):
     """
-    Build this subcommand's parser.
+    Build the `search-annotations` parser.
 
-    The genome-input flags deliberately match the main GToTree program's short flags
-    (`-a`, `-g`, `-f`, `-A`, `-w`), since these subcommands are a subset of it and the
-    same input files should work in both without editing.
+    Both target flags are optional here; `check_args_multi` enforces that at least one
+    is given. The genome-input flags match the main GToTree program's short flags
+    (`-a`, `-g`, `-f`, `-A`, `-w`) so the same input files work in both.
     """
-    targets = spec.target_label_plural
+    pfam_spec = get_spec("pfam")
+    ko_spec = get_spec("ko")
 
-    desc = (f"This is a helper program that searches a set of input genomes for a list "
-            f"of target {targets}. It takes the same genome inputs as the main GToTree "
-            f"program, preprocesses them the same way, and produces the same "
-            f"{spec.target_label} search results a full GToTree run would have produced "
-            f"if you'd passed `{spec.targets_flag}` to it.")
+    desc = ("This is a helper program that searches a set of input genomes for target "
+            "KOs and/or Pfams. It takes the same genome inputs as the main GToTree program, "
+            "preprocesses them the same way, and produces the same Pfam/KO search results "
+            "a full GToTree run would produce if you passed `-p` and/or `-K` to it.")
 
-    example = (f"Ex. usage: `gtt {spec.subcommand} -f my-genomes.txt "
-               f"{spec.targets_flag} my-targets.txt`")
+    example = ("Ex. usage: `gtt search-annotations -w Alteromonas -f my-fasta-files.txt "
+               "-p target-pfams.txt -K target-kos.txt`")
 
     if parent_subparsers is not None:
         parser = parent_subparsers.add_parser(
-            spec.subcommand,
+            SUBCOMMAND,
             description=desc,
             formatter_class=CustomRichHelpFormatter,
             add_help=False,
@@ -160,16 +196,25 @@ def build_parser(spec, parent_subparsers=None):
             add_help=False,
         )
 
-    required = parser.add_argument_group("Required Parameters")
+    targets = parser.add_argument_group("Search Targets (at least one)")
     genomes = parser.add_argument_group("Input Genomes (at least one)")
     optional = parser.add_argument_group("Optional Parameters")
 
-    required.add_argument(
-        spec.targets_flag, spec.targets_flag_long,
+    targets.add_argument(
+        pfam_spec.targets_flag, pfam_spec.targets_flag_long,
         metavar="<FILE>",
-        dest=spec.targets_dest,
-        help=(f"A single-column file of the target {spec.target_label} IDs to search "
-              f"for (e.g. '{spec.example_target}')."),
+        dest=pfam_spec.targets_dest,
+        help=(f"A single-column file of the target Pfam IDs to search for (e.g. "
+              f"'{pfam_spec.example_target}')."),
+        action="store",
+    )
+
+    targets.add_argument(
+        ko_spec.targets_flag, ko_spec.targets_flag_long,
+        metavar="<FILE>",
+        dest=ko_spec.targets_dest,
+        help=(f"A single-column file of the target KO IDs to search for (e.g. "
+              f"'{ko_spec.example_target}')."),
         action="store",
     )
 
@@ -246,9 +291,9 @@ def build_parser(spec, parent_subparsers=None):
     optional.add_argument(
         "-o", "--output-dir",
         metavar="<DIR>",
-        default=spec.default_output_dir,
+        default=DEFAULT_OUTPUT_DIR,
         dest="output_dir",
-        help=f'Desired output directory (default: "{spec.default_output_dir}")',
+        help=f'Desired output directory (default: "{DEFAULT_OUTPUT_DIR}")',
         action="store",
     )
 
@@ -284,17 +329,16 @@ def build_parser(spec, parent_subparsers=None):
     add_help(optional)
     add_version_arg(optional)
 
-    parser.set_defaults(func=spec.subcommand.replace("-", "_"))
+    parser.set_defaults(func=SUBCOMMAND.replace("-", "_"))
 
     return parser
 
 
 ################################################################################
-# terminal styling (matching gen-scg-hmms)
+# terminal styling (matching the single-command driver)
 ################################################################################
 
 def _phase_counter():
-    """Returns a callable yielding 1, 2, 3, ... on each call (for phase labels)."""
     state = {"i": 0}
 
     def nxt():
@@ -309,41 +353,58 @@ def section(title):
     report_phase_header(title)
 
 
-def report_finish(out_dir, run_data, spec, summary_path, targets_with_hits):
-    """
-    The closing banner, mirroring gen-scg-hmms'.
+def _spec_out_dir(out_dir, spec_name):
+    return os.path.join(out_dir, SUBDIRS[spec_name])
 
-    `targets_with_hits` is how many targets actually got a combined hit-seqs fasta. At
-    zero there is no hit-seqs directory to point at, and saying so plainly is a lot
-    more useful than listing an output that isn't there -- a run where nothing hit
-    anything is a real (and usually surprising) result, not an error.
+
+def report_finish(out_dir, run_data, active, summary_path):
     """
-    searched, removed, failed = outputs.summarize_counts(run_data, spec)
-    num_targets = len(spec.found_targets(run_data))
+    The closing banner for a combined run.
+
+    `active` is the list of (spec_name, spec, targets_with_hits) actually run. One
+    genome count is reported (genomes are shared), then a per-type line for what each
+    search found and where it landed.
+    """
+    # every active spec searched the same surviving genome set, so any of them gives
+    # the shared genome count
+    any_spec = active[0][1]
+    searched, removed, failed = outputs.summarize_counts(run_data, any_spec)
+
+    labels = " and ".join(spec.target_label_plural for _, spec, _ in active)
 
     border = color_text("  " + "-" * 78, "green")
-    title = color_text("  " + f"{spec.target_label} search complete!".center(78), "green")
+    title = color_text("  " + "Annotation search complete!".center(78), "green")
     print()
     print(border)
     print(title)
     print(border)
 
     print(f"\n      {color_text(f'{searched:,}', 'green')} genome(s) searched for "
-          f"{color_text(f'{num_targets:,}', 'green')} {spec.target_label} target(s).\n")
-
-    if not targets_with_hits:
-        report_message(
-            f"No hits were found for any of the {num_targets:,} "
-            f"{spec.target_label} target(s) in any of the genomes searched :/", "yellow", ii="      ", si="      ", newline=False)
-        print()
+          f"{labels}.\n")
 
     print("      Results written to:")
     print(f"        {color_text(out_dir + '/', 'green')}\n")
 
-    print("      Including:")
-    print(f"        {color_text(spec.counts_filename, 'green')}")
-    if targets_with_hits:
-        print(f"        {color_text(spec.hit_seqs_subdir + '/', 'green')}")
+    for spec_name, spec, targets_with_hits in active:
+        num_targets = len(spec.found_targets(run_data))
+        sub = SUBDIRS[spec_name] + "/"
+        print(f"      {color_text(spec.target_label, 'green')} results "
+              f"({color_text(f'{num_targets:,}', 'green')} target(s)) in "
+              f"{color_text(sub, 'green')}")
+        if not targets_with_hits:
+            report_message(
+                f"No hits were found for any {spec.target_label} target in any "
+                "genome searched.", "yellow", ii="        ", si="        ",
+                newline=False)
+        else:
+            print(f"        {color_text(sub + spec.counts_filename, 'green')}")
+            print(f"        {color_text(sub + spec.hit_seqs_subdir + '/', 'green')}")
+        print(f"        {color_text(sub + spec.summary_filename, 'green')}")
+        if spec.failed_targets(run_data):
+            print(f"        {color_text(sub + spec.failed_targets_filename, 'green')}")
+        print()
+
+    print("      Genome preprocessing summary (all input genomes):")
     print(f"        {color_text(os.path.basename(summary_path), 'green')}\n")
 
     if removed or failed:
@@ -358,11 +419,6 @@ def report_finish(out_dir, run_data, spec, summary_path, targets_with_hits):
 ################################################################################
 
 def _load_previous_run_data(work_dir):
-    """
-    Load a prior run's RunData, or None. A corrupt file is a hard stop rather than a
-    silent fresh start: silently discarding it would re-download everything while
-    looking like a resume.
-    """
     path = os.path.join(work_dir, RUN_DATA_FILENAME)
     if not os.path.isfile(path):
         return None
@@ -375,30 +431,159 @@ def _load_previous_run_data(work_dir):
             "start fresh with `-F`.") from e
 
 
-def ensure_all_required_data(args, spec):  # pragma: no cover
+def ensure_all_required_data(args, specs):  # pragma: no cover
     """
-    Make every managed dataset this run needs is present
+    Fetch every managed dataset the requested target types need, returning a
+    {spec_name: version-or-None} map for the run-info block and fingerprint.
+
+    Only the requested types are fetched -- a `-p`-only run never touches the KO data.
     """
-    ensure_reference_data(args, spec)
-    spec.ensure_data()
+    ensure_reference_data(args, specs[0] if specs else get_spec("pfam"))
 
-    check_env_vars(spec)
+    versions = {}
+    for name in SPEC_NAMES:
+        spec = get_spec(name)
+        if spec not in specs:
+            continue
+        spec.ensure_data()
+        check_env_vars(spec)
+        versions[name] = (spec.describe_data_version(None)
+                          if spec.describe_data_version else None)
+    return versions
 
-    if spec.describe_data_version is None:
-        return None
 
-    return spec.describe_data_version(None)
-
-
-def run_search(args, spec):  # pragma: no cover
+def _prepare_spec(run_data, args, spec, spec_name, out_dir, tmp_dir, total):
     """
-    The whole program, phase by phase.
+    Root one spec's results at its output subdirectory and create its result subdirs.
+
+    Called after the shared RunData exists so each target type writes to `<out>/pfam/`
+    or `<out>/ko/` instead of colliding at the top level.
     """
+    spec_out = _spec_out_dir(out_dir, spec_name)
+    make_spec_result_dirs(spec_out, spec)
+    wire_spec_results_dirs(
+        run_data, args, spec, tmp_dir,
+        results_root=spec_out,
+        results_root_rel=os.path.join(run_data.output_dir_rel, SUBDIRS[spec_name]),
+        tmp_subdir=os.path.join("target-hit-seqs", spec_name),
+        total_targets=total,
+    )
+    return spec_out
+
+
+def _combined_plan(args, specs):
+    """
+    A SearchPlan turning on exactly the requested target types' searches.
+
+    `do_scg=False` for the same reason the single command sets it: there's no SCG set
+    to press or search and no tree downstream. The fused worker already runs whichever
+    of Pfam/KO are on, so one plan drives a one-pass search for both.
+    """
+    names = {spec.subcommand for spec in specs}
+    return SearchPlan(
+        do_pfam=(get_spec("pfam").subcommand in names),
+        do_ko=(get_spec("ko").subcommand in names),
+        keep_genome_files=bool(getattr(args, "keep_working_dir", False)),
+        do_scg=False,
+    )
+
+
+def phase_search_genomes(args, run_data, specs, plan):
+    """
+    Preprocess and search every not-yet-finished genome in one pool for all requested
+    target types.
+
+    This is the single-command `phase_search_genomes` generalized to press each
+    profile-based type once (only Pfam presses today) and report both target counts.
+    `genome_is_fully_processed` already ANDs every requested search flag, so a genome
+    that finished Pfam but not KO in an interrupted run is correctly re-picked here and
+    the worker skips the Pfam work it already has.
+    """
+    phase_stats.begin("processing and searching genomes")
+
+    press_dirs = []
+    try:
+        for spec in specs:
+            if not spec.presses_profiles:
+                continue
+            press_dir = tempfile.mkdtemp(prefix="gtt-press-")
+            press_dirs.append(press_dir)
+            hmm_path = getattr(run_data, spec.combined_hmm_attr)
+            with spinner(f"Preparing {spec.target_label} profiles for searching...",
+                         f"Prepared {spec.target_label} profiles"):
+                plan.pressed_pfam_base = press_profiles(
+                    hmm_path, press_dir, "target-profiles")
+
+        to_process = genomes_needing_processing(run_data.all_input_genomes, plan)
+        alive = [gd for gd in run_data.all_input_genomes if not gd.removed]
+        already_done = len(alive) - len(to_process)
+
+        labels = " and ".join(
+            f"{len(spec.found_targets(run_data)):,} {spec.target_label} target(s)"
+            for spec in specs)
+
+        if not to_process:
+            print(f"\n      All {len(alive):,} genome(s) were already processed and "
+                  "searched in a previous run")
+            return run_data
+
+        print(f"\n      Processing and searching {len(to_process):,} genome(s) for "
+              f"{labels}:")
+        if already_done:
+            print(f"        ({already_done:,} already done in a previous run)")
+
+        preprocess, apply_status = stages._dispatching_worker_pair(run_data)
+        worker, apply_result = _fused(preprocess, apply_status, plan)
+
+        run_data = run_pooled_stage(to_process, worker, apply_result, args, run_data,
+                                    bar_format=GTT_PROGRESS_BAR_FORMAT_INDENTED_6)
+    finally:
+        for press_dir in press_dirs:
+            shutil.rmtree(press_dir, ignore_errors=True)
+
+    for spec in specs:
+        stages.mark_failed_searches_removed(run_data, spec)
+
+    write_removed_genomes_report(run_data)
+    write_run_data(run_data)
+
+    # a genome is "searched" if it completed at least one requested search; per-type
+    # completion is what the summary table and per-type reporting reflect
+    any_searched = any(stages.count_searched_genomes(run_data, spec) for spec in specs)
+    failed_here = run_data.genomes_removed_at(*stages.SEARCH_PHASE_REMOVAL_STAGES)
+
+    if failed_here:
+        report_message(
+            f"{len(failed_here):,} genome(s) failed the search phase. Reported in:",
+            "yellow", ii="      ", si="      ")
+        print(f"        {color_text(stages.removals_pointer(run_data), 'yellow')}")
+
+    if not any_searched:
+        raise TargetSearchError(
+            "None of the input genomes made it through to a completed search. The "
+            f"reason for each is in {stages.removals_pointer(run_data)}.")
+
+    return run_data
+
+
+def run_search(args, specs=None):  # pragma: no cover
+    """
+    The whole combined program, phase by phase.
+
+    `specs` defaults to all target types; only the ones whose flag was given are
+    actually run, so passing a subset is only needed by tests.
+    """
+    if specs is None:
+        specs = _all_specs()
+
     args = fill_in_shared_args(args)
-    args = check_args(args, spec)
-    check_dependencies(args, spec)
+    args = check_args_multi(args, specs)
 
-    out_dir, work_dir = setup_output_dir(args, spec)
+    active_specs = requested_specs(args, specs)
+    for spec in active_specs:
+        check_dependencies(args, spec)
+
+    out_dir, work_dir = setup_output_dir_multi(args, active_specs)
 
     resuming = bool(args.resume)
     state = RESUME.load(work_dir) if resuming else None
@@ -406,11 +591,26 @@ def run_search(args, spec):  # pragma: no cover
 
     n = _phase_counter()
 
-    args = validate_input_files(args, spec)
-    data_version = ensure_all_required_data(args, spec)
+    args = validate_genome_input_files(args)
+    totals = {}
+    for spec_name in SPEC_NAMES:
+        spec = get_spec(spec_name)
+        if spec in active_specs:
+            totals[spec_name] = validate_targets_file(args, spec)
+
+    data_versions = ensure_all_required_data(args, active_specs)
 
     section(f"Phase {n()}: Resolving input genomes...")
-    run_data = build_run_data(args, spec, out_dir, work_dir, previous=previous)
+    run_data = build_run_data(args, active_specs[0], out_dir, work_dir,
+                              previous=previous)
+
+    # re-root every active spec's results at its own subdirectory (build_run_data wired
+    # only the first spec, at the flat out_dir)
+    for spec_name in SPEC_NAMES:
+        spec = get_spec(spec_name)
+        if spec in active_specs:
+            _prepare_spec(run_data, args, spec, spec_name, out_dir, run_data.tmp_dir,
+                          totals[spec_name])
 
     run_data, _selection = stages.resolve_input_genomes(args, run_data)
 
@@ -418,7 +618,7 @@ def run_search(args, spec):  # pragma: no cover
 
     adopt_genome_progress(run_data, previous)
 
-    fingerprint = build_fingerprint(run_data, args, spec, data_version=data_version)
+    fingerprint = build_fingerprint(run_data, args, specs, data_versions=data_versions)
 
     if resuming and state:
         differences = RESUME.compare(state.get("fingerprint"), fingerprint)
@@ -431,49 +631,93 @@ def run_search(args, spec):  # pragma: no cover
         state = RESUME.new(fingerprint)
         RESUME.save(work_dir, state)
 
-    plan = stages.build_plan(args, spec)
+    plan = _combined_plan(args, active_specs)
 
     if not (resuming and stages.all_genomes_already_processed(run_data, plan)):
         run_data = stages.lookup_ncbi_accessions(run_data)
 
     write_run_data(run_data)
 
-    section(f"Phase {n()}: Collecting target {spec.target_label_plural}...")
-    if data_version:
-        print(f"      {spec.target_label} version being used: "
-              f"{color_text(data_version, 'green')}\n")
+    section(f"Phase {n()}: Collecting targets...")
+    for spec_name in SPEC_NAMES:
+        spec = get_spec(spec_name)
+        if spec not in active_specs:
+            continue
+        version = data_versions.get(spec_name)
+        if version:
+            print(f"      {spec.target_label} version being used: "
+                  f"{color_text(version, 'green')}")
+        run_data = stages.phase_collect_targets(
+            run_data, spec, _spec_out_dir(out_dir, spec_name), resuming=resuming)
 
-    state.setdefault("fingerprint", {})["data_version"] = data_version
+    state.setdefault("fingerprint", {})["pfam_data_version"] = data_versions.get("pfam")
+    state.setdefault("fingerprint", {})["ko_data_version"] = data_versions.get("ko")
 
-    run_data = stages.phase_collect_targets(run_data, spec, out_dir, resuming=resuming)
     write_run_data(run_data)
     RESUME.mark_complete(state, STAGE_TARGETS, work_dir=work_dir)
     RESUME.save(work_dir, state)
 
     section(f"Phase {n()}: Processing and searching genomes...")
-    run_data = stages.phase_search_genomes(args, run_data, spec, plan)
+    run_data = phase_search_genomes(args, run_data, active_specs, plan)
     RESUME.mark_complete(state, STAGE_SEARCH, work_dir=work_dir)
     RESUME.save(work_dir, state)
 
     section(f"Phase {n()}: Combining results...")
-    summary_path, targets_with_hits = stages.phase_write_outputs(run_data, spec, out_dir)
+    active = []
+    summary_path = None
+    for spec_name in SPEC_NAMES:
+        spec = get_spec(spec_name)
+        if spec not in active_specs:
+            continue
+        spec_out = _spec_out_dir(out_dir, spec_name)
+        s_path, targets_with_hits = stages.phase_write_outputs(run_data, spec, spec_out)
+        active.append((spec_name, spec, targets_with_hits))
+
+    # one run-level genomes summary at the top, preprocessing columns only (per-type
+    # hit counts and search status live in each type's own subdirectory table)
+    summary_path = outputs.write_root_genomes_summary(out_dir, run_data)
+
     RESUME.mark_complete(state, STAGE_OUTPUTS, work_dir=work_dir)
     RESUME.save(work_dir, state)
 
     if not args.keep_working_dir:
         shutil.rmtree(work_dir, ignore_errors=True)
 
-    # closes the final phase, so this has to happen before anything reads the table
     phase_stats.finish()
     phase_stats.write_tsv(out_dir)
 
-    report_finish(out_dir, run_data, spec, summary_path, targets_with_hits)
+    report_finish(out_dir, run_data, active, summary_path)
 
     return run_data
 
 
-def main(spec):  # pragma: no cover
-    parser = build_parser(spec)
+def setup_output_dir_multi(args, specs):
+    """
+    Create the output dir and working dir, then each requested type's subdirectory.
+
+    Mirrors the single command's `setup_output_dir` (which honors -F/-R via
+    `prepare_output_dir`) but lays out `<out>/pfam/` and `<out>/ko/` instead of
+    flattening result subdirs into the top level.
+    """
+    from gtotree.utils.misc.general import prepare_output_dir
+    from gtotree.utils.target_search.target_search_setup import WORKING_DIR_NAME
+
+    out_dir, work_dir = prepare_output_dir(args.output_dir,
+                                           resume=args.resume,
+                                           force_overwrite=args.force_overwrite,
+                                           work_dir_name=WORKING_DIR_NAME,
+                                           ii="      ", si="      ")
+
+    for spec_name in SPEC_NAMES:
+        spec = get_spec(spec_name)
+        if spec in specs:
+            make_spec_result_dirs(_spec_out_dir(out_dir, spec_name), spec)
+
+    return out_dir, work_dir
+
+
+def main():  # pragma: no cover
+    parser = build_parser()
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -482,7 +726,7 @@ def main(spec):  # pragma: no cover
     args = parser.parse_args()
 
     try:
-        run_search(args, spec)
+        run_search(args)
     except KeyboardInterrupt:
         print()
         report_very_early_exit("Interrupted by user.", "yellow")
@@ -494,3 +738,7 @@ def main(spec):  # pragma: no cover
         report_very_early_exit(str(e))
     finally:
         phase_stats.report()
+
+
+if __name__ == "__main__":
+    main()

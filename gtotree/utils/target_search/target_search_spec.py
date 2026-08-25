@@ -63,6 +63,7 @@ class TargetSearchSpec:
     hit_seqs_subdir: str             # "pfam-hit-seqs"
     counts_filename: str             # "pfam-hit-counts.tsv"
     failed_targets_filename: str     # "failed-pfam-targets.txt"
+    summary_filename: str            # "pfam-genomes-summary-info.tsv"
 
     # --- behavior --------------------------------------------------------------
     # (run_data) -> run_data; resolves the target set and writes the profile assets
@@ -95,6 +96,9 @@ class TargetSearchSpec:
 
     def results_dir(self, run_data):
         return getattr(run_data, self.results_dir_attr)
+
+    def results_dir_rel(self, run_data):
+        return getattr(run_data, self.results_dir_rel_attr)
 
     def tmp_results_dir(self, run_data):
         return getattr(run_data, self.tmp_results_dir_attr)
@@ -149,6 +153,7 @@ def _pfam_spec():
 
         result_subdirs=["info", "individual-genome-results", "pfam-hit-seqs",
                         "target-pfam-profiles"],
+        summary_filename="pfam-genomes-summary-info.tsv",
         target_stage_artifacts=["target-pfam-profiles/all-pfam-targets.hmm"],
         hit_seqs_subdir="pfam-hit-seqs",
         counts_filename="pfam-hit-counts.tsv",
@@ -204,6 +209,7 @@ def _ko_spec():
 
         result_subdirs=["individual-genome-results", "ko-hit-seqs",
                         "target-ko-profiles"],
+        summary_filename="ko-genomes-summary-info.tsv",
         target_stage_artifacts=["target-kos.tsv", "target-ko-profiles"],
         hit_seqs_subdir="ko-hit-seqs",
         counts_filename="ko-hit-counts.tsv",

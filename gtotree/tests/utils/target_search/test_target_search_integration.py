@@ -1,15 +1,20 @@
 """
-End-to-end tests for `gtt search-annotations`.
+End-to-end tests for `gtt search-annotations`, single-target-type (Pfam) path.
 
-These drive `run_search` with only the managed-Pfam *download* stubbed out; target
-collection, the fused preprocess-and-search stage, the counts matrix, and the hit-seq
-combining are all the production code paths -- the same functions a full GToTree run
-with `-p` calls.
+These drive the combined `run_search` with a one-spec list and only the managed-Pfam
+*download* stubbed out; target collection, the fused preprocess-and-search stage, the
+counts matrix, and the hit-seq combining are all the production code paths -- the same
+functions a full GToTree run with `-p` calls. Only the Pfam path is exercised because
+the KO search worker needs the external `exec_annotation` binary.
 
-The point of running the whole thing rather than each piece is that the interesting
-failure mode for this feature is wiring: every individual helper works (they're the
-main driver's), and what could break is a directory attribute pointed somewhere wrong
-or a search that silently never runs.
+The interesting failure mode for this feature is wiring: every individual helper works
+(they're the main driver's), and what could break is a directory attribute pointed
+somewhere wrong or a search that silently never runs. Multi-type behavior (running
+both target types, per-type layout, the combined fingerprint) is covered in
+test_target_search_multi.py.
+
+Results for the single Pfam type land under the `pfam/` subdirectory -- the same layout
+the command produces for every run -- so paths here are rooted there.
 """
 
 import os
@@ -18,12 +23,17 @@ import pytest  # type: ignore
 from gtotree.utils.target_search import target_search_cli
 from gtotree.utils.target_search import target_search_stages as stages
 from gtotree.utils.target_search import target_search_outputs as outputs
+from gtotree.utils.target_search.target_search_spec import get_spec
 from gtotree.utils.target_search.target_search_setup import (TargetSearchError,
                                                              make_args,
                                                              WORKING_DIR_NAME)
 from gtotree.utils.misc.messaging import REMOVED_GENOMES_FILENAME
 from gtotree.utils.misc.stages import GenomeRemovalStage
 from gtotree.tests.utils.target_search.conftest import MOCK_PFAM_VERSION
+
+
+# where the single Pfam type's results land
+PFAM_SUB = "pfam"
 
 
 def _read_tsv(path):
@@ -34,10 +44,20 @@ def _read_tsv(path):
 
 
 @pytest.fixture
-def run_pfam_search(pfam_spec, tmp_path, listing, write_genome, capsys):
+def run_pfam_search(pfam_spec, tmp_path, listing, write_genome, capsys, monkeypatch):
     """
-    Returns a callable that runs a full search over the given {genome: [pfam ids]} map.
+    Run the combined driver over a {genome: [pfam ids]} map with Pfam as the only type.
+
+    `pfam_spec` (from conftest) is the production Pfam spec with only the dataset
+    download stubbed; it's substituted everywhere the driver reaches for the Pfam spec
+    so the run uses the mock Pfam_data_dir.
     """
+    monkeypatch.setattr(target_search_cli, "_all_specs", lambda: [pfam_spec])
+
+    def fake_get_spec(name):
+        return pfam_spec if name == "pfam" else get_spec(name)
+
+    monkeypatch.setattr(target_search_cli, "get_spec", fake_get_spec)
 
     def _run(genomes, targets, **arg_overrides):
         paths = [write_genome(name, ids) for name, ids in genomes.items()]
@@ -48,7 +68,7 @@ def run_pfam_search(pfam_spec, tmp_path, listing, write_genome, capsys):
             num_jobs=2,
             **arg_overrides,
         )
-        run_data = target_search_cli.run_search(args, pfam_spec)
+        run_data = target_search_cli.run_search(args, specs=[pfam_spec])
         capsys.readouterr()
         return run_data, str(tmp_path / "out")
 
@@ -78,7 +98,7 @@ def basic_run(run_pfam_search):
 
 def test_hit_counts_matrix_matches_the_planted_copies(basic_run, pfam_spec):
     _run_data, out_dir = basic_run
-    header, rows = _read_tsv(os.path.join(out_dir, pfam_spec.counts_filename))
+    header, rows = _read_tsv(os.path.join(out_dir, PFAM_SUB, pfam_spec.counts_filename))
 
     assert header == ["genome_id", "total_gene_count", "PF90001", "PF90002"]
     by_genome = {row["genome_id"]: row for row in rows}
@@ -93,7 +113,7 @@ def test_hit_counts_matrix_matches_the_planted_copies(basic_run, pfam_spec):
 
 def test_hit_seqs_are_combined_per_target(basic_run, pfam_spec):
     _run_data, out_dir = basic_run
-    hit_dir = os.path.join(out_dir, pfam_spec.hit_seqs_subdir)
+    hit_dir = os.path.join(out_dir, PFAM_SUB, pfam_spec.hit_seqs_subdir)
 
     assert sorted(os.listdir(hit_dir)) == ["PF90001.faa", "PF90002.faa"]
 
@@ -108,20 +128,22 @@ def test_hit_seqs_are_combined_per_target(basic_run, pfam_spec):
 def test_per_genome_result_files_are_written(basic_run):
     _run_data, out_dir = basic_run
     for genome in ("g1", "g2", "g3"):
-        path = os.path.join(out_dir, "individual-genome-results", genome,
+        path = os.path.join(out_dir, PFAM_SUB, "individual-genome-results", genome,
                             "pfam-hmmsearch.txt")
         assert os.path.isfile(path), f"no per-genome tblout for {genome}"
 
 
 def test_failed_targets_are_reported(basic_run, pfam_spec):
     _run_data, out_dir = basic_run
-    path = os.path.join(out_dir, pfam_spec.failed_targets_filename)
+    # the failed-targets file lands in the type's results subdirectory, alongside the
+    # counts table and hit seqs it belongs with
+    path = os.path.join(out_dir, PFAM_SUB, pfam_spec.failed_targets_filename)
     assert open(path).read().split() == ["PF99999"]
 
 
 def test_requested_and_pulled_table_records_every_request(basic_run):
     _run_data, out_dir = basic_run
-    header, rows = _read_tsv(os.path.join(out_dir, "info",
+    header, rows = _read_tsv(os.path.join(out_dir, PFAM_SUB, "info",
                                           "requested-and-pulled-pfams.tsv"))
     assert header == ["specified_pfam", "pulled_pfam"]
     pulled = {row["specified_pfam"]: row["pulled_pfam"] for row in rows}
@@ -130,23 +152,52 @@ def test_requested_and_pulled_table_records_every_request(basic_run):
     assert pulled["PF99999"] == "NA"
 
 
-def test_summary_table_covers_every_input_genome(basic_run):
-    _run_data, out_dir = basic_run
-    header, rows = _read_tsv(os.path.join(out_dir, "genomes-summary-info.tsv"))
+def _root_summary(out_dir):
+    return _read_tsv(os.path.join(out_dir, "genomes-summary-info.tsv"))
 
-    assert "search_completed" in header
+
+def _pfam_summary(out_dir, pfam_spec):
+    return _read_tsv(os.path.join(out_dir, PFAM_SUB, pfam_spec.summary_filename))
+
+
+def test_root_summary_covers_every_input_genome(basic_run):
+    _run_data, out_dir = basic_run
+    header, rows = _root_summary(out_dir)
+
     assert [row["genome_id"] for row in rows] == ["g1", "g2", "g3"]
-    assert all(row["search_completed"] == "Yes" for row in rows)
     assert all(row["source"] == "amino-acid-fasta" for row in rows)
     assert rows[2]["num_genes"] == "3"
 
 
-def test_summary_table_reports_hit_totals(basic_run):
+def test_root_summary_has_no_per_type_hit_or_search_columns(basic_run):
+    """
+    The run-level table is preprocessing only: the hit-count and search-completion
+    columns would be ambiguous across target types, so they live in the per-type table.
+    """
+    _run_data, out_dir = basic_run
+    header, _rows = _root_summary(out_dir)
+
+    for col in ("num_hits", "num_targets_hit", "search_completed"):
+        assert col not in header
+    assert header == ["genome_id", "input", "source", "num_genes",
+                      "prodigal_used", "reason_removed"]
+
+
+def test_pfam_summary_covers_every_input_genome(basic_run, pfam_spec):
+    _run_data, out_dir = basic_run
+    header, rows = _pfam_summary(out_dir, pfam_spec)
+
+    assert "search_completed" in header
+    assert [row["genome_id"] for row in rows] == ["g1", "g2", "g3"]
+    assert all(row["search_completed"] == "Yes" for row in rows)
+
+
+def test_pfam_summary_reports_hit_totals(basic_run, pfam_spec):
     """
     num_hits counts hits; num_targets_hit counts targets that got at least one. g3 is
     the case that separates them -- two copies of PF90001 plus one of PF90002.
     """
-    header, rows = _read_tsv(os.path.join(basic_run[1], "genomes-summary-info.tsv"))
+    header, rows = _pfam_summary(basic_run[1], pfam_spec)
 
     assert header[:6] == ["genome_id", "input", "source", "num_genes",
                           "num_hits", "num_targets_hit"]
@@ -156,7 +207,7 @@ def test_summary_table_reports_hit_totals(basic_run):
     assert (by_id["g3"]["num_hits"], by_id["g3"]["num_targets_hit"]) == ("3", "2")
 
 
-def test_summary_hit_totals_match_the_counts_matrix(basic_run, pfam_spec):
+def test_pfam_summary_hit_totals_match_the_counts_matrix(basic_run, pfam_spec):
     """
     The two numbers are the row sum and non-zero count of that genome's counts row --
     a mismatch would mean the summary and the matrix disagree about the same search.
@@ -164,10 +215,10 @@ def test_summary_hit_totals_match_the_counts_matrix(basic_run, pfam_spec):
     _run_data, out_dir = basic_run
 
     counts_header, counts_rows = _read_tsv(
-        os.path.join(out_dir, pfam_spec.counts_filename))
+        os.path.join(out_dir, PFAM_SUB, pfam_spec.counts_filename))
     targets = counts_header[2:]
 
-    _header, summary = _read_tsv(os.path.join(out_dir, "genomes-summary-info.tsv"))
+    _header, summary = _pfam_summary(out_dir, pfam_spec)
     by_id = {row["genome_id"]: row for row in summary}
 
     for row in counts_rows:
@@ -177,10 +228,11 @@ def test_summary_hit_totals_match_the_counts_matrix(basic_run, pfam_spec):
             sum(1 for c in counts if c))
 
 
-def test_no_nested_search_results_directory(basic_run):
-    """The flattened layout: no `pfam-search-results/` wrapper."""
+def test_per_type_summary_is_named_for_its_type(basic_run, pfam_spec):
+    """The per-type summary carries a type prefix so it's unambiguous in a combined run."""
     _run_data, out_dir = basic_run
-    assert not os.path.exists(os.path.join(out_dir, "pfam-search-results"))
+    assert pfam_spec.summary_filename == "pfam-genomes-summary-info.tsv"
+    assert os.path.isfile(os.path.join(out_dir, PFAM_SUB, pfam_spec.summary_filename))
 
 
 def test_working_dir_is_cleaned_up_on_success(basic_run):
@@ -264,11 +316,11 @@ def test_a_genome_with_no_hits_still_appears_everywhere(run_pfam_search, pfam_sp
         targets=["PF90001"],
     )
 
-    _header, rows = _read_tsv(os.path.join(out_dir, pfam_spec.counts_filename))
+    _header, rows = _read_tsv(os.path.join(out_dir, PFAM_SUB, pfam_spec.counts_filename))
     by_genome = {row["genome_id"]: row for row in rows}
     assert by_genome["nohit"]["PF90001"] == "0"
 
-    _header, summary = _read_tsv(os.path.join(out_dir, "genomes-summary-info.tsv"))
+    _header, summary = _pfam_summary(out_dir, pfam_spec)
     assert {row["genome_id"] for row in summary} == {"hit", "nohit"}
 
     # zero, not NA: it was searched, and the answer was nothing
@@ -282,7 +334,7 @@ def test_single_genome_run_works(run_pfam_search):
     run_data, out_dir = run_pfam_search(genomes={"solo": ["PF90001"]},
                                         targets=["PF90001"])
     assert len(run_data.all_input_genomes) == 1
-    assert os.path.isfile(os.path.join(out_dir, "pfam-hit-seqs", "PF90001.faa"))
+    assert os.path.isfile(os.path.join(out_dir, PFAM_SUB, "pfam-hit-seqs", "PF90001.faa"))
 
 
 ################################################################################
@@ -365,11 +417,11 @@ def test_a_failed_search_stays_out_of_the_counts_matrix(run_pfam_search,
         targets=["PF90001"],
     )
 
-    _header, rows = _read_tsv(os.path.join(out_dir, pfam_spec.counts_filename))
+    _header, rows = _read_tsv(os.path.join(out_dir, PFAM_SUB, pfam_spec.counts_filename))
     assert [row["genome_id"] for row in rows] == ["fine"]
 
     # but it still gets a summary row, saying plainly that it didn't finish
-    _header, summary = _read_tsv(os.path.join(out_dir, "genomes-summary-info.tsv"))
+    _header, summary = _pfam_summary(out_dir, pfam_spec)
     by_id = {row["genome_id"]: row for row in summary}
     assert by_id["broken"]["search_completed"] == "No"
     assert by_id["fine"]["search_completed"] == "Yes"
@@ -478,7 +530,7 @@ def test_resume_reuses_finished_genomes(run_pfam_search, tmp_path, pfam_spec, ca
                                         keep_working_dir=True, resume=True)
 
     # the results are still complete after a run that did no new work
-    _header, rows = _read_tsv(os.path.join(out_dir, pfam_spec.counts_filename))
+    _header, rows = _read_tsv(os.path.join(out_dir, PFAM_SUB, pfam_spec.counts_filename))
     assert len(rows) == 2
     assert all(gd.pfam_search_done for gd in run_data.all_input_genomes)
 
@@ -487,7 +539,7 @@ def test_resume_refuses_a_changed_target_list(run_pfam_search):
     run_pfam_search(genomes={"g1": ["PF90001"]}, targets=["PF90001"],
                     keep_working_dir=True)
 
-    with pytest.raises(TargetSearchError, match="list of search targets changed"):
+    with pytest.raises(TargetSearchError, match="the list of target Pfams"):
         run_pfam_search(genomes={"g1": ["PF90001"]},
                         targets=["PF90001", "PF90002"],
                         keep_working_dir=True, resume=True)
@@ -505,7 +557,7 @@ def test_resume_refuses_a_changed_genome_set(run_pfam_search):
 def test_resume_without_a_previous_run_starts_fresh(run_pfam_search, pfam_spec):
     _run_data, out_dir = run_pfam_search(genomes={"g1": ["PF90001"]},
                                          targets=["PF90001"], resume=True)
-    assert os.path.isfile(os.path.join(out_dir, pfam_spec.counts_filename))
+    assert os.path.isfile(os.path.join(out_dir, PFAM_SUB, pfam_spec.counts_filename))
 
 
 def test_pfam_version_is_recorded_in_the_run_state(run_pfam_search, tmp_path):
@@ -514,4 +566,4 @@ def test_pfam_version_is_recorded_in_the_run_state(run_pfam_search, tmp_path):
                     keep_working_dir=True)
     state_path = tmp_path / "out" / WORKING_DIR_NAME / "run-state.json"
     state = json.loads(state_path.read_text())
-    assert state["fingerprint"]["data_version"] == MOCK_PFAM_VERSION
+    assert state["fingerprint"]["pfam_data_version"] == MOCK_PFAM_VERSION
