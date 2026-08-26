@@ -187,7 +187,7 @@ def get_seqs(dict_of_hit_gene_ids, path):
                     target_scg = reverse_lookup[seq_id]
                     hit_seqs_dict[target_scg] = easel_alphabet.decode(seq)
         extract_seqs_failed = False
-    except:
+    except Exception:
         extract_seqs_failed = True
         hit_seqs_dict = None
 

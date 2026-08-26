@@ -154,14 +154,37 @@ def test_parse_matches_on_root_accession_ignoring_version(tmp_path):
     assert rows[0]["found_accession"] == "GCF_000005845.3"   # what NCBI had
 
 
-def test_parse_idempotent_if_subtable_already_set(tmp_path):
+def test_parse_early_returns_when_the_recorded_subtable_still_exists(tmp_path):
     summary = tmp_path / "ncbi-data.parquet"
     _write_parquet(summary, [_row("GCF_000005845.2")])
     rd = FakeRunData(["GCF_000005845.2"], tmp_path)
-    rd.ncbi_sub_table_path = "already/done.tsv"
+
+    # a real, on-disk sub-table from a prior run: nothing to redo
+    existing = tmp_path / "already-done.tsv"
+    existing.write_text("input_accession\thttp_base_link\n")
+    rd.ncbi_sub_table_path = str(existing)
 
     out = parse_assembly_summary(str(summary), rd)
-    assert out.ncbi_sub_table_path == "already/done.tsv"   # unchanged, no work
+    assert out.ncbi_sub_table_path == str(existing)   # unchanged, no work
+
+
+def test_parse_reparses_when_the_recorded_subtable_is_gone(tmp_path):
+    """
+    A resumed run can carry a recorded sub-table path whose file no longer exists
+    (the temp dir was cleaned or removed). Early-returning on the bare path would
+    leave a dangling reference that build_base_link_map then fails on, so the parser
+    must fall through and rebuild the sub-table instead.
+    """
+    summary = tmp_path / "ncbi-data.parquet"
+    _write_parquet(summary, [_row("GCF_000005845.2")])
+    rd = FakeRunData(["GCF_000005845.2"], tmp_path)
+    rd.ncbi_sub_table_path = str(tmp_path / "gone" / "ncbi-accessions-info.tsv")
+
+    out = parse_assembly_summary(str(summary), rd)
+
+    # rebuilt to the real tmp_dir location, and the file actually exists now
+    assert out.ncbi_sub_table_path == str(tmp_path / "ncbi-accessions-info.tsv")
+    assert Path(out.ncbi_sub_table_path).is_file()
 
 
 ################################################################################

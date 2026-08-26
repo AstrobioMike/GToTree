@@ -1,4 +1,5 @@
 import re
+import os
 import pyarrow as pa # type: ignore
 import pyarrow.compute as pc # type: ignore
 import pyarrow.dataset as ds # type: ignore
@@ -93,7 +94,7 @@ def parse_assembly_summary(assembly_summary_file, run_data):
     puts them into removed-genomes.tsv. Returns the updated run_data.
     """
 
-    if run_data.ncbi_sub_table_path:
+    if run_data.ncbi_sub_table_path and os.path.isfile(run_data.ncbi_sub_table_path):
         return run_data
 
     # root (version-stripped) accession -> the exact string the user asked for

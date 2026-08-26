@@ -201,6 +201,18 @@ ENTRIES = [
          best genome (e.g., could be useful for adding an outgroup).
          """,
          FULL),
+
+        ("--exclusion-list <file>",
+         "accessions to exclude; default: none",
+         """
+         A single-column file of NCBI accessions you don't want included. Any
+         accession listed here is removed from the reference genomes `-w` pulls in.
+         (This only affects `-w` selections, it does not affect genomes specified
+         directly through the `-a` parameter.)
+
+         Note that matching ignores the GCA_/GCF_ distinction and the version suffix.
+         """,
+         FULL),
     ]),
 
     ("User-specified modification of genome labels:", [

@@ -71,6 +71,7 @@ def parser():
                      choices=["gtdb", "ncbi"], default="gtdb")
     opt.add_argument("--target-rank", metavar="<str>", type=str, default=None)
     opt.add_argument("--derep-rank", metavar="<str>", type=str, default="auto")
+    opt.add_argument("--exclusion-list", metavar="<file>", type=str, dest="exclusion_list", default=None)
 
     # --- Taxonomy Options ---
     opt.add_argument("-D", "--add-gtdb-tax", action="store_true")

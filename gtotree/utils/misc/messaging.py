@@ -355,6 +355,11 @@ def report_missing_mapping_file(path, flag):
     report_early_exit(None, copy_log = False)
 
 
+def report_missing_exclusion_list_file(path, flag):
+    report_message(f'You specified "{path}" as an exclusion list to use (passed to `{flag}`), but that file can\'t be found.')
+    report_early_exit(None, copy_log = False)
+
+
 def report_problem_with_mapping_file(mapping_file_problems, path, flag = "-m"):
     report_message(f'Unfortunately, there were problems detected in the mapping file "{path}" (passed to `{flag}`):\n')
     for problem in mapping_file_problems:
@@ -405,7 +410,17 @@ def _wanted_ref_tax_detail_lines(selection, indent):
         lines.append(f'{indent}- all genomes under the input rank, {rank}, were kept '
                      f'(--derep-rank off)')
 
-    already_had = selection.get("num_selected", 0) - selection.get("num_added", 0)
+    num_excluded = selection.get("num_excluded", 0)
+    if num_excluded > 0:
+        word = "genome" if num_excluded == 1 else "genomes"
+        lines.append(f"{indent}- {num_excluded} selected {word} dropped by the "
+                     f"--exclusion-list")
+
+    # excluded genomes were removed before the merge, so they're neither "added" nor
+    # part of the already-counted overlap; back them out here
+    already_had = (selection.get("num_selected", 0)
+                   - selection.get("num_added", 0)
+                   - num_excluded)
     if already_had > 0:
         # with a repeated `-w`, the overlap can be with a previously-resolved taxon as
         # well as with `-a`, so this stays deliberately vague about which

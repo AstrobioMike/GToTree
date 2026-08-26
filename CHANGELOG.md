@@ -27,6 +27,9 @@ my best to rapidly address anything!
     rank (default `auto`, which uses two ranks finer than the target; `off` keeps them all)
     - this is particularly helpful when trying to make broad-level trees where you don't need 
       a bajillion of the same species
+  - `--exclusion-list` allows you to specify NCBI accessions you definitely don't want included
+    regardless of the `-w`/`--wanted-ref-tax` search (it does not affect accessions you explicitly
+    specified in the file passed to the `-a` parameter)
 
 
 #### More pre-packaged single-copy gene-sets!

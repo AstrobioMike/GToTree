@@ -4,6 +4,8 @@
 
 ### TO DO STILL ###
 
+    # resume functionality testing
+
     # do some benchmarks between gtotree v1 and v2 timing-wise, nothing extensive, just to be able to say it's like X% faster
         # on my altermonas ~90 genomes, v2 is 80 seconds, v1 is 130 (~40% or 1.6x faster)
         # check a larger number of genomes also

@@ -14,6 +14,7 @@ from gtotree.utils.misc.messaging import (color_text,
                                      report_missing_pfam_targets_file,
                                      report_missing_ko_targets_file,
                                      report_missing_mapping_file,
+                                     report_missing_exclusion_list_file,
                                      report_problem_with_mapping_file,
                                      report_notice,
                                      report_run_info_banner,
@@ -35,7 +36,7 @@ from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data
 from gtotree.utils.pfam.get_pfam_data import get_pfam_data
-from gtotree.utils.taxonomy.tax_ranks import RANKS
+from gtotree.utils.taxonomy.tax_ranks import RANKS, accession_core
 from gtotree.utils.taxonomy.tax_select import AmbiguousTaxon, TaxonNotFound
 from gtotree.utils.taxonomy.tax_targets import is_all_target
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
@@ -71,7 +72,8 @@ def preflight_checks(args):
     selections = select_wanted_ref_tax(args, previous_run_data)
     args = resolve_hmm(args, selections, previous_run_data)
     args, run_data = setup_run_data(args, previous_run_data)
-    run_data = merge_wanted_ref_tax(run_data, selections)
+    run_data = merge_wanted_ref_tax(run_data, selections,
+                                    exclusion_list=getattr(args, "exclusion_list", None))
     check_for_genome_id_collisions(run_data)
     check_for_min_input_genomes(run_data)
     run_data = track_tools_used(args, run_data)
@@ -91,6 +93,7 @@ RESUME = ResumeProfile(
         "mapping_file_sha256": "the mapping file (-m)",
         "target_pfams_sha256": "the target Pfams file (-p)",
         "target_kos_sha256": "the target KOs file (-K)",
+        "exclusion_list_sha256": "the exclusion list (--exclusion-list)",
         "hmm": "-H/--hmm",
         "wanted_ref_tax": "-w/--wanted-ref-tax",
         "target_rank": "--target-rank",
@@ -120,6 +123,7 @@ _INPUT_FILE_FIELDS = (
     ("mapping_file_sha256", "mapping_file"),
     ("target_pfams_sha256", "target_pfams_file"),
     ("target_kos_sha256", "target_kos_file"),
+    ("exclusion_list_sha256", "exclusion_list"),
 )
 
 # args that change how the run executes, not what it produces. Listed explicitly
@@ -408,17 +412,51 @@ def select_wanted_ref_tax(args, previous_run_data=None):
     return selections
 
 
-def merge_wanted_ref_tax(run_data, selections):
+def merge_wanted_ref_tax(run_data, selections, exclusion_list=None):
     """
     Fold each `-w` selection's accessions into run_data's NCBI-accession input pool
     (deduping against user-provided accessions, and against each other). The run_data
     half of the job select_wanted_ref_tax() starts.
+
+    `exclusion_list` is an optional path to a single-column file of accessions. Any
+    accession it names is dropped from every `-w` selection BEFORE the selection is
+    merged, so an excluded genome never reaches processing. The exclusion set is
+    applied only to `-w`-selected accessions, not to anything the user provided
+    directly through `-a`. Matching is on the accession core only (ignores GCA/GCF
+    and version suffix)
     """
+    # a resume passes no selections (they were resolved and merged by the original
+    # run); leave the recorded exclusion count from that run untouched
+    if not selections:
+        return run_data
+
+    # keyed by core, empty cores dropped so junk can't match an unrecognized accession
+    excluded_cores = set()
+    if exclusion_list:
+        for entry in read_single_column_file(exclusion_list):
+            core = accession_core(entry)
+            if core:
+                excluded_cores.add(core)
+
+    total_excluded = 0
+
     for selection in selections or []:
-        added = run_data.merge_wanted_ref_tax_accessions(selection.accessions,
+        if excluded_cores:
+            kept = [acc for acc in selection.accessions
+                    if accession_core(acc) not in excluded_cores]
+            num_excluded = len(selection.accessions) - len(kept)
+        else:
+            kept = selection.accessions
+            num_excluded = 0
+        total_excluded += num_excluded
+
+        added = run_data.merge_wanted_ref_tax_accessions(kept,
                                                          taxon=selection.canonical)
         run_data.record_wanted_ref_tax_selection(selection, taxon=selection.canonical,
-                                                 num_added=added)
+                                                 num_added=added,
+                                                 num_excluded=num_excluded)
+
+    run_data.wanted_ref_tax_num_excluded = total_excluded
 
     return run_data
 
@@ -468,6 +506,18 @@ def check_input_genome_files(args):
         args.fasta_files = check_expected_single_column_input(args.fasta_files, "-f")
     if args.amino_acid_files:
         args.amino_acid_files = check_expected_single_column_input(args.amino_acid_files, "-A")
+
+    if getattr(args, "exclusion_list", None):
+        if not args.wanted_ref_tax:
+            report_message(
+                "An `--exclusion-list` was provided, but it only has an effect alongside "
+                "`-w`/`--wanted-ref-tax` (it removes accessions from the references `-w` "
+                "pulls in). Nothing would be excluded, so this is almost certainly a "
+                "mistake."
+            )
+            report_very_early_exit(suggest_help=True)
+        args.exclusion_list = check_expected_single_column_input(
+            args.exclusion_list, "--exclusion-list")
 
     return args
 
@@ -644,6 +694,8 @@ def check_path(path, flag):
             report_missing_ko_targets_file(path, flag)
         if flag == "-m":
             report_missing_mapping_file(path, flag)
+        if flag == "--exclusion-list":
+            report_missing_exclusion_list_file(path, flag)
 
 
 def check_expected_single_column_input(path, flag, get_count=False):

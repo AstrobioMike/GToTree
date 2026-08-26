@@ -113,9 +113,6 @@ def compare_fingerprints(old, new, field_labels, deferred_fields=()):
     Pfam version, say). Those are only compared when *both* sides know them, so a run
     interrupted before that point legitimately has None stored and isn't refused on
     that basis.
-
-    `count_fields` maps a hash field to a companion count field, so a changed genome
-    set can report "12 -> 15" instead of two opaque hashes.
     """
     if not old:
         return ["no previous run state was found"]

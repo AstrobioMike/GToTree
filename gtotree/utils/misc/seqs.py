@@ -83,7 +83,7 @@ def extract_filter_and_rename_cds_amino_acids_from_gb(prefix, input_gb, run_data
             remove_file_if_exists(output_file)
             return False, None, num
         return True, output_file, num
-    except:
+    except Exception:
         remove_file_if_exists(output_file)
         return False, None, num
 
@@ -243,7 +243,7 @@ def run_trimal(inpath, output, log_path):
         with open(log_path, "w") as log_out:
             subprocess.run(cmd, stdout=log_out, stderr=log_out, check=True)
         trimal_failed = False
-    except:
+    except Exception:
         trimal_failed = True
 
     return trimal_failed

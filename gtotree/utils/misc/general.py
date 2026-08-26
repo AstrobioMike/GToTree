@@ -543,6 +543,9 @@ class RunData:
 
     wanted_ref_tax_selections: List[dict] = field(default_factory=list)
 
+    # how many `-w`-selected accessions an `--exclusion-list` removed before merging
+    wanted_ref_tax_num_excluded: int = 0
+
     # dict of the run parameters that affect what this run produces; compared on -R
     # to decide whether resuming is safe. See preflight_checks.build_fingerprint
     fingerprint: dict = field(default_factory=dict)
@@ -653,13 +656,18 @@ class RunData:
             self.update_all_input_genomes()
         return added
 
-    def record_wanted_ref_tax_selection(self, selection, taxon=None, num_added=None):
+    def record_wanted_ref_tax_selection(self, selection, taxon=None, num_added=None,
+                                        num_excluded=0):
         """
         Remember HOW one `-w` selection was made, for the reporting layer
 
         `num_selected` is what the taxonomy core handed back, BEFORE deduping against
         `-a` and against any earlier `-w`, so the difference between it and
         `num_added` is exactly the overlap worth mentioning.
+
+        `num_excluded` is how many of that selection's accessions an `--exclusion-list`
+        removed before the merge, so the reporting can tell excluded genomes apart from
+        ones that were merely already counted.
 
         Appends rather than overwrites: a repeated `-w` produces one entry per taxon,
         in the order they were resolved.
@@ -682,6 +690,7 @@ class RunData:
             "derep_rank": selection.effective_derep_rank,
             "num_selected": len(selection.accessions),
             "num_added": num_added,
+            "num_excluded": num_excluded,
             "warnings": list(getattr(selection, "warnings", []) or []),
         })
 
