@@ -63,6 +63,11 @@ def gtotree_header():
 
 ansi_prefix_pattern = re.compile(r'^(?:\x1B\[[0-9;]*m)+')
 bullet_pattern = re.compile(r'^(?:[-*\u2022]|\d+[.)])\s+')
+ansi_escape_pattern = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+
+
+def strip_ansi(s):
+    return ansi_escape_pattern.sub("", s)
 
 
 def wprint(text, width = 80, ii = "  ", si = "  "):
@@ -134,14 +139,14 @@ class Tee:
     def __init__(self, *files):
         self.files = files
 
-    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+    ansi_escape = ansi_escape_pattern
 
     def write(self, s):
         for f in self.files:
             if hasattr(f, "isatty") and f.isatty():
                 f.write(s)
             else:
-                f.write(self.ansi_escape.sub("", s))
+                f.write(strip_ansi(s))
 
     def flush(self):
         for f in self.files:
@@ -372,12 +377,13 @@ def stdout_and_log(*args, log_file="gtotree-runlog.txt", sep=" ", end="\n\n", fl
     message = sep.join(str(arg) for arg in args) + end
     if not log_only:
         print(message, end="", flush=flush)
+    log_message = strip_ansi(message)
     if restart_log:
         with open(log_file, "w") as f:
-            f.write(message)
+            f.write(log_message)
     else:
         with open(log_file, "a") as f:
-            f.write(message)
+            f.write(log_message)
 
 
 ################################################################################

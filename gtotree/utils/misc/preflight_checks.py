@@ -1046,7 +1046,7 @@ def final_setups(args, run_data):
 
     full_execution_command = f"{' '.join(sys.argv)}"
     stdout_and_log(gtotree_header(), log_file=args.log_file, log_only=True, restart_log=True)
-    stdout_and_log("    Command entered:\n       ", full_execution_command, log_file=args.log_file, log_only=True)
+    stdout_and_log("    Command executed:\n       ", full_execution_command, "\n", log_file=args.log_file, log_only=True)
     stdout_and_log(RUN_INFO_BANNER, log_file=args.log_file, log_only=True,
                    end="\n" * (RUN_INFO_BANNER_TRAILING_BLANKS + 1))
 
