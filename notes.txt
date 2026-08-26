@@ -12,6 +12,17 @@
         # if i want to go crazy, i could benchmark cpu/memory/time like i did for gen-mg
 
 
+# gtotree2 vibrionaceae example
+# mtime gtotree -w Vibrionaceae --exclusion-list vibro-exclusion-list.txt -f vibrio-bins.txt --add-gtdb-tax -L genus,species -j 15 -o vibrio-gtotree
+
+# Time: 1:27:09
+# Mem: 3576.11 MB
+# CPU: 1424%
+
+# gtotree1 vibrionaceae example
+# mtime gtotree -a vibrio-accs.txt -f vibrio-bins.txt -D -L Genus,Species -j 15 -o old-vibrio-gtotree -H Gammaproteobacteria
+
+
 ################################################
 ### other things to do prior to final launch ###
 ################################################
@@ -32,8 +43,9 @@
 # - many more prepackaged SCG sets for differet groups (run `gtt hmms` to see them)
 # - HMM can be auto-selected based on the `--wanted-ref-tax` specification
 # - resume interrupted runs with `--resume`
+# - much fewer printouts while running and more informative progress indicators
 # - all helpers are subcommands under `gtt` now (run `gtt` or `gtt -h` for an overview)
-    # - this includes `gtt update-headers`, allowing you to modify headers of a previously completed run now!
+    # - this includes `gtt update-headers`, allowing you to modify headers of a previously completed run!
 # - itol-compatible annotation files produced automatically for any target KOs/pfams, and for input source (so you can, e.g., easily highlight all your MAGs in a ref tree)
     # `gtt itol` helper exists for creating more itol annotation files
 # - main program callable with lowercase `gtotree` or original `GToTree` now
@@ -106,12 +118,6 @@
         # example output from a run
 
 
-## Use of AI in code development
-    # Anthropic's Claude was frequently used through its web interface (claude.ai) for help on
-    # individual modules, functions, and writing unit tests when converting GToTree v1 to v2.
-    # All AI-assisted code was manually inspected and tested prior to being incorporating into the
-    # codebase.
-
 
 ### """
 # In its first 7 years, the original GToTree received over 700 citations and has been
@@ -127,7 +133,7 @@
 
 #### paper examples
     # new tree of life
-    # vibrionacaea with luxA search/highlighed (K00494)
+    # nifH in Cyanos
 
 
 #### paper discussion
