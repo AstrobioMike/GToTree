@@ -582,7 +582,7 @@ def download_prepackaged_hmm(dest_path, hmm_arg):
     hmm_file = os.path.basename(dest_path)
     target_hmm_url = get_target_hmm_url(hmm_file, hmm_arg)
 
-    print(color_text(f"\n    Downloading the prebuilt \"{hmm_arg}\" HMM set (only needs to be done once)...\n", "yellow"))
+    print(color_text(f"    Downloading the prebuilt \"{hmm_arg}\" HMM set (only needs to be done once)...\n", "yellow"))
 
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
