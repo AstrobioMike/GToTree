@@ -1320,6 +1320,8 @@ def write_table_tsv(table, out_path):
     """
     import pyarrow.csv as pacsv # type: ignore
 
+    table = table.combine_chunks()
+
     tmp = f"{out_path}.part"
     try:
         try:
