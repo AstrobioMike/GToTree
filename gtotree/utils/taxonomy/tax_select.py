@@ -75,15 +75,35 @@ class AmbiguousTaxon(Exception):
             f"specify which rank is wanted")
 
 
+class CrossDomainTaxon(Exception):
+    """
+    The taxon name occurs in more than one domain; caller must disambiguate.
+
+    e.g., `Bacillus` is both a bacterial and eukaryotic genus
+    """
+
+    def __init__(self, taxon, domains_found):
+        self.taxon = taxon
+        self.domains_found = list(domains_found)
+        example = self.domains_found[0] if self.domains_found else "<domain>"
+        super().__init__(
+            f"'{taxon}' occurs in more than one domain "
+            f"({', '.join(self.domains_found)}). Specify which domain is wanted with "
+            f"`--target-domain` (e.g., `--target-domain {example}`).")
+
+
 # ---------------------------------------------------------------------------
 # resolving a user-supplied taxon
 # ---------------------------------------------------------------------------
 
 def find_ranks_for_taxon(path, taxon):
     """
-    Which of the 7 ranks contain `taxon`? Case-insensitive.
-    Returns (canonical_name, [ranks]). Reads one column at a time, so this stays
-    cheap even on the 4M-row NCBI table.
+    Which of the 7 ranks contain `taxon`, and which domains it spans. Case-insensitive.
+
+    Returns (canonical_name, [ranks], [domains]). Reads one column at a time, so this
+    stays cheap even on the 4M-row NCBI table. `domains` is the sorted list of distinct
+    assigned domains the name appears in (across whatever rank(s) it occurs at); it is
+    what lets resolution catch a name shared across domains.
     """
     target = normalize_taxon_name(taxon).lower()
     canonical = None
@@ -98,18 +118,52 @@ def find_ranks_for_taxon(path, taxon):
                 break
     if canonical is None:
         raise TaxonNotFound(f"'{taxon}' doesn't exist at any rank in this source")
-    return canonical, found
+
+    domains = _domains_for_taxon(path, canonical, found)
+    return canonical, found, domains
 
 
-def resolve_taxon(path, taxon, rank=None):
+def _domains_for_taxon(path, canonical, ranks):
     """
-    Resolve a user-supplied taxon (+ optional explicit rank) to (canonical, rank).
+    The sorted distinct assigned domains a resolved taxon appears in.
 
-    Raises AmbiguousTaxon if the name lives at multiple ranks and no rank was
-    given. E.g., a name used as both an order and a family. On the NCBI side a user can
-    sidestep this entirely by passing a taxid for now (though i might remove this; revisit Mike)
+    One filtered scan of the `domain` column per rank the name occupies (usually one).
+    A domain-rank taxon is its own domain, handled without a scan.
     """
-    canonical, found = find_ranks_for_taxon(path, taxon)
+    domain_rank = RANKS[0]
+    domains = set()
+    for rank in ranks:
+        if rank == domain_rank:
+            domains.add(canonical)
+            continue
+        tab = pq.read_table(path, columns=[domain_rank],
+                            filters=[(rank, "=", canonical)])
+        for d in pc.unique(tab.column(domain_rank)).to_pylist():
+            if d and d != NA:
+                domains.add(d)
+    return sorted(domains)
+
+
+def resolve_taxon(path, taxon, rank=None, domain=None):
+    """
+    Resolve a user-supplied taxon (+ optional explicit rank and/or domain) to
+    (canonical, rank, domain).
+
+    Raises AmbiguousTaxon if the name lives at multiple ranks and no `rank` was given
+    (e.g. a name used as both an order and a family).
+
+    Raises CrossDomainTaxon if the name occurs in more than one domain and no `domain`
+    was given (e.g. `Bacillus`, both a bacterial and a eukaryotic genus). Selecting on
+    the bare name would mix domains into one tree.
+
+    `rank` and `domain` are independent disambiguators and may be given together. A
+    `domain` is normalized through the same alias table as `-w` (so 'eukarya' ->
+    'Eukaryota'), and must be one the taxon actually occurs in.
+
+    The returned `domain` is the taxon's sole domain (or the one selected), or None
+    when the taxon has no assigned domain at all (viral/metagenome names).
+    """
+    canonical, found, domains = find_ranks_for_taxon(path, taxon)
 
     if rank:
         r = str(rank).strip().lower()
@@ -117,12 +171,42 @@ def resolve_taxon(path, taxon, rank=None):
         if r not in found:
             raise TaxonNotFound(
                 f"'{canonical}' exists at rank(s) {', '.join(found)}, not '{r}'")
-        return canonical, r
-
-    if len(found) > 1:
+        resolved_rank = r
+    elif len(found) > 1:
         raise AmbiguousTaxon(canonical, found)
+    else:
+        resolved_rank = found[0]
 
-    return canonical, found[0]
+    resolved_domain = _resolve_domain_choice(canonical, domains, domain)
+
+    return canonical, resolved_rank, resolved_domain
+
+
+def _resolve_domain_choice(canonical, domains, domain):
+    """
+    Reconcile the domains a taxon spans with an optional user --target-domain.
+
+    - no --target-domain: sole domain if there's exactly one, None if there are none
+      (domain-less viral/metagenome names), CrossDomainTaxon if there's more than one.
+    - --target-domain given: it must be one the taxon actually occurs in; returns it
+      (as the asset spells it). Aliases are honored via normalize_taxon_name.
+    """
+    if domain is None:
+        if len(domains) > 1:
+            raise CrossDomainTaxon(canonical, domains)
+        return domains[0] if domains else None
+
+    wanted = normalize_taxon_name(domain).strip().lower()
+    for d in domains:
+        if d.lower() == wanted:
+            return d
+    if not domains:
+        raise TaxonNotFound(
+            f"'{canonical}' has no assigned domain, so it can't be scoped with "
+            f"--target-domain.")
+    raise TaxonNotFound(
+        f"'{canonical}' doesn't occur in domain '{domain}'. It occurs in: "
+        f"{', '.join(domains)}.")
 
 
 # ---------------------------------------------------------------------------
@@ -154,12 +238,19 @@ def assigned_mask(col, assigned=True):
 
 
 def select(path, source, rank, taxon, reps_only=False, columns=None,
-           accession_prefixes=None, assembly_levels=None):
+           accession_prefixes=None, assembly_levels=None, domain=None):
     """
     All rows under `taxon` at `rank`. Returns a pyarrow Table
+
+    `domain`, when given, additionally scopes to that domain -- needed when the taxon
+    name is shared across domains (e.g. the genus `Bacillus`) and the caller has
+    resolved which domain is wanted. Ignored when the target rank IS domain (the rank
+    filter already pins it).
     """
     spec = SOURCES[source]
     filters = [(rank, "=", taxon)]
+    if domain and rank != RANKS[0]:
+        filters.append((RANKS[0], "=", domain))
     if reps_only:
         filters.append((spec.rep_filter[0], "=", spec.rep_filter[1]))
     if assembly_levels and spec.level_col:

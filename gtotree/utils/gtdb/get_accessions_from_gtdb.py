@@ -11,6 +11,7 @@ from gtotree.utils.gtdb.get_gtdb_data import (get_gtdb_data, gtdb_data_table_pat
                                               report_gtdb_version_info as _read_gtdb_version_info)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import (TaxonNotFound, AmbiguousTaxon,
+                                               CrossDomainTaxon,
                                                find_ranks_for_taxon as _resolve_ranks)
 from gtotree.utils.taxonomy.tax_derep import select_ref_genomes, select_all_domains
 from gtotree.utils.taxonomy.tax_counts import (representatives_filter, count_genomes,
@@ -176,11 +177,20 @@ def _select_rows(gtdb_path, args, representatives_source):
         selection = select_ref_genomes(
             gtdb_path, "gtdb", args.wanted_ref_tax,
             target_rank=args.target_rank, derep_rank=args.derep_rank,
-            reps_only=reps_only)
+            reps_only=reps_only,
+            target_domain=getattr(args, "target_domain", None))
     except AmbiguousTaxon:
         report_message(f"Since the input taxon '{args.wanted_ref_tax}' occurs at more than 1 rank, "
                         "you'll need to specify which rank is wanted as well before we pull the "
                         "accessions. This can be done with the `-r` parameter.", "yellow",
+                       ii="    ", si="    ", width=100, trailing_newline=True)
+        sys.exit(0)
+    except CrossDomainTaxon as e:
+        report_message(f"The input taxon '{e.taxon}' occurs in more than one domain "
+                       f"({', '.join(e.domains_found)}), so pulling on the name alone "
+                       "would mix genomes from different domains. Specify which domain "
+                       "is wanted with `--target-domain` "
+                       f"(e.g. `--target-domain {e.domains_found[0]}`).", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
     except TaxonNotFound:
@@ -403,7 +413,7 @@ def _report_rank_counts_for_taxon_or_exit(gtdb_path, taxon, representatives_sour
     rep_filter = _rep_filter_for(representatives_source)
 
     try:
-        canonical, ranks_found_in = _resolve_ranks(gtdb_path, taxon)
+        canonical, ranks_found_in, _domains_found = _resolve_ranks(gtdb_path, taxon)
     except TaxonNotFound:
         report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100)
@@ -452,7 +462,7 @@ def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source, args=
 
     # shared resolver: case-insensitive, returns (canonical, [ranks]); raises TaxonNotFound
     try:
-        canonical, ranks_found_in = _resolve_ranks(gtdb_path, taxon)
+        canonical, ranks_found_in, _domains_found = _resolve_ranks(gtdb_path, taxon)
     except TaxonNotFound:
         report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100)

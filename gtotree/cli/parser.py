@@ -70,6 +70,8 @@ def parser():
     opt.add_argument("--source", metavar="<str>", type=str.lower,
                      choices=["gtdb", "ncbi"], default="gtdb")
     opt.add_argument("--target-rank", metavar="<str>", type=str, default=None)
+    opt.add_argument("--target-domain", metavar="<str>", type=str, default=None,
+                     dest="target_domain")
     opt.add_argument("--derep-rank", metavar="<str>", type=str, default="auto")
     opt.add_argument("--exclusion-list", metavar="<file>", type=str, dest="exclusion_list", default=None)
 

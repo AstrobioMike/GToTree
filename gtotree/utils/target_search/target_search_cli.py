@@ -43,7 +43,7 @@ from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
                                      report_phase_header, report_very_early_exit)
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.taxonomy.tax_ranks import RANKS
-from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
+from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import WantedRefTaxError
 from gtotree.utils.misc.general import wanted_ref_tax_list
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
@@ -107,6 +107,7 @@ RESUME = ResumeProfile(
         "source": "--source",
         "wanted_ref_tax": "--wanted-ref-tax",
         "target_rank": "--target-rank",
+        "target_domain": "--target-domain",
         "derep_rank": "--derep-rank",
         "pfam_data_version": "the Pfam database version",
         "ko_data_version": "the KO database version",
@@ -152,6 +153,7 @@ def build_fingerprint(run_data, args, specs, data_versions=None):
         "source": (args.source or "").lower(),
         "wanted_ref_tax": (sorted(wanted_ref_tax_list(args)) or None),
         "target_rank": args.target_rank,
+        "target_domain": getattr(args, "target_domain", None),
         "derep_rank": args.derep_rank,
         "pfam_data_version": data_versions.get("pfam"),
         "ko_data_version": data_versions.get("ko"),
@@ -274,6 +276,16 @@ def build_parser(parent_subparsers=None):
         choices=list(RANKS),
         help=("Target rank, if needed to disambiguate a taxon name that exists at "
               "multiple ranks"),
+        action="store",
+    )
+
+    optional.add_argument(
+        "--target-domain",
+        type=str,
+        dest="target_domain",
+        default=None,
+        help=("Target domain, if needed to disambiguate a taxon name that exists in "
+              "multiple domains (e.g., bacillus is both a bacterial and eukaryotic genus)"),
         action="store",
     )
 
@@ -730,7 +742,7 @@ def main():  # pragma: no cover
     except KeyboardInterrupt:
         print()
         report_very_early_exit("Interrupted by user.", "yellow")
-    except (TaxonNotFound, AmbiguousTaxon, WantedRefTaxError) as e:
+    except (TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon, WantedRefTaxError) as e:
         report_very_early_exit(str(e))
     except OutputDirExistsError as e:
         report_very_early_exit(str(e), "yellow", leading_newline=False)

@@ -40,6 +40,10 @@ _RECORDS = [
     _rec("GCF_000000001.1", ("Bacteria", "Bphy", "Bclass", "Bord", "Bfam", "Bgen", "Bgen sp1")),
     _rec("GCF_000000002.1", ("Archaea", "Aphy", "Aclass", "Aord", "Afam", "Agen", "Agen sp1")),
     _rec("GCF_000000003.1", ("Eukaryota", "Ephy", "Eclass", "Eord", "Efam", "Egen", "Egen sp1")),
+    # 'Xgen' is a genus in BOTH Bacteria and Eukaryota (as `Bacillus` is in the real
+    # asset), so it belongs to no single domain
+    _rec("GCF_000000006.1", ("Bacteria", "Bphy", "Bclass", "Bord", "Bfam", "Xgen", "Xgen sp1")),
+    _rec("GCF_000000007.1", ("Eukaryota", "Ephy", "Eclass", "Eord", "Efam", "Xgen", "Xgen sp2")),
     _rec("GCF_000000004.1", (NA, "Uroviricota", "Caudoviricetes", NA, NA, NA, "phage sp1")),
     _rec("GCF_000000005.1", (NA, "Uroviricota", "Caudoviricetes", NA, NA, NA, "phage sp2")),
 ]

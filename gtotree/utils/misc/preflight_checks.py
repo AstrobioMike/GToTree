@@ -37,7 +37,7 @@ from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data
 from gtotree.utils.pfam.get_pfam_data import get_pfam_data
 from gtotree.utils.taxonomy.tax_ranks import RANKS, accession_core
-from gtotree.utils.taxonomy.tax_select import AmbiguousTaxon, TaxonNotFound
+from gtotree.utils.taxonomy.tax_select import AmbiguousTaxon, TaxonNotFound, CrossDomainTaxon
 from gtotree.utils.taxonomy.tax_targets import is_all_target
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
                                                    expand_wanted_ref_tax,
@@ -97,6 +97,7 @@ RESUME = ResumeProfile(
         "hmm": "-H/--hmm",
         "wanted_ref_tax": "-w/--wanted-ref-tax",
         "target_rank": "--target-rank",
+        "target_domain": "--target-domain",
         "derep_rank": "--derep-rank",
         "source": "--source",
         "add_gtdb_tax": "-D/--add-gtdb-tax",
@@ -393,15 +394,28 @@ def select_wanted_ref_tax(args, previous_run_data=None):
                 _accessions, selection = resolve_wanted_ref_tax_accessions(
                     args.source, taxon,
                     target_rank=args.target_rank, derep_rank=args.derep_rank,
+                    target_domain=getattr(args, "target_domain", None),
                     building_tree=True)
         except AmbiguousTaxon:
             report_message(f"Since the `-w` taxon '{taxon}' occurs at more than "
                            "one rank, you'll need to specify which rank is wanted with "
                            "`--target-rank`.")
             report_very_early_exit(suggest_help=True)
-        except TaxonNotFound:
-            report_message(f"The `-w` taxon '{taxon}' doesn't seem to exist at any "
-                           f"rank in the {args.source} taxonomy :(")
+        except CrossDomainTaxon as err:
+            report_message(f"The `-w` taxon '{taxon}' occurs in more than one domain "
+                           f"({', '.join(err.domains_found)}). Specify which domain is "
+                           "wanted with `--target-domain` "
+                           f"(e.g. `--target-domain {err.domains_found[0]}`).")
+            report_very_early_exit(suggest_help=True)
+        except TaxonNotFound as err:
+            # a bad --target-domain resolves to TaxonNotFound with a specific message;
+            # surface it, else fall back to the generic "doesn't exist" wording
+            detail = str(err)
+            if "domain" in detail:
+                report_message(detail)
+            else:
+                report_message(f"The `-w` taxon '{taxon}' doesn't seem to exist at any "
+                               f"rank in the {args.source} taxonomy :(")
             report_very_early_exit(suggest_help=True)
         except (WantedRefTaxError, ValueError) as err:
             report_message(str(err))

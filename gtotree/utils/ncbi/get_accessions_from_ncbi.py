@@ -12,6 +12,7 @@ from gtotree.utils.ncbi.get_ncbi_assembly_data import (get_ncbi_assembly_data,
                                                        read_date_retrieved)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import (TaxonNotFound, AmbiguousTaxon,
+                                               CrossDomainTaxon,
                                                find_ranks_for_taxon as _resolve_ranks)
 from gtotree.utils.taxonomy.tax_derep import select_ref_genomes, select_all_domains
 from gtotree.utils.taxonomy.tax_counts import (representatives_filter, count_genomes,
@@ -275,7 +276,7 @@ def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_leve
     scope_note = _counts_scope_note(args, assembly_levels)
 
     try:
-        canonical, ranks_found_in = _resolve_ranks(table_path, taxon)
+        canonical, ranks_found_in, _domains_found = _resolve_ranks(table_path, taxon)
     except TaxonNotFound:
         report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
@@ -313,7 +314,7 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
     scope_note = _counts_scope_note(args, assembly_levels)
 
     try:
-        canonical, ranks_found_in = _resolve_ranks(table_path, taxon)
+        canonical, ranks_found_in, _domains_found = _resolve_ranks(table_path, taxon)
     except TaxonNotFound:
         report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
@@ -427,12 +428,21 @@ def _select_rows(table_path, args, assembly_levels=None):
             target_rank=args.target_rank, derep_rank=args.derep_rank,
             reps_only=reps_only,
             accession_prefixes=_source_prefixes(args.source),
-            assembly_levels=assembly_levels)
+            assembly_levels=assembly_levels,
+            target_domain=getattr(args, "target_domain", None))
     except AmbiguousTaxon as e:
         report_message(f"Since the input taxon '{e.taxon}' occurs at more than 1 rank, "
                        "you'll need to specify which rank is wanted as well before we pull the "
                        "accessions. This can be done with the `-r` parameter, or you can try passing "
                        "the NCBI taxid to `-t` instead.", "yellow",
+                       ii="    ", si="    ", width=100, trailing_newline=True)
+        sys.exit(0)
+    except CrossDomainTaxon as e:
+        report_message(f"The input taxon '{e.taxon}' occurs in more than one domain "
+                       f"({', '.join(e.domains_found)}), so pulling on the name alone "
+                       "would mix genomes from different domains. Specify which domain "
+                       "is wanted with `--target-domain` "
+                       f"(e.g. `--target-domain {e.domains_found[0]}`).", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
     except TaxonNotFound:

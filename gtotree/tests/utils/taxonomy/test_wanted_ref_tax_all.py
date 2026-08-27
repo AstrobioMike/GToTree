@@ -66,6 +66,17 @@ def assets(tmp_path, monkeypatch):
                                       "Agen", "Agen sp1")),
         _ncbi_rec("GCF_000000003.1", ("Eukaryota", "Ephy", "Eclass", "Eord", "Efam",
                                       "Egen", "Egen sp1")),
+        # a second eukaryote in the SAME phylum but a different class/order, so a euk
+        # phylum target has >1 class and >1 order to dereplicate across (lets a
+        # phylum-target auto pick differ between one-step (class) and two-step (order))
+        _ncbi_rec("GCF_000000005.1", ("Eukaryota", "Ephy", "Eclass2", "Eord2", "Efam2",
+                                      "Egen2", "Egen2 sp1")),
+        # a genus name shared across domains: 'Xgen' is both a bacterial and a
+        # eukaryotic genus, so `-w Xgen` must NOT be treated as eukaryotic
+        _ncbi_rec("GCF_000000006.1", ("Bacteria", "Bphy", "Bclass", "Bord", "Bfam",
+                                      "Xgen", "Xgen sp1")),
+        _ncbi_rec("GCF_000000007.1", ("Eukaryota", "Ephy", "Eclass", "Eord", "Efam",
+                                      "Xgen", "Xgen sp2")),
         _ncbi_rec("GCF_000000004.1", (NA, "Uroviricota", "Caudoviricetes", NA, NA, NA,
                                       "Phage sp1")),
     ], "assembly_accession", _NCBI_EXTRA)
@@ -144,3 +155,66 @@ class TestSelectionAfterExpansion:
             assert accessions
             assert selection.resolved_rank == "domain"
             assert selection.effective_derep_rank == "class"
+
+
+class TestEukAutoDerepIsCoarser:
+    """
+    Under `auto`, the Eukaryota slice of `-w all --source ncbi` dereplicates one rank
+    coarser (phylum) than the prokaryotic domains (class), because euks are far more
+    genome-heavy per class. The prokaryotic domains are unaffected.
+    """
+
+    def test_eukaryota_auto_resolves_to_phylum(self, assets):
+        _accessions, selection = resolve_wanted_ref_tax_accessions(
+            "ncbi", "Eukaryota", derep_rank="auto")
+        assert selection.resolved_rank == "domain"
+        assert selection.effective_derep_rank == "phylum"
+
+    def test_prokaryotic_domains_auto_still_resolve_to_class(self, assets):
+        for taxon in ("Bacteria", "Archaea"):
+            _accessions, selection = resolve_wanted_ref_tax_accessions(
+                "ncbi", taxon, derep_rank="auto")
+            assert selection.effective_derep_rank == "class"
+
+    def test_explicit_derep_rank_on_eukaryota_is_not_coarsened(self, assets):
+        # a user who explicitly asks for class gets class, euk or not
+        _accessions, selection = resolve_wanted_ref_tax_accessions(
+            "ncbi", "Eukaryota", derep_rank="class")
+        assert selection.effective_derep_rank == "class"
+
+    def test_eukaryotic_phylum_target_is_coarsened_one_step(self, assets):
+        # a euk phylum target -> class (one finer), not order (two finer)
+        _accessions, selection = resolve_wanted_ref_tax_accessions(
+            "ncbi", "Ephy", derep_rank="auto")
+        assert selection.resolved_rank == "phylum"
+        assert selection.effective_derep_rank == "class"
+
+    def test_eukaryotic_class_target_is_coarsened_one_step(self, assets):
+        # a euk class target -> order (one finer), not family (two finer)
+        _accessions, selection = resolve_wanted_ref_tax_accessions(
+            "ncbi", "Eclass", derep_rank="auto")
+        assert selection.resolved_rank == "class"
+        assert selection.effective_derep_rank == "order"
+
+    def test_a_name_spanning_domains_is_refused_at_the_driver(self, assets):
+        """
+        'Xgen' is a genus in BOTH Bacteria and Eukaryota (as `Bacillus` is in the real
+        asset). Resolving it without --target-domain must raise rather than silently
+        mixing domains into one selection.
+        """
+        from gtotree.utils.taxonomy.tax_select import CrossDomainTaxon
+        with pytest.raises(CrossDomainTaxon):
+            resolve_wanted_ref_tax_accessions("ncbi", "Xgen", derep_rank="auto")
+
+    def test_target_domain_disambiguates_at_the_driver(self, assets):
+        # picking the eukaryotic side scopes selection and gets the euk derep rule
+        _accessions, selection = resolve_wanted_ref_tax_accessions(
+            "ncbi", "Xgen", derep_rank="auto", target_domain="eukarya")
+        assert selection.resolved_rank == "genus"
+        assert {r.get("domain") for r in selection.rows} == {"Eukaryota"}
+
+    def test_a_prokaryotic_class_target_keeps_two_step(self, assets):
+        _accessions, selection = resolve_wanted_ref_tax_accessions(
+            "ncbi", "Bclass", derep_rank="auto")
+        assert selection.resolved_rank == "class"
+        assert selection.effective_derep_rank == "family"

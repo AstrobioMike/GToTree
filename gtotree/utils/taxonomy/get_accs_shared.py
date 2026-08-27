@@ -189,12 +189,23 @@ def derep_note(pool, rank, taxon, derep_rank):
 
 
 def all_derep_size(pool, derep_rank):
-    """How many genomes a `<taxon_flag> all --derep-rank X` pull would return."""
-    effective, _warnings = resolve_derep_rank(RANKS[0], derep_rank)
-    if effective is None:
-        return pool.count_genomes(domain_assigned=True)
-    return sum(pool.derep_size(RANKS[0], domain, effective)
-               for domain in pool.domains())
+    """
+    How many genomes a `<taxon_flag> all --derep-rank X` pull would return.
+
+    The effective rank is resolved PER DOMAIN, because `auto` is domain-aware:
+    Eukaryota dereplicates one rank coarser than the prokaryotic domains, so a single
+    asset-wide rank would over- or under-count it. An explicit --derep-rank resolves
+    to the same rank for every domain, so this still matches that case exactly.
+    """
+    total = 0
+    for domain in pool.domains():
+        effective, _warnings = resolve_derep_rank(RANKS[0], derep_rank, domain=domain)
+        if effective is None:
+            total += pool.count_genomes(rank=RANKS[0], taxon=domain,
+                                        domain_assigned=True)
+        else:
+            total += pool.derep_size(RANKS[0], domain, effective)
+    return total
 
 
 def scoped_counts_note(taxon_flag="-w"):
@@ -222,6 +233,15 @@ def add_common_get_accs_args(required, optional, source_label,
         choices=list(RANKS),
         help=("Target rank (if needed to disambiguate a taxon name that exists at "
               "multiple ranks)"),
+        action="store",
+    )
+
+    optional.add_argument(
+        "--target-domain",
+        dest="target_domain",
+        default=None,
+        help=("Target domain (if needed to disambiguate a taxon name that exists in "
+              "multiple domains, e.g., bacillus is both a bacterial and eukaryotic genus)"),
         action="store",
     )
 

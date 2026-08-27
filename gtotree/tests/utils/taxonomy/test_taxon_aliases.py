@@ -61,12 +61,14 @@ class TestAliasesResolveAgainstTheAsset:
 
     @pytest.mark.parametrize("spelling", ["eukarya", "eukaryotes"])
     def test_aliases_resolve_to_the_canonical_asset_name(self, ncbi_path, spelling):
-        assert resolve_taxon(ncbi_path, spelling) == ("Eukaryota", "domain")
+        # resolve_taxon now also returns the resolved domain (Eukaryota is its own)
+        assert resolve_taxon(ncbi_path, spelling) == ("Eukaryota", "domain", "Eukaryota")
 
     def test_find_ranks_returns_the_assets_spelling_not_the_users(self, ncbi_path):
-        canonical, ranks = find_ranks_for_taxon(ncbi_path, "eukarya")
+        canonical, ranks, domains = find_ranks_for_taxon(ncbi_path, "eukarya")
         assert canonical == "Eukaryota"
         assert ranks == ["domain"]
+        assert domains == ["Eukaryota"]
 
     def test_an_alias_for_something_absent_still_fails_cleanly(self, tmp_path):
         """

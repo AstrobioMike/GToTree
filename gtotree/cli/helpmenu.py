@@ -188,6 +188,14 @@ ENTRIES = [
          """,
          FULL),
 
+        ("--target-domain <str>",
+         "domain of the `-w` taxon; default: auto-detected",
+         """
+         Only needed to disambiguate if the `-w` target taxon name occurs in more
+         than one domain.
+         """,
+         FULL),
+
         ("--derep-rank <str>",
          "dereplicate to one genome per rank; default: auto",
          """

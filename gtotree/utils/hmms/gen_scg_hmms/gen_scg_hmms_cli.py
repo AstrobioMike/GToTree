@@ -44,7 +44,7 @@ from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
                                      REMOVED_GENOMES_FILENAME)
 from gtotree.utils.misc.data_locations import ensure_reference_data
 from gtotree.utils.taxonomy.tax_ranks import RANKS
-from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon
+from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import WantedRefTaxError
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
     GenSCGHMMsError,
@@ -99,6 +99,7 @@ RESUME = ResumeProfile(
         "source": "--source",
         "wanted_ref_tax": "--wanted-ref-tax",
         "target_rank": "--target-rank",
+        "target_domain": "--target-domain",
         "derep_rank": "--derep-rank",
         "min_completeness": "--min-completeness",
         "max_contamination": "--max-contamination",
@@ -137,6 +138,7 @@ def build_fingerprint(run_data, args, pfam_version=None):
         "source": (args.source or "").upper(),
         "wanted_ref_tax": (sorted(wanted_ref_tax_list(args)) or None),
         "target_rank": args.target_rank,
+        "target_domain": getattr(args, "target_domain", None),
         "derep_rank": args.derep_rank,
         "min_completeness": args.min_completeness,
         "max_contamination": args.max_contamination,
@@ -232,6 +234,16 @@ def build_parser(parent_subparsers=None):
         choices=list(RANKS),
         help=("Target rank, if needed to disambiguate a taxon name that exists at "
               "multiple ranks"),
+        action="store",
+    )
+
+    optional.add_argument(
+        "--target-domain",
+        type=str,
+        dest="target_domain",
+        default=None,
+        help=("Target domain, if needed to disambiguate a taxon name that exists in "
+              "multiple domains (e.g., bacillus is both a bacterial and eukaryotic genus)"),
         action="store",
     )
 
@@ -991,7 +1003,7 @@ def main():  # pragma: no cover
     except KeyboardInterrupt:
         print()
         report_very_early_exit("Interrupted by user.", "yellow")
-    except (TaxonNotFound, AmbiguousTaxon, WantedRefTaxError) as e:
+    except (TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon, WantedRefTaxError) as e:
         report_very_early_exit(str(e))
     except OutputDirExistsError as e:
         report_very_early_exit(str(e), "yellow", leading_newline=False)

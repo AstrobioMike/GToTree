@@ -70,7 +70,8 @@ def describe_source_version(source):
 
 def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
                                       derep_rank="auto", min_completeness=None,
-                                      max_contamination=None, building_tree=False):
+                                      max_contamination=None, target_domain=None,
+                                      building_tree=False):
     """
     Resolve `-w <taxon>` to a list of assembly accessions plus the RefGenomeSelection
     it came from (for warnings / provenance the caller may want to surface).
@@ -91,6 +92,10 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
     max_contamination : float or None
         --max-contamination; drops candidates above this checkm contamination before
         selection. None (the default) means no ceiling.
+    target_domain : str or None
+        --target-domain; disambiguates a name shared across domains (e.g. `Bacillus`).
+        Without it such a name raises CrossDomainTaxon. Also scopes selection to that
+        domain and drives the domain-aware `auto` derep step.
     building_tree : bool
         Whether the selected genomes become a tree. Only the main GToTree driver sets
         this; `gtt gen-scg-hmms` and `gtt search-annotations` share this
@@ -105,7 +110,7 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
     ------
     WantedRefTaxError
         Unknown source, or the selection produced no accessions.
-    TaxonNotFound, AmbiguousTaxon, ValueError
+    TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon, ValueError
         Propagated from the taxonomy core for the CLI layer to translate.
     """
 
@@ -119,7 +124,8 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
         target_rank=target_rank, derep_rank=derep_rank,
         screen_against=screen_against,
         min_completeness=min_completeness,
-        max_contamination=max_contamination)
+        max_contamination=max_contamination,
+        target_domain=target_domain)
 
     if not selection.accessions:
         detail = ""

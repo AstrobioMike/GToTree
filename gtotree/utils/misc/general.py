@@ -899,7 +899,8 @@ def resolve_input_genomes(args, run_data, error_cls):
                     target_rank=args.target_rank,
                     derep_rank=args.derep_rank,
                     min_completeness=getattr(args, "min_completeness", None),
-                    max_contamination=getattr(args, "max_contamination", None))
+                    max_contamination=getattr(args, "max_contamination", None),
+                    target_domain=getattr(args, "target_domain", None))
 
             added = run_data.merge_wanted_ref_tax_accessions(
                 accessions, taxon=selection.canonical)
