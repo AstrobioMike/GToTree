@@ -23,15 +23,32 @@
 # Mem: 3576.11 MB
 # CPU: 1424%
 
-# gtotree1 vibrionaceae example (oops, old gammaproteobacteria HMMs, so it had more genes in it (like 170 vs 108))
-# mtime gtotree -a vibrio-accs.txt -f vibrio-bins.txt -D -L Genus,Species -j 15 -o old-vibrio-gtotree -H Gammaproteobacteria
-
-# Time: 3:26:23
-# Mem: 4823.00 MB
-# CPU: 1378%
-
 # gtotree v1 with the same HMM targets
-# mtime gtotree -a vibrio-accs.txt -f vibrio-bins.txt -D -L Genus,Species -j 15 -o old-vibrio-gtotree -H /Users/michael.lee/miniconda3/envs/gtotree-dev/share/gtotree/hmm_sets/Gammaproteobacteria.hmm
+# mtime GToTree -a vibrio-accs.txt -f vibrio-bins.txt -D -L Genus,Species -j 15 -o old-vibrio-gtotree -H /Users/michael.lee/miniconda3/envs/gtotree-dev/share/gtotree/hmm_sets/Gammaproteobacteria.hmm
+# Time: 1:58:13
+# Mem: 3463.40 MB
+# CPU: 1337%
+
+
+# gtotree2 alteromonas example (~80 genomes; ~100 target genes -> gammaproteo set)
+# mtime gtotree -w alteromonas -o alteromonas-v2 -F -j 15
+
+# Time: 3:35.28
+# Mem: 2118.34 MB
+# CPU: 1178%
+
+# gtotree v1 alteromonas test (with the same HMM targets)
+# mtime GToTree -a alteromonas-accs.txt -o alteromonas-v1 -F -j 15 -H /Users/michael.lee/miniconda3/envs/gtotree-dev/share/gtotree/hmm_sets/Gammaproteobacteria.hmm
+# Time: 9:30.24
+# Mem: 1297.80 MB
+# CPU: 1121%
+
+
+# gtotree2 ToL example (defaults to --derep-rank class, which was 493 genomes, i might try a --derep-rank order example too)
+# gtotree -w all --source ncbi -j 15 -o tol-v2
+
+
+
 
 
 ################################################
