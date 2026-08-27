@@ -290,20 +290,19 @@ Here is an example of one way you might do this with [iqtree](http://www.iqtree.
 
 ```bash
 iqtree -s alteromonas-example/aligned-SCGs-mod-names.faa \
-       -spp alteromonas-example/run-files/partitions.txt \
+       -spp alteromonas-example/run-files/partitions.nex \
        -m MFP -bb 1000 -nt 4 -pre iqtree-out
 ```
 
 > **Code Breakdown:**
 >  * **-s** – the alignment file we got from GToTree  
 >  * **-spp** – the partitions file we got from GToTree  
->    * note that sometimes the txt-formatted partitions file [won't work with iqtree](https://github.com/AstrobioMike/GToTree/issues/108), but you can use the nex-formatted file (`partitions.nex`) that is produced in the same location  
 >  * **-m** – telling iqtree to use model finder plus to select the model  
 >  * **-bb** – number of ["ultrafast" bootstraps](http://www.iqtree.org/doc/Tutorial#assessing-branch-supports-with-ultrafast-bootstrap-approximation) we want  
 >  * **-nt** – number of threads we want to use  
 >  * **-pre** – the prefix of the output files generated  
 
-> If the run added taxonomy or used a mapping file, the alignment with the nicer labels is `aligned-SCGs-mod-names.faa`; otherwise use `aligned-SCGs.faa`.
+> If the run added taxonomy or used a mapping file, the alignment with the modified labels is `aligned-SCGs-mod-names.faa`, while `aligned-SCGs.faa` is the original.
 
 ---
 ---

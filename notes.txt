@@ -6,6 +6,10 @@
 
     # resume functionality testing
 
+
+    # iqtree partitions file test
+
+
     # do some benchmarks between gtotree v1 and v2 timing-wise, nothing extensive, just to be able to say it's like X% faster
         # on my altermonas ~90 genomes, v2 is 80 seconds, v1 is 130 (~40% or 1.6x faster)
         # check a larger number of genomes also
@@ -19,8 +23,15 @@
 # Mem: 3576.11 MB
 # CPU: 1424%
 
-# gtotree1 vibrionaceae example
+# gtotree1 vibrionaceae example (oops, old gammaproteobacteria HMMs, so it had more genes in it (like 170 vs 108))
 # mtime gtotree -a vibrio-accs.txt -f vibrio-bins.txt -D -L Genus,Species -j 15 -o old-vibrio-gtotree -H Gammaproteobacteria
+
+# Time: 3:26:23
+# Mem: 4823.00 MB
+# CPU: 1378%
+
+# gtotree v1 with the same HMM targets
+# mtime gtotree -a vibrio-accs.txt -f vibrio-bins.txt -D -L Genus,Species -j 15 -o old-vibrio-gtotree -H /Users/michael.lee/miniconda3/envs/gtotree-dev/share/gtotree/hmm_sets/Gammaproteobacteria.hmm
 
 
 ################################################

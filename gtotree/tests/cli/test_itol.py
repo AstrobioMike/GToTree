@@ -478,11 +478,16 @@ def test_a_file_is_written_for_every_source_present(tmp_path):
 
     assert len(written) == 5
     assert sorted(os.listdir(itol_dir)) == [
-        "amino-acid-fasta-itol.txt",
-        "genbank-file-itol.txt",
-        "ncbi-accession-itol.txt",
-        "nucleotide-fasta-itol.txt",
-        "wanted-ref-tax-itol.txt",
+        "amino-acid-fasta-branches-itol.txt",
+        "amino-acid-fasta-symbols-itol.txt",
+        "genbank-file-branches-itol.txt",
+        "genbank-file-symbols-itol.txt",
+        "ncbi-accession-branches-itol.txt",
+        "ncbi-accession-symbols-itol.txt",
+        "nucleotide-fasta-branches-itol.txt",
+        "nucleotide-fasta-symbols-itol.txt",
+        "wanted-ref-tax-branches-itol.txt",
+        "wanted-ref-tax-symbols-itol.txt",
     ]
 
 
@@ -496,7 +501,7 @@ def test_wanted_ref_tax_file_is_slugged_not_named_after_its_label(tmp_path):
     summary, itol_dir = _summary(tmp_path, ALL_FIVE)
     generate_input_source_itol_files(summary, itol_dir)
 
-    text = open(os.path.join(itol_dir, "wanted-ref-tax-itol.txt")).read()
+    text = open(os.path.join(itol_dir, "wanted-ref-tax-branches-itol.txt")).read()
     assert "DATASET_LABEL\tncbi-accession (via -w)\n" in text
 
 
@@ -507,8 +512,26 @@ def test_nucleotide_fasta_uses_the_same_blue_as_the_search_files(tmp_path):
     summary, itol_dir = _summary(tmp_path, ALL_FIVE)
     generate_input_source_itol_files(summary, itol_dir)
 
-    text = open(os.path.join(itol_dir, "nucleotide-fasta-itol.txt")).read()
+    text = open(os.path.join(itol_dir, "nucleotide-fasta-branches-itol.txt")).read()
     assert f"COLOR\t{ITOL_COLOR}\n" in text
+
+
+def test_symbols_file_is_a_binary_dataset(tmp_path):
+    """The `-symbols-` counterpart is a DATASET_BINARY of filled squares."""
+    from gtotree.utils.misc.itol import generate_input_source_itol_files
+
+    summary, itol_dir = _summary(tmp_path, ALL_FIVE)
+    generate_input_source_itol_files(summary, itol_dir)
+
+    branches = open(
+        os.path.join(itol_dir, "nucleotide-fasta-branches-itol.txt")).read()
+    symbols = open(
+        os.path.join(itol_dir, "nucleotide-fasta-symbols-itol.txt")).read()
+
+    assert branches.startswith("DATASET_STYLE\n")
+    assert symbols.startswith("DATASET_BINARY\n")
+    assert "FIELD_SHAPES\t1\n" in symbols   # 1 == filled square
+    assert "Nuc_1\t1\n" in symbols
 
 
 def test_every_source_file_gets_its_own_color(tmp_path):
@@ -532,7 +555,7 @@ def test_source_files_skip_genomes_not_in_the_tree(tmp_path):
     summary, itol_dir = _summary(tmp_path, MIXED)
     generate_input_source_itol_files(summary, itol_dir)
 
-    text = open(os.path.join(itol_dir, "nucleotide-fasta-itol.txt")).read()
+    text = open(os.path.join(itol_dir, "nucleotide-fasta-branches-itol.txt")).read()
     assert "My_MAG_01" in text
     assert "My_MAG_02" not in text
 
@@ -559,3 +582,61 @@ def test_no_source_files_without_a_summary_table(tmp_path):
 
     assert generate_input_source_itol_files(
         str(tmp_path / "nope.tsv"), str(tmp_path / "out")) == []
+
+
+################################################################################
+# per-target search files (Pfam/KO): a -branches- and a -symbols- pair
+################################################################################
+
+# genome_id, total_gene_count, then one column per target. g2 is kept out of the
+# tree by the summary below, so its PF00002 hit must not reach any file.
+_COUNTS = ("genome_id\ttotal_gene_count\tPF00001\tPF00002\tPF00003\n"
+           "g1\t3000\t1\t0\t2\n"
+           "g2\t3100\t0\t4\t0\n"
+           "g3\t2900\t0\t0\t0\n")
+
+# g1,g3 in tree; g2 removed. No header swap (label == genome_id).
+_SEARCH_SUMMARY = ("g1\tg1.fa\tnucleotide-fasta\tg1\tNA\tYes\tNA\n"
+                   "g2\tg2.fa\tnucleotide-fasta\tg2\tNA\tNo\ttoo few SCG hits\n"
+                   "g3\tg3.fa\tnucleotide-fasta\tg3\tNA\tYes\tNA\n")
+
+
+def _search_inputs(tmp_path):
+    summary, itol_dir = _summary(tmp_path, _SEARCH_SUMMARY)
+    counts = tmp_path / "run" / "pfam-hit-counts.tsv"
+    counts.write_text(_COUNTS)
+    return str(counts), summary, itol_dir
+
+
+def test_search_writes_a_branches_and_symbols_pair_per_hit_target(tmp_path):
+    from gtotree.utils.misc.itol import generate_search_itol_files
+
+    counts, summary, itol_dir = _search_inputs(tmp_path)
+    written = generate_search_itol_files(counts, summary, itol_dir)
+
+    # PF00003 has a hit (g1); PF00001 has a hit (g1); PF00002's only hit (g2) is
+    # not in the tree, so it gets no files and isn't reported as written.
+    assert sorted(written) == ["PF00001", "PF00003"]
+    assert sorted(os.listdir(itol_dir)) == [
+        "PF00001-branches-itol.txt",
+        "PF00001-symbols-itol.txt",
+        "PF00003-branches-itol.txt",
+        "PF00003-symbols-itol.txt",
+    ]
+
+
+def test_search_branches_is_style_and_symbols_is_binary(tmp_path):
+    from gtotree.utils.misc.itol import generate_search_itol_files
+
+    counts, summary, itol_dir = _search_inputs(tmp_path)
+    generate_search_itol_files(counts, summary, itol_dir)
+
+    branches = open(os.path.join(itol_dir, "PF00001-branches-itol.txt")).read()
+    symbols = open(os.path.join(itol_dir, "PF00001-symbols-itol.txt")).read()
+
+    assert branches.startswith("DATASET_STYLE\n")
+    assert symbols.startswith("DATASET_BINARY\n")
+    # only g1 hit PF00001 and is in the tree; g2/g3 must be absent from both
+    assert "g1\t1\n" in symbols
+    assert "g2" not in symbols and "g3" not in symbols
+    assert "g1\tbranch" in branches

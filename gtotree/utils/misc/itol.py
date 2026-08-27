@@ -376,14 +376,16 @@ def _read_summary(summary_path):
 
 def generate_search_itol_files(counts_path, summary_path, itol_dir):
     """
-    Generate one DATASET_STYLE iToL file per target that has >=1 hit among
-    genomes retained in the final tree.
+    For each target with >=1 hit among genomes retained in the final tree,
+    generate a pair of iToL files: a DATASET_STYLE (`-branches-`) coloring the
+    branches, and a DATASET_BINARY (`-symbols-`) placing a filled square at each
+    hit genome.
 
     counts_path : path to {pfam,ko}-hit-counts.tsv
     summary_path: path to genomes-summary-info.tsv
     itol_dir    : output directory for the iToL files (created if needed)
 
-    Returns the list of targets for which a file was written.
+    Returns the list of targets for which files were written.
     """
     if not (os.path.isfile(counts_path) and os.path.isfile(summary_path)):
         return []
@@ -405,10 +407,13 @@ def generate_search_itol_files(counts_path, summary_path, itol_dir):
         if not leaf_ids:
             continue
 
-        out_path = os.path.join(itol_dir, f"{target}-itol.txt")
-        write_style_dataset(out_path, leaf_ids, label=target, color=ITOL_COLOR,
-                            what_to_color="branches",
-                            line_weight=SEARCH_STYLE_LINE_WEIGHT)
+        write_style_dataset(
+            os.path.join(itol_dir, f"{target}-branches-itol.txt"), leaf_ids,
+            label=target, color=ITOL_COLOR, what_to_color="branches",
+            line_weight=SEARCH_STYLE_LINE_WEIGHT)
+        write_binary_dataset(
+            os.path.join(itol_dir, f"{target}-symbols-itol.txt"), leaf_ids,
+            label=target, color=ITOL_COLOR, shape="square")
         written.append(target)
 
     return written
@@ -456,9 +461,12 @@ def generate_input_source_itol_files(summary_path, itol_dir):
         color, slug = SOURCE_FILE_SPECS[source]
         labels = list(in_tree.loc[in_tree["source"] == source, "label"])
 
-        write_style_dataset(os.path.join(itol_dir, f"{slug}-itol.txt"), labels,
-                            label=source, color=color, what_to_color="branches",
+        write_style_dataset(os.path.join(itol_dir, f"{slug}-branches-itol.txt"),
+                            labels, label=source, color=color,
+                            what_to_color="branches",
                             line_weight=SEARCH_STYLE_LINE_WEIGHT)
+        write_binary_dataset(os.path.join(itol_dir, f"{slug}-symbols-itol.txt"),
+                             labels, label=source, color=color, shape="square")
         written.append(source)
 
     return written
