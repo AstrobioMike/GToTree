@@ -858,7 +858,7 @@ def wanted_ref_tax_source_line(source):
     if not source_desc:
         return None
 
-    return (f"      Genome source being used for `-w` input: "
+    return (f"    Genome source being used for `-w` input: "
             f"{color_text(source_desc, 'green')}")
 
 

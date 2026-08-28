@@ -7,7 +7,7 @@
     # resume functionality testing
 
     # do some benchmarks between gtotree v1 and v2 timing-wise, nothing extensive, just to be able to say it's like X% faster
-        # on my altermonas ~90 genomes, v2 is 80 seconds, v1 is 130 (~40% or 1.6x faster)
+        # on my altermonas ~90 genomes, v2 is XX minutes, v1 is YY minutes (~40% or 1.6x faster)
         # check a larger number of genomes also
         # if i want to go crazy, i could benchmark cpu/memory/time like i did for gen-mg
 
@@ -40,17 +40,33 @@
 # CPU: 1121%
 
 
+
 # gtotree2 ToL example (defaults to --derep-rank class, which was 493 genomes, i might try a --derep-rank order example too)
-# mtime gtotree -w all --source ncbi -j 15 -o tol-v2 -G 0.4
-# Time: 1:12:30
-# Mem: 4110.87 MB
-# CPU: 109%
+# mtime gtotree -w all --source ncbi -j 15 -o tol-v2 -G 0.3
+# Time: 1:00:00
+# Mem: 4069.82 MB
+# CPU: 152%
 
 # gtotree v1 ToL example
-# mtime GToTree -a tol-accs.txt -H Universal -j 15 -o tol-v1 -F -G 0.4
-# Time: 32:22.35
-# Mem: 919.02 MB
-# CPU: 336%
+# mtime GToTree -a tol-accs.txt -H Universal -j 15 -o tol-v1 -F -G 0.3
+# Time: 1:02:30
+# Mem: 919.53 MB
+# CPU: 192%
+
+
+
+# gtotree2 bacteria/archaea example (630 out of 645 genomes; 16 target genes)
+# mtime gtotree -w all -j 15 -o ba-v2 -H Universal -G 0.4
+# Time: 9:50.88
+# Mem: 1832.98 MB
+# CPU: 989%
+
+
+# gtotree v1 bacteria/archaea example (630 out of 645 genomes; 16 target genes)
+# tail -n +2 ba-v2/genomes-summary-info.tsv | cut -f 1 > ba-accs.txt
+# mtime GToTree -a ba-accs.txt -o ba-v1 -H /Users/michael.lee/miniconda3/envs/gtotree-dev/share/gtotree/hmm_sets/Universal-Hug-et-al.hmm -G 0.4
+
+
 
 
 
