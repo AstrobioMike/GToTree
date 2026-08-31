@@ -241,7 +241,7 @@ def add_common_get_accs_args(required, optional, source_label,
         dest="target_domain",
         default=None,
         help=("Target domain (if needed to disambiguate a taxon name that exists in "
-              "multiple domains, e.g., bacillus is both a bacterial and eukaryotic genus)"),
+              "multiple domains)"),
         action="store",
     )
 

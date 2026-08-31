@@ -56,16 +56,25 @@
 
 
 # gtotree2 bacteria/archaea example (630 out of 645 genomes; 16 target genes)
-# mtime gtotree -w all -j 15 -o ba-v2 -H Universal -G 0.4
+# mtime gtotree -w all -j 15 -o ba-v2 -H Universal -G 0.4 -F
 # Time: 9:50.88
 # Mem: 1832.98 MB
 # CPU: 989%
 
+# Time: 9:25.32
+# Mem: 1888.24 MB
+# CPU: 1039%
 
 # gtotree v1 bacteria/archaea example (630 out of 645 genomes; 16 target genes)
 # tail -n +2 ba-v2/genomes-summary-info.tsv | cut -f 1 > ba-accs.txt
-# mtime GToTree -a ba-accs.txt -o ba-v1 -H /Users/michael.lee/miniconda3/envs/gtotree-dev/share/gtotree/hmm_sets/Universal-Hug-et-al.hmm -G 0.4
+# mtime GToTree -a ba-accs.txt -j 15 -o ba-v1 -H /Users/michael.lee/miniconda3/envs/gtotree-dev/share/gtotree/hmm_sets/Universal-Hug-et-al.hmm -G 0.4 -F
+# Time: 38:27.30
+# Mem: 3054.53 MB
+# CPU: 1264%
 
+# Time: 38:09.65
+# Mem: 3055.00 MB
+# CPU: 1278%
 
 
 

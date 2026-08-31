@@ -413,11 +413,12 @@ def swap_labels_in_alignment(run_data):
 def copy_gene_alignments(run_data):
 
     all_SCG_targets = run_data.get_all_SCG_targets_remaining()
+    ext = run_data.general_ext
 
     for SCG in all_SCG_targets:
 
-        source_path = os.path.join(run_data.found_SCG_seqs_dir, f"{SCG.id}-final.fasta")
-        dest_path = os.path.join(run_data.individual_gene_alignments_dir, f"{SCG.id}-aligned.fasta")
+        source_path = os.path.join(run_data.found_SCG_seqs_dir, f"{SCG.id}-final{ext}")
+        dest_path = os.path.join(run_data.individual_gene_alignments_dir, f"{SCG.id}-aligned{ext}")
         if os.path.exists(source_path):
             shutil.copyfile(source_path, dest_path)
 
