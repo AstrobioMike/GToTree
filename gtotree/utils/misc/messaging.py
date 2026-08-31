@@ -734,7 +734,7 @@ def absurd_number_of_genomes_notice(total_input_genomes):
 def report_processing_stage(stage, run_data):
 
     stages_dict = {
-        "ncbi":                        "PROCESSING THE GENOMES PROVIDED AS NCBI ACCESSIONS",
+        "ncbi":                        "PROCESSING THE GENOMES BEING RETRIEVED FROM NCBI",
         "genbank":                     "PROCESSING THE GENOMES PROVIDED AS GENBANK FILES",
         "fasta":                       "PROCESSING THE GENOMES PROVIDED AS FASTA FILES",
         "amino-acid":                  "PROCESSING THE GENOMES PROVIDED AS AMINO-ACID FILES",
