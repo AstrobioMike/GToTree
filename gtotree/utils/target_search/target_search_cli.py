@@ -105,6 +105,7 @@ RESUME = ResumeProfile(
         "pfam_targets_sha256": "the list of target Pfams",
         "ko_targets_sha256": "the list of target KOs",
         "source": "--source",
+        "ncbi_section": "--ncbi-section",
         "wanted_ref_tax": "--wanted-ref-tax",
         "target_rank": "--target-rank",
         "target_domain": "--target-domain",
@@ -151,6 +152,7 @@ def build_fingerprint(run_data, args, specs, data_versions=None):
         "pfam_targets_sha256": hash_file_contents(pfam_spec.targets_file(args)),
         "ko_targets_sha256": hash_file_contents(ko_spec.targets_file(args)),
         "source": (args.source or "").lower(),
+        "ncbi_section": (getattr(args, "ncbi_section", None) or "").lower(),
         "wanted_ref_tax": (sorted(wanted_ref_tax_list(args)) or None),
         "target_rank": args.target_rank,
         "target_domain": getattr(args, "target_domain", None),
@@ -267,6 +269,18 @@ def build_parser(parent_subparsers=None):
         choices=["gtdb", "ncbi"],
         help=("Which taxonomy source to select `--wanted-ref-tax` genomes from "
               "(default: gtdb)"),
+        action="store",
+    )
+
+    optional.add_argument(
+        "--ncbi-section",
+        dest="ncbi_section",
+        type=str.lower,
+        default="both",
+        choices=["refseq", "genbank", "both"],
+        help=("Which section of NCBI to draw `--wanted-ref-tax` genomes from "
+              "(default: both). The default of 'both' is typically fine with the "
+              "default `--derep-rank auto`. Ignored with `--source gtdb`."),
         action="store",
     )
 

@@ -5,6 +5,7 @@ from gtotree.cli.common import add_help, add_version_arg, CustomRichHelpFormatte
 
 
 SUBCOMMAND_MAP = {
+    "dl-ncbi-assemblies":  "gtotree.utils.ncbi.dl_ncbi_assemblies",
     "get-accs-from-gtdb":  "gtotree.utils.gtdb.get_accessions_from_gtdb",
     "get-accs-from-ncbi":  "gtotree.utils.ncbi.get_accessions_from_ncbi",
     "hmms":                "gtotree.utils.hmms.gtt_hmms",
@@ -22,6 +23,10 @@ PROGRAM_GROUPS = [
     {
         "title": "NCBI/GTDB-related",
         "programs": [
+            {
+                "name": "dl-ncbi-assemblies",
+                "desc": "download NCBI assemblies by GTDB/NCBI taxonomy or accession",
+            },
             {
                 "name": "get-accs-from-gtdb",
                 "desc": "search GTDB by taxonomy and retrieve NCBI accessions",

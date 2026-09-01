@@ -100,6 +100,7 @@ RESUME = ResumeProfile(
         "target_domain": "--target-domain",
         "derep_rank": "--derep-rank",
         "source": "--source",
+        "ncbi_section": "--ncbi-section",
         "add_gtdb_tax": "-D/--add-gtdb-tax",
         "add_ncbi_tax": "-t/--add-ncbi-tax",
         "lineage": "-L/--lineage-ranks",
@@ -395,6 +396,7 @@ def select_wanted_ref_tax(args, previous_run_data=None):
                     args.source, taxon,
                     target_rank=args.target_rank, derep_rank=args.derep_rank,
                     target_domain=getattr(args, "target_domain", None),
+                    ncbi_section=getattr(args, "ncbi_section", "refseq"),
                     building_tree=True)
         except AmbiguousTaxon:
             report_message(f"Since the `-w` taxon '{taxon}' occurs at more than "

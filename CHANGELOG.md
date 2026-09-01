@@ -76,6 +76,7 @@ my best to rapidly address anything!
     - puts new outputs in a new directory, it does not overwrite the originals
     - creates a "label-map.tsv" tracking changed labels
     - regenerates any iToL files for any Pfam/KO searches the original run did
+  - `gtt dl-ncbi-assembly` - download genome assemblies based on GTDB/NCBI taxonomy or input accessions
   - `gtt get-accs-from-gtdb` / `gtt get-accs-from-ncbi` - pull accessions based on taxonomy if you want them (though the main `gtotree` program does this for you now)
   - `gtt search-annotations` — search input genomes for target Pfams (`-p`) and/or KOs (`-K`)
   - `gtt itol` - various subcommands for generating iToL-compatible files that can be drag-and-dropped onto a tree in the iToL web interface

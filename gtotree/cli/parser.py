@@ -69,6 +69,9 @@ def parser():
     # --- Adding Reference Genomes by Taxonomy ---
     opt.add_argument("--source", metavar="<str>", type=str.lower,
                      choices=["gtdb", "ncbi"], default="gtdb")
+    opt.add_argument("--ncbi-section", metavar="<str>", type=str.lower,
+                     choices=["refseq", "genbank", "both"], default="both",
+                     dest="ncbi_section")
     opt.add_argument("--target-rank", metavar="<str>", type=str, default=None)
     opt.add_argument("--target-domain", metavar="<str>", type=str, default=None,
                      dest="target_domain")

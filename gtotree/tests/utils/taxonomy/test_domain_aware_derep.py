@@ -107,3 +107,135 @@ class TestResolveDerepRankDomainAware:
 
     def test_off_is_unaffected_by_domain(self):
         assert resolve_derep_rank("domain", "off", domain="Eukaryota") == (None, [])
+
+
+################################################################################
+# include_rows: skipping metadata must not change WHICH genomes are selected, and
+# the default must stay True because HMM auto-selection reads the pulled rows.
+#
+# Also pins why counts come from the selection path rather than the cheaper
+# tax_counts.derep_size(): that counts distinct groups present in the table, so it
+# sees neither liveness screening nor the quality floor, and over-reports.
+################################################################################
+
+import pyarrow as pa  # type: ignore
+import pyarrow.parquet as pq  # type: ignore
+
+from gtotree.utils.taxonomy.tax_ranks import RANKS
+from gtotree.utils.taxonomy.tax_derep import select_ref_genomes
+from gtotree.utils.taxonomy.tax_counts import derep_size
+
+
+_NCBI_EXTRA = ["assembly_level", "refseq_category", "checkm_completeness",
+               "checkm_contamination", "genome_size", "genome_size_ungapped",
+               "contig_count"]
+
+
+def _ncbi_rec(acc, lineage, completeness="99.0"):
+    d = {"assembly_accession": acc, "assembly_level": "Complete Genome",
+         "refseq_category": "", "checkm_completeness": completeness,
+         "checkm_contamination": "0.5", "genome_size": "4000000",
+         "genome_size_ungapped": "4000000", "contig_count": "1"}
+    for i, r in enumerate(RANKS):
+        d[r] = lineage[i]
+    return d
+
+
+@pytest.fixture
+def three_families(tmp_path):
+    """
+    One phylum, three families of one genome each:
+      Fam1 -- fine
+      Fam2 -- its only genome is absent from the liveness-screen asset (suppressed)
+      Fam3 -- its only genome is low completeness
+    Returns (table_path, screen_path).
+    """
+    recs = [
+        _ncbi_rec("GCF_000000010.1", ("Bacteria", "Bphy", "Bcls", "Bord", "Fam1",
+                                      "G1", "G1 sp1")),
+        _ncbi_rec("GCF_000000020.1", ("Bacteria", "Bphy", "Bcls", "Bord", "Fam2",
+                                      "G2", "G2 sp1")),
+        _ncbi_rec("GCF_000000030.1", ("Bacteria", "Bphy", "Bcls", "Bord", "Fam3",
+                                      "G3", "G3 sp1"), completeness="40.0"),
+    ]
+    table = tmp_path / "ncbi-data.parquet"
+    keys = ["assembly_accession"] + list(RANKS) + _NCBI_EXTRA
+    cols = {k: [r[k] for r in recs] for k in keys}
+    pq.write_table(
+        pa.table({k: pa.array(v, type=pa.string()) for k, v in cols.items()}),
+        str(table))
+
+    screen = tmp_path / "ncbi-screen.parquet"
+    pq.write_table(
+        pa.table({"assembly_accession": pa.array(
+            ["GCF_000000010.1", "GCF_000000030.1"], type=pa.string())}), str(screen))
+
+    return str(table), str(screen)
+
+
+class TestIncludeRowsDoesNotChangeSelection:
+
+    @pytest.mark.parametrize("derep", ["off", "family"])
+    def test_accessions_are_identical_with_and_without_rows(self, three_families, derep):
+        table, _screen = three_families
+        with_rows = select_ref_genomes(table, "ncbi", "Bphy", derep_rank=derep,
+                                       include_rows=True)
+        without = select_ref_genomes(table, "ncbi", "Bphy", derep_rank=derep,
+                                     include_rows=False)
+        assert with_rows.accessions == without.accessions
+
+    def test_rows_are_carried_only_when_asked_for(self, three_families):
+        table, _screen = three_families
+        assert select_ref_genomes(table, "ncbi", "Bphy", derep_rank="family",
+                                  include_rows=True).rows
+        assert select_ref_genomes(table, "ncbi", "Bphy", derep_rank="family",
+                                  include_rows=False).rows == []
+
+    def test_the_default_keeps_rows_because_hmm_autopick_reads_them(self, three_families):
+        """
+        scg_hmms_setup reads selection.rows for the pulled genomes' lineage to choose
+        an SCG set (a euk target routing to Universal depends on it). If the default
+        ever flipped to False, that would silently stop working.
+        """
+        table, _screen = three_families
+        sel = select_ref_genomes(table, "ncbi", "Bphy", derep_rank="family")
+        assert sel.rows, "default must carry rows"
+        assert all("domain" in row for row in sel.rows)
+
+    def test_warnings_and_resolution_survive_without_rows(self, three_families):
+        table, screen = three_families
+        sel = select_ref_genomes(table, "ncbi", "Bphy", derep_rank="family",
+                                 screen_against=screen, include_rows=False)
+        assert sel.canonical == "Bphy"
+        assert sel.resolved_rank == "phylum"
+        assert sel.effective_derep_rank == "family"
+        assert any("no longer available at NCBI" in w for w in sel.warnings)
+
+
+class TestCheapCountPathWouldOverreport:
+    """
+    Why `--dry-run` resolves the selection instead of calling derep_size().
+
+    derep_size() counts distinct assigned values of the derep-rank column in the
+    table, never applying `screen_against` or the quality floor. A dry run built on
+    it would promise more genomes than the real run downloads.
+    """
+
+    def test_derep_size_counts_every_group_in_the_table(self, three_families):
+        table, _screen = three_families
+        assert derep_size(table, "ncbi", "phylum", "Bphy", "family") == 3
+
+    def test_liveness_screening_makes_the_real_selection_smaller(self, three_families):
+        table, screen = three_families
+        sel = select_ref_genomes(table, "ncbi", "Bphy", derep_rank="family",
+                                 screen_against=screen, include_rows=False)
+        assert len(sel.accessions) == 2
+        assert derep_size(table, "ncbi", "phylum", "Bphy", "family") == 3
+
+    def test_a_quality_floor_makes_it_smaller_still(self, three_families):
+        table, screen = three_families
+        sel = select_ref_genomes(table, "ncbi", "Bphy", derep_rank="family",
+                                 screen_against=screen, min_completeness=90.0,
+                                 include_rows=False)
+        assert len(sel.accessions) == 1
+        assert derep_size(table, "ncbi", "phylum", "Bphy", "family") == 3

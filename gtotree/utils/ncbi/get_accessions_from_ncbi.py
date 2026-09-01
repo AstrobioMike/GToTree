@@ -74,7 +74,8 @@ def build_parser(parent_subparsers=None):
                     "in the table). Not needed with `--get-rank-counts`."))
 
     optional.add_argument(
-        "--source",
+        "--ncbi-section",
+        dest="ncbi_section",
         type=str.lower,
         default="refseq",
         choices=["refseq", "genbank", "both"],
@@ -120,7 +121,7 @@ def get_accessions_from_ncbi(args):
     table_path = ncbi_data_table_path()
 
     _report_ncbi_date(table_path)
-    _report_source_overlap(args.source)
+    _report_source_overlap(args.ncbi_section)
 
     if args.get_table:
         copy_ncbi_table(table_path)
@@ -145,7 +146,7 @@ def get_accessions_from_ncbi(args):
             # so the table reconciles with the accessions it writes. Without `-w`, the
             # counts are the whole database, as documented.
             report_unique_taxa_counts_of_all_ranks(
-                table_path, source=args.source,
+                table_path, source=args.ncbi_section,
                 reps_only=args.refseq_reference_genomes_only,
                 assembly_levels=assembly_levels,
                 scoped_to_all=is_all_target(target))
@@ -244,7 +245,7 @@ def _pool(args, assembly_levels=None, reps_only=None):
         reps_only = getattr(args, "refseq_reference_genomes_only", False)
     return PoolSpec(ncbi_data_table_path(), "ncbi",
                     rep_filter=_rep_filter(reps_only),
-                    accession_prefixes=_source_prefixes(args.source),
+                    accession_prefixes=_source_prefixes(args.ncbi_section),
                     assembly_levels=assembly_levels,
                     label="NCBI", taxon_flag="-w")
 
@@ -271,7 +272,7 @@ def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_leve
     """
     `--get-rank-counts` scoped to a taxon
     """
-    prefixes = _source_prefixes(args.source)
+    prefixes = _source_prefixes(args.ncbi_section)
     reps_only = args.refseq_reference_genomes_only
     scope_note = _counts_scope_note(args, assembly_levels)
 
@@ -309,7 +310,7 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
     Report how many genomes match `taxon` at each rank it occurs at
 
     """
-    prefixes = _source_prefixes(args.source)
+    prefixes = _source_prefixes(args.ncbi_section)
 
     scope_note = _counts_scope_note(args, assembly_levels)
 
@@ -364,9 +365,9 @@ def _report_derep_note(table_path, rank, taxon, args, prefixes, assembly_levels,
 
 def _counts_scope_note(args, assembly_levels):
     bits = []
-    if args.source == "refseq":
+    if args.ncbi_section == "refseq":
         bits.append("in refseq")
-    elif args.source == "genbank":
+    elif args.ncbi_section == "genbank":
         bits.append("in genbank")
     if assembly_levels:
         levels = ", ".join(sorted(assembly_levels))
@@ -388,7 +389,7 @@ def _select_rows(table_path, args, assembly_levels=None):
     """
     target = str(args.wanted_ref_tax)
     reps_only = args.refseq_reference_genomes_only
-    prefixes = _source_prefixes(args.source)
+    prefixes = _source_prefixes(args.ncbi_section)
 
     if is_all_target(target):
         if _derep_is_on(args):
@@ -427,7 +428,7 @@ def _select_rows(table_path, args, assembly_levels=None):
             table_path, "ncbi", target,
             target_rank=args.target_rank, derep_rank=args.derep_rank,
             reps_only=reps_only,
-            accession_prefixes=_source_prefixes(args.source),
+            accession_prefixes=_source_prefixes(args.ncbi_section),
             assembly_levels=assembly_levels,
             target_domain=getattr(args, "target_domain", None))
     except AmbiguousTaxon as e:
@@ -582,8 +583,8 @@ def _write_outputs(rows, args, selection):
     suffix_bits = []
     if args.refseq_reference_genomes_only:
         suffix_bits.append("refseq-ref")
-    elif args.source != "both":
-        suffix_bits.append(args.source)
+    elif args.ncbi_section != "both":
+        suffix_bits.append(args.ncbi_section)
     suffix = ("-" + "-".join(suffix_bits)) if suffix_bits else ""
 
     acc_out = f"ncbi-{taxon_for_filename}{rank_bit}{suffix}-accs.txt"

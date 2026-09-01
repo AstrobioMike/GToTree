@@ -18,6 +18,22 @@ _SOURCE_ASSETS = {
 }
 
 
+NCBI_SECTION_PREFIXES = {
+    "refseq": ("GCF_",),
+    "genbank": ("GCA_",),
+    "both": None,
+}
+
+
+def section_prefixes(source, ncbi_section):
+    """
+    Accession prefixes for an --ncbi-section value, or None for no restriction.
+    """
+    if str(source).strip().lower() == "gtdb":
+        return None
+    return NCBI_SECTION_PREFIXES.get(str(ncbi_section or "refseq").strip().lower())
+
+
 class WantedRefTaxError(Exception):
     """A --wanted-ref-tax request that resolved to nothing usable."""
 
@@ -71,6 +87,7 @@ def describe_source_version(source):
 def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
                                       derep_rank="auto", min_completeness=None,
                                       max_contamination=None, target_domain=None,
+                                      ncbi_section="refseq", include_rows=True,
                                       building_tree=False):
     """
     Resolve `-w <taxon>` to a list of assembly accessions plus the RefGenomeSelection
@@ -92,10 +109,19 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
     max_contamination : float or None
         --max-contamination; drops candidates above this checkm contamination before
         selection. None (the default) means no ceiling.
+    ncbi_section : str
+        --ncbi-section ('refseq' | 'genbank' | 'both')
     target_domain : str or None
         --target-domain; disambiguates a name shared across domains (e.g. `Bacillus`).
         Without it such a name raises CrossDomainTaxon. Also scopes selection to that
         domain and drives the domain-aware `auto` derep step.
+    include_rows : bool
+        Whether to carry the selected genomes' metadata rows back on the returned
+        selection. Default True, and the main driver needs them -- scg_hmms_setup
+        reads the pulled rows' lineage to auto-select an HMM set. Pass False only from
+        a caller that wants accessions and counts alone (`gtt dl-ncbi-assemblies`); it
+        skips a second filtered read of the asset per taxon without changing which
+        genomes are selected.
     building_tree : bool
         Whether the selected genomes become a tree. Only the main GToTree driver sets
         this; `gtt gen-scg-hmms` and `gtt search-annotations` share this
@@ -123,9 +149,11 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
         table_path, core_source, taxon,
         target_rank=target_rank, derep_rank=derep_rank,
         screen_against=screen_against,
+        accession_prefixes=section_prefixes(source, ncbi_section),
         min_completeness=min_completeness,
         max_contamination=max_contamination,
-        target_domain=target_domain)
+        target_domain=target_domain,
+        include_rows=include_rows)
 
     if not selection.accessions:
         detail = ""

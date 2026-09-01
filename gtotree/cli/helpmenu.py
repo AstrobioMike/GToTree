@@ -180,6 +180,15 @@ ENTRIES = [
          """,
          FULL),
 
+        ("--ncbi-section <str>",
+         "which part of NCBI to draw from; default: both",
+         """
+         Which section of NCBI the `-w` genomes are drawn from: "refseq", "genbank",
+         or "both". The default of "both" draws from everything, which is typically fine
+         with the default `--derep-rank auto`. Only applies with `--source ncbi`.
+         """,
+         FULL),
+
         ("--target-rank <str>",
          "rank of the `-w` taxon; default: auto-detected",
          """

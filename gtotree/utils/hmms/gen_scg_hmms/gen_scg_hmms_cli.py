@@ -97,6 +97,7 @@ RESUME = ResumeProfile(
         "percent_single_copy": "--percent-single-copy",
         "min_pfam_coverage": "--min-pfam-coverage",
         "source": "--source",
+        "ncbi_section": "--ncbi-section",
         "wanted_ref_tax": "--wanted-ref-tax",
         "target_rank": "--target-rank",
         "target_domain": "--target-domain",
@@ -136,6 +137,7 @@ def build_fingerprint(run_data, args, pfam_version=None):
         "percent_single_copy": args.percent_single_copy,
         "min_pfam_coverage": args.min_pfam_coverage,
         "source": (args.source or "").upper(),
+        "ncbi_section": (getattr(args, "ncbi_section", None) or "").lower(),
         "wanted_ref_tax": (sorted(wanted_ref_tax_list(args)) or None),
         "target_rank": args.target_rank,
         "target_domain": getattr(args, "target_domain", None),
@@ -225,6 +227,17 @@ def build_parser(parent_subparsers=None):
         choices=["gtdb", "ncbi"],
         help=("Which taxonomy source to select `--wanted-ref-tax` genomes from "
               "(default: gtdb)"),
+        action="store",
+    )
+
+    optional.add_argument(
+        "--ncbi-section",
+        dest="ncbi_section",
+        type=str.lower,
+        default="genbank",
+        choices=["refseq", "genbank", "both"],
+        help=("Which section of NCBI to draw `--wanted-ref-tax` genomes from "
+              "(default: genbank). Ignored with `--source gtdb`."),
         action="store",
     )
 

@@ -486,7 +486,7 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                        reps_only=None, pick="quality", screen_against=None,
                        accession_prefixes=None, assembly_levels=None,
                        min_completeness=None, max_contamination=None,
-                       target_domain=None):
+                       target_domain=None, include_rows=True):
     """
     The one selection entry point shared by every surface that adds reference genomes
     by taxonomy: the standalone get-accessions helpers and the main GToTree driver's
@@ -525,6 +525,21 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
         both paths below. With derep on it constrains what each group can be
         represented BY, and with derep off it constrains the kept set directly.
 
+    include_rows:
+        Whether to carry the selected genomes' metadata rows back. Default True, and
+        the main driver NEEDS them: scg_hmms_setup reads the pulled rows' lineage to
+        auto-select an HMM set, so a euk target routes to the Universal set off the
+        back of this. Pass False only from a caller that wants accessions and counts
+        alone (`gtt dl-ncbi-assemblies`): with derep ON that skips an entire second
+        filtered read of the asset, and with derep OFF it reads one column instead of
+        the full metadata set. The returned `accessions` are identical either way --
+        this only drops `rows`, never changes WHICH genomes are selected.
+
+        Note this is NOT the same as counting via tax_counts.derep_size(), which is
+        cheaper still but counts distinct groups in the table and so sees neither
+        liveness screening nor the quality floor; it over-reports. Anything
+        user-facing has to come from this path.
+
     Returns a RefGenomeSelection
     """
     spec = SOURCES[source]
@@ -549,7 +564,8 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
     if effective_derep_rank is None:
         # derep off: take every genome under the taxon (optionally NCBI-liveness
         # screened), preserving full metadata rows for the caller's TSV
-        cols = _selection_columns(spec, extra_rank=None)
+        cols = (_selection_columns(spec, extra_rank=None) if include_rows
+                else [spec.acc_col])
         tab = select(path, source, resolved_rank, canonical,
                      reps_only=reps_only, columns=cols,
                      accession_prefixes=accession_prefixes,
@@ -573,8 +589,8 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
             n_below, n_missing, min_completeness, max_contamination))
 
         accessions = [r.get(spec.acc_col) for r in rows if r.get(spec.acc_col)]
-        return RefGenomeSelection(accessions, rows, canonical, resolved_rank,
-                                  None, warnings)
+        return RefGenomeSelection(accessions, rows if include_rows else [],
+                                  canonical, resolved_rank, None, warnings)
 
     # 3. dereplicate to one best genome per unique value of effective_derep_rank.
     #    derep() returns accessions only, so re-slice to recover metadata rows for the
@@ -591,7 +607,7 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                                 effective_derep_rank, reps_only, set(accessions),
                                 accession_prefixes=accession_prefixes,
                                 assembly_levels=assembly_levels,
-                                domain=resolved_domain)
+                                domain=resolved_domain) if include_rows else []
 
     return RefGenomeSelection(accessions, rows, canonical, resolved_rank,
                               effective_derep_rank, warnings)
@@ -599,7 +615,8 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
 
 def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="quality",
                        screen_against=None, accession_prefixes=None,
-                       assembly_levels=None, min_completeness=None, max_contamination=None):
+                       assembly_levels=None, min_completeness=None,
+                       max_contamination=None, include_rows=True):
     """
     Dereplicate across the whole asset, by running one selection per domain and
     merging the results
@@ -623,7 +640,8 @@ def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="qu
             reps_only=reps_only, pick=pick, screen_against=screen_against,
             accession_prefixes=accession_prefixes,
             assembly_levels=assembly_levels,
-            min_completeness=min_completeness, max_contamination=max_contamination)
+            min_completeness=min_completeness, max_contamination=max_contamination,
+            include_rows=include_rows)
 
         effective_derep_rank = effective_derep_rank or selection.effective_derep_rank
 
