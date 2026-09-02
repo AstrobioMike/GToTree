@@ -493,10 +493,10 @@ def report_selection(accessions, selections, expansion_note, args):
     for sel in selections:
         derep = (f"dereplicated to one genome per {sel.effective_derep_rank}"
                  if sel.effective_derep_rank else "dereplication off")
-        wprint(f"-w {color_text(sel.canonical)} "
-               f"(resolved to {sel.resolved_rank}; {derep})", ii="    ", si="    ")
+        wprint(f"- {color_text(sel.canonical)}", ii="    ", si="    ")
+        wprint(f"- resolved to {sel.resolved_rank}; {derep}", ii="        ", si="        ")
 
-        line = f"{sel.num_selected:,} genome(s) selected"
+        line = f"- {sel.num_selected:,} genome(s) selected"
         overlap = sel.num_selected - sel.num_new
         if overlap:
             line += f", {sel.num_new:,} new ({overlap:,} already counted)"
@@ -510,10 +510,10 @@ def report_selection(accessions, selections, expansion_note, args):
     if getattr(args, "dry_run", False):
         wprint(color_text(f"Total that would be downloaded: {total:,} genome(s) in "
                           f"{args.format} format.", "green"), ii="    ", si="    ")
+        print("")
     else:
         wprint(color_text(f"Total to download: {total:,} genome(s)", "green"),
                ii="    ", si="    ")
-    print("")
 
 
 def setup(args, wanted_accs=None):
@@ -539,7 +539,7 @@ def parse_main_assembly_table(run_data):
 
     report_message(f"Targeting {run_data.num_wanted:,} accession(s) in "
                    f"{run_data.wanted_format} format...", "yellow",
-                   ii="    ", si="    ", width=100, trailing_newline=True)
+                   ii="    ", si="    ", width=100, trailing_newline=False)
 
     return parse_ncbi_assembly_summary(ncbi_data_table_path(), run_data)
 

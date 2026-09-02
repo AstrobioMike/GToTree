@@ -4,8 +4,12 @@
 
 ### TO DO STILL ###
 
-    # add dl-ncbi-assemblies subcommand analogous to bit's
-        # missing --representatives-only flag like in bit
+    # test taxon selection in all functions that use it
+        # dl-ncbi-assemblies seems to be working
+        # gen-scg-hmms
+        # get-accs-from-*
+        # others?
+    # keep mirroring help menus with bit where possible
 
     # resume-functionality testing
 

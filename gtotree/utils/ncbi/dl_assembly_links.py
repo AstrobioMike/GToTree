@@ -49,11 +49,13 @@ def _resolve_links(dl_acc, assembly_name, ftp_path):
     """
     if ftp_path and ftp_path.lower() != "na":
         http_path = resolve_base_link(ftp_path, dl_acc, assembly_name)
-        dir_basename = http_path.rstrip("/").split("/")[-1]
     elif assembly_name != "NA" and dl_acc != "NA":
-        http_path, dir_basename = build_base_link(dl_acc, assembly_name)
+        http_path, _ = build_base_link(dl_acc, assembly_name)
     else:
-        http_path, dir_basename = "NA", "NA"
+        return "NA", "NA"
+
+    http_path = http_path.rstrip("/")
+    dir_basename = http_path.split("/")[-1]
     return http_path, dir_basename
 
 
@@ -117,8 +119,8 @@ def parse_ncbi_assembly_summary(assembly_summary_file, run_data):
 
                 if run_data.wanted_format:
                     ncbi_ext, local_ext = FORMAT_EXTENSIONS[run_data.wanted_format]
-                    target_link = (f"{http_path}{dir_basename}{ncbi_ext}"
-                                   if http_path != "NA" else "NA")
+                    target_link = (f"{http_path}/{dir_basename}{ncbi_ext}"
+                                   if http_path.lower() != "na" else "NA")
                     local_path = f"{run_data.output_dir}/{dl_acc}{local_ext}"
                     out_line += "\t" + target_link + "\t" + local_path
 

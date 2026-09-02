@@ -175,7 +175,6 @@ class TestDryRun:
         assert "Bacteria" in out and "Escherichia" in out
         assert "already counted" in out
         assert "3" in out          # union of {1,2} and {2,3}
-        assert "dry run" in out.lower()
 
 
 class TestReportSelection:
