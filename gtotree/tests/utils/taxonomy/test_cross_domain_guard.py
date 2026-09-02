@@ -370,15 +370,21 @@ class TestNcbiSectionOnEveryWantedRefTaxSurface:
         args = build_parser().parse_args(["-p", "pfams.txt", "-w", "Bacillus"])
         assert args.ncbi_section == "both"
 
-    def test_get_accs_from_ncbi_keeps_its_long_standing_refseq_default(self):
+    def test_get_accs_from_ncbi_now_matches_the_other_surfaces(self):
         """
-        The one surface that should NOT change: it has always defaulted to refseq and
-        defaults --derep-rank to off, so its section filter is load-bearing.
+        This surface used to default to refseq, because --derep-rank defaulted to off
+        and the section filter was the only thing keeping a pull from returning
+        everything. --derep-rank now defaults to auto here like everywhere else, which
+        does that job properly, so the section filter goes back to 'both'.
+
+        --derep-rank reads as the sentinel straight off the parser; preflight is what
+        swaps it for the real default (see test_derep_rank_default.py).
         """
         from gtotree.utils.ncbi.get_accessions_from_ncbi import build_parser
+        from gtotree.utils.taxonomy.get_accs_shared import DEREP_UNSET
         args = build_parser().parse_args(["-w", "Bacillus"])
-        assert args.ncbi_section == "refseq"
-        assert args.derep_rank == "off"
+        assert args.ncbi_section == "both"
+        assert args.derep_rank == DEREP_UNSET
 
     def test_search_annotations_source_flag_still_works(self):
         from gtotree.utils.target_search.target_search_cli import build_parser

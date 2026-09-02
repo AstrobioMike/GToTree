@@ -22,6 +22,7 @@ from gtotree.utils.taxonomy.tax_targets import (is_all_target,
 from gtotree.utils.taxonomy.get_accs_shared import (PoolSpec,
                                                     add_common_get_accs_args,
                                                     all_derep_size,
+                                                    apply_derep_default,
                                                     derep_note as _shared_derep_note,
                                                     is_derep_on, scoped_counts_note)
 
@@ -148,6 +149,8 @@ def get_accessions_from_gtdb(args):
 
 
 def preflight_checks(args):
+    apply_derep_default(args)
+
     if args.get_taxon_counts and not args.wanted_ref_tax:
         report_message("A specific taxon needs to also be provided to the `-w` flag "
                        "in order to use `--get-taxon-counts`.", "yellow",

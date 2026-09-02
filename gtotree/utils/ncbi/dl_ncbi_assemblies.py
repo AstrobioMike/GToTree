@@ -180,7 +180,7 @@ def build_parser(parent_subparsers=None, show_detailed=False):
         action="append",
         choices=list(ASSEMBLY_LEVELS),
         default=None,
-        help=h("Only include genomes (from `-w`) at these assembly levels. "
+        help=h("Only include genomes (from `-w`) at this assembly level. "
                "Can be provided multiple times."),
     )
 

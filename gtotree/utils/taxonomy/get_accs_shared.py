@@ -21,10 +21,37 @@ ASSEMBLY_LEVELS = {
 
 DEREP_OFF = (None, "off", "none", "None")
 
+# --derep-rank's real default, and the placeholder argparse actually stores.
+#
+# The sentinel exists so a caller can tell "the user typed --derep-rank auto" from
+# "the user typed nothing". The taxid path needs that distinction: dereplication
+# can't be applied to a taxid, so an inherited default should quietly step aside
+# while an explicit request should still be an error.
+#
+# It is deliberately NOT None: None is in DEREP_OFF, so an unresolved None would
+# silently mean "off". An unresolved sentinel instead reaches resolve_derep_rank()
+# and raises, which is the failure mode we want.
+DEREP_DEFAULT = "auto"
+DEREP_UNSET = "__derep_unset__"
+
 
 def is_derep_on(derep_rank):
     """True when --derep-rank asks for actual dereplication."""
     return derep_rank not in DEREP_OFF
+
+
+def apply_derep_default(args):
+    """
+    Swap the --derep-rank sentinel on `args` for the real default, in place.
+
+    Returns True when the user set --derep-rank themselves. Safe to call more than
+    once, but only the first call can report that faithfully, so the caller that
+    needs the answer (the taxid guard) has to be the first one in.
+    """
+    if getattr(args, "derep_rank", DEREP_UNSET) == DEREP_UNSET:
+        args.derep_rank = DEREP_DEFAULT
+        return False
+    return True
 
 
 def parse_assembly_levels(value):
@@ -43,7 +70,7 @@ def parse_assembly_levels(value):
 
 
 def source_prefixes(source):
-    """Accession prefixes for an NCBI --source value (None means no restriction)."""
+    """Accession prefixes for an NCBI --ncbi-section value (None means no restriction)."""
     if source == "refseq":
         return ("GCF_",)
     if source == "genbank":
@@ -53,12 +80,12 @@ def source_prefixes(source):
 
 SOURCE_OVERLAP_NOTE = (
     "There is a lot of overlap between RefSeq and GenBank (most RefSeq entries are "
-    "derived from a GenBank one), so `--source both` will return many duplicate "
+    "derived from a GenBank one), so `--ncbi-section both` will return many duplicate "
     "assemblies. You most likely only want one of them, but you're the boss!")
 
 
 def source_overlap_note(source):
-    """The `--source both` warning, or None for a single-section source."""
+    """The `--ncbi-section both` warning, or None for a single-section source."""
     if str(source or "").strip().lower() != "both":
         return None
     return SOURCE_OVERLAP_NOTE
@@ -256,11 +283,12 @@ def add_common_get_accs_args(required, optional, source_label,
     optional.add_argument(
         "--derep-rank",
         choices=["auto", "off"] + list(RANKS),
-        default="off",
+        default=DEREP_UNSET,
         help=("Dereplicate the pulled genomes down to a single best genome per unique "
-              "value of this rank (default: off). E.g., '--derep-rank family' keeps "
-              "one genome per family within the target taxon. Use 'auto' for two "
-              "ranks finer than the target."),
+              "value of this rank (default: auto). 'auto' is two ranks finer than the "
+              "target (one rank finer for eukaryotes). E.g., '--derep-rank family' "
+              "keeps one genome per family within the target taxon. 'off' returns "
+              "every genome under the target taxon, so use with care :)"),
         action="store",
     )
 
