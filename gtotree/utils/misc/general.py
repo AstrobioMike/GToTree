@@ -866,17 +866,25 @@ def resolve_input_genomes(args, run_data, error_cls):
     """
     Phase 1 for every program that takes the four genome inputs plus `-w`: fold in any
     `-w` selections, then report the whole input set
+
+    An `--exclusion-list` is resolved to accession cores once and handed to the
+    selection core, which drops those genomes from the candidate pool before
+    dereplication. It therefore constrains only the `-w` selections; genomes given
+    directly with `-a`, `-g`, `-f`, or `-A` are always used as provided.
     """
     # imported here rather than at module scope: the taxonomy layer reaches back into
     # the GTDB/NCBI asset modules, and this module is imported by almost everything
     from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
                                                        expand_wanted_ref_tax,
                                                        describe_all_expansion)
+    from gtotree.utils.taxonomy.exclusion_list import load_exclusion_cores
     from gtotree.utils.misc.messaging import (input_genome_source_lines,
                                               total_input_genomes_line,
                                               spinner)
 
     selections = []
+    total_excluded = 0
+    exclude_cores = load_exclusion_cores(getattr(args, "exclusion_list", None))
     wanted, all_domains = expand_wanted_ref_tax(args.source,
                                                 wanted_ref_tax_list(args))
 
@@ -901,16 +909,23 @@ def resolve_input_genomes(args, run_data, error_cls):
                     min_completeness=getattr(args, "min_completeness", None),
                     max_contamination=getattr(args, "max_contamination", None),
                     target_domain=getattr(args, "target_domain", None),
-                    ncbi_section=getattr(args, "ncbi_section", "refseq"))
+                    ncbi_section=getattr(args, "ncbi_section", "refseq"),
+                    exclude_cores=exclude_cores)
+
+            num_excluded = getattr(selection, "num_excluded", 0)
+            total_excluded += num_excluded
 
             added = run_data.merge_wanted_ref_tax_accessions(
                 accessions, taxon=selection.canonical)
             run_data.record_wanted_ref_tax_selection(
-                selection, taxon=selection.canonical, num_added=added)
+                selection, taxon=selection.canonical, num_added=added,
+                num_excluded=num_excluded)
             selections.append(selection)
 
             for warning in selection.warnings:
                 report_message(warning, "orange", ii="        ", si="        ")
+
+        run_data.wanted_ref_tax_num_excluded = total_excluded
 
         print()
 

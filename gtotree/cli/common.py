@@ -35,7 +35,7 @@ def add_help(group):
         "-h",
         "--help",
         action="help",
-        help=wrap_help("Show this help message and exit")
+        help=wrap_help("Show this help message")
     )
 
 
@@ -54,7 +54,7 @@ def add_version_arg(group):
         "-v",
         "--version",
         action=VersionAction,
-        help=wrap_help("Show GToTree version and exit")
+        help=wrap_help("Show GToTree version")
     )
 
 

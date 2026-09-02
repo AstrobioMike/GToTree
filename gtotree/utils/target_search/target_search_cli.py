@@ -45,6 +45,7 @@ from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import WantedRefTaxError
+from gtotree.utils.taxonomy.exclusion_list import exclusion_list_help
 from gtotree.utils.misc.general import wanted_ref_tax_list
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 from gtotree.main_stages.processing_genomes import (SearchPlan, _fused,
@@ -110,6 +111,7 @@ RESUME = ResumeProfile(
         "target_rank": "--target-rank",
         "target_domain": "--target-domain",
         "derep_rank": "--derep-rank",
+        "exclusion_list_sha256": "the exclusion list (--exclusion-list)",
         "pfam_data_version": "the Pfam database version",
         "ko_data_version": "the KO database version",
     },
@@ -157,6 +159,8 @@ def build_fingerprint(run_data, args, specs, data_versions=None):
         "target_rank": args.target_rank,
         "target_domain": getattr(args, "target_domain", None),
         "derep_rank": args.derep_rank,
+        "exclusion_list_sha256": hash_file_contents(
+            getattr(args, "exclusion_list", None)),
         "pfam_data_version": data_versions.get("pfam"),
         "ko_data_version": data_versions.get("ko"),
     }
@@ -311,6 +315,15 @@ def build_parser(parent_subparsers=None):
         help=("Dereplicate `-w`-selected genomes down to one per unique value of this "
               "rank (default: auto, which uses two ranks finer than the target). Use "
               "'off' to keep them all."),
+        action="store",
+    )
+
+    optional.add_argument(
+        "--exclusion-list",
+        metavar="<FILE>",
+        dest="exclusion_list",
+        default=None,
+        help=exclusion_list_help("-w"),
         action="store",
     )
 

@@ -419,14 +419,11 @@ def _wanted_ref_tax_detail_lines(selection, indent):
     num_excluded = selection.get("num_excluded", 0)
     if num_excluded > 0:
         word = "genome" if num_excluded == 1 else "genomes"
-        lines.append(f"{indent}- {num_excluded} selected {word} dropped by the "
-                     f"--exclusion-list")
+        lines.append(f"{indent}- {num_excluded} candidate {word} removed by the "
+                     f"--exclusion-list before selection")
 
-    # excluded genomes were removed before the merge, so they're neither "added" nor
-    # part of the already-counted overlap; back them out here
     already_had = (selection.get("num_selected", 0)
-                   - selection.get("num_added", 0)
-                   - num_excluded)
+                   - selection.get("num_added", 0))
     if already_had > 0:
         # with a repeated `-w`, the overlap can be with a previously-resolved taxon as
         # well as with `-a`, so this stays deliberately vague about which

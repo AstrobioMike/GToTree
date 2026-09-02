@@ -41,6 +41,8 @@ _NcbiSelection = namedtuple("_NcbiSelection", ["rows", "label", "rank", "taxon"]
 
 
 ################################################################################
+from gtotree.utils.taxonomy.exclusion_list import load_exclusion_cores
+
 
 def build_parser(parent_subparsers=None):
 
@@ -114,6 +116,10 @@ def main():
 
 def get_accessions_from_ncbi(args):
 
+    # the counts flags preview what a pull would return, so they honor the same
+    # exclusion list the pull itself would apply
+    exclude_cores = load_exclusion_cores(getattr(args, "exclusion_list", None))
+
     preflight_checks(args)
 
     # make sure the prepared NCBI Parquet is present, then work against it
@@ -140,7 +146,8 @@ def get_accessions_from_ncbi(args):
     if args.get_rank_counts:
         if named_taxon:
             _report_rank_counts_for_taxon_or_exit(table_path, target, args,
-                                                  assembly_levels)
+                                                  assembly_levels,
+                                                  exclude_cores=exclude_cores)
         else:
             # `-w all` scopes the counts to the pool an 'all' pull can actually reach,
             # so the table reconciles with the accessions it writes. Without `-w`, the
@@ -149,11 +156,13 @@ def get_accessions_from_ncbi(args):
                 table_path, source=args.ncbi_section,
                 reps_only=args.refseq_reference_genomes_only,
                 assembly_levels=assembly_levels,
-                scoped_to_all=is_all_target(target))
+                scoped_to_all=is_all_target(target),
+                                            exclude_cores=exclude_cores)
         sys.exit(0)
 
     if args.get_taxon_counts and named_taxon:
-        _report_taxon_counts_or_exit(table_path, target, args, assembly_levels)
+        _report_taxon_counts_or_exit(table_path, target, args, assembly_levels,
+                                     exclude_cores=exclude_cores)
         sys.exit(0)
 
     selection = _select_rows(table_path, args, assembly_levels)
@@ -219,7 +228,7 @@ def _derep_is_on(args):
 
 
 def _count_at_rank(table_path, rank, taxon, prefixes=None, reps_only=False,
-                   assembly_levels=None):
+                   assembly_levels=None, exclude_cores=None):
     """
     Count rows where column `rank` == `taxon`, with the set POOL filters applied
     (source prefix, RefSeq-reference-only, assembly level). This is the number of
@@ -229,7 +238,8 @@ def _count_at_rank(table_path, rank, taxon, prefixes=None, reps_only=False,
     return count_genomes(table_path, "ncbi", rank=rank, taxon=taxon,
                          rep_filter=_rep_filter(reps_only),
                          accession_prefixes=prefixes,
-                         assembly_levels=assembly_levels)
+                         assembly_levels=assembly_levels,
+                         exclude_cores=exclude_cores)
 
 
 def _rep_filter(reps_only):
@@ -251,24 +261,26 @@ def _pool(args, assembly_levels=None, reps_only=None):
 
 
 def _derep_count_at_rank(table_path, rank, taxon, derep_rank, prefixes=None,
-                         reps_only=False, assembly_levels=None):
+                         reps_only=False, assembly_levels=None, exclude_cores=None):
     """How many genomes survive dereplication at `derep_rank`, under the same pool."""
     return derep_size(table_path, "ncbi", rank, taxon, derep_rank,
                       rep_filter=_rep_filter(reps_only),
                       accession_prefixes=prefixes,
-                      assembly_levels=assembly_levels)
+                      assembly_levels=assembly_levels,
+                      exclude_cores=exclude_cores)
 
 
 def _derep_note(table_path, rank, taxon, args, prefixes, assembly_levels,
-                reps_only=False):
+                reps_only=False, exclude_cores=None):
     pool = PoolSpec(table_path, "ncbi", rep_filter=_rep_filter(reps_only),
                     accession_prefixes=prefixes, assembly_levels=assembly_levels,
-                    label="NCBI", taxon_flag="-w")
+                    label="NCBI", taxon_flag="-w",
+                    exclude_cores=exclude_cores)
     return _shared_derep_note(pool, rank, taxon,
                               getattr(args, "derep_rank", "off"))
 
 
-def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_levels):
+def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_levels, exclude_cores=None):
     """
     `--get-rank-counts` scoped to a taxon
     """
@@ -285,11 +297,13 @@ def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_leve
 
     for rank in ranks_found_in:
         total = _count_at_rank(table_path, rank, canonical, prefixes=prefixes,
-                               reps_only=reps_only, assembly_levels=assembly_levels)
+                               reps_only=reps_only, assembly_levels=assembly_levels,
+                               exclude_cores=exclude_cores)
         rows = rank_counts(table_path, "ncbi", scope_rank=rank, scope_taxon=canonical,
                            rep_filter=_rep_filter(reps_only),
                            accession_prefixes=prefixes,
-                           assembly_levels=assembly_levels)
+                           assembly_levels=assembly_levels,
+                           exclude_cores=exclude_cores)
 
         print("")
         report_message(f"The rank '{rank}' has {total:,} {canonical} entries{scope_note}.",
@@ -305,7 +319,7 @@ def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_leve
                    ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
 
 
-def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
+def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels, exclude_cores=None):
     """
     Report how many genomes match `taxon` at each rank it occurs at
 
@@ -326,10 +340,12 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
     print("")
     for rank in ranks_found_in:
         count = _count_at_rank(table_path, rank, taxon, prefixes=prefixes,
-                               assembly_levels=assembly_levels)
+                               assembly_levels=assembly_levels,
+                               exclude_cores=exclude_cores)
         report_message(f"The rank '{rank}' has {count:,} {taxon} entries{scope_note}.", color=None,
                        ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
-        _report_derep_note(table_path, rank, taxon, args, prefixes, assembly_levels)
+        _report_derep_note(table_path, rank, taxon, args, prefixes, assembly_levels,
+                           exclude_cores=exclude_cores)
 
     if args.refseq_reference_genomes_only:
         report_message("Of those, in considering only RefSeq reference genomes:", "yellow",
@@ -337,13 +353,15 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
         any_rep = False
         for rank in ranks_found_in:
             count = _count_at_rank(table_path, rank, taxon, prefixes=prefixes,
-                                   reps_only=True, assembly_levels=assembly_levels)
+                                   reps_only=True, assembly_levels=assembly_levels,
+                                   exclude_cores=exclude_cores)
             if count:
                 any_rep = True
                 report_message(f"The rank '{rank}' has {count:,} {taxon} RefSeq reference genome entries.", color=None,
                                ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
                 _report_derep_note(table_path, rank, taxon, args, prefixes,
-                                   assembly_levels, reps_only=True)
+                                   assembly_levels, reps_only=True,
+                           exclude_cores=exclude_cores)
         if not any_rep:
             report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank as a RefSeq reference genome :(", "yellow",
                            ii="    ", si="    ", width=100, newline=False, trailing_newline=True)
@@ -351,10 +369,11 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels):
 
 
 def _report_derep_note(table_path, rank, taxon, args, prefixes, assembly_levels,
-                       reps_only=False):
+                       reps_only=False, exclude_cores=None):
     """Print the dereplicated-count line (and any 'auto' advisory) for one rank."""
     line, warnings = _derep_note(table_path, rank, taxon, args, prefixes,
-                                 assembly_levels, reps_only=reps_only)
+                                 assembly_levels, reps_only=reps_only,
+                                 exclude_cores=exclude_cores)
     if line:
         report_message(line, color=None, ii="      ", si="      ", width=100,
                        newline=False, trailing_newline=True)
@@ -395,7 +414,9 @@ def _select_rows(table_path, args, assembly_levels=None):
         if _derep_is_on(args):
             selection = select_all_domains(
                 table_path, "ncbi", derep_rank=args.derep_rank, reps_only=reps_only,
-                accession_prefixes=prefixes, assembly_levels=assembly_levels)
+                accession_prefixes=prefixes, assembly_levels=assembly_levels,
+                exclude_cores=load_exclusion_cores(
+                    getattr(args, "exclusion_list", None)))
             report_message(f"Dereplicating within each domain "
                            f"({', '.join(selection.domains)}).", "yellow",
                            ii="    ", si="    ", width=100, trailing_newline=False)
@@ -430,6 +451,8 @@ def _select_rows(table_path, args, assembly_levels=None):
             reps_only=reps_only,
             accession_prefixes=_source_prefixes(args.ncbi_section),
             assembly_levels=assembly_levels,
+            exclude_cores=load_exclusion_cores(
+                getattr(args, "exclusion_list", None)),
             target_domain=getattr(args, "target_domain", None))
     except AmbiguousTaxon as e:
         report_message(f"Since the input taxon '{e.taxon}' occurs at more than 1 rank, "
@@ -520,7 +543,7 @@ def _report_unassigned_domains(summary):
 
 
 def report_unique_taxa_counts_of_all_ranks(table_path, source="refseq", reps_only=False,
-                                           assembly_levels=None, scoped_to_all=False):
+                                           assembly_levels=None, scoped_to_all=False, exclude_cores=None):
     """
     Print, for each of the 7 ranks, how many unique taxa exist in the NCBI table,
     scoped to `source` (refseq -> GCF_ only, genbank -> GCA_ only, both -> no filter).
@@ -537,7 +560,8 @@ def report_unique_taxa_counts_of_all_ranks(table_path, source="refseq", reps_onl
 
     rows = rank_counts(table_path, "ncbi", accession_prefixes=prefixes,
                        assembly_levels=assembly_levels,
-                       domain_assigned=domain_assigned)
+                       domain_assigned=domain_assigned,
+                       exclude_cores=exclude_cores)
     print("")
     print(render_rank_count_table(rows, count_header=f"Num. Unique Taxa ({label})"))
     print("")
@@ -553,7 +577,8 @@ def report_unique_taxa_counts_of_all_ranks(table_path, source="refseq", reps_onl
         rep_rows = rank_counts(table_path, "ncbi", accession_prefixes=prefixes,
                                rep_filter=_rep_filter(True),
                                assembly_levels=assembly_levels,
-                               domain_assigned=domain_assigned)
+                               domain_assigned=domain_assigned,
+                               exclude_cores=exclude_cores)
         wprint(color_text("In considering only RefSeq reference genomes:", "yellow"))
         print("")
         print(render_rank_count_table(rep_rows, count_header="Num. Unique Ref. Taxa"))

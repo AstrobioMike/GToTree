@@ -36,7 +36,8 @@ from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
 from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
 from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data
 from gtotree.utils.pfam.get_pfam_data import get_pfam_data
-from gtotree.utils.taxonomy.tax_ranks import RANKS, accession_core
+from gtotree.utils.taxonomy.tax_ranks import RANKS
+from gtotree.utils.taxonomy.exclusion_list import load_exclusion_cores
 from gtotree.utils.taxonomy.tax_select import AmbiguousTaxon, TaxonNotFound, CrossDomainTaxon
 from gtotree.utils.taxonomy.tax_targets import is_all_target
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
@@ -366,6 +367,10 @@ def select_wanted_ref_tax(args, previous_run_data=None):
     `-w` may be given more than once. Each taxon is resolved and dereplicated on its
     own, then merged
 
+    An `--exclusion-list` is resolved to accession cores here and handed to the
+    selection core, which drops those genomes from the candidate pool BEFORE
+    dereplication.
+
     Returns a list of RefGenomeSelection (empty when there's nothing to resolve).
     """
     if not args.wanted_ref_tax:
@@ -375,6 +380,7 @@ def select_wanted_ref_tax(args, previous_run_data=None):
         return []
 
     selections = []
+    exclude_cores = load_exclusion_cores(getattr(args, "exclusion_list", None))
 
     try:
         wanted, domains = expand_wanted_ref_tax(args.source,
@@ -397,6 +403,7 @@ def select_wanted_ref_tax(args, previous_run_data=None):
                     target_rank=args.target_rank, derep_rank=args.derep_rank,
                     target_domain=getattr(args, "target_domain", None),
                     ncbi_section=getattr(args, "ncbi_section", "refseq"),
+                    exclude_cores=exclude_cores,
                     building_tree=True)
         except AmbiguousTaxon:
             report_message(f"Since the `-w` taxon '{taxon}' occurs at more than "
@@ -434,39 +441,29 @@ def merge_wanted_ref_tax(run_data, selections, exclusion_list=None):
     (deduping against user-provided accessions, and against each other). The run_data
     half of the job select_wanted_ref_tax() starts.
 
-    `exclusion_list` is an optional path to a single-column file of accessions. Any
-    accession it names is dropped from every `-w` selection BEFORE the selection is
-    merged, so an excluded genome never reaches processing. The exclusion set is
-    applied only to `-w`-selected accessions, not to anything the user provided
-    directly through `-a`. Matching is on the accession core only (ignores GCA/GCF
-    and version suffix)
+    The `--exclusion-list` itself is NOT applied here. It is applied inside the
+    selection core, against the candidate pool before dereplication, so by the time a
+    selection reaches this function its accessions are already exclusion-free and each
+    dereplication group has had a chance to put forward a genome that isn't excluded.
+    All this function does with it is read back the per-selection count the core
+    recorded, so the reporting layer can say how many candidates were dropped.
+
+    `exclusion_list` is still accepted so callers don't have to know where the
+    exclusion happens, and so a list that names nothing in range is still reflected as
+    a zero rather than an absence.
     """
     # a resume passes no selections (they were resolved and merged by the original
     # run); leave the recorded exclusion count from that run untouched
     if not selections:
         return run_data
 
-    # keyed by core, empty cores dropped so junk can't match an unrecognized accession
-    excluded_cores = set()
-    if exclusion_list:
-        for entry in read_single_column_file(exclusion_list):
-            core = accession_core(entry)
-            if core:
-                excluded_cores.add(core)
-
     total_excluded = 0
 
     for selection in selections or []:
-        if excluded_cores:
-            kept = [acc for acc in selection.accessions
-                    if accession_core(acc) not in excluded_cores]
-            num_excluded = len(selection.accessions) - len(kept)
-        else:
-            kept = selection.accessions
-            num_excluded = 0
+        num_excluded = getattr(selection, "num_excluded", 0)
         total_excluded += num_excluded
 
-        added = run_data.merge_wanted_ref_tax_accessions(kept,
+        added = run_data.merge_wanted_ref_tax_accessions(selection.accessions,
                                                          taxon=selection.canonical)
         run_data.record_wanted_ref_tax_selection(selection, taxon=selection.canonical,
                                                  num_added=added,

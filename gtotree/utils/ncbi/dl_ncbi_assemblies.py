@@ -1,11 +1,9 @@
 """
-`gtt dl-ncbi-assemblies` -- download assembly files for NCBI genomes.
-
 Targets are given either as assembly accessions (`-a`) or pulled by taxonomy (`-w`)
 from the NCBI or GTDB tables, optionally dereplicated to one best genome per rank.
 
-NOTE ON DUPLICATION: GToTree already downloads NCBI assemblies during a run, in
-utils/misc/processing_genomes.py. That one downloads-and-processes a single format as
+NOTE ON SEMI-CODE-DUPLICATION, MIKE: GToTree already downloads NCBI assemblies during a run,
+in utils/misc/processing_genomes.py. That one downloads-and-processes a single format as
 part of building a tree; this one is a standalone fetcher for any of eight formats and
 does no processing. They are deliberately separate rather than one parameterized
 routine. The retry/backoff engine below is shared in spirit with bit's
@@ -24,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from tqdm import tqdm # type: ignore
 
-from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
+from gtotree.cli.common import CustomRichHelpFormatter, add_version_arg
 # The retry/backoff POLICY is shared with the in-run downloader rather than
 # reimplemented: same throttle split, same sawtooth, same ceilings. Only the transfer
 # differs (this one guards against NCBI error pages and writes atomically).
@@ -44,6 +42,8 @@ from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_access
                                                    expand_wanted_ref_tax,
                                                    describe_all_expansion,
                                                    WantedRefTaxError)
+from gtotree.utils.taxonomy.exclusion_list import (load_exclusion_cores,
+                                                   exclusion_list_help)
 
 
 # HTTP statuses worth another attempt: explicit rate-limiting plus plain server
@@ -61,16 +61,11 @@ SECTION_CHOICES = ["refseq", "genbank", "both"]
 
 
 def build_parser(parent_subparsers=None, show_detailed=False):
-    """
-    `show_detailed` toggles whether the fine-tuning parameters carry real help strings
-    (the `-s`/`--show-detailed-help` menu) or are hidden but still parsed, so they keep
-    working and keep their defaults either way.
-    """
 
     desc = """
-        This program downloads assembly files for NCBI genomes. Targets can be given as
-        assembly accessions (`-a`), or pulled by taxonomy (`-w`) from either the GTDB or
-        NCBI tables, optionally dereplicated down to one best genome per rank.
+        This program downloads assembly files for NCBI genomes. Targets can be pulled
+        based on taxonomy (`-w`) from either GTDB or NCBI (also see the --derep-rank parameter),
+        and/or they can be explicitly specified as assembly accessions in a file (passed to `-a`).
         """
 
     if parent_subparsers is not None:
@@ -83,7 +78,7 @@ def build_parser(parent_subparsers=None, show_detailed=False):
     else:
         parser = argparse.ArgumentParser(
             description=desc,
-            epilog="Ex. usage: `gtt dl-ncbi-assemblies -w Nitrospirota --derep-rank family`",
+            epilog="Ex. usage: `gtt dl-ncbi-assemblies -w Nitrospirota`",
             formatter_class=CustomRichHelpFormatter,
             add_help=False,
         )
@@ -92,111 +87,173 @@ def build_parser(parent_subparsers=None, show_detailed=False):
         return argparse.SUPPRESS if not show_detailed else text
 
     required = parser.add_argument_group("Required Parameters (one or both)")
-    selection = parser.add_argument_group("Reference-genome Selection Parameters (used with `-w`)")
+    selection = parser.add_argument_group("Taxon-selection Parameters (used with `-w`)")
     optional = parser.add_argument_group("Optional Parameters")
 
     required.add_argument(
-        "-a", "--ncbi-accessions",
-        metavar="<file>",
-        dest="ncbi_accessions",
-        default=None,
-        help="single-column file of NCBI assembly accessions",
-    )
-
-    required.add_argument(
-        "-w", "--wanted-ref-tax",
-        metavar="<str>",
+        "-w", "--wanted-tax",
+        metavar="<STR>",
         dest="wanted_ref_tax",
         action="append",
         default=None,
-        help=("target taxon to pull genomes for (a name, or 'all'); can be given "
-              "multiple times, and combined with `-a`"),
+        help=("Target taxon to pull genomes for (a name, or 'all'). Can be given "
+              "multiple times, and can be combined with `-a`."),
+    )
+
+    required.add_argument(
+        "-a", "--ncbi-accessions",
+        metavar="<FILE>",
+        dest="ncbi_accessions",
+        default=None,
+        help="Single-column file of wanted NCBI assembly accessions",
+    )
+
+
+    selection.add_argument(
+        "--source",
+        type=str.lower,
+        choices=SOURCE_CHOICES,
+        default="gtdb",
+        help="Which taxonomy to pull `-w` targets from (default: gtdb)",
     )
 
     selection.add_argument(
-        "--source", metavar="<str>", type=str.lower,
-        choices=SOURCE_CHOICES, default="gtdb",
-        help="where to pull reference genomes from; default: gtdb",
+        "--ncbi-section",
+        type=str.lower,
+        dest="ncbi_section",
+        choices=SECTION_CHOICES,
+        default="both",
+        help=("Which part of NCBI to draw from (default: both). You probably only "
+              "need to worry about changing this from 'both' if you are setting "
+              "`--derep-rank off` and/or targeting a single species. Ignored with "
+              "`--source gtdb`."),
     )
 
     selection.add_argument(
-        "--ncbi-section", metavar="<str>", type=str.lower,
-        dest="ncbi_section", choices=SECTION_CHOICES, default="both",
-        help=("which part of NCBI to draw from; default: both (ignored with "
-              "`--source gtdb`)"),
+        "--derep-rank",
+        type=str.lower,
+        choices=["auto", "off"] + list(RANKS),
+        default="auto",
+        help=("Dereplicate down to one genome per unique value of this rank "
+              "(default: auto). 'auto' is two ranks finer than the "
+              "target (one rank finer for eukaryotes). 'off' downloads every "
+              "genome under the target taxon, so use with care :)"),
     )
 
     selection.add_argument(
-        "--derep-rank", metavar="<str>", type=str.lower,
-        choices=["auto", "off"] + list(RANKS), default="auto",
-        help=("dereplicate to one best genome per unique value of this rank; "
-              "default: auto"),
+        "--target-rank",
+        type=str.lower,
+        dest="target_rank",
+        choices=list(RANKS),
+        default=None,
+        help="Target rank (if needed to disambiguate a taxon name that exists at multiple ranks)",
     )
 
     selection.add_argument(
-        "--target-rank", metavar="<str>", type=str.lower,
-        dest="target_rank", choices=list(RANKS), default=None,
-        help="rank of the `-w` taxon; default: auto-detected",
+        "--target-domain",
+        metavar="<STR>",
+        dest="target_domain",
+        default=None,
+        help="Target domain (if needed to disambiguate a taxon name that exists in multiple domains)",
     )
 
     selection.add_argument(
-        "--target-domain", metavar="<str>",
-        dest="target_domain", default=None,
-        help="domain of the `-w` taxon, if the name spans more than one",
+        "--exclusion-list",
+        metavar="<FILE>",
+        dest="exclusion_list",
+        default=None,
+        help=h(exclusion_list_help("-w")),
+    )
+
+    selection.add_argument(
+        "--representatives-only",
+        dest="representatives_only",
+        action="store_true",
+        help=h("With `--source gtdb`, only pull GTDB representative genomes; "
+               "with `--source ncbi`, only pull NCBI reference genomes. If the goal is "
+               "removing redundancy, the `--derep-rank` parameter can handle that while "
+               "ensuring the breadth of available diversity is maintained."),
+    )
+
+    selection.add_argument(
+        "--assembly-level",
+        action="append",
+        choices=list(ASSEMBLY_LEVELS),
+        default=None,
+        help=h("Only include genomes (from `-w`) at these assembly levels. "
+               "Can be provided multiple times."),
+    )
+
+    selection.add_argument(
+        "--min-completeness",
+        metavar="<FLOAT>",
+        type=float,
+        dest="min_completeness",
+        default=None,
+        help=h("Don't include any genomes (from `-w`) below this checkm completeness "
+               "(default: None). If set, genomes with no recorded "
+               "value are also excluded."),
+    )
+
+    selection.add_argument(
+        "--max-contamination",
+        metavar="<FLOAT>",
+        type=float,
+        dest="max_contamination",
+        default=None,
+        help=h("Don't include any genomes (from `-w`) above this checkm contamination "
+               "(default: None). If set, genomes with no recorded "
+               "value are also excluded."),
     )
 
     selection.add_argument(
         "--dry-run",
-        dest="dry_run", action="store_true",
-        help=("report how many genomes each `-w` would pull and the combined total, "
-              "then stop without downloading anything"),
+        dest="dry_run",
+        action="store_true",
+        help=("Run the selection (based on `-w`), but just report how many genomes would be downloaded"),
     )
 
     optional.add_argument(
-        "-f", "--format", metavar="<str>", type=str.lower,
-        choices=FORMAT_CHOICES, default="fasta",
-        help='format to download; default: "fasta"',
+        "-f",
+        "--format",
+        type=str.lower,
+        choices=FORMAT_CHOICES,
+        default="fasta",
+        help='Format to download (default: "fasta")',
     )
 
     optional.add_argument(
-        "-j", "--jobs", metavar="<int>", type=int, default=10,
-        help=("number of concurrent downloads (capped at 20 to keep NCBI happy); "
-              "default: 10"),
+        "-j",
+        "--jobs",
+        metavar="<INT>",
+        type=int,
+        default=10,
+        help="Number of concurrent downloads (default: 10; capped at 20 to keep NCBI happy)",
     )
 
     optional.add_argument(
-        "-o", "--output-dir", metavar="<dir>",
-        dest="output_dir", default=".",
-        help="directory to save output files; default: current directory",
-    )
-
-    fine = parser.add_argument_group("Fine-tuning Parameters") if show_detailed else parser
-
-    fine.add_argument(
-        "--assembly-level", metavar="<str>",
-        dest="assembly_level", choices=list(ASSEMBLY_LEVELS), nargs="+", default=None,
-        help=h("restrict the candidate pool to these assembly levels before selection"),
-    )
-
-    fine.add_argument(
-        "--min-completeness", metavar="<float>", type=float,
-        dest="min_completeness", default=None,
-        help=h("drop candidate genomes below this checkm completeness before selection"),
-    )
-
-    fine.add_argument(
-        "--max-contamination", metavar="<float>", type=float,
-        dest="max_contamination", default=None,
-        help=h("drop candidate genomes above this checkm contamination before selection"),
+        "-o",
+        "--output-dir",
+        metavar="<DIR>",
+        dest="output_dir",
+        default=".",
+        help="Directory for output files (default: current directory)",
     )
 
     optional.add_argument(
-        "-s", "--show-detailed-help",
-        dest="show_detailed_help", action="store_true",
-        help="show detailed help, including fine-tuning parameters",
+        "-s",
+        "--show-detailed-help",
+        dest="show_detailed_help",
+        action="store_true",
+        help="Show detailed help, including additional taxon-selection parameters",
     )
 
-    add_help(optional)
+    optional.add_argument(
+        "-h",
+        "--help",
+        action="help",
+        help="Show basic help",
+    )
     add_version_arg(optional)
 
     return parser
@@ -261,6 +318,23 @@ def preflight_checks(args):
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(1)
 
+    exclusion_list = getattr(args, "exclusion_list", None)
+    if exclusion_list:
+        if not wanted:
+            report_message("An `--exclusion-list` was provided, but that only has an "
+                           "effect alongside `-w` (it removes genomes from what `-w` "
+                           "pulls in). Accessions given directly with `-a` are always "
+                           "downloaded as provided, so nothing would be excluded. Stopping "
+                           "here to let you adjust input parameters we we're all on the same page :)",
+                           "yellow", ii="    ", si="    ", width=100,
+                           trailing_newline=True)
+            sys.exit(1)
+        if not os.path.isfile(exclusion_list):
+            report_message(f"The specified exclusion list, '{exclusion_list}', wasn't "
+                           "found :(", "yellow",
+                           ii="    ", si="    ", width=100, trailing_newline=True)
+            sys.exit(1)
+
     # a dry run reports and stops, so it must not create anything
     if not getattr(args, "dry_run", False):
         if args.output_dir and not os.path.exists(args.output_dir):
@@ -270,18 +344,31 @@ def preflight_checks(args):
 
 
 def _selection_kwargs(args):
-    """The selection knobs shared by every `-w` target in a run."""
+    """
+    The selection knobs shared by every `-w` target in a run.
+    """
+    # Deliberately NOT the source's own default (`None`), which would make a GTDB
+    # pull species-representatives-only. Two reasons:
+    #   1. --derep-rank is `auto` here, so volume is already controlled by
+    #      dereplication. Reps-only was a volume brake, and on top of derep it only
+    #      narrows what each group can be represented BY -- quietly excluding a
+    #      possibly-better genome for no benefit.
+    #   2. `gtt get-accs-from-gtdb` already defaults to all genomes, so deferring to
+    #      the source default here would make this subcommand the odd one out.
+    # With this, --representatives-only means the same thing for both sources, and
+    # matches my `bit dl-ncbi-assemblies`.
+    reps_only = bool(getattr(args, "representatives_only", False))
+
     return {
         "target_rank": getattr(args, "target_rank", None),
         "derep_rank": getattr(args, "derep_rank", "auto"),
         "target_domain": getattr(args, "target_domain", None),
         "ncbi_section": getattr(args, "ncbi_section", "refseq"),
+        "reps_only": reps_only,
+        "assembly_levels": getattr(args, "assembly_level", None),
         "min_completeness": getattr(args, "min_completeness", None),
         "max_contamination": getattr(args, "max_contamination", None),
-        # this subcommand downloads files rather than writing a metadata TSV, and it
-        # does no HMM auto-selection, so it never reads the selection's metadata rows.
-        # Skipping them saves a second filtered read of the asset per taxon, which
-        # matters most on `-w all` and on a --dry-run someone is waiting on.
+        "exclude_cores": load_exclusion_cores(getattr(args, "exclusion_list", None)),
         "include_rows": False,
     }
 
@@ -358,6 +445,7 @@ def resolve_targets(args):
             effective_derep_rank=selection.effective_derep_rank,
             num_selected=len(taxon_accs),
             num_new=num_new,
+            num_excluded=getattr(selection, "num_excluded", 0),
             warnings=list(selection.warnings)))
 
     return accessions, selections, (expansion_note, num_from_file)
@@ -378,6 +466,7 @@ class TaxonSelection:
     effective_derep_rank: str = None
     num_selected: int = 0
     num_new: int = 0
+    num_excluded: int = 0
     warnings: list = None
 
 
@@ -404,7 +493,7 @@ def report_selection(accessions, selections, expansion_note, args):
     for sel in selections:
         derep = (f"dereplicated to one genome per {sel.effective_derep_rank}"
                  if sel.effective_derep_rank else "dereplication off")
-        wprint(f"-w {color_text(sel.canonical)}  "
+        wprint(f"-w {color_text(sel.canonical)} "
                f"(resolved to {sel.resolved_rank}; {derep})", ii="    ", si="    ")
 
         line = f"{sel.num_selected:,} genome(s) selected"
@@ -421,8 +510,6 @@ def report_selection(accessions, selections, expansion_note, args):
     if getattr(args, "dry_run", False):
         wprint(color_text(f"Total that would be downloaded: {total:,} genome(s) in "
                           f"{args.format} format.", "green"), ii="    ", si="    ")
-        wprint("(dry run, nothing was downloaded and no files were written)",
-               ii="    ", si="    ")
     else:
         wprint(color_text(f"Total to download: {total:,} genome(s)", "green"),
                ii="    ", si="    ")

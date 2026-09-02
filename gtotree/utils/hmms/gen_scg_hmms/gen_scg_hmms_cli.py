@@ -46,6 +46,7 @@ from gtotree.utils.misc.data_locations import ensure_reference_data
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon
 from gtotree.utils.taxonomy.wanted_ref_tax import WantedRefTaxError
+from gtotree.utils.taxonomy.exclusion_list import exclusion_list_help
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
     GenSCGHMMsError,
     DEFAULT_MIN_PFAM_COVERAGE,
@@ -54,7 +55,9 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
     read_hmm_accessions,
     write_filtered_pfam_hmms,
 )
-from gtotree.utils.misc.resume_state import ResumeProfile, hash_strings, hash_local_genomes, STATE_VERSION
+from gtotree.utils.misc.resume_state import (ResumeProfile, hash_strings,
+                                             hash_local_genomes,
+                                             hash_file_contents, STATE_VERSION)
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (TargetGenomeError,
                                                                   build_run_data,
                                                                   resolve_download_info,
@@ -104,6 +107,7 @@ RESUME = ResumeProfile(
         "derep_rank": "--derep-rank",
         "min_completeness": "--min-completeness",
         "max_contamination": "--max-contamination",
+        "exclusion_list_sha256": "the exclusion list (--exclusion-list)",
         "pfam_version": "the Pfam version",
     },
     # the Pfam version isn't resolved until the Pfam stage runs, so a run interrupted
@@ -144,6 +148,10 @@ def build_fingerprint(run_data, args, pfam_version=None):
         "derep_rank": args.derep_rank,
         "min_completeness": args.min_completeness,
         "max_contamination": args.max_contamination,
+        # hashed by CONTENTS, not path: moving the file shouldn't force a re-run,
+        # and editing it in place must, since it changes which genomes get selected
+        "exclusion_list_sha256": hash_file_contents(
+            getattr(args, "exclusion_list", None)),
         "pfam_version": pfam_version,
     }
 
@@ -291,6 +299,15 @@ def build_parser(parent_subparsers=None):
     )
 
     optional.add_argument(
+        "--exclusion-list",
+        metavar="<FILE>",
+        dest="exclusion_list",
+        default=None,
+        help=exclusion_list_help("-w"),
+        action="store",
+    )
+
+    optional.add_argument(
         "-o", "--output-dir",
         metavar="<DIR>",
         default=DEFAULT_OUTPUT_DIR,
@@ -428,6 +445,18 @@ def check_args(args):
             "`--min-completeness` / `--max-contamination` filter the genomes selected "
             "by `--wanted-ref-tax` (-w), so they need `-w` to act on. Genomes given "
             "directly with `-a`, `-g`, `-f`, or `-A` are always used as provided.")
+
+    exclusion_list = getattr(args, "exclusion_list", None)
+    if exclusion_list:
+        if not args.wanted_ref_tax:
+            raise GenSCGHMMsError(
+                "An `--exclusion-list` only has an effect alongside "
+                "`--wanted-ref-tax` (-w), since it removes genomes from what `-w` "
+                "selects. Genomes given directly with `-a`, `-g`, `-f`, or `-A` are "
+                "always used as provided, so nothing would be excluded.")
+        if not os.path.isfile(exclusion_list):
+            raise GenSCGHMMsError(
+                f"The specified exclusion list '{exclusion_list}' can't be found.")
 
     return args
 

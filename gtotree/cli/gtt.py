@@ -72,7 +72,13 @@ PROGRAM_GROUPS = [
             },
             {
                 "name": "itol",
-                "desc": "generate iToL files for annotating a tree at itol.embl.de",
+                "desc": "",
+                "subcommands": [
+                    ("style",         "generate a branch/label style dataset file"),
+                    ("binary-dataset","generate a binary dataset annotation file"),
+                    ("colorstrip",    "generate a color strip annotation file"),
+                    ("text-dataset",  "generate a text label dataset file"),
+                ],
             },
         ],
     },
@@ -94,7 +100,7 @@ PROGRAM_GROUPS = [
         "programs": [
             {
                 "name": "test",
-                "desc": "run a quick end-to-end test of the installed environment",
+                "desc": "run a quick end-to-end test of the main gtotree program in the installed environment",
             },
         ],
     },

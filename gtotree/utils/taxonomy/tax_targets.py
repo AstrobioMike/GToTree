@@ -26,7 +26,7 @@ def is_all_target(value):
 
 
 def domains_in_asset(path, source, rep_filter=None, accession_prefixes=None,
-                     assembly_levels=None):
+                     assembly_levels=None, exclude_cores=None):
     """
     The domains present in the asset, under the same pool filters the pull will use.
 
@@ -34,7 +34,8 @@ def domains_in_asset(path, source, rep_filter=None, accession_prefixes=None,
     """
     return distinct_taxa(path, source, DOMAIN_RANK, rep_filter=rep_filter,
                          accession_prefixes=accession_prefixes,
-                         assembly_levels=assembly_levels)
+                         assembly_levels=assembly_levels,
+                         exclude_cores=exclude_cores)
 
 
 def expand_all_targets(path, source, taxa, rep_filter=None, accession_prefixes=None,
@@ -101,7 +102,8 @@ class UnassignedDomainSummary:
 
 
 def unassigned_domain_summary(path, source, rank=None, rep_filter=None,
-                              accession_prefixes=None, assembly_levels=None):
+                              accession_prefixes=None, assembly_levels=None,
+                              exclude_cores=None):
     """
     Describe the domain-less slice of the asset under the given pool filters.
 
@@ -112,6 +114,7 @@ def unassigned_domain_summary(path, source, rank=None, rep_filter=None,
     n_genomes = count_genomes(path, source, rep_filter=rep_filter,
                               accession_prefixes=accession_prefixes,
                               assembly_levels=assembly_levels,
+                              exclude_cores=exclude_cores,
                               domain_assigned=False)
 
     if not n_genomes or not rank:
@@ -120,6 +123,7 @@ def unassigned_domain_summary(path, source, rank=None, rep_filter=None,
     n_taxa = count_distinct_taxa(path, source, rank, rep_filter=rep_filter,
                                  accession_prefixes=accession_prefixes,
                                  assembly_levels=assembly_levels,
+                                 exclude_cores=exclude_cores,
                                  domain_assigned=False)
 
     return UnassignedDomainSummary(n_genomes, rank=rank, n_taxa_at_rank=n_taxa)

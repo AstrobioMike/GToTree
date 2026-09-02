@@ -88,7 +88,8 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
                                       derep_rank="auto", min_completeness=None,
                                       max_contamination=None, target_domain=None,
                                       ncbi_section="refseq", include_rows=True,
-                                      building_tree=False):
+                                      building_tree=False, exclude_cores=None,
+                                      reps_only=None, assembly_levels=None):
     """
     Resolve `-w <taxon>` to a list of assembly accessions plus the RefGenomeSelection
     it came from (for warnings / provenance the caller may want to surface).
@@ -122,6 +123,19 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
         a caller that wants accessions and counts alone (`gtt dl-ncbi-assemblies`); it
         skips a second filtered read of the asset per taxon without changing which
         genomes are selected.
+    reps_only : bool or None
+        Restrict the candidate pool to the source's representative/reference
+        genomes. None (the default) defers to the source's own default, which is
+        representatives-only for GTDB and all genomes for NCBI. Callers that want
+        the same meaning for both sources pass an explicit bool.
+    assembly_levels : list or None
+        Optional assembly_level restriction, applied to the candidate pool before
+        selection.
+    exclude_cores : set or None
+        Accession cores from `--exclusion-list`. Handed to the selection core rather
+        than applied to its result, so the listed genomes leave the candidate pool
+        before dereplication: excluding a group's chosen representative promotes the
+        next-best genome in that group instead of dropping the group entirely.
     building_tree : bool
         Whether the selected genomes become a tree. Only the main GToTree driver sets
         this; `gtt gen-scg-hmms` and `gtt search-annotations` share this
@@ -150,9 +164,12 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
         target_rank=target_rank, derep_rank=derep_rank,
         screen_against=screen_against,
         accession_prefixes=section_prefixes(source, ncbi_section),
+        reps_only=reps_only,
+        assembly_levels=assembly_levels,
         min_completeness=min_completeness,
         max_contamination=max_contamination,
         target_domain=target_domain,
+        exclude_cores=exclude_cores,
         include_rows=include_rows)
 
     if not selection.accessions:
@@ -160,6 +177,9 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
         if min_completeness is not None or max_contamination is not None:
             detail = (" No genomes cleared the requested quality floor, so you may "
                       "want to relax `--min-completeness` / `--max-contamination`.")
+        elif exclude_cores:
+            detail = (" Every candidate genome for it was named in the "
+                      "`--exclusion-list`.")
         raise WantedRefTaxError(
             f"No accessions were found for the --wanted-ref-tax target "
             f"'{selection.canonical}'.{detail}")

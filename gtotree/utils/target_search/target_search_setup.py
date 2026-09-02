@@ -122,9 +122,10 @@ def requested_specs(args, specs):
 
 def _check_dangling_ref_tax_args(args):
     """
-    `--target-rank` and `--derep-rank` only mean something alongside `-w`, and
-    `--target-rank` additionally can't mean anything alongside `-w all`. Caught up
-    front so a misunderstanding fails before any dataset is fetched.
+    `--target-rank`, `--derep-rank`, and `--exclusion-list` only mean something
+    alongside `-w`, and `--target-rank` additionally can't mean anything alongside
+    `-w all`. Caught up front so a misunderstanding fails before any dataset is
+    fetched.
     """
     if args.wanted_ref_tax:
         if args.target_rank is not None and any(is_all_target(t)
@@ -141,6 +142,8 @@ def _check_dangling_ref_tax_args(args):
         dangling.append("`--target-rank`")
     if args.derep_rank not in (None, "auto"):
         dangling.append("`--derep-rank`")
+    if getattr(args, "exclusion_list", None):
+        dangling.append("`--exclusion-list`")
 
     if dangling:
         joined = " and ".join(dangling)
@@ -469,7 +472,8 @@ def validate_genome_input_files(args):
     for dest, flag in (("ncbi_accessions", "-a"),
                        ("genbank_files", "-g"),
                        ("fasta_files", "-f"),
-                       ("amino_acid_files", "-A")):
+                       ("amino_acid_files", "-A"),
+                       ("exclusion_list", "--exclusion-list")):
         value = getattr(args, dest, None)
         if value:
             setattr(args, dest, check_expected_single_column_input(value, flag))

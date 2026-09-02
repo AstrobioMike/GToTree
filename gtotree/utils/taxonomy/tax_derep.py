@@ -50,6 +50,9 @@ DEREP_STEPS = 2
 # CrossDomainTaxon for it unless --target-domain picks one, so the domain passed here
 # is always unambiguous.
 DEREP_STEPS_BY_DOMAIN = {"Eukaryota": 1}
+from gtotree.utils.taxonomy.exclusion_list import (filter_rows_by_exclusion,
+                                                    exclusion_warning)
+
 
 def _derive_default_derep(target_rank, steps=DEREP_STEPS):
     """`steps` ranks finer, clamped at species; None if that would be the target's own rank."""
@@ -327,7 +330,8 @@ def _quality_floor_warnings(n_below, n_missing, min_completeness, max_contaminat
 def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
           reps_only=None, pick="quality", screen_against=None,
           accession_prefixes=None, assembly_levels=None,
-          min_completeness=None, max_contamination=None, domain=None):
+          min_completeness=None, max_contamination=None, domain=None,
+          exclude_cores=None):
     """
     One genome per unique value of `derep_rank`, within `wanted_taxon`
 
@@ -367,7 +371,13 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
         quality. Applied before grouping, so a group with no genome clearing the
         floor drops out entirely.
 
-    Returns (accessions, groups_seen, warnings).
+    exclude_cores:
+        Optional set of accession cores (from `--exclusion-list`) to drop from the
+        candidate pool.
+
+    Returns (accessions, groups_seen, warnings, num_excluded), where num_excluded is
+    how many CANDIDATES `exclude_cores` removed (not how many fewer genomes come
+    out, which dereplication makes a different and much less meaningful number).
     """
     warnings = []
 
@@ -423,6 +433,11 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
     else:
         rows = tab.to_pylist()
 
+    rows, n_excluded = filter_rows_by_exclusion(rows, spec.acc_col, exclude_cores)
+    excluded_note = exclusion_warning(n_excluded)
+    if excluded_note:
+        warnings.append(excluded_note)
+
     rows, n_below, n_missing = apply_quality_floor(
         rows, spec, min_completeness, max_contamination)
     warnings.extend(_quality_floor_warnings(
@@ -431,7 +446,7 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
     if not rows:
         warnings.append(f"No genomes found under {wanted_rank} '{wanted_taxon}'"
                         + (" in the representatives pool." if reps_only else "."))
-        return [], 0, warnings
+        return [], 0, warnings, n_excluded
 
     keyfn = resolve_picker(pick)
 
@@ -452,7 +467,7 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
     #         f"skipped (unnamed/unclassified at that rank).")
 
     accs = [best[g][spec.acc_col] for g in sorted(best)]
-    return accs, len(best), warnings
+    return accs, len(best), warnings, n_excluded
 
 
 class RefGenomeSelection:
@@ -470,23 +485,27 @@ class RefGenomeSelection:
         effective_derep_rank : the rank dereplication collapsed to, or None if derep
                                was off (all genomes under the taxon kept)
         warnings             : human-facing advisory strings (empty list if none)
+        num_excluded         : how many CANDIDATE genomes an --exclusion-list removed
+                               before selection (0 when no list was given)
     """
 
     def __init__(self, accessions, rows, canonical, resolved_rank,
-                 effective_derep_rank, warnings):
+                 effective_derep_rank, warnings, num_excluded=0):
         self.accessions = accessions
         self.rows = rows
         self.canonical = canonical
         self.resolved_rank = resolved_rank
         self.effective_derep_rank = effective_derep_rank
         self.warnings = warnings
+        self.num_excluded = num_excluded
 
 
 def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                        reps_only=None, pick="quality", screen_against=None,
                        accession_prefixes=None, assembly_levels=None,
                        min_completeness=None, max_contamination=None,
-                       target_domain=None, include_rows=True):
+                       target_domain=None, include_rows=True,
+                       exclude_cores=None):
     """
     The one selection entry point shared by every surface that adds reference genomes
     by taxonomy: the standalone get-accessions helpers and the main GToTree driver's
@@ -524,6 +543,14 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
         selection (see apply_quality_floor). Both default to None (off). Honored on
         both paths below. With derep on it constrains what each group can be
         represented BY, and with derep off it constrains the kept set directly.
+
+    exclude_cores:
+        Optional set of accession cores (from `--exclusion-list`) to drop from the
+        candidate pool BEFORE selection, on both paths below. Applied up front for
+        the same reason as accession_prefixes and the quality floor: with derep on,
+        excluding a group's best genome promotes the next-best genome in that group
+        rather than deleting the group, and with derep off it simply removes the
+        listed genomes from the kept set.
 
     include_rows:
         Whether to carry the selected genomes' metadata rows back. Default True, and
@@ -583,6 +610,12 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                     f"{n_dead:,} candidate genome(s) are no longer available at NCBI "
                     f"(suppressed/removed) and were excluded.")
 
+        rows, n_excluded = filter_rows_by_exclusion(rows, spec.acc_col,
+                                                   exclude_cores)
+        excluded_note = exclusion_warning(n_excluded)
+        if excluded_note:
+            warnings.append(excluded_note)
+
         rows, n_below, n_missing = apply_quality_floor(
             rows, spec, min_completeness, max_contamination)
         warnings.extend(_quality_floor_warnings(
@@ -590,17 +623,18 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
 
         accessions = [r.get(spec.acc_col) for r in rows if r.get(spec.acc_col)]
         return RefGenomeSelection(accessions, rows if include_rows else [],
-                                  canonical, resolved_rank, None, warnings)
+                                  canonical, resolved_rank, None, warnings,
+                                  num_excluded=n_excluded)
 
     # 3. dereplicate to one best genome per unique value of effective_derep_rank.
     #    derep() returns accessions only, so re-slice to recover metadata rows for the
     #    kept set (keeps a single source of truth for WHICH genomes are picked).
-    accessions, _groups, derep_warnings = derep(
+    accessions, _groups, derep_warnings, n_excluded = derep(
         path, source, resolved_rank, canonical, effective_derep_rank,
         reps_only=reps_only, pick=pick, screen_against=screen_against,
         accession_prefixes=accession_prefixes, assembly_levels=assembly_levels,
         min_completeness=min_completeness, max_contamination=max_contamination,
-        domain=resolved_domain)
+        domain=resolved_domain, exclude_cores=exclude_cores)
     warnings.extend(derep_warnings)
 
     rows = _rows_for_accessions(path, source, resolved_rank, canonical,
@@ -610,18 +644,25 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                                 domain=resolved_domain) if include_rows else []
 
     return RefGenomeSelection(accessions, rows, canonical, resolved_rank,
-                              effective_derep_rank, warnings)
+                              effective_derep_rank, warnings,
+                              num_excluded=n_excluded)
 
 
 def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="quality",
                        screen_against=None, accession_prefixes=None,
                        assembly_levels=None, min_completeness=None,
-                       max_contamination=None, include_rows=True):
+                       max_contamination=None, include_rows=True,
+                       exclude_cores=None):
     """
     Dereplicate across the whole asset, by running one selection per domain and
     merging the results
 
     The domain list is READ FROM THE ASSET rather than hardcoded
+
+    An `exclude_cores` set is passed straight through to each domain's selection, so
+    the exclusion happens per-domain and pre-dereplication exactly as it does for a
+    named taxon. The per-domain exclusion advisories are collapsed into one line
+    carrying the asset-wide total
 
     Returns a RefGenomeSelection whose `canonical` is "all" and whose `domains` lists
     the domains that were walked.
@@ -633,6 +674,7 @@ def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="qu
     accessions, rows, warnings = [], [], []
     seen_accessions, seen_warnings = set(), set()
     effective_derep_rank = None
+    total_excluded = 0
 
     for domain in domains:
         selection = select_ref_genomes(
@@ -641,9 +683,10 @@ def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="qu
             accession_prefixes=accession_prefixes,
             assembly_levels=assembly_levels,
             min_completeness=min_completeness, max_contamination=max_contamination,
-            include_rows=include_rows)
+            include_rows=include_rows, exclude_cores=exclude_cores)
 
         effective_derep_rank = effective_derep_rank or selection.effective_derep_rank
+        total_excluded += selection.num_excluded
 
         for acc in selection.accessions:
             if acc not in seen_accessions:
@@ -654,7 +697,10 @@ def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="qu
 
         # each domain raises the same advisories (they depend on the target RANK, which
         # is 'domain' every time), so the user should see each one once, not per domain
+        per_domain_exclusion = exclusion_warning(selection.num_excluded)
         for warning in selection.warnings:
+            if warning == per_domain_exclusion:
+                continue
             if warning not in seen_warnings:
                 seen_warnings.add(warning)
                 warnings.append(warning)
@@ -662,8 +708,13 @@ def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="qu
     # what walking the domains cannot reach (the domain-less viral / metagenome rows).
     # Attached rather than warned about here: the CLIs decide the wording, and the
     # main driver never sees it, since it expands 'all' into per-domain targets.
+    total_exclusion_note = exclusion_warning(total_excluded)
+    if total_exclusion_note:
+        warnings.append(total_exclusion_note)
+
     merged = RefGenomeSelection(accessions, rows, "all", None,
-                                effective_derep_rank, warnings)
+                                effective_derep_rank, warnings,
+                                num_excluded=total_excluded)
     merged.domains = domains
     merged.unassigned = unassigned_domain_summary(
         path, source, rank=effective_derep_rank,
