@@ -37,12 +37,10 @@ from gtotree.utils.taxonomy.exclusion_list import (load_exclusion_cores,
 
 def build_parser(parent_subparsers=None):
 
-    desc = ("This is a helper program to facilitate using taxonomy and genomes "
-            "from the Genome Taxonomy Database (gtdb.ecogenomic.org) with GToTree. "
-            "It primarily returns NCBI accessions and GTDB metadata subsets based "
-            "on GTDB-taxonomy searches, with optional filtering to GTDB "
-            "representative species or RefSeq reference genomes, plus optional "
-            "dereplication down to one genome per specified rank.")
+    desc = ("This is a helper program to facilitate retrieving accessions from the "
+            "Genome Taxonomy Database (gtdb.ecogenomic.org). It returns NCBI "
+            "accessions and GTDB metadata subsets based on GTDB-taxonomy searches, "
+            "with optional filtering and dereplication settings.")
 
     if parent_subparsers is not None:
         parser = parent_subparsers.add_parser(
@@ -54,7 +52,7 @@ def build_parser(parent_subparsers=None):
     else:
         parser = argparse.ArgumentParser(
             description=desc,
-            epilog="Ex. usage: `gtt get-accs-from-gtdb -t Archaea --gtdb-representatives-only`",
+            epilog="Ex. usage: `gtt get-accs-from-gtdb -w Archaea --gtdb-representatives-only`",
             formatter_class=CustomRichHelpFormatter,
             add_help=False,
         )
@@ -63,9 +61,7 @@ def build_parser(parent_subparsers=None):
     optional = parser.add_argument_group("Optional Parameters")
 
     add_common_get_accs_args(
-        required, optional, "GTDB",
-        taxon_help=("Target taxon (a name, or 'all' for every domain in the table). "
-                    "Not needed with `--get-rank-counts`."))
+        required, optional, "GTDB")
 
     optional.add_argument(
         "-G",

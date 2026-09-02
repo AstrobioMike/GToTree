@@ -222,7 +222,7 @@ def scoped_counts_note(taxon_flag="-w"):
 
 
 def add_common_get_accs_args(required, optional, source_label,
-                             taxon_flags=("-w", "--wanted-ref-tax"),
+                             taxon_flags=("-w", "--wanted-tax"),
                              taxon_help=None):
     """
     Declare the flags both helpers take
@@ -230,8 +230,8 @@ def add_common_get_accs_args(required, optional, source_label,
     required.add_argument(
         *taxon_flags,
         metavar="<STR>",
-        help=taxon_help or ("Target taxon (a name, or 'all' for every domain in the "
-                            "table). Not needed with `--get-rank-counts`."),
+        dest="wanted_ref_tax",
+        help=taxon_help or ("Wanted tax to get accessions for (a name, or 'all'). Not needed with `--get-rank-counts`."),
         action="store",
     )
 
@@ -246,6 +246,7 @@ def add_common_get_accs_args(required, optional, source_label,
     optional.add_argument(
         "--target-domain",
         dest="target_domain",
+        metavar="<STR>",
         default=None,
         help=("Target domain (if needed to disambiguate a taxon name that exists in "
               "multiple domains)"),
@@ -264,13 +265,6 @@ def add_common_get_accs_args(required, optional, source_label,
     )
 
     optional.add_argument(
-        "-R", "--refseq-reference-genomes-only",
-        dest="refseq_reference_genomes_only",
-        action="store_true",
-        help="Pull only genomes designated as RefSeq reference genomes.",
-    )
-
-    optional.add_argument(
         "--exclusion-list",
         metavar="<FILE>",
         dest="exclusion_list",
@@ -283,9 +277,7 @@ def add_common_get_accs_args(required, optional, source_label,
         "--get-taxon-counts",
         action="store_true",
         help=(f"Provide this flag along with a specified taxon to `{taxon_flags[0]}` "
-              f"to see how many genomes match the set parameters. If `--derep-rank` "
-              f"is also set, the number of genomes following dereplication is "
-              f"reported too."),
+              f"to see how many genomes match the set parameters."),
     )
 
     optional.add_argument(
@@ -301,6 +293,13 @@ def add_common_get_accs_args(required, optional, source_label,
         action="store_true",
         help=(f"Provide just this flag alone to write out a tsv of GToTree's {source_label} "
               f"metadata table."),
+    )
+
+    optional.add_argument(
+        "-R", "--refseq-ref-genomes-only",
+        dest="refseq_reference_genomes_only",
+        action="store_true",
+        help="Pull only genomes designated as RefSeq reference genomes.",
     )
 
     return optional

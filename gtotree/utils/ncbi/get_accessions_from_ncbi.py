@@ -46,11 +46,9 @@ from gtotree.utils.taxonomy.exclusion_list import load_exclusion_cores
 
 def build_parser(parent_subparsers=None):
 
-    desc = ("This is a helper program to facilitate using taxonomy and genomes "
-            "from NCBI with GToTree. It primarily returns NCBI accessions and "
-            "metadata subsets based on NCBI-taxonomy searches, with optional "
-            "filtering by source (RefSeq/GenBank), assembly level, and/or RefSeq 'reference' genomes "
-            "only, plus optional dereplication down to one genome per specified rank.")
+    desc = ("This is a helper program to facilitate retrieving assembly accessions from NCBI. "
+            "It returns NCBI accessions and metadata subsets based on NCBI-taxonomy or taxid searches, "
+            "with optional filtering and dereplication settings.")
 
     if parent_subparsers is not None:
         parser = parent_subparsers.add_parser(
@@ -62,7 +60,7 @@ def build_parser(parent_subparsers=None):
     else:
         parser = argparse.ArgumentParser(
             description=desc,
-            epilog="Ex. usage: `gtt get-accs-from-ncbi -t Alteromonas`",
+            epilog="Ex. usage: `gtt get-accs-from-ncbi -w Alteromonas`",
             formatter_class=CustomRichHelpFormatter,
             add_help=False,
         )
@@ -72,8 +70,7 @@ def build_parser(parent_subparsers=None):
 
     add_common_get_accs_args(
         required, optional, "NCBI assembly-summary",
-        taxon_help=("Target taxon (a name, an NCBI taxid, or 'all' for every domain "
-                    "in the table). Not needed with `--get-rank-counts`."))
+        taxon_help=("Wanted tax to get accessions for (a name, an NCBI taxid, or 'all'). Not needed with `--get-rank-counts`."))
 
     optional.add_argument(
         "--ncbi-section",
