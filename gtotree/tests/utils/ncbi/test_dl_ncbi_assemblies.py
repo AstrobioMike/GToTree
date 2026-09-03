@@ -270,6 +270,62 @@ class TestSelectionSkipsMetadataRows:
         assert dry_sels[0].num_selected == real_sels[0].num_selected
 
 
+class TestAssemblyLevelPlumbing:
+    """
+    --assembly-level tokens must be parsed into the NCBI table's display strings before
+    reaching the selection core; passing the raw tokens through matched nothing and
+    silently dropped every genome.
+    """
+
+    def _capture(self, **kwargs):
+        sel = _selection("T", ["GCF_1"])
+        with patch(f"{_MOD}.resolve_wanted_ref_tax_accessions",
+                   return_value=(sel.accessions, sel)) as m, \
+             patch(f"{_MOD}.expand_wanted_ref_tax", return_value=(["T"], [])):
+            resolve_targets(_args(wanted_ref_tax=["T"], source="ncbi", **kwargs))
+        return m.call_args.kwargs
+
+    def test_single_level_is_parsed(self):
+        assert self._capture(assembly_level=["complete"])["assembly_levels"] == \
+            ["Complete Genome"]
+
+    def test_multiple_levels_all_pass_through(self):
+        # argparse append accumulates; all levels are parsed and kept, not just the last
+        assert self._capture(assembly_level=["complete", "contig"])["assembly_levels"] \
+            == ["Complete Genome", "Contig"]
+
+    def test_no_level_is_empty(self):
+        assert self._capture(assembly_level=None)["assembly_levels"] == []
+
+
+class TestAssemblyLevelSourceGuard:
+
+    def _preflight(self, **kwargs):
+        from gtotree.utils.ncbi.dl_ncbi_assemblies import preflight_checks
+        with patch(f"{_MOD}.get_ncbi_assembly_data"):
+            preflight_checks(_args(**kwargs))
+
+    def test_assembly_level_with_gtdb_source_exits(self, capsys):
+        # GTDB has no assembly-level column; erroring beats silently ignoring the flag
+        with pytest.raises(SystemExit):
+            self._preflight(source="gtdb", wanted_ref_tax=["Bacteria"],
+                            assembly_level=["complete"])
+        assert "--source ncbi" in capsys.readouterr().out
+
+    def test_assembly_level_with_ncbi_source_is_fine(self):
+        self._preflight(source="ncbi", wanted_ref_tax=["Bacteria"],
+                        assembly_level=["complete"])
+
+
+class TestAssemblyLevelIsRepeatableOnParser:
+
+    def test_repeated_flag_accumulates(self):
+        args = build_parser().parse_args(
+            ["-w", "Nitrospirota", "--source", "ncbi",
+             "--assembly-level", "complete", "--assembly-level", "contig"])
+        assert args.assembly_level == ["complete", "contig"]
+
+
 ################################################################################
 # download_one: built on urllib, not requests.
 #

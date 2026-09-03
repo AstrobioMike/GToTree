@@ -161,6 +161,17 @@ def test_bad_assembly_level_rejected(in_ncbi, capsys):
     assert "unrecognised" in capsys.readouterr().out.lower()
 
 
+def test_cli_assembly_level_is_repeatable():
+    # repeated --assembly-level must accumulate (argparse append), not overwrite down to
+    # the last value
+    from gtotree.utils.taxonomy.get_accs_shared import parse_assembly_levels
+    args = mod.build_parser().parse_args(
+        ["-w", "Testophyla", "--assembly-level", "complete",
+         "--assembly-level", "contig"])
+    assert args.assembly_level == ["complete", "contig"]
+    assert parse_assembly_levels(args.assembly_level) == ["Complete Genome", "Contig"]
+
+
 def test_coarser_derep_rank_rejected(in_ncbi, capsys):
     code = _run(_args(wanted_ref_tax="GenA", ncbi_section="both", derep_rank="phylum"))
     assert code == 0
@@ -190,25 +201,29 @@ def test_taxon_counts_proper_case_no_match_note(in_ncbi, capsys):
 
 
 def test_taxon_counts_reports_per_rank_breakdown(in_ncbi, capsys):
-    # GTDB-style format: "The rank 'X' has N <taxon> entries."
+    # GTDB-style format, now with the generic filter tag appended to every count line
     _run(_args(wanted_ref_tax="Testophyla", ncbi_section="both", get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 4 Testophyla entries." in out
+    assert ("The rank 'phylum' has 4 Testophyla entries "
+            "(after any specified filters)." in out)
 
 
 def test_taxon_counts_applies_source_filter(in_ncbi, capsys):
-    # source refseq -> only the 2 GCF rows under Testophyla; scope note names the source
+    # source refseq -> only the 2 GCF rows under Testophyla; the count reflects the
+    # filter, and the generic "(after any specified filters)" tag flags that it does
     _run(_args(wanted_ref_tax="Testophyla", ncbi_section="refseq", get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 2 Testophyla entries (in refseq)." in out
+    assert ("The rank 'phylum' has 2 Testophyla entries "
+            "(after any specified filters)." in out)
 
 
 def test_taxon_counts_applies_assembly_level_filter(in_ncbi, capsys):
-    # only GCA_...004 is Scaffold under Testophyla; scope note names the level
+    # only GCA_...004 is Scaffold under Testophyla; count drops to 1 and carries the tag
     _run(_args(wanted_ref_tax="Testophyla", ncbi_section="both", assembly_level="scaffold",
                get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 1 Testophyla entries (at assembly level Scaffold)." in out
+    assert ("The rank 'phylum' has 1 Testophyla entries "
+            "(after any specified filters)." in out)
 
 
 def test_taxon_counts_reps_block(in_ncbi, capsys):
@@ -216,7 +231,8 @@ def test_taxon_counts_reps_block(in_ncbi, capsys):
     _run(_args(wanted_ref_tax="Testophyla", ncbi_section="both",
                refseq_reference_genomes_only=True, get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 4 Testophyla entries." in out         # base pool (source both -> no scope note)
+    assert ("The rank 'phylum' has 4 Testophyla entries "
+            "(after any specified filters)." in out)  # base pool
     assert "Of those, in considering only RefSeq reference genomes:" in out
     assert "has 1 Testophyla RefSeq reference genome entries." in out    # only GCF_...003
 
@@ -227,7 +243,8 @@ def test_taxon_counts_reports_matches_and_the_dereplicated_size(in_ncbi, capsys)
     _run(_args(wanted_ref_tax="Testophyla", ncbi_section="both", derep_rank="family",
                get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 4 Testophyla entries." in out   # all 4, not 2 families
+    assert ("The rank 'phylum' has 4 Testophyla entries "
+            "(after any specified filters)." in out)  # all 4, not 2 families
     assert "Dereplicated at 'family', that would be 2 genome(s)." in out
 
 
@@ -240,8 +257,10 @@ def test_taxon_counts_multi_rank_breakdown(in_ncbi, capsys, tmp_path):
     _write_mock_ncbi(tmp_path / PARQUET_FILENAME, records)
     _run(_args(wanted_ref_tax="Dualname", ncbi_section="both", get_taxon_counts=True))
     out = capsys.readouterr().out
-    assert "The rank 'phylum' has 1 Dualname entries." in out
-    assert "The rank 'class' has 1 Dualname entries." in out
+    assert ("The rank 'phylum' has 1 Dualname entries "
+            "(after any specified filters)." in out)
+    assert ("The rank 'class' has 1 Dualname entries "
+            "(after any specified filters)." in out)
 
 
 def test_get_table_writes_full_metadata_tsv(in_ncbi, capsys):

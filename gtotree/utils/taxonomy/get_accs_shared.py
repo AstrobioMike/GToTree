@@ -222,12 +222,28 @@ def derep_note(pool, rank, taxon, derep_rank):
     return f"Dereplicated at '{effective}', that would be {n:,} genome(s).", warnings
 
 
+FILTERS_APPLIED_NOTE = " (after any specified filters)"
+
+
+def with_filters_note(text):
+    """
+    Append FILTERS_APPLIED_NOTE just inside a line's trailing period, if it has one.
+
+    "The rank 'genus' has 2 X entries." ->
+    "The rank 'genus' has 2 X entries (after any specified filters)."
+    """
+    if text.endswith("."):
+        return text[:-1] + FILTERS_APPLIED_NOTE + "."
+    return text + FILTERS_APPLIED_NOTE
+
+
 def pull_count_lines(pool, resolved_rank, taxon, effective_derep_rank, kept_n):
     """
     The count block a completed pull prints above its "Wrote N accession(s)" lines
     """
     total = pool.count_genomes(rank=resolved_rank, taxon=taxon)
-    header = f"The rank '{resolved_rank}' has {total:,} {taxon} entries."
+    header = with_filters_note(
+        f"The rank '{resolved_rank}' has {total:,} {taxon} entries.")
     if effective_derep_rank is None:
         return header, None
     derep = (f"Dereplicated at '{effective_derep_rank}', that is "

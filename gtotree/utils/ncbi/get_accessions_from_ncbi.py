@@ -20,7 +20,8 @@ from gtotree.utils.taxonomy.tax_counts import (representatives_filter, count_gen
                                                render_rank_count_table)
 from gtotree.utils.taxonomy.tax_targets import (is_all_target,
                                                 unassigned_domain_summary)
-from gtotree.utils.taxonomy.get_accs_shared import (ASSEMBLY_LEVELS, PoolSpec,
+from gtotree.utils.taxonomy.get_accs_shared import (ASSEMBLY_LEVELS,
+                                                    FILTERS_APPLIED_NOTE, PoolSpec,
                                                     add_common_get_accs_args,
                                                     apply_derep_default,
                                                     derep_note as _shared_derep_note,
@@ -28,7 +29,8 @@ from gtotree.utils.taxonomy.get_accs_shared import (ASSEMBLY_LEVELS, PoolSpec,
                                                     parse_assembly_levels as _parse_levels,
                                                     pull_count_lines,
                                                     scoped_counts_note,
-                                                    source_prefixes as _shared_prefixes)
+                                                    source_prefixes as _shared_prefixes,
+                                                    with_filters_note)
 
 
 _COLUMNS = [
@@ -90,10 +92,11 @@ def build_parser(parent_subparsers=None):
 
     optional.add_argument(
         "--assembly-level",
+        action="append",
         choices=list(_ASSEMBLY_LEVELS),
         default=None,
-        help=("Only include genomes (from `-w`) at this assembly level. "
-               "Can be provided multiple times."),
+        help=("Only include genomes (from `-w`) at this assembly level. Can be "
+              "provided multiple times."),
     )
 
     add_help(optional)
@@ -171,14 +174,14 @@ def get_accessions_from_ncbi(args):
 
     if args.get_taxon_counts:
         print("")
-        wprint(f"There are {len(rows):,} genome(s) under {label} with any specified "
-               "filters.")
+        wprint(with_filters_note(
+            f"There are {len(rows):,} genome(s) under {label}."))
         print("")
         sys.exit(0)
 
     if not rows:
-        wprint(color_text(f"No genomes were found under {label} with any specified "
-                          "filters.", "yellow"))
+        wprint(color_text(with_filters_note(
+            f"No genomes were found under {label}."), "yellow"))
         print("")
         sys.exit(0)
 
@@ -320,7 +323,6 @@ def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_leve
     """
     prefixes = _source_prefixes(args.ncbi_section)
     reps_only = args.refseq_reference_genomes_only
-    scope_note = _counts_scope_note(args, assembly_levels)
 
     try:
         canonical, ranks_found_in, _domains_found = _resolve_ranks(table_path, taxon)
@@ -340,7 +342,8 @@ def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_leve
                            exclude_cores=exclude_cores)
 
         print("")
-        report_message(f"The rank '{rank}' has {total:,} {canonical} entries{scope_note}.",
+        report_message(with_filters_note(
+                           f"The rank '{rank}' has {total:,} {canonical} entries."),
                        color=None, ii="    ", si="    ", width=100, newline=False)
         print("")
         print(render_rank_count_table(
@@ -360,8 +363,6 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels, exclu
     """
     prefixes = _source_prefixes(args.ncbi_section)
 
-    scope_note = _counts_scope_note(args, assembly_levels)
-
     try:
         canonical, ranks_found_in, _domains_found = _resolve_ranks(table_path, taxon)
     except TaxonNotFound:
@@ -376,7 +377,9 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels, exclu
         count = _count_at_rank(table_path, rank, taxon, prefixes=prefixes,
                                assembly_levels=assembly_levels,
                                exclude_cores=exclude_cores)
-        report_message(f"The rank '{rank}' has {count:,} {taxon} entries{scope_note}.", color=None,
+        report_message(with_filters_note(
+                           f"The rank '{rank}' has {count:,} {taxon} entries."),
+                       color=None,
                        ii="    ", si="    ", width=100, newline=False, trailing_newline=False)
         _report_derep_note(table_path, rank, taxon, args, prefixes, assembly_levels,
                            exclude_cores=exclude_cores)
@@ -414,20 +417,6 @@ def _report_derep_note(table_path, rank, taxon, args, prefixes, assembly_levels,
     for warning in warnings:
         report_message(warning, "yellow", ii="      ", si="      ", width=100,
                        newline=False, trailing_newline=True)
-
-
-def _counts_scope_note(args, assembly_levels):
-    bits = []
-    if args.ncbi_section == "refseq":
-        bits.append("in refseq")
-    elif args.ncbi_section == "genbank":
-        bits.append("in genbank")
-    if assembly_levels:
-        levels = ", ".join(sorted(assembly_levels))
-        bits.append(f"at assembly level {levels}")
-    if not bits:
-        return ""
-    return " (" + ", ".join(bits) + ")"
 
 
 def _source_prefixes(source):

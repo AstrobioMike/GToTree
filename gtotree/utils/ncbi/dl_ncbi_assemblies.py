@@ -37,7 +37,8 @@ from gtotree.utils.ncbi.dl_assembly_links import parse_ncbi_assembly_summary
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import (TaxonNotFound, AmbiguousTaxon,
                                                CrossDomainTaxon)
-from gtotree.utils.taxonomy.get_accs_shared import ASSEMBLY_LEVELS
+from gtotree.utils.taxonomy.get_accs_shared import (ASSEMBLY_LEVELS,
+                                                    parse_assembly_levels)
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
                                                    expand_wanted_ref_tax,
                                                    describe_all_expansion,
@@ -318,6 +319,14 @@ def preflight_checks(args):
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(1)
 
+    if (getattr(args, "assembly_level", None)
+            and getattr(args, "source", "gtdb") == "gtdb"):
+        report_message("`--assembly-level` is only applicable with `--source ncbi`. "
+                       "Re-run with `--source ncbi`, or drop `--assembly-level`.",
+                       "yellow", ii="    ", si="    ", width=100,
+                       trailing_newline=True)
+        sys.exit(1)
+
     exclusion_list = getattr(args, "exclusion_list", None)
     if exclusion_list:
         if not wanted:
@@ -365,7 +374,7 @@ def _selection_kwargs(args):
         "target_domain": getattr(args, "target_domain", None),
         "ncbi_section": getattr(args, "ncbi_section", "refseq"),
         "reps_only": reps_only,
-        "assembly_levels": getattr(args, "assembly_level", None),
+        "assembly_levels": parse_assembly_levels(getattr(args, "assembly_level", None)),
         "min_completeness": getattr(args, "min_completeness", None),
         "max_contamination": getattr(args, "max_contamination", None),
         "exclude_cores": load_exclusion_cores(getattr(args, "exclusion_list", None)),
