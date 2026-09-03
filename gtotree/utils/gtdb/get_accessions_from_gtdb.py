@@ -53,7 +53,7 @@ def build_parser(parent_subparsers=None):
     else:
         parser = argparse.ArgumentParser(
             description=desc,
-            epilog="Ex. usage: `gtt get-accs-from-gtdb -w Archaea --gtdb-representatives-only`",
+            epilog="Ex. usage: `gtt get-accs-from-gtdb -w Archaea`",
             formatter_class=CustomRichHelpFormatter,
             add_help=False,
         )
