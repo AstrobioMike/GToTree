@@ -222,6 +222,19 @@ def derep_note(pool, rank, taxon, derep_rank):
     return f"Dereplicated at '{effective}', that would be {n:,} genome(s).", warnings
 
 
+def pull_count_lines(pool, resolved_rank, taxon, effective_derep_rank, kept_n):
+    """
+    The count block a completed pull prints above its "Wrote N accession(s)" lines
+    """
+    total = pool.count_genomes(rank=resolved_rank, taxon=taxon)
+    header = f"The rank '{resolved_rank}' has {total:,} {taxon} entries."
+    if effective_derep_rank is None:
+        return header, None
+    derep = (f"Dereplicated at '{effective_derep_rank}', that is "
+             f"{kept_n:,} genome(s).")
+    return header, derep
+
+
 def all_derep_size(pool, derep_rank):
     """
     How many genomes a `<taxon_flag> all --derep-rank X` pull would return.

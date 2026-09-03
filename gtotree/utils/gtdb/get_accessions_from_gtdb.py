@@ -24,7 +24,8 @@ from gtotree.utils.taxonomy.get_accs_shared import (PoolSpec,
                                                     all_derep_size,
                                                     apply_derep_default,
                                                     derep_note as _shared_derep_note,
-                                                    is_derep_on, scoped_counts_note)
+                                                    is_derep_on, pull_count_lines,
+                                                    scoped_counts_note)
 
 
 _RANK_COLUMNS = list(RANKS)
@@ -144,8 +145,29 @@ def get_accessions_from_gtdb(args):
         sys.exit(0)
 
     selection = _select_rows(gtdb_path, args, representatives_source)
+    _report_pull_counts(gtdb_path, representatives_source, selection,
+                        exclude_cores=exclude_cores)
     _write_outputs(selection, representatives_source)
     sys.exit(0)
+
+
+def _report_pull_counts(gtdb_path, representatives_source, selection,
+                        exclude_cores=None):
+    """
+    The "The rank 'X' has N <taxon> entries." (+ dereplicated) block a taxon pull
+    prints just above its "Wrote N accession(s)" lines.
+    """
+    pool = PoolSpec(gtdb_path, "gtdb",
+                    rep_filter=_rep_filter_for(representatives_source),
+                    label="GTDB", taxon_flag="-w", exclude_cores=exclude_cores)
+    header, derep = pull_count_lines(pool, selection.resolved_rank,
+                                     selection.canonical,
+                                     selection.effective_derep_rank,
+                                     len(selection.accessions))
+    print("")
+    wprint("  " + header)
+    if derep:
+        wprint("    " + derep)
 
 
 def preflight_checks(args):
@@ -245,11 +267,11 @@ def _write_outputs(selection, representatives_source):
     _write_metadata_tsv(selection.rows, tab_out_filename)
 
     print("")
-    wprint(f"Wrote {len(selection.accessions):,} accession(s) to:")
-    wprint("  " + color_text(acc_out_filename))
+    wprint("  " + f"Wrote {len(selection.accessions):,} accession(s) to:")
+    wprint("    " + color_text(acc_out_filename))
     print("")
-    wprint("Associated taxonomy and metadata of these targets written to:")
-    wprint("  " + color_text(tab_out_filename))
+    wprint("  " + "Associated taxonomy and metadata of these targets written to:")
+    wprint("    " + color_text(tab_out_filename))
     print("")
 
 
