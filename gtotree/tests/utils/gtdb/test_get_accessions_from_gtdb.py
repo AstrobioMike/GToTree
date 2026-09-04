@@ -191,7 +191,7 @@ def test_all_with_refseq_reference_only_writes_only_reference_genomes(in_gtdb):
     # same stale literal: this used to write EVERY accession into a file named for
     # reference genomes
     _run(_args(wanted_ref_tax="all", refseq_reference_genomes_only=True))
-    accs = _read_accs("gtdb-arc-and-bac-refseq-rep-accs.txt")
+    accs = _read_accs("gtdb-arc-and-bac-refseq-ref-accs.txt")
     assert accs == ["GCA_000000003.1"]
 
 

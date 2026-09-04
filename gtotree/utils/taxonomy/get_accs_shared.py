@@ -35,6 +35,26 @@ DEREP_DEFAULT = "auto"
 DEREP_UNSET = "__derep_unset__"
 
 
+def representatives_suffix(representatives_source):
+    """
+    The filename suffix for a pull restricted to a source's curated genomes.
+
+    Empty string when the pull wasn't restricted.
+    """
+    if not representatives_source:
+        return ""
+    word = "rep" if str(representatives_source).strip().lower() == "gtdb" else "ref"
+    return f"-{representatives_source}-{word}"
+
+
+def resolved_derep_rank(args):
+    """
+    The --derep-rank sitting on `args`, already resolved by apply_derep_default().
+    """
+    derep_rank = getattr(args, "derep_rank", DEREP_DEFAULT)
+    return DEREP_DEFAULT if derep_rank == DEREP_UNSET else derep_rank
+
+
 def is_derep_on(derep_rank):
     """True when --derep-rank asks for actual dereplication."""
     return derep_rank not in DEREP_OFF
@@ -223,6 +243,14 @@ def derep_note(pool, rank, taxon, derep_rank):
 
 
 FILTERS_APPLIED_NOTE = " (after any specified filters)"
+FILTERS_IMPLICATED_NOTE = " with the specified filters"
+
+
+def _with_note(text, note):
+    """Splice `note` in just inside a line's trailing period, if it has one."""
+    if text.endswith("."):
+        return text[:-1] + note + "."
+    return text + note
 
 
 def with_filters_note(text):
@@ -232,9 +260,19 @@ def with_filters_note(text):
     "The rank 'genus' has 2 X entries." ->
     "The rank 'genus' has 2 X entries (after any specified filters)."
     """
-    if text.endswith("."):
-        return text[:-1] + FILTERS_APPLIED_NOTE + "."
-    return text + FILTERS_APPLIED_NOTE
+    return _with_note(text, FILTERS_APPLIED_NOTE)
+
+
+def with_filters_implicated_note(text):
+    """
+    The stronger sibling of with_filters_note(), for the case where we KNOW a filter
+    is what emptied the result rather than only that filters may have applied.
+
+    "No accessions were found for the --wanted-ref-tax target 'Trichodesmium'." ->
+    "No accessions were found for the --wanted-ref-tax target 'Trichodesmium' with
+     the specified filters."
+    """
+    return _with_note(text, FILTERS_IMPLICATED_NOTE)
 
 
 def pull_count_lines(pool, resolved_rank, taxon, effective_derep_rank, kept_n):

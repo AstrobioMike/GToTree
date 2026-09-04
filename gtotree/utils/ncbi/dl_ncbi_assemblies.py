@@ -29,7 +29,8 @@ from gtotree.cli.common import CustomRichHelpFormatter, add_version_arg
 from gtotree.utils.misc.processing_genomes import (_sleep_backoff,
                                                    NCBI_DOWNLOAD_MAX_RETRIES,
                                                    NCBI_DOWNLOAD_TIMEOUT,
-                                                   NCBI_THROTTLE_STATUS)
+                                                   NCBI_THROTTLE_STATUS,
+                                                   NCBI_TRANSIENT_STATUS)
 from gtotree.utils.misc.messaging import report_message, wprint, color_text
 from gtotree.utils.ncbi.get_ncbi_assembly_data import (get_ncbi_assembly_data,
                                                        ncbi_data_table_path)
@@ -38,6 +39,7 @@ from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import (TaxonNotFound, AmbiguousTaxon,
                                                CrossDomainTaxon)
 from gtotree.utils.taxonomy.get_accs_shared import (ASSEMBLY_LEVELS,
+                                                    resolved_derep_rank,
                                                     parse_assembly_levels)
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
                                                    expand_wanted_ref_tax,
@@ -47,10 +49,10 @@ from gtotree.utils.taxonomy.exclusion_list import (load_exclusion_cores,
                                                    exclusion_list_help)
 
 
-# HTTP statuses worth another attempt: explicit rate-limiting plus plain server
-# hiccups. NCBI_THROTTLE_STATUS (imported above) is the subset that means we are
-# specifically being rate-limited and so earns true exponential backoff.
-TRANSIENT_STATUS = {429, 500, 502, 503, 504}
+# NCBI_TRANSIENT_STATUS (imported above) is the set worth another attempt;
+# NCBI_THROTTLE_STATUS is the subset meaning we are specifically being rate-limited
+# and so earns true exponential backoff. Both come from the in-run downloader so the
+# two GToTree downloaders can't drift on what counts as retryable.
 
 max_threads = 20
 max_retries = NCBI_DOWNLOAD_MAX_RETRIES
@@ -370,7 +372,7 @@ def _selection_kwargs(args):
 
     return {
         "target_rank": getattr(args, "target_rank", None),
-        "derep_rank": getattr(args, "derep_rank", "auto"),
+        "derep_rank": resolved_derep_rank(args),
         "target_domain": getattr(args, "target_domain", None),
         "ncbi_section": getattr(args, "ncbi_section", "refseq"),
         "reps_only": reps_only,
@@ -636,6 +638,10 @@ def download_one(target_link, local_dest, retries=max_retries):
 
     local_path.parent.mkdir(parents=True, exist_ok=True)
 
+    if not os.access(local_path.parent, os.W_OK):
+        return (local_dest,
+                f"download directory '{local_path.parent}' is not writable", "failed")
+
     # clear any stale tmp left behind by a prior interrupted run
     tmp_path.unlink(missing_ok=True)
 
@@ -673,7 +679,7 @@ def download_one(target_link, local_dest, retries=max_retries):
                 return (local_dest,
                         "Not available in requested format (404)", "failed")
 
-            if err.code not in TRANSIENT_STATUS:
+            if err.code not in NCBI_TRANSIENT_STATUS:
                 return (local_dest, f"HTTP {err.code}", "failed")
 
             if attempt == retries:

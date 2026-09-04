@@ -32,6 +32,10 @@ NCBI_DOWNLOAD_MAX_RETRIES = 10
 # Retry/backoff policy, mirroring bit's dl-ncbi-assemblies
 NCBI_THROTTLE_STATUS = {429}
 
+# HTTP statuses worth another attempt: explicit rate-limiting plus plain server
+# hiccups. Anything else (400/401/403/...) is permanent and must NOT be retried
+NCBI_TRANSIENT_STATUS = {429, 500, 502, 503, 504}
+
 # ceiling on any single retry sleep (seconds), applied to the throttled path
 NCBI_MAX_BACKOFF = 30
 
@@ -234,6 +238,8 @@ def download_and_unzip_accession(link, filepath, max_retries=NCBI_DOWNLOAD_MAX_R
             if e.code == 404:
                 raise AssemblyFormatNotAvailable(
                     f"no file of this format at {link}") from e
+            if e.code not in NCBI_TRANSIENT_STATUS:
+                raise AssemblyDownloadFailed(f"HTTP {e.code} for {link}") from e
             last_err = e
             throttled = _is_throttle(e)
         except (urllib.error.URLError, OSError, EOFError, gzip.BadGzipFile) as e:

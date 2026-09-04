@@ -9,7 +9,8 @@ import pyarrow.compute as pc # type: ignore
 from gtotree.utils.taxonomy.tax_ranks import (RANKS, NA, REFERENCE_VALUE, accession_core,
                                               rank_index, validate_derep_rank)
 from gtotree.utils.taxonomy.tax_select import (SOURCES, select, resolve_taxon,
-                                               live_accession_cores)
+                                               live_accession_cores,
+                                               diagnose_empty_pool)
 from gtotree.utils.taxonomy.tax_targets import (domains_in_asset,
                                                 unassigned_domain_summary)
 
@@ -414,10 +415,14 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
         if extra and extra not in cols:
             cols.append(extra)
 
+    attrition = PoolAttrition(resolved_rank=wanted_rank, derep_rank=derep_rank,
+                              reps_only=reps_only)
+
     tab = select(path, source, wanted_rank, wanted_taxon,
                  reps_only=reps_only, columns=cols,
                  accession_prefixes=accession_prefixes,
                  assembly_levels=assembly_levels, domain=domain)
+    attrition.n_candidates = tab.num_rows
 
     if screen_against:
         live = live_accession_cores(screen_against)
@@ -429,24 +434,32 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
             warnings.append(
                 f"{n_dead:,} candidate genome(s) are no longer available at NCBI "
                 f"(suppressed/removed) and were excluded before selection.")
+        attrition.n_dead = n_dead
         tab = None
     else:
         rows = tab.to_pylist()
+    attrition.n_after_liveness = len(rows)
 
     rows, n_excluded = filter_rows_by_exclusion(rows, spec.acc_col, exclude_cores)
     excluded_note = exclusion_warning(n_excluded)
     if excluded_note:
         warnings.append(excluded_note)
+    attrition.n_excluded = n_excluded
+    attrition.n_after_exclusion = len(rows)
 
     rows, n_below, n_missing = apply_quality_floor(
         rows, spec, min_completeness, max_contamination)
     warnings.extend(_quality_floor_warnings(
         n_below, n_missing, min_completeness, max_contamination))
+    attrition.n_below_floor = n_below
+    attrition.n_missing_quality = n_missing
+    attrition.n_after_floor = len(rows)
 
     if not rows:
-        warnings.append(f"No genomes found under {wanted_rank} '{wanted_taxon}'"
-                        + (" in the representatives pool." if reps_only else "."))
-        return [], 0, warnings, n_excluded
+        warnings.append(
+            f"{NO_GENOMES_WARNING_PREFIX}{wanted_rank} '{wanted_taxon}'"
+            + (" in the representatives pool." if reps_only else "."))
+        return [], 0, warnings, attrition
 
     keyfn = resolve_picker(pick)
 
@@ -461,13 +474,118 @@ def derep(path, source, wanted_rank, wanted_taxon, derep_rank,
         if group not in best or k < keyfn(best[group], spec):
             best[group] = row
 
-    # if n_na_group:
-    #     warnings.append(
-    #         f"{n_na_group:,} genome(s) have no assigned '{derep_rank}' and were "
-    #         f"skipped (unnamed/unclassified at that rank).")
+    # n_na_group is NOT warned about per-pull on purpose. Broad targets routinely have
+    # some genomes unclassified at the derep rank and saying so every time is noise.
+    # It rides on the attrition record instead, where the one case that actually
+    # matters (ALL of them unassigned, so the selection comes back empty with no
+    # filter to blame) gets explained by empty_selection.py.
+    attrition.n_unassigned_group = n_na_group
+    attrition.n_groups = len(best)
 
     accs = [best[g][spec.acc_col] for g in sorted(best)]
-    return accs, len(best), warnings, n_excluded
+    return accs, len(best), warnings, attrition
+
+
+#: prefix of the terse "nothing here" warning derep() and the derep-off branch emit.
+#: Named so select_ref_genomes() can suppress it for callers that have opted into
+#: diagnose_empty and are going to print a fuller explanation of the same fact.
+NO_GENOMES_WARNING_PREFIX = "No genomes found under "
+
+
+def _drop_terse_empty_warning(warnings):
+    """
+    Remove the core's one-line "nothing here" warning.
+
+    Only for callers that passed diagnose_empty: they are about to say the same thing
+    with the cause attached, and printing both puts a barer, filter-blind version of
+    the message directly above the good one.
+    """
+    return [w for w in warnings
+            if not w.startswith(NO_GENOMES_WARNING_PREFIX)]
+
+
+class PoolAttrition:
+    """
+    Where a selection's candidate genomes went, stage by stage.
+
+    Selection narrows a pool in a fixed order, and each stage can take the whole thing
+    to zero. When that happens the caller has to explain WHY, and the only honest way
+    to do that is to look at which stage the survivors hit zero -- not at which flags
+    the user happened to pass. Those are different questions: `--assembly-level
+    chromosome --min-completeness 50` against a taxon with no chromosome-level
+    assemblies empties the pool at the LEVEL stage, and the quality floor never sees
+    a single genome to reject.
+
+    Survivor counts, in the order they're applied:
+
+        n_candidates       -- rows the pool filters left (rank/taxon, domain,
+                              reps_only, assembly levels, accession prefixes)
+        n_after_liveness   -- ... still present at NCBI (GTDB-sourced pulls only)
+        n_after_exclusion  -- ... not named in the --exclusion-list
+        n_after_floor      -- ... clearing the checkm quality floor
+
+    And what each stage removed: n_dead, n_excluded, n_below_floor,
+    n_missing_quality. Then dereplication groups whatever is left:
+
+        n_unassigned_group -- survivors with no assigned value at the derep rank, so
+                              no group to belong to. When this equals n_after_floor,
+                              dereplication itself is what emptied the selection --
+                              a real case (113 phyla in the current NCBI table have
+                              nothing assigned at 'order') that otherwise looks like
+                              an unexplained empty result.
+        n_groups           -- groups that got a representative, i.e. genomes returned
+
+    The three `diagnosed_*` fields are filled in ONLY on the empty path, by
+    diagnose_pool_attrition(); see tax_select.diagnose_empty_pool.
+    """
+
+    def __init__(self, resolved_rank=None, derep_rank=None, reps_only=False):
+        self.resolved_rank = resolved_rank
+        self.derep_rank = derep_rank
+
+        self.reps_only = bool(reps_only)
+
+        self.n_candidates = 0
+        self.n_after_liveness = 0
+        self.n_after_exclusion = 0
+        self.n_after_floor = 0
+
+        self.n_dead = 0
+        self.n_excluded = 0
+        self.n_below_floor = 0
+        self.n_missing_quality = 0
+
+        self.n_unassigned_group = 0
+        self.n_groups = 0
+
+        self.diagnosed = False
+        self.n_unfiltered = 0
+        self.pool_culprits = []
+        self.present_levels = []
+
+
+def diagnose_pool_attrition(attrition, path, source, rank, taxon, domain=None,
+                            reps_only=False, accession_prefixes=None,
+                            assembly_levels=None):
+    """
+    Fill in an attrition record's `diagnosed_*` fields, in place.
+
+    Only meaningful when the POOL filters are what emptied things (n_candidates == 0);
+    every later stage already knows its own numbers and needs no extra reads. Costs a
+    few narrow reads, so this is called on the empty path alone.
+    """
+    if attrition.n_candidates:
+        return attrition
+
+    n_unfiltered, culprits, present_levels = diagnose_empty_pool(
+        path, source, rank, taxon, domain=domain, reps_only=reps_only,
+        accession_prefixes=accession_prefixes, assembly_levels=assembly_levels)
+
+    attrition.diagnosed = True
+    attrition.n_unfiltered = n_unfiltered
+    attrition.pool_culprits = culprits
+    attrition.present_levels = present_levels
+    return attrition
 
 
 class RefGenomeSelection:
@@ -487,10 +605,15 @@ class RefGenomeSelection:
         warnings             : human-facing advisory strings (empty list if none)
         num_excluded         : how many CANDIDATE genomes an --exclusion-list removed
                                before selection (0 when no list was given)
+        attrition            : the PoolAttrition record for this selection: how many
+                               candidates survived each narrowing stage. Always
+                               present. Interesting mainly when `accessions` is empty,
+                               where it is what lets a caller say WHICH stage emptied
+                               it rather than guessing from which flags were passed.
     """
 
     def __init__(self, accessions, rows, canonical, resolved_rank,
-                 effective_derep_rank, warnings, num_excluded=0):
+                 effective_derep_rank, warnings, num_excluded=0, attrition=None):
         self.accessions = accessions
         self.rows = rows
         self.canonical = canonical
@@ -498,6 +621,8 @@ class RefGenomeSelection:
         self.effective_derep_rank = effective_derep_rank
         self.warnings = warnings
         self.num_excluded = num_excluded
+        self.attrition = attrition if attrition is not None else PoolAttrition(
+            resolved_rank=resolved_rank, derep_rank=effective_derep_rank)
 
 
 def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
@@ -505,7 +630,7 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                        accession_prefixes=None, assembly_levels=None,
                        min_completeness=None, max_contamination=None,
                        target_domain=None, include_rows=True,
-                       exclude_cores=None):
+                       exclude_cores=None, diagnose_empty=False):
     """
     The one selection entry point shared by every surface that adds reference genomes
     by taxonomy: the standalone get-accessions helpers and the main GToTree driver's
@@ -552,6 +677,15 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
         rather than deleting the group, and with derep off it simply removes the
         listed genomes from the kept set.
 
+    diagnose_empty:
+        When the selection comes back EMPTY, spend a few extra narrow reads working
+        out which filter is responsible and hang the answer on the returned
+        selection's `attrition` (see diagnose_pool_attrition). Off by default, and
+        opt-in rather than automatic for one reason: select_all_domains() walks every
+        domain in the asset, and under a narrow filter most of them are legitimately
+        empty -- diagnosing each one would be pure waste. The `-w` wrappers, which
+        are about to turn an empty selection into an error message, turn it on.
+
     include_rows:
         Whether to carry the selected genomes' metadata rows back. Default True, and
         the main driver NEEDS them: scg_hmms_setup reads the pulled rows' lineage to
@@ -593,11 +727,15 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
         # screened), preserving full metadata rows for the caller's TSV
         cols = (_selection_columns(spec, extra_rank=None) if include_rows
                 else [spec.acc_col])
+        attrition = PoolAttrition(resolved_rank=resolved_rank, derep_rank=None,
+                                  reps_only=reps_only)
+
         tab = select(path, source, resolved_rank, canonical,
                      reps_only=reps_only, columns=cols,
                      accession_prefixes=accession_prefixes,
                      assembly_levels=assembly_levels, domain=resolved_domain)
         rows = tab.to_pylist()
+        attrition.n_candidates = len(rows)
 
         if screen_against:
             live = live_accession_cores(screen_against)
@@ -609,33 +747,63 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
                 warnings.append(
                     f"{n_dead:,} candidate genome(s) are no longer available at NCBI "
                     f"(suppressed/removed) and were excluded.")
+            attrition.n_dead = n_dead
+        attrition.n_after_liveness = len(rows)
 
         rows, n_excluded = filter_rows_by_exclusion(rows, spec.acc_col,
                                                    exclude_cores)
         excluded_note = exclusion_warning(n_excluded)
         if excluded_note:
             warnings.append(excluded_note)
+        attrition.n_excluded = n_excluded
+        attrition.n_after_exclusion = len(rows)
 
         rows, n_below, n_missing = apply_quality_floor(
             rows, spec, min_completeness, max_contamination)
         warnings.extend(_quality_floor_warnings(
             n_below, n_missing, min_completeness, max_contamination))
+        attrition.n_below_floor = n_below
+        attrition.n_missing_quality = n_missing
+        attrition.n_after_floor = len(rows)
 
         accessions = [r.get(spec.acc_col) for r in rows if r.get(spec.acc_col)]
+
+        # the derep-on path warns here via derep(); saying it on both keeps the two
+        # branches telling the same story when a pull comes back with nothing
+        if not accessions:
+            warnings.append(
+                f"{NO_GENOMES_WARNING_PREFIX}{resolved_rank} '{canonical}'"
+                + (" in the representatives pool." if reps_only else "."))
+            if diagnose_empty:
+                warnings = _drop_terse_empty_warning(warnings)
+                diagnose_pool_attrition(
+                    attrition, path, source, resolved_rank, canonical,
+                    domain=resolved_domain, reps_only=reps_only,
+                    accession_prefixes=accession_prefixes,
+                    assembly_levels=assembly_levels)
+
         return RefGenomeSelection(accessions, rows if include_rows else [],
                                   canonical, resolved_rank, None, warnings,
-                                  num_excluded=n_excluded)
+                                  num_excluded=n_excluded, attrition=attrition)
 
     # 3. dereplicate to one best genome per unique value of effective_derep_rank.
     #    derep() returns accessions only, so re-slice to recover metadata rows for the
     #    kept set (keeps a single source of truth for WHICH genomes are picked).
-    accessions, _groups, derep_warnings, n_excluded = derep(
+    accessions, _groups, derep_warnings, attrition = derep(
         path, source, resolved_rank, canonical, effective_derep_rank,
         reps_only=reps_only, pick=pick, screen_against=screen_against,
         accession_prefixes=accession_prefixes, assembly_levels=assembly_levels,
         min_completeness=min_completeness, max_contamination=max_contamination,
         domain=resolved_domain, exclude_cores=exclude_cores)
     warnings.extend(derep_warnings)
+
+    if diagnose_empty and not accessions:
+        warnings = _drop_terse_empty_warning(warnings)
+        diagnose_pool_attrition(
+            attrition, path, source, resolved_rank, canonical,
+            domain=resolved_domain, reps_only=reps_only,
+            accession_prefixes=accession_prefixes,
+            assembly_levels=assembly_levels)
 
     rows = _rows_for_accessions(path, source, resolved_rank, canonical,
                                 effective_derep_rank, reps_only, set(accessions),
@@ -645,7 +813,8 @@ def select_ref_genomes(path, source, taxon, target_rank=None, derep_rank="auto",
 
     return RefGenomeSelection(accessions, rows, canonical, resolved_rank,
                               effective_derep_rank, warnings,
-                              num_excluded=n_excluded)
+                              num_excluded=attrition.n_excluded,
+                              attrition=attrition)
 
 
 def select_all_domains(path, source, derep_rank="auto", reps_only=None, pick="quality",

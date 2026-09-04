@@ -19,10 +19,13 @@ from gtotree.utils.taxonomy.tax_counts import (representatives_filter, count_gen
                                                render_rank_count_table)
 from gtotree.utils.taxonomy.tax_targets import (is_all_target,
                                                 unassigned_domain_summary)
+from gtotree.utils.taxonomy.empty_selection import empty_pull_message
 from gtotree.utils.taxonomy.get_accs_shared import (PoolSpec,
+                                                    representatives_suffix,
                                                     add_common_get_accs_args,
                                                     all_derep_size,
                                                     apply_derep_default,
+                                                    resolved_derep_rank,
                                                     derep_note as _shared_derep_note,
                                                     is_derep_on, pull_count_lines,
                                                     scoped_counts_note)
@@ -211,7 +214,7 @@ def _select_rows(gtdb_path, args, representatives_source):
         selection = select_ref_genomes(
             gtdb_path, "gtdb", args.wanted_ref_tax,
             target_rank=args.target_rank, derep_rank=args.derep_rank,
-            reps_only=reps_only,
+            reps_only=reps_only, diagnose_empty=True,
             exclude_cores=load_exclusion_cores(
                 getattr(args, "exclusion_list", None)),
             target_domain=getattr(args, "target_domain", None))
@@ -241,7 +244,15 @@ def _select_rows(gtdb_path, args, representatives_source):
         report_message(warning, "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
 
     if not selection.accessions:
-        report_message(f"No accessions were found for the given target '{selection.canonical}' :(", "yellow",
+        label = f"{selection.resolved_rank} '{selection.canonical}'"
+        if selection.effective_derep_rank:
+            label += (" (dereplicated to one genome per "
+                      f"{selection.effective_derep_rank})")
+        report_message(empty_pull_message(
+                           f"No genomes were found under {label}.", selection,
+                           reps_only_requested=bool(reps_only),
+                           emoticon=":("),
+                       "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
@@ -252,13 +263,7 @@ def _write_outputs(selection, representatives_source):
     taxon_for_filename = selection.canonical.replace(" ", "-").lower()
     rank = selection.resolved_rank
 
-    if representatives_source:
-        if representatives_source == "gtdb":
-            suffix = "-" + representatives_source + "-rep"
-        else:
-            suffix = "-" + representatives_source + "-ref"
-    else:
-        suffix = ""
+    suffix = representatives_suffix(representatives_source)
 
     acc_out_filename = f"gtdb-{taxon_for_filename}-{rank}{suffix}-accs.txt"
     tab_out_filename = f"gtdb-{taxon_for_filename}-{rank}{suffix}-metadata.tsv"
@@ -277,7 +282,7 @@ def _write_outputs(selection, representatives_source):
 
 def _derep_is_on(args):
     """True when --derep-rank asks for actual dereplication."""
-    return is_derep_on(getattr(args, "derep_rank", "off"))
+    return is_derep_on(resolved_derep_rank(args))
 
 
 def _pool(gtdb_path, representatives_source=None):
@@ -318,7 +323,7 @@ def _write_all_dereplicated(gtdb_path, args, representatives_source):
                        ii="    ", si="    ", width=100, trailing_newline=True)
         sys.exit(0)
 
-    suffix = f"-{representatives_source}-rep" if representatives_source else ""
+    suffix = representatives_suffix(representatives_source)
     acc_out_filename = f"gtdb-arc-and-bac{suffix}-accs.txt"
     tab_out_filename = f"gtdb-arc-and-bac{suffix}-metadata.tsv"
 
@@ -361,9 +366,10 @@ def _write_all(gtdb_path, representatives_source, exclude_cores=None):
 
     accessions = table.column("ncbi_genbank_assembly_accession").to_pylist()
 
+    stem = "gtdb-arc-and-bac" + representatives_suffix(representatives_source)
     if representatives_source:
-        acc_out_filename = "gtdb-arc-and-bac-" + representatives_source + "-rep-accs.txt"
-        tab_out_filename = "gtdb-arc-and-bac-" + representatives_source + "-rep-metadata.tsv"
+        acc_out_filename = stem + "-accs.txt"
+        tab_out_filename = stem + "-metadata.tsv"
         write_table_tsv(table, tab_out_filename)
     else:
         acc_out_filename = "gtdb-arc-and-bac-accs.txt"
@@ -444,7 +450,7 @@ def _derep_note(gtdb_path, rank, taxon, args, rep_filter=None, exclude_cores=Non
     pool = PoolSpec(gtdb_path, "gtdb", rep_filter=rep_filter, label="GTDB",
                     taxon_flag="-w",
                     exclude_cores=exclude_cores)
-    return _shared_derep_note(pool, rank, taxon, getattr(args, "derep_rank", "off"))
+    return _shared_derep_note(pool, rank, taxon, resolved_derep_rank(args))
 
 
 def _report_derep_note(gtdb_path, rank, taxon, args, rep_filter=None, exclude_cores=None):

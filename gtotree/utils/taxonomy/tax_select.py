@@ -276,6 +276,122 @@ def select_accessions(path, source, rank, taxon, reps_only=False):
     return [a for a in tab.column(spec.acc_col).to_pylist() if a and a != NA]
 
 
+# ---------------------------------------------------------------------------
+# diagnosing an empty candidate pool
+# ---------------------------------------------------------------------------
+#
+# The pool filters below are Parquet pushdown predicates (or, for prefixes, a mask
+# applied right after the read), so nothing downstream ever learns what any one of
+# them cost. Counting in stages on the HOT path would mean giving that pushdown up,
+# which isn't worth it to serve an error message.
+#
+# So instead: when a selection comes back empty, peel the optional filters back one
+# at a time and see which one was load-bearing. Cost is irrelevant here (we are
+# already on our way to exiting), and it's a handful of single-column reads against
+# an already-narrow taxon slice.
+
+POOL_FILTERS = ("assembly_levels", "accession_prefixes", "reps_only")
+
+
+def count_pool(path, source, rank, taxon, domain=None, reps_only=False,
+               accession_prefixes=None, assembly_levels=None):
+    """How many rows the pool `select()` would build holds. One narrow read."""
+    tab = select(path, source, rank, taxon, reps_only=reps_only,
+                 accession_prefixes=accession_prefixes,
+                 assembly_levels=assembly_levels, domain=domain)
+    return tab.num_rows
+
+
+def present_assembly_levels(path, source, rank, taxon, domain=None, reps_only=False,
+                            accession_prefixes=None):
+    """
+    The assembly_level values a taxon actually HAS, sorted best-to-worst.
+
+    For the very common "you asked for a level this taxon doesn't have" case, so the
+    message can say what is there instead of only what isn't. Empty list for a source
+    with no assembly-level column (GTDB).
+    """
+    spec = SOURCES[source]
+    if not spec.level_col:
+        return []
+
+    tab = select(path, source, rank, taxon, reps_only=reps_only,
+                 columns=[spec.level_col],
+                 accession_prefixes=accession_prefixes, domain=domain)
+    col = tab.column(spec.level_col)
+    if len(col) == 0:
+        return []
+
+    present = pc.unique(col.filter(assigned_mask(col))).to_pylist()
+    return sorted(present, key=lambda v: LEVEL_REPORT_ORDER.get(str(v).strip().lower(),
+                                                               len(LEVEL_REPORT_ORDER)))
+
+
+#: best-to-worst, so a "present for it: ..." list reads the way a person would say it
+LEVEL_REPORT_ORDER = {
+    "complete genome": 0,
+    "chromosome": 1,
+    "scaffold": 2,
+    "contig": 3,
+}
+
+
+def diagnose_empty_pool(path, source, rank, taxon, domain=None, reps_only=False,
+                        accession_prefixes=None, assembly_levels=None):
+    """
+    Work out why the candidate pool for `taxon` came back empty.
+
+    Returns (n_unfiltered, culprits, present_levels):
+
+        n_unfiltered  -- rows under the taxon with NONE of the optional pool filters
+                         applied. Zero means the taxon is genuinely empty here and no
+                         filter is to blame.
+        culprits      -- the POOL_FILTERS names that, dropped on their own, bring the
+                         pool back. Usually exactly one. EMPTY when no single filter
+                         explains it, which is the signal that a COMBINATION did it
+                         and the caller should list them all rather than accuse one.
+        present_levels-- the assembly levels the taxon does have, but only when
+                         assembly_levels is implicated; [] otherwise.
+
+    `domain` is deliberately not treated as a droppable filter: it is a disambiguator
+    resolved FROM the taxon, not something the user narrowed with, so it can't be the
+    thing that emptied the pool.
+    """
+    active = {
+        "assembly_levels": assembly_levels or None,
+        "accession_prefixes": accession_prefixes or None,
+        "reps_only": bool(reps_only) or None,
+    }
+
+    def count(**overrides):
+        kwargs = {
+            "reps_only": bool(active["reps_only"]) and overrides.get("reps_only", True),
+            "accession_prefixes": (active["accession_prefixes"]
+                                   if overrides.get("accession_prefixes", True) else None),
+            "assembly_levels": (active["assembly_levels"]
+                                if overrides.get("assembly_levels", True) else None),
+        }
+        return count_pool(path, source, rank, taxon, domain=domain, **kwargs)
+
+    n_unfiltered = count(reps_only=False, accession_prefixes=False,
+                         assembly_levels=False)
+
+    culprits = []
+    if n_unfiltered:
+        for name in POOL_FILTERS:
+            if active[name] and count(**{name: False}):
+                culprits.append(name)
+
+    present_levels = []
+    if culprits == ["assembly_levels"]:
+        present_levels = present_assembly_levels(
+            path, source, rank, taxon, domain=domain,
+            reps_only=bool(active["reps_only"]),
+            accession_prefixes=active["accession_prefixes"])
+
+    return n_unfiltered, culprits, present_levels
+
+
 def select_by_taxid(path, rank, taxid):
     """
     NCBI only: select by a lineage TAXID rather than a name

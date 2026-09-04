@@ -20,10 +20,12 @@ from gtotree.utils.taxonomy.tax_counts import (representatives_filter, count_gen
                                                render_rank_count_table)
 from gtotree.utils.taxonomy.tax_targets import (is_all_target,
                                                 unassigned_domain_summary)
+from gtotree.utils.taxonomy.empty_selection import empty_pull_message
 from gtotree.utils.taxonomy.get_accs_shared import (ASSEMBLY_LEVELS,
                                                     FILTERS_APPLIED_NOTE, PoolSpec,
                                                     add_common_get_accs_args,
                                                     apply_derep_default,
+                                                    resolved_derep_rank,
                                                     derep_note as _shared_derep_note,
                                                     is_derep_on,
                                                     parse_assembly_levels as _parse_levels,
@@ -42,8 +44,8 @@ _ASSEMBLY_LEVELS = ASSEMBLY_LEVELS
 
 _NcbiSelection = namedtuple(
     "_NcbiSelection",
-    ["rows", "label", "rank", "taxon", "effective_derep_rank"],
-    defaults=[None],
+    ["rows", "label", "rank", "taxon", "effective_derep_rank", "ref_selection"],
+    defaults=[None, None],
 )
 
 
@@ -180,8 +182,12 @@ def get_accessions_from_ncbi(args):
         sys.exit(0)
 
     if not rows:
-        wprint(color_text(with_filters_note(
-            f"No genomes were found under {label}."), "yellow"))
+        wprint(color_text(empty_pull_message(
+            f"No genomes were found under {label}.", selection.ref_selection,
+            assembly_levels=assembly_levels,
+            ncbi_section=getattr(args, "ncbi_section", None),
+            reps_only_requested=bool(args.refseq_reference_genomes_only),
+            emoticon=":("), "yellow"))
         print("")
         sys.exit(0)
 
@@ -261,7 +267,7 @@ def check_derep_rank_is_applicable(args):
 
 def _derep_is_on(args):
     """True when --derep-rank asks for actual dereplication."""
-    return is_derep_on(getattr(args, "derep_rank", "off"))
+    return is_derep_on(resolved_derep_rank(args))
 
 
 def _count_at_rank(table_path, rank, taxon, prefixes=None, reps_only=False,
@@ -314,7 +320,7 @@ def _derep_note(table_path, rank, taxon, args, prefixes, assembly_levels,
                     label="NCBI", taxon_flag="-w",
                     exclude_cores=exclude_cores)
     return _shared_derep_note(pool, rank, taxon,
-                              getattr(args, "derep_rank", "off"))
+                              resolved_derep_rank(args))
 
 
 def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_levels, exclude_cores=None):
@@ -473,7 +479,7 @@ def _select_rows(table_path, args, assembly_levels=None):
         selection = select_ref_genomes(
             table_path, "ncbi", target,
             target_rank=args.target_rank, derep_rank=args.derep_rank,
-            reps_only=reps_only,
+            reps_only=reps_only, diagnose_empty=True,
             accession_prefixes=_source_prefixes(args.ncbi_section),
             assembly_levels=assembly_levels,
             exclude_cores=load_exclusion_cores(
@@ -505,15 +511,11 @@ def _select_rows(table_path, args, assembly_levels=None):
     for warning in selection.warnings:
         report_message(warning, "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
 
-    if not selection.accessions:
-        report_message(f"No accessions were found for the given target '{selection.canonical}' :(", "yellow",
-                       ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
-
     return _NcbiSelection(selection.rows,
                           f"{selection.resolved_rank} '{selection.canonical}'",
                           selection.resolved_rank, selection.canonical,
-                          selection.effective_derep_rank)
+                          selection.effective_derep_rank,
+                          ref_selection=selection)
 
 
 def _select_by_taxid(table_path, taxid, reps_only=False, assembly_levels=None):
