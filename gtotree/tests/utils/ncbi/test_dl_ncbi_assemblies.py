@@ -15,8 +15,8 @@ import pytest  # type: ignore
 
 from gtotree.utils.ncbi.dl_ncbi_assemblies import (
     build_parser, resolve_targets, report_selection, dl_ncbi_assemblies,
-    download_assemblies, TaxonSelection, RunData, MAX_RETRY_PASSES,
-    RETRY_PASS_WAITS)
+    download_assemblies, report_finish, TaxonSelection, RunData,
+    MAX_RETRY_PASSES, RETRY_PASS_WAITS)
 from gtotree.utils.taxonomy.tax_select import CrossDomainTaxon, AmbiguousTaxon, TaxonNotFound
 
 _MOD = "gtotree.utils.ncbi.dl_ncbi_assemblies"
@@ -575,3 +575,64 @@ def test_retry_pass_waits_grow(tmp_path):
          patch(f"{_RETRY_MOD}.time.sleep") as slept:
         download_assemblies(rd)
     assert [c.args[0] for c in slept.call_args_list] == list(RETRY_PASS_WAITS)
+
+
+# ---------------------------------------------------------------------------
+# report_finish() -- the info-table pointer
+# ---------------------------------------------------------------------------
+
+
+def test_report_finish_points_at_the_info_table(capsys, tmp_path):
+    info = tmp_path / "downloaded-assemblies-info.tsv"
+    rd = RunData(num_wanted=3, num_found=3, num_downloaded=3,
+                 ncbi_sub_table_path=info)
+    report_finish(rd)
+    out = capsys.readouterr().out
+    assert "Info written to:" in out
+    assert str(info) in out
+    # the pointer is the last thing on screen, after the success line
+    assert out.index("All 3") < out.index("Info written to:")
+
+
+def test_report_finish_points_at_the_info_table_when_some_failed(capsys, tmp_path):
+    """The table is written before any downloading, so a partial run still has one."""
+    info = tmp_path / "downloaded-assemblies-info.tsv"
+    rd = RunData(
+        num_wanted=3, num_found=3,
+        num_downloaded=2, num_not_downloaded=1,
+        not_downloaded_path=tmp_path / "failed.tsv",
+        ncbi_sub_table_path=info,
+    )
+    report_finish(rd)
+    assert "Info written to:" in capsys.readouterr().out
+
+
+def test_report_finish_points_at_the_info_table_when_nothing_downloaded(capsys, tmp_path):
+    """
+    Even a total wash still wrote the table (what was found at NCBI, and any requested
+    lineage), so the pointer has to survive the non-zero exit rather than be skipped
+    by it.
+    """
+    info = tmp_path / "downloaded-assemblies-info.tsv"
+    rd = RunData(
+        num_wanted=3, num_found=3,
+        num_downloaded=0, num_not_downloaded=3,
+        not_downloaded_path=tmp_path / "failed.tsv",
+        ncbi_sub_table_path=info,
+    )
+    with pytest.raises(SystemExit) as excinfo:
+        report_finish(rd)
+    assert excinfo.value.code == 1
+    assert "Info written to:" in capsys.readouterr().out
+
+
+def test_report_finish_info_table_pointer_respects_quiet(capsys, tmp_path):
+    """
+    `gtt dl-ncbi-assemblies` has no `--quiet` flag today, but RunData carries the
+    field and bit's mirror of this module does, so the gate is exercised here to keep
+    the two from drifting.
+    """
+    rd = RunData(num_wanted=3, num_found=3, num_downloaded=3, quiet=True,
+                 ncbi_sub_table_path=tmp_path / "downloaded-assemblies-info.tsv")
+    report_finish(rd)
+    assert "Info written to:" not in capsys.readouterr().out

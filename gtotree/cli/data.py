@@ -1,16 +1,36 @@
 import sys
 import argparse
+import importlib
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 
 
-# The data-source selector: `gtt data get <source>`. Each entry maps the name a
-# user types to a zero-import-cost description; the worker function is imported
-# lazily in main() only for the source actually requested.
 DATA_SOURCES = {
-    "gtdb-data":       "GTDB metadata table (gtdb-data.parquet)",
-    "ncbi-assembly-data":       "NCBI assembly-summary table",
-    "kofamscan-data":  "KOFamScan data (KO profiles and list)",
-    "pfam-data":       "Pfam data (Pfam-A HMMs and info)",
+    "gtdb-data": {
+        "help": "Download or update GTDB metadata",
+        "description": "This subcommand downloads or updates the GTDB metadata.",
+        "module": "gtotree.utils.gtdb.get_gtdb_data",
+        "function": "get_gtdb_data",
+    },
+    "ncbi-assembly-data": {
+        "help": "Download or update NCBI assembly-summary tables",
+        "description": "This subcommand downloads or updates NCBI's assembly-summary tables.",
+        "module": "gtotree.utils.ncbi.get_ncbi_assembly_data",
+        "function": "get_ncbi_assembly_data",
+    },
+    "kofamscan-data": {
+        "help": "Download or update KOFamScan data",
+        "description": ("This subcommand downloads or updates the KOFamScan data "
+                        "(KO profiles and list)."),
+        "module": "gtotree.utils.ko.get_kofamscan_data",
+        "function": "get_kofamscan_data",
+    },
+    "pfam-data": {
+        "help": "Download or update Pfam data",
+        "description": ("This subcommand downloads or updates the Pfam data "
+                        "(Pfam-A HMMs and info)."),
+        "module": "gtotree.utils.pfam.get_pfam_data",
+        "function": "get_pfam_data",
+    },
 }
 
 
@@ -43,8 +63,10 @@ def build_parser(parent_subparsers=None):
     ### get subcommand ###
     ############################################################################
 
-    get_desc = ("This subcommand downloads or updates a GToTree-utilized database. "
-                "Choose which one via the required `source` argument.")
+    get_desc = """
+        This subcommand downloads or updates GToTree-utilized databases. All sub-subcommands
+        accept an optional `-f/--force-update` flag.
+        """
 
     get_parser = subparsers.add_parser(
         "get",
@@ -55,26 +77,38 @@ def build_parser(parent_subparsers=None):
         add_help=False,
     )
 
-    get_required = get_parser.add_argument_group("Required Parameters")
-    get_optional = get_parser.add_argument_group("Optional Parameters")
+    add_help(get_parser)
 
-    get_required.add_argument(
-        "source",
-        choices=list(DATA_SOURCES),
-        metavar="<source>",
-        help="Which database to download/update. One of: " + ", ".join(DATA_SOURCES) + ".",
-    )
+    add_version_arg(get_parser)
 
-    get_optional.add_argument(
-        "-f", "--force-update",
-        help="Re-download the data even if it is already present",
-        action="store_true",
-    )
+    get_subparsers = get_parser.add_subparsers(dest="get_action", required=True, metavar='')
+    get_parser.subparsers = get_subparsers
 
-    add_help(get_optional)
-    add_version_arg(get_optional)
+    def add_get_common_args(group):
+        group.add_argument(
+            "-f", "--force-update",
+            help="Re-download the data even if it is already present",
+            action="store_true",
+        )
 
-    get_parser.set_defaults(func="get")
+    for source_name, source_info in DATA_SOURCES.items():
+
+        source_parser = get_subparsers.add_parser(
+            source_name,
+            help=source_info["help"],
+            description=source_info["description"],
+            epilog=f"Ex. usage: `gtt data get {source_name}`",
+            formatter_class=CustomRichHelpFormatter,
+            add_help=False,
+        )
+
+        source_optional = source_parser.add_argument_group("Optional Parameters")
+        add_get_common_args(source_optional)
+        add_help(source_optional)
+
+        add_version_arg(source_optional)
+
+        source_parser.set_defaults(func="get")
 
     ############################################################################
     ### locations subcommand ###
@@ -145,21 +179,9 @@ def build_parser(parent_subparsers=None):
 
 def _run_get(args):
     """Dispatch `gtt data get <source>` to the matching worker (lazy import)."""
-    source = args.source
-    force = args.force_update
-
-    if source == "gtdb-data":
-        from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data
-        get_gtdb_data(force_update=force)
-    elif source == "ncbi-assembly-data":
-        from gtotree.utils.ncbi.get_ncbi_assembly_data import get_ncbi_assembly_data
-        get_ncbi_assembly_data(force_update=force)
-    elif source == "kofamscan-data":
-        from gtotree.utils.ko.get_kofamscan_data import get_kofamscan_data
-        get_kofamscan_data(force_update=force)
-    elif source == "pfam-data":
-        from gtotree.utils.pfam.get_pfam_data import get_pfam_data
-        get_pfam_data(force_update=force)
+    source_info = DATA_SOURCES[args.get_action]
+    module = importlib.import_module(source_info["module"])
+    getattr(module, source_info["function"])(force_update=args.force_update)
 
 
 def _run_locations_check(args):
@@ -224,6 +246,11 @@ def main():
 
                 if sub_cmd in ("-h", "--help"):
                     top_sub_parser.print_help(sys.stderr)
+                    sys.exit(0)
+
+                if sub_cmd in ("-v", "--version"):
+                    from gtotree.utils.misc.messaging import get_version
+                    print(f"GToTree v{get_version()}")
                     sys.exit(0)
 
                 if sub_cmd not in top_sub_parser.subparsers.choices:
