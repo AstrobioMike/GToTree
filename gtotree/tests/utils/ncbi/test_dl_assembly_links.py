@@ -19,6 +19,8 @@ from gtotree.utils.ncbi.dl_assembly_links import (parse_ncbi_assembly_summary,
                                                   _resolve_links,
                                                   FORMAT_EXTENSIONS)
 from gtotree.utils.ncbi.dl_ncbi_assemblies import RunData
+from gtotree.utils.taxonomy.tax_ranks import RANKS, accession_core
+from gtotree.utils.taxonomy.lineage_lookup import NO_LINEAGE
 
 
 _PARQUET_COLUMNS = [
@@ -55,7 +57,7 @@ def _run(tmp_path, rows, accs, wanted_format="fasta"):
         output_dir=str(out_dir),
         wanted_accs=list(accs),
         num_wanted=len(accs),
-        ncbi_sub_table_path=out_dir / "wanted-ncbi-accessions-info.tsv",
+        ncbi_sub_table_path=out_dir / "downloaded-assemblies-info.tsv",
         not_found_path=out_dir / "ncbi-accessions-not-found.txt",
         not_downloaded_path=out_dir / "ncbi-accessions-not-downloaded.tsv",
     )
@@ -122,3 +124,113 @@ def test_unresolvable_row_yields_na_link(tmp_path):
     (record,) = _run(tmp_path, [_row(asm="", ftp="na")], ["GCF_000005845.2"])
 
     assert record["target_link"] == "NA"
+
+
+# --- lineage columns in the info table ------------------------------------
+# --add-ncbi-tax / --add-gtdb-tax are independent of each other and of --source, and
+# both default off. NCBI lineage rides along on the asset scan; GTDB lineage comes
+# from a map the caller builds and hangs off run_data.
+
+_LINEAGE = ("Bacteria", "Pseudomonadota", "Gammaproteobacteria", "Enterobacterales",
+            "Enterobacteriaceae", "Escherichia", "Escherichia coli")
+
+
+def _lineage_summary(tmp_path, with_ranks=True):
+    """A one-row Parquet fixture, optionally carrying the asset's lineage columns."""
+    row = _row()
+    cols = {c: [str(row[c])] for c in _PARQUET_COLUMNS}
+    if with_ranks:
+        for rank, value in zip(RANKS, _LINEAGE):
+            cols[rank] = [value]
+    path = tmp_path / "ncbi-summary-lineage.parquet"
+    pq.write_table(pa.table(cols), path)
+    return path
+
+
+def _lineage_run_data(tmp_path):
+    out_dir = tmp_path / "lineage-out"
+    out_dir.mkdir()
+    return RunData(
+        wanted_format="fasta",
+        output_dir=str(out_dir),
+        wanted_accs=["GCF_000005845.2"],
+        num_wanted=1,
+        ncbi_sub_table_path=out_dir / "downloaded-assemblies-info.tsv",
+        not_found_path=out_dir / "ncbi-accessions-not-found.txt",
+        not_downloaded_path=out_dir / "ncbi-accessions-not-downloaded.tsv",
+    )
+
+
+_lineage_parse = parse_ncbi_assembly_summary
+
+
+def _lineage_table(tmp_path, add_ncbi_tax=False, add_gtdb_tax=False,
+                   gtdb_lineage=None, with_ranks=True):
+    summary = _lineage_summary(tmp_path, with_ranks=with_ranks)
+    rd = _lineage_run_data(tmp_path)
+    rd.add_ncbi_tax = add_ncbi_tax
+    rd.add_gtdb_tax = add_gtdb_tax
+    rd.gtdb_lineage = gtdb_lineage
+    _lineage_parse(summary, rd)
+    lines = Path(rd.ncbi_sub_table_path).read_text().splitlines()
+    header = lines[0].split("\t")
+    return header, [dict(zip(header, line.split("\t"))) for line in lines[1:]]
+
+
+def test_no_lineage_columns_by_default(tmp_path):
+    header, _ = _lineage_table(tmp_path)
+    assert not [c for c in header if c.startswith(("ncbi_", "gtdb_"))]
+
+
+def test_add_ncbi_tax_adds_prefixed_ncbi_columns(tmp_path):
+    header, rows = _lineage_table(tmp_path, add_ncbi_tax=True)
+    assert header[-7:] == [f"ncbi_{r}" for r in RANKS]
+    assert rows[0]["ncbi_species"] == "Escherichia coli"
+    assert rows[0]["ncbi_domain"] == "Bacteria"
+    assert not [c for c in header if c.startswith("gtdb_")]
+
+
+def test_add_gtdb_tax_adds_prefixed_gtdb_columns(tmp_path):
+    mapping = {accession_core("GCF_000005845.2"): _LINEAGE}
+    header, rows = _lineage_table(tmp_path, add_gtdb_tax=True, gtdb_lineage=mapping,
+                                  with_ranks=False)
+    assert header[-7:] == [f"gtdb_{r}" for r in RANKS]
+    assert rows[0]["gtdb_species"] == "Escherichia coli"
+    assert not [c for c in header if c.startswith("ncbi_")]
+
+
+def test_both_taxonomies_can_be_on_at_once(tmp_path):
+    """
+    They're independent flags, and the prefixes are what keeps a mixed table
+    unambiguous when GTDB and NCBI disagree.
+    """
+    gtdb = ("Bacteria", "GtdbPhylum", "GtdbClass", "GtdbOrder", "GtdbFamily",
+            "GtdbGenus", "Gtdb species")
+    mapping = {accession_core("GCF_000005845.2"): gtdb}
+    header, rows = _lineage_table(tmp_path, add_ncbi_tax=True, add_gtdb_tax=True,
+                                  gtdb_lineage=mapping)
+    assert header[-14:] == ([f"ncbi_{r}" for r in RANKS] +
+                            [f"gtdb_{r}" for r in RANKS])
+    assert rows[0]["ncbi_phylum"] == "Pseudomonadota"
+    assert rows[0]["gtdb_phylum"] == "GtdbPhylum"
+
+
+def test_accession_missing_from_gtdb_gets_NA(tmp_path):
+    """GTDB is bacteria/archaea only, so a miss is expected, not an error."""
+    header, rows = _lineage_table(tmp_path, add_gtdb_tax=True, gtdb_lineage={},
+                                  with_ranks=False)
+    assert [rows[0][f"gtdb_{r}"] for r in RANKS] == list(NO_LINEAGE)
+
+
+def test_lineage_columns_come_after_the_link_columns(tmp_path):
+    header, _ = _lineage_table(tmp_path, add_ncbi_tax=True)
+    assert header.index("local_destination") < header.index("ncbi_domain")
+    assert header.index("target_link") < header.index("ncbi_domain")
+
+
+def test_every_row_has_the_full_width(tmp_path):
+    mapping = {accession_core("GCF_000005845.2"): _LINEAGE}
+    header, rows = _lineage_table(tmp_path, add_ncbi_tax=True, add_gtdb_tax=True,
+                                  gtdb_lineage=mapping)
+    assert all(len(row) == len(header) for row in rows)
+    assert "" not in rows[0].values()

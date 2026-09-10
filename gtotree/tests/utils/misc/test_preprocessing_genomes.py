@@ -346,7 +346,7 @@ def test_nucleotide_mode_skips_the_protein_attempt_without_raising(tmp_path):
 
 def _write_sub_table(path, rows):
     with open(path, "w") as f:
-        f.write("input_accession\tfound_accession\ttaxid\thttp_base_link\n")
+        f.write("target_accession\tfound_accession\ttaxid\thttp_base_link\n")
         for acc, link in rows.items():
             f.write(f"{acc}\t{acc}\t0\t{link}\n")
 

@@ -262,7 +262,7 @@ def check_lineage(args):
             print(f"\n  Accepted ranks are any combination of the below entered as a comma-delimited list:\n\n        {'\n        '.join(accepted_ranks)}")
             report_very_early_exit()
 
-    if args.lineage != "domain,phylum,class,genus,species" and not args.add_ncbi_tax and not args.add_gtdb_tax:
+    if args.lineage != "domain,phylum,class,order,family,genus,species" and not args.add_ncbi_tax and not args.add_gtdb_tax:
         report_message("You've specified a custom lineage (`-L`), but neither the "
                        "`--add-gtdb-tax` or `--add-ncbi-tax` flags were provided to indicate which taxonomy to use.")
         report_very_early_exit(suggest_help=True)

@@ -182,11 +182,9 @@ By setting the **`-D`** flag, GToTree will add GTDB taxonomy information to the 
 ---
 
 ### Specify which taxonomic ranks to add to genome labels
-* **[-L \<str\>] default: domain,phylum,class,genus,species**
+* **[-L \<str\>] default: domain,phylum,class,order,family,genus,species**
 
-Provide the **`-t`** or **`-D`** flag in order to add lineage info to the genome labels. By default this adds domain, phylum, class, genus, and species, where available. This may be suitable when making a tree across multiple domains, but may be unnecessarily cumbersome when just making a tree of one genus. You can specify which ranks you'd like added with the **`-L`** argument as a comma-separated list, e.g. `-L domain,phylum,class,order,family,genus,species,strain`.
-
-> **Changed in v2:** the default is now `domain,phylum,class,genus,species` — genus is included and strain is not. Rank names are case-insensitive, so v1-style `-L Domain,Phylum,Class` still works.
+Provide the **`-t`** or **`-D`** flag in order to add lineage info to the genome labels. By default this adds domain, phylum, class, genus, and species, where available. This may be suitable when making a tree across multiple domains, but may be unnecessarily cumbersome when just making a tree of one genus. You can specify which ranks you'd like added with the **`-L`** argument as a comma-separated list, e.g. `-L genus,species`.
 
 ---
 

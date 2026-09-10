@@ -23,9 +23,6 @@ from dataclasses import dataclass
 from tqdm import tqdm # type: ignore
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_version_arg
-# The retry/backoff POLICY is shared with the in-run downloader rather than
-# reimplemented: same throttle split, same sawtooth, same ceilings. Only the transfer
-# differs (this one guards against NCBI error pages and writes atomically).
 from gtotree.utils.misc.processing_genomes import (_sleep_backoff,
                                                    NCBI_DOWNLOAD_MAX_RETRIES,
                                                    NCBI_DOWNLOAD_TIMEOUT,
@@ -35,6 +32,8 @@ from gtotree.utils.misc.messaging import report_message, wprint, color_text
 from gtotree.utils.ncbi.get_ncbi_assembly_data import (get_ncbi_assembly_data,
                                                        ncbi_data_table_path)
 from gtotree.utils.ncbi.dl_assembly_links import parse_ncbi_assembly_summary
+from gtotree.utils.gtdb.get_gtdb_data import get_gtdb_data, gtdb_data_table_path
+from gtotree.utils.taxonomy.lineage_lookup import gtdb_lineage_map
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.tax_select import (TaxonNotFound, AmbiguousTaxon,
                                                CrossDomainTaxon)
@@ -56,6 +55,13 @@ from gtotree.utils.taxonomy.exclusion_list import (load_exclusion_cores,
 
 max_threads = 20
 max_retries = NCBI_DOWNLOAD_MAX_RETRIES
+
+# Whole-pool sweeps over anything that failed for a transient reason, on top of the
+# per-file retries inside download_one()
+MAX_RETRY_PASSES = 2
+
+# Seconds to wait before each retry pass
+RETRY_PASS_WAITS = (3, 7)
 
 FORMAT_CHOICES = ["fasta", "protein", "genbank", "gff", "nt_cds",
                   "feature_tab", "report", "stats"]
@@ -244,6 +250,20 @@ def build_parser(parent_subparsers=None, show_detailed=False):
     )
 
     optional.add_argument(
+        "--add-ncbi-tax",
+        dest="add_ncbi_tax",
+        action="store_true",
+        help=("Add NCBI taxonomy info to the output table of downloaded assemblies"),
+    )
+
+    optional.add_argument(
+        "--add-gtdb-tax",
+        dest="add_gtdb_tax",
+        action="store_true",
+        help=("Add GTDB taxonomy info to the output table of downloaded assemblies"),
+    )
+
+    optional.add_argument(
         "-s",
         "--show-detailed-help",
         dest="show_detailed_help",
@@ -352,6 +372,10 @@ def preflight_checks(args):
             os.makedirs(args.output_dir, exist_ok=True)
 
     get_ncbi_assembly_data()
+
+    if (getattr(args, "add_gtdb_tax", False)
+            and not getattr(args, "dry_run", False)):
+        get_gtdb_data()
 
 
 def _selection_kwargs(args):
@@ -533,17 +557,24 @@ def setup(args, wanted_accs=None):
         with open(args.ncbi_accessions, "r") as f:
             wanted_accs = [line.strip() for line in f if line.strip()]
 
-    return RunData(
+    run_data = RunData(
         wanted_format=args.format,
         num_jobs=args.jobs,
         output_dir=args.output_dir,
         wanted_accs=wanted_accs,
         num_wanted=len(wanted_accs),
-        ncbi_sub_table_path=Path(args.output_dir) / "wanted-ncbi-accessions-info.tsv",
+        ncbi_sub_table_path=Path(args.output_dir) / "downloaded-assemblies-info.tsv",
         not_found_path=Path(args.output_dir) / "ncbi-accessions-not-found.txt",
         not_downloaded_path=Path(args.output_dir) / "ncbi-accessions-not-downloaded.tsv",
         from_taxon=bool(getattr(args, "wanted_ref_tax", None)),
+        add_ncbi_tax=bool(getattr(args, "add_ncbi_tax", False)),
+        add_gtdb_tax=bool(getattr(args, "add_gtdb_tax", False)),
     )
+
+    if run_data.add_gtdb_tax:
+        run_data.gtdb_lineage = gtdb_lineage_map(gtdb_data_table_path(), wanted_accs)
+
+    return run_data
 
 
 def parse_main_assembly_table(run_data):
@@ -572,6 +603,9 @@ class RunData:
     not_downloaded_path: str = None
     quiet: bool = False
     from_taxon: bool = False
+    add_ncbi_tax: bool = False
+    add_gtdb_tax: bool = False
+    gtdb_lineage: dict = None
 
     @property
     def not_found_reason(self):
@@ -755,22 +789,25 @@ def download_assemblies(run_data):
 
     permanent, transient, num_skipped = run_download_pass(targets, run_data)
 
-    # second pass on transient-only failures
     if transient:
-        retry_targets = [(link, dest) for link, dest, _ in transient]
-        print("")
         report_message(f"{len(transient):,} file(s) failed with transient errors, "
-                       "doing another pass to see if we can grab them...", "yellow",
-                       ii="    ", si="    ", width=100, trailing_newline=True)
+                       f"giving them up to {MAX_RETRY_PASSES} more pass(es) to see "
+                       f"if we can grab them...", "yellow", ii="    ", si="    ",
+                       width=80, trailing_newline=True)
 
-        time.sleep(3)
-        retry_permanent, retry_transient, retry_skipped = run_download_pass(
-            retry_targets, run_data, desc="Progress"
+    for retry_pass in range(1, MAX_RETRY_PASSES + 1):
+        if not transient:
+            break
+        retry_targets = [(link, dest) for link, dest, _ in transient]
+        time.sleep(RETRY_PASS_WAITS[retry_pass - 1])
+        retry_permanent, transient, retry_skipped = run_download_pass(
+            retry_targets, run_data, desc=f"Retry {retry_pass}"
         )
         num_skipped += retry_skipped
-        # anything still failing after the retry is final, regardless of category
         permanent.extend(retry_permanent)
-        permanent.extend(retry_transient)
+
+    # anything still transient once the passes are spent is final
+    permanent.extend(transient)
 
     failed = [(dest, error) for _, dest, error in permanent]
 

@@ -81,7 +81,7 @@ def parser():
     # --- Taxonomy Options ---
     opt.add_argument("-D", "--add-gtdb-tax", action="store_true")
     opt.add_argument("-t", "--add-ncbi-tax", action="store_true")
-    opt.add_argument("-L", "--lineage-ranks", metavar="<str>", type=str, dest="lineage", default="domain,phylum,class,genus,species")
+    opt.add_argument("-L", "--lineage-ranks", metavar="<str>", type=str, dest="lineage", default="domain,phylum,class,order,family,genus,species")
 
     # --- Filtering Settings ---
     opt.add_argument("-c", "--seq-length-cutoff", metavar="<float>", type=float, default=0.2)

@@ -365,8 +365,8 @@ def build_base_link_map(run_data):
             f'"{path or "<unset>"}", so there are no download links to work from')
 
     df = pd.read_csv(path, sep="\t",
-                     usecols=["input_accession", "http_base_link"])
-    return dict(zip(df["input_accession"], df["http_base_link"], strict=True))
+                     usecols=["target_accession", "http_base_link"])
+    return dict(zip(df["target_accession"], df["http_base_link"], strict=True))
 
 
 def _normalize_base_link(raw_base_link):

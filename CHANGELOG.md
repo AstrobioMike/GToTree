@@ -97,8 +97,7 @@ my best to rapidly address anything!
 
 - `-j`/`--num-jobs` now defaults to 4 (was 1)
 - default output directory is now `gtotree-output`
-- `-L`/`--lineage-ranks` now defaults to `domain,phylum,class,genus,species` (strain is
-  no longer included)
+- `-L`/`--lineage-ranks` defaults to all primary ranks (`domain,phylum,class,order,family,genus,species`)
 
 
 #### Filtering

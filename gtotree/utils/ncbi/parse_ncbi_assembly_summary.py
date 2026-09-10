@@ -84,11 +84,8 @@ def parse_assembly_summary(assembly_summary_file, run_data):
 
     Writes a sub-table (ncbi-accessions-info.tsv) into run_data.tmp_dir with one row
     per found wanted accession and these tab-separated columns:
-        input_accession, found_accession, assembly_name, taxid, organism_name,
+        target_accession, found_accession, assembly_name, taxid, organism_name,
         infraspecific_name, version_status, assembly_level, http_base_link
-
-    (input_accession and http_base_link are the two columns processing's
-    get_base_link depends on -- their names/semantics are held stable.)
 
     Accessions not found have their GenomeData entries marked removed, which is what
     puts them into removed-genomes.tsv. Returns the updated run_data.
@@ -114,7 +111,7 @@ def parse_assembly_summary(assembly_summary_file, run_data):
 
     with open(ncbi_sub_table_path, "w") as out_file:
 
-        out_file.write("input_accession\tfound_accession\tassembly_name\ttaxid\t"
+        out_file.write("target_accession\tfound_accession\tassembly_name\ttaxid\t"
                        "organism_name\tinfraspecific_name\tversion_status\t"
                        "assembly_level\thttp_base_link\n")
 

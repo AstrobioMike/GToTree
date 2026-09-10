@@ -11,6 +11,8 @@ The link-building helpers themselves are imported from that module rather than
 duplicated, so a fix to the NCBI path layout lands in both.
 """
 
+from pathlib import Path
+
 import pyarrow as pa # type: ignore
 import pyarrow.compute as pc # type: ignore
 import pyarrow.dataset as ds # type: ignore
@@ -18,6 +20,9 @@ import pyarrow.dataset as ds # type: ignore
 from gtotree.utils.ncbi.parse_ncbi_assembly_summary import (build_base_link,
                                                             resolve_base_link,
                                                             _clean)
+from gtotree.utils.taxonomy.tax_ranks import RANKS, accession_core
+from gtotree.utils.taxonomy.lineage_lookup import (NO_LINEAGE, lineage_columns,
+                                                   lineage_from_row)
 
 
 # NCBI's suffix for each format, and the extension we save it under locally
@@ -33,10 +38,20 @@ FORMAT_EXTENSIONS = {
 }
 
 
-_NEEDED_COLUMNS = [
+_BASE_COLUMNS = [
     "assembly_accession", "asm_name", "taxid", "organism_name",
     "infraspecific_name", "version_status", "assembly_level", "ftp_path",
 ]
+
+
+def _needed_columns(add_ncbi_tax=False):
+    """
+    Asset columns to scan. The lineage columns are only requested when they'll be
+    written, so the common case doesn't pay to read seven extra columns.
+    """
+    if add_ncbi_tax:
+        return _BASE_COLUMNS + list(RANKS)
+    return list(_BASE_COLUMNS)
 
 
 def _resolve_links(dl_acc, assembly_name, ftp_path):
@@ -83,16 +98,22 @@ def parse_ncbi_assembly_summary(assembly_summary_file, run_data):
         root_field,
         value_set=pa.array(sorted(set(wanted_dict)), type=pa.string()))
 
+    add_ncbi_tax = bool(getattr(run_data, "add_ncbi_tax", False))
+    add_gtdb_tax = bool(getattr(run_data, "add_gtdb_tax", False))
+    gtdb_lineage = getattr(run_data, "gtdb_lineage", None) or {}
+
     with open(run_data.ncbi_sub_table_path, "w") as out_file:
 
-        cols = ["input_accession", "found_accession", "assembly_name", "taxid",
+        cols = ["target_accession", "found_accession", "assembly_name", "taxid",
                 "organism_name", "infraspecific_name", "version_status",
-                "assembly_level", "http_base_link"]
+                "assembly_level"]
         if run_data.wanted_format:
             cols.extend(["target_link", "local_destination"])
+        cols.extend(lineage_columns(add_ncbi_tax, add_gtdb_tax))
         out_file.write("\t".join(cols) + "\n")
 
-        scanner = dataset.scanner(columns=_NEEDED_COLUMNS, filter=predicate)
+        scanner = dataset.scanner(columns=_needed_columns(add_ncbi_tax),
+                                  filter=predicate)
 
         for batch in scanner.to_batches():
             for row in batch.to_pylist():
@@ -113,18 +134,24 @@ def parse_ncbi_assembly_summary(assembly_summary_file, run_data):
                     _clean(row.get("taxid")), _clean(row.get("organism_name")),
                     _clean(row.get("infraspecific_name")),
                     _clean(row.get("version_status")),
-                    _clean(row.get("assembly_level")), http_path,
+                    _clean(row.get("assembly_level")),
                 ]
-                out_line = "\t".join(out_fields)
 
                 if run_data.wanted_format:
                     ncbi_ext, local_ext = FORMAT_EXTENSIONS[run_data.wanted_format]
                     target_link = (f"{http_path}/{dir_basename}{ncbi_ext}"
                                    if http_path.lower() != "na" else "NA")
-                    local_path = f"{run_data.output_dir}/{dl_acc}{local_ext}"
-                    out_line += "\t" + target_link + "\t" + local_path
+                    local_path = str(Path(run_data.output_dir) /
+                                     f"{dl_acc}{local_ext}")
+                    out_fields.extend([target_link, local_path])
 
-                out_file.write(out_line + "\n")
+                if add_ncbi_tax:
+                    out_fields.extend(lineage_from_row(row))
+                if add_gtdb_tax:
+                    out_fields.extend(
+                        gtdb_lineage.get(accession_core(dl_acc), NO_LINEAGE))
+
+                out_file.write("\t".join(out_fields) + "\n")
 
     not_found = set(run_data.wanted_accs) - found
 

@@ -15,10 +15,12 @@ import pytest  # type: ignore
 
 from gtotree.utils.ncbi.dl_ncbi_assemblies import (
     build_parser, resolve_targets, report_selection, dl_ncbi_assemblies,
-    TaxonSelection, RunData)
+    download_assemblies, TaxonSelection, RunData, MAX_RETRY_PASSES,
+    RETRY_PASS_WAITS)
 from gtotree.utils.taxonomy.tax_select import CrossDomainTaxon, AmbiguousTaxon, TaxonNotFound
 
 _MOD = "gtotree.utils.ncbi.dl_ncbi_assemblies"
+_RETRY_MOD = _MOD
 
 
 def _args(**kwargs):
@@ -455,3 +457,121 @@ class TestDownloadOne:
         dest = tmp_path / "GCF_1.fasta.gz"
         assert dlmod.download_one("http://x/f.gz", str(dest), retries=2)[2] == \
             "failed_transient"
+
+
+def _make_run_data(tmp_path, links_and_dests):
+    tsv = tmp_path / "downloaded-assemblies-info.tsv"
+    rows = "\n".join(f"{link}\t{dest}" for link, dest in links_and_dests)
+    tsv.write_text(f"target_link\tlocal_destination\n{rows}\n")
+    return RunData(
+        ncbi_sub_table_path=tsv,
+        not_downloaded_path=tmp_path / "failed.tsv",
+        num_jobs=1,
+    )
+
+
+# --- retry passes ---------------------------------------------------------
+# A transient failure gets whole-pool sweeps on top of download_one()'s own per-file
+# retries. What matters here is that the sweeps are bounded, stop as soon as the pool
+# is clear, label their progress bars by pass number, and treat anything still
+# transient after the last one as final.
+
+def _queued_passes(results):
+    """
+    Stand in for run_download_pass, returning a queued result per call and recording
+    the progress-bar label each pass was handed.
+    """
+    calls = []
+
+    def fake(targets, run_data, desc="Progress"):
+        calls.append(desc)
+        return results[len(calls) - 1]
+
+    return fake, calls
+
+
+def _retry_run_data(tmp_path):
+    dest = str(tmp_path / "a.gz")
+    return _make_run_data(tmp_path, [("http://fake/a.gz", dest)]), dest
+
+
+def test_no_retry_passes_when_nothing_is_transient(tmp_path):
+    rd, dest = _retry_run_data(tmp_path)
+    fake, calls = _queued_passes([([], [], 0)])
+    with patch(f"{_RETRY_MOD}.run_download_pass", fake), \
+         patch(f"{_RETRY_MOD}.time.sleep"):
+        rd = download_assemblies(rd)
+    assert calls == ["Progress"]
+    assert rd.num_downloaded == 1
+    assert rd.num_not_downloaded == 0
+
+
+def test_transient_failure_gets_up_to_max_retry_passes(tmp_path):
+    rd, dest = _retry_run_data(tmp_path)
+    still_failing = [("http://fake/a.gz", dest, "HTTP 503")]
+    fake, calls = _queued_passes([
+        ([], still_failing, 0),     # initial pass
+        ([], still_failing, 0),     # retry 1 doesn't get it
+        ([], [], 0),                # retry 2 does
+    ])
+    with patch(f"{_RETRY_MOD}.run_download_pass", fake), \
+         patch(f"{_RETRY_MOD}.time.sleep"):
+        rd = download_assemblies(rd)
+    assert calls == ["Progress", "Retry 1", "Retry 2"]
+    assert rd.num_downloaded == 1
+    assert rd.num_not_downloaded == 0
+
+
+def test_retry_passes_stop_as_soon_as_the_pool_is_clear(tmp_path):
+    rd, dest = _retry_run_data(tmp_path)
+    fake, calls = _queued_passes([
+        ([], [("http://fake/a.gz", dest, "HTTP 503")], 0),
+        ([], [], 0),                                        # cleared on retry 1
+    ])
+    with patch(f"{_RETRY_MOD}.run_download_pass", fake), \
+         patch(f"{_RETRY_MOD}.time.sleep"):
+        rd = download_assemblies(rd)
+    assert calls == ["Progress", "Retry 1"]      # no wasted second sweep
+
+
+def test_still_transient_after_the_last_pass_is_final(tmp_path):
+    rd, dest = _retry_run_data(tmp_path)
+    still_failing = [("http://fake/a.gz", dest, "HTTP 503")]
+    fake, calls = _queued_passes([([], still_failing, 0)] * (MAX_RETRY_PASSES + 1))
+    with patch(f"{_RETRY_MOD}.run_download_pass", fake), \
+         patch(f"{_RETRY_MOD}.time.sleep"):
+        rd = download_assemblies(rd)
+    assert len(calls) == MAX_RETRY_PASSES + 1
+    assert rd.num_not_downloaded == 1
+    assert rd.num_downloaded == 0
+    assert "HTTP 503" in Path(rd.not_downloaded_path).read_text()
+
+
+def test_permanent_failure_from_a_retry_pass_is_kept(tmp_path):
+    rd, dest = _retry_run_data(tmp_path)
+    fake, calls = _queued_passes([
+        ([], [("http://fake/a.gz", dest, "HTTP 503")], 0),
+        ([("http://fake/a.gz", dest, "HTTP 404")], [], 0),
+    ])
+    with patch(f"{_RETRY_MOD}.run_download_pass", fake), \
+         patch(f"{_RETRY_MOD}.time.sleep"):
+        rd = download_assemblies(rd)
+    assert rd.num_not_downloaded == 1
+    assert "HTTP 404" in Path(rd.not_downloaded_path).read_text()
+
+
+def test_retry_pass_waits_grow(tmp_path):
+    """
+    The pause is there to let a throttle window expire, so a window that outlasted the
+    first wait needs longer than the same wait again.
+    """
+    assert len(RETRY_PASS_WAITS) == MAX_RETRY_PASSES
+    assert RETRY_PASS_WAITS[1] > RETRY_PASS_WAITS[0]
+
+    rd, dest = _retry_run_data(tmp_path)
+    still_failing = [("http://fake/a.gz", dest, "HTTP 503")]
+    fake, _ = _queued_passes([([], still_failing, 0)] * (MAX_RETRY_PASSES + 1))
+    with patch(f"{_RETRY_MOD}.run_download_pass", fake), \
+         patch(f"{_RETRY_MOD}.time.sleep") as slept:
+        download_assemblies(rd)
+    assert [c.args[0] for c in slept.call_args_list] == list(RETRY_PASS_WAITS)

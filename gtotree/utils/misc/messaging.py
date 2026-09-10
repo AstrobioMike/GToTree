@@ -625,7 +625,7 @@ def check_and_report_any_changed_default_behavior(args, run_data):
     elif args.add_ncbi_tax:
         lines.append("NCBI taxonomic info will be added to labels where possible")
 
-    if args.lineage != "domain,phylum,class,genus,species":
+    if args.lineage != "domain,phylum,class,order,family,genus,species":
         lines.append(f"Lineage info added to labels will be: \"{args.lineage}\"")
 
     if args.tree_program != "FastTreeMP":

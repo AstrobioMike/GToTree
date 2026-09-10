@@ -275,11 +275,10 @@ ENTRIES = [
          BRIEF),
 
         ("-L | --lineage-ranks <str>",
-         "wanted lineage ranks; default: domain,phylum,class,genus,species",
+         "wanted lineage ranks; default: domain,phylum,class,order,family,genus,species",
          """
          A comma-separated list of the taxonomic ranks you'd like added to the labels
-         if adding taxonomic information. E.g., all would be "--lineage-ranks
-         domain,phylum,class,order,family,genus,species,strain".
+         if adding taxonomic information.
 
          Note: Strain-level only applicable to NCBI taxonomy (not GTDB).
          """,

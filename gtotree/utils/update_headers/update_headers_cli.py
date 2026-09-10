@@ -30,7 +30,7 @@ from gtotree.utils.update_headers.update_headers_run import (
 
 
 DEFAULT_OUTPUT_DIR = "gtotree-updated-headers"
-DEFAULT_LINEAGE = "domain,phylum,class,genus,species"
+DEFAULT_LINEAGE = "domain,phylum,class,order,family,genus,species"
 
 
 ################################################################################

@@ -93,7 +93,7 @@ def test_parse_extracts_correct_columns(tmp_path):
     parse_assembly_summary(str(summary), rd)
 
     header, rows = _read_subtable(rd)
-    assert header == ["input_accession", "found_accession", "assembly_name",
+    assert header == ["target_accession", "found_accession", "assembly_name",
                       "taxid", "organism_name", "infraspecific_name",
                       "version_status", "assembly_level", "http_base_link"]
     r = rows[0]
@@ -150,7 +150,7 @@ def test_parse_matches_on_root_accession_ignoring_version(tmp_path):
     parse_assembly_summary(str(summary), rd)
 
     _, rows = _read_subtable(rd)
-    assert rows[0]["input_accession"] == "GCF_000005845.2"   # original preserved
+    assert rows[0]["target_accession"] == "GCF_000005845.2"  # original preserved
     assert rows[0]["found_accession"] == "GCF_000005845.3"   # what NCBI had
 
 
@@ -161,7 +161,7 @@ def test_parse_early_returns_when_the_recorded_subtable_still_exists(tmp_path):
 
     # a real, on-disk sub-table from a prior run: nothing to redo
     existing = tmp_path / "already-done.tsv"
-    existing.write_text("input_accession\thttp_base_link\n")
+    existing.write_text("target_accession\thttp_base_link\n")
     rd.ncbi_sub_table_path = str(existing)
 
     out = parse_assembly_summary(str(summary), rd)
@@ -220,7 +220,7 @@ def test_the_taxid_on_genome_data_matches_the_sub_table(tmp_path):
     parse_assembly_summary(str(summary), rd)
 
     _header, rows = _read_subtable(rd)
-    from_sub_table = {r["input_accession"]: r["taxid"] for r in rows}
+    from_sub_table = {r["target_accession"]: r["taxid"] for r in rows}
     from_genome_data = {gd.id: gd.taxid for gd in rd.ncbi_accs}
 
     assert from_genome_data == from_sub_table
