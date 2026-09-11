@@ -118,16 +118,17 @@ def test_rank_counts(in_gtdb, capsys):
     assert "Num. Unique Taxa" in out
 
 
-def test_not_found_taxon_exits_cleanly(in_gtdb, capsys):
+def test_not_found_taxon_exits_with_a_failure_status(in_gtdb, capsys):
+    # friendly message, non-zero status -- see the NCBI twin of this test
     code = _run(_args(wanted_ref_tax="Nonexistent"))
-    assert code == 0
+    assert code == 1
     assert "doesn't seem to exist" in capsys.readouterr().out
 
 
 def test_coarser_derep_rank_is_rejected(in_gtdb, capsys):
     # target at genus, derep at phylum (coarser) -> ValueError translated
     code = _run(_args(wanted_ref_tax="GenA", derep_rank="phylum"))
-    assert code == 0
+    assert code == 1
     assert capsys.readouterr().out  # some friendly message emitted
 
 

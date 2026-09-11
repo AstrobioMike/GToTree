@@ -340,7 +340,7 @@ def autopick_scg_set(source, selections):
     if outside:
         return AutoPickedSCGSet(
             UNIVERSAL_SCG_SET,
-            reason=(f""))
+            reason=(""))
 
     if via_genomes:
         resolved, unplaced = _resolve_ncbi_selections(selections)

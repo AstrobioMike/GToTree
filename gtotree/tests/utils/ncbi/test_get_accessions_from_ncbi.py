@@ -149,15 +149,17 @@ def test_refseq_reference_genomes_only(in_ncbi):
     assert accs == ["GCF_000000001.1"]
 
 
-def test_not_found_exits_cleanly(in_ncbi, capsys):
+def test_not_found_exits_with_a_failure_status(in_ncbi, capsys):
+    # a friendly message, but still a non-zero status -- `get-accs-from-ncbi ... && next`
+    # must not treat "that taxon doesn't exist" as a successful pull
     code = _run(_args(wanted_ref_tax="Nonexistent", ncbi_section="both"))
-    assert code == 0
+    assert code == 1
     assert "doesn't seem to exist" in capsys.readouterr().out
 
 
 def test_bad_assembly_level_rejected(in_ncbi, capsys):
     code = _run(_args(wanted_ref_tax="Testophyla", assembly_level="banana"))
-    assert code == 0
+    assert code == 1
     assert "unrecognised" in capsys.readouterr().out.lower()
 
 
@@ -174,7 +176,7 @@ def test_cli_assembly_level_is_repeatable():
 
 def test_coarser_derep_rank_rejected(in_ncbi, capsys):
     code = _run(_args(wanted_ref_tax="GenA", ncbi_section="both", derep_rank="phylum"))
-    assert code == 0
+    assert code == 1
     assert capsys.readouterr().out  # friendly message emitted
 
 
@@ -377,7 +379,7 @@ def test_all_with_derep_rank_includes_eukaryotes(in_ncbi, tmp_path, capsys):
 
 def test_derep_rank_with_a_taxid_is_refused(in_ncbi, capsys):
     code = _run(_args(wanted_ref_tax="5000", ncbi_section="both", derep_rank="family"))
-    assert code == 0
+    assert code == 1
     assert "`--derep-rank` can't be applied with a taxid" in capsys.readouterr().out
     assert not glob.glob("ncbi-*accs.txt")
 

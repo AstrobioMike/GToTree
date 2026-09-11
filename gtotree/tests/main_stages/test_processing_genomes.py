@@ -18,8 +18,19 @@ from gtotree.main_stages.processing_genomes import (SearchPlan,
                                                     genomes_needing_processing)
 from gtotree.utils.misc.stages import GenomeRemovalStage
 
+# `prodigal` is what the nucleotide tests themselves need. The rest are what
+# `preflight_checks()` insists on before any stage runs -- the stage under test never
+# calls them, but _process() goes through preflight, so a machine without them gets
+# failures that look like real breakage instead of skips.
 REQUIRED = ["prodigal"]
+PREFLIGHT_REQUIRED = ["muscle", "trimal", "FastTreeMP"]
+
 _missing = [b for b in REQUIRED if shutil.which(b) is None]
+_missing_preflight = [b for b in PREFLIGHT_REQUIRED if shutil.which(b) is None]
+
+needs_preflight_deps = pytest.mark.skipif(
+    bool(_missing_preflight),
+    reason=f"missing binaries preflight_checks requires: {_missing_preflight}")
 
 
 def _plan(do_pfam=False, do_ko=False, keep=False):
@@ -86,6 +97,7 @@ AA_GENOMES = [DATA_DIR / f"mock-{i}.faa" for i in range(1, 5)]
 MOCK_HMM = DATA_DIR / "mock.hmm"
 
 
+@needs_preflight_deps
 def test_processing_searches_every_genome_and_drops_its_sequence_files(tmp_path):
     _, run_data = _process(tmp_path, "-A", AA_GENOMES, MOCK_HMM)
 
@@ -94,12 +106,14 @@ def test_processing_searches_every_genome_and_drops_its_sequence_files(tmp_path)
     assert os.listdir(run_data.ready_genome_files_dir) == []
 
 
+@needs_preflight_deps
 def test_keep_working_dir_keeps_the_sequence_files(tmp_path):
     _, run_data = _process(tmp_path, "-A", AA_GENOMES, MOCK_HMM, extra=["--keep-working-dir"])
     assert sorted(os.listdir(run_data.ready_genome_files_dir)) == \
         ["mock-1.faa", "mock-2.faa", "mock-3.faa", "mock-4.faa"]
 
 
+@needs_preflight_deps
 def test_running_the_stage_again_skips_everything_and_keeps_outputs_complete(tmp_path):
     from gtotree.main_stages.processing_genomes import process_genomes
 
@@ -117,6 +131,7 @@ def test_running_the_stage_again_skips_everything_and_keeps_outputs_complete(tmp
 # nucleotide mode
 # ---------------------------------------------------------------------------
 
+@needs_preflight_deps
 @pytest.mark.skipif(bool(_missing), reason=f"missing binaries: {_missing}")
 def test_nucleotide_input_has_genes_called_and_targets_found(tmp_path, nt_genomes, nt_hmm):
     _, run_data = _process(tmp_path, "-f", nt_genomes, nt_hmm)
@@ -131,6 +146,7 @@ def test_nucleotide_input_has_genes_called_and_targets_found(tmp_path, nt_genome
             assert "*" not in open(hits).read()
 
 
+@needs_preflight_deps
 @pytest.mark.skipif(bool(_missing), reason=f"missing binaries: {_missing}")
 def test_nucleotide_mode_yields_nucleotide_hits_and_drops_both_files(
         tmp_path, nt_genomes, nt_hmm):

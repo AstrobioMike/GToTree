@@ -6,7 +6,6 @@ against, staged into a directory laid out like a real managed `Pfam_data_dir` so
 production `get_additional_pfam_targets` runs unmodified against it.
 """
 
-import os
 import shutil
 import dataclasses
 import pytest  # type: ignore

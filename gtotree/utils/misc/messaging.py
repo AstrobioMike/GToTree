@@ -1199,3 +1199,20 @@ def get_path_rel_to_outdir(path, args):
     if rel == os.pardir or rel.startswith(os.pardir + os.sep):
         raise ValueError(f"Directory {key_dir!r} not found in {path!r}")
     return os.path.join(key_dir, rel)
+
+
+def report_hosted_data_dl_failure(data_name, url, fallback_advice, err):
+    """
+    Explain a failed download of one of the GitHub-hosted data bundles, and exit.
+
+    Shared by the KOFamScan and Pfam fetchers, which differ only in the name of the
+    data, the URL to check, and the closing sentence naming the flag a user can drop
+    to proceed without it.
+    """
+    report_message(f"Downloading the {data_name} data failed with the following "
+                   f"error:\n{err}", "red")
+    report_message("GToTree pulls this data from a GitHub-hosted release asset over HTTPS.")
+    report_message("You can check whether you can access this URL:")
+    report_message(f"    {url}")
+    report_message(fallback_advice)
+    report_early_exit(None, copy_log=False)

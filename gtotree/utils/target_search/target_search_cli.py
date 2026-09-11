@@ -25,26 +25,24 @@ report, and phase-stats -- live at the top.
 """
 
 import os
-import sys
 import shutil
 import tempfile
 import argparse
 
-from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
+from gtotree.cli.common import (CustomRichHelpFormatter, add_help, add_version_arg,
+                                run_subcommand_main)
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.general import (read_run_data, write_run_data, CorruptRunData,
-                                        OutputDirExistsError, adopt_genome_progress,
+                                        adopt_genome_progress,
                                         run_pooled_stage,
                                         GTT_PROGRESS_BAR_FORMAT_INDENTED_6)
 from gtotree.utils.misc.resume_state import (ResumeProfile, hash_strings,
                                         hash_local_genomes, hash_file_contents,
                                         STATE_VERSION)
 from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
-                                     report_phase_header, report_very_early_exit)
+                                     report_phase_header)
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.taxonomy.tax_ranks import RANKS
-from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon
-from gtotree.utils.taxonomy.wanted_ref_tax import WantedRefTaxError
 from gtotree.utils.taxonomy.exclusion_list import exclusion_list_help
 from gtotree.utils.misc.general import wanted_ref_tax_list
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
@@ -756,27 +754,7 @@ def setup_output_dir_multi(args, specs):
 
 
 def main():  # pragma: no cover
-    parser = build_parser()
-
-    if len(sys.argv) == 1:
-        parser.print_help(sys.stderr)
-        sys.exit(0)
-
-    args = parser.parse_args()
-
-    try:
-        run_search(args)
-    except KeyboardInterrupt:
-        print()
-        report_very_early_exit("Interrupted by user.", "yellow")
-    except (TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon, WantedRefTaxError) as e:
-        report_very_early_exit(str(e))
-    except OutputDirExistsError as e:
-        report_very_early_exit(str(e), "yellow", leading_newline=False)
-    except TargetSearchError as e:
-        report_very_early_exit(str(e))
-    finally:
-        phase_stats.report()
+    run_subcommand_main(build_parser(), run_search, TargetSearchError)
 
 
 if __name__ == "__main__":

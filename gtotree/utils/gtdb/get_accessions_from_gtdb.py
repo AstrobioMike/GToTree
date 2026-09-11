@@ -5,8 +5,7 @@ import pyarrow.parquet as pq # type: ignore
 
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.misc.messaging import wprint, color_text, report_message, spinner
-from gtotree.utils.misc.general import (write_table_tsv, write_accessions,
-                                        atomic_write_text)
+from gtotree.utils.misc.general import (write_table_tsv, write_accessions)
 from gtotree.utils.gtdb.get_gtdb_data import (get_gtdb_data, gtdb_data_table_path,
                                               report_gtdb_version_info as _read_gtdb_version_info)
 from gtotree.utils.taxonomy.tax_ranks import RANKS
@@ -28,7 +27,8 @@ from gtotree.utils.taxonomy.get_accs_shared import (PoolSpec,
                                                     resolved_derep_rank,
                                                     derep_note as _shared_derep_note,
                                                     is_derep_on, pull_count_lines,
-                                                    scoped_counts_note)
+                                                    scoped_counts_note,
+                                                    write_metadata_tsv)
 
 
 _RANK_COLUMNS = list(RANKS)
@@ -109,7 +109,7 @@ def get_accessions_from_gtdb(args):
 
     if args.get_table:
         copy_gtdb_table(gtdb_path)
-        sys.exit(0)
+        sys.exit(1)
 
     _report_gtdb_version(gtdb_path)
 
@@ -180,12 +180,12 @@ def preflight_checks(args):
         report_message("A specific taxon needs to also be provided to the `-w` flag "
                        "in order to use `--get-taxon-counts`.", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     if not args.get_rank_counts and not args.get_table and not args.wanted_ref_tax:
         report_message("A target taxon needs to be provided to `-w` (or 'all').", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     if args.gtdb_representatives_only and args.refseq_reference_genomes_only:
         print("")
@@ -223,7 +223,7 @@ def _select_rows(gtdb_path, args, representatives_source):
                         "you'll need to specify which rank is wanted as well before we pull the "
                         "accessions. This can be done with the `-r` parameter.", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
     except CrossDomainTaxon as e:
         report_message(f"The input taxon '{e.taxon}' occurs in more than one domain "
                        f"({', '.join(e.domains_found)}), so pulling on the name alone "
@@ -231,14 +231,14 @@ def _select_rows(gtdb_path, args, representatives_source):
                        "is wanted with `--target-domain` "
                        f"(e.g. `--target-domain {e.domains_found[0]}`).", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
     except TaxonNotFound:
         report_message(f"Input taxon '{args.wanted_ref_tax}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
     except ValueError as err:
         report_message(str(err), "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     for warning in selection.warnings:
         report_message(warning, "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
@@ -254,7 +254,7 @@ def _select_rows(gtdb_path, args, representatives_source):
                            emoticon=":("),
                        "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     return selection
 
@@ -285,15 +285,6 @@ def _derep_is_on(args):
     return is_derep_on(resolved_derep_rank(args))
 
 
-def _pool(gtdb_path, representatives_source=None):
-    """
-    The genomes this invocation is working within, as a PoolSpec
-    """
-    return PoolSpec(gtdb_path, "gtdb",
-                    rep_filter=_rep_filter_for(representatives_source),
-                    label="GTDB", taxon_flag="-w")
-
-
 def _write_all_dereplicated(gtdb_path, args, representatives_source):
     """`-w all` WITH --derep-rank: one selection per domain, merged."""
     reps_only = representatives_source is not None
@@ -306,7 +297,7 @@ def _write_all_dereplicated(gtdb_path, args, representatives_source):
     except ValueError as err:
         report_message(str(err), "yellow", ii="    ", si="    ", width=100,
                        trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     report_message(f"Dereplicating within each domain "
                    f"({', '.join(selection.domains)}).", "yellow",
@@ -321,7 +312,7 @@ def _write_all_dereplicated(gtdb_path, args, representatives_source):
     if not selection.accessions:
         report_message("No accessions were found :(", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     suffix = representatives_suffix(representatives_source)
     acc_out_filename = f"gtdb-arc-and-bac{suffix}-accs.txt"
@@ -398,21 +389,8 @@ def _report_unassigned_domains(summary):
 
 
 def _write_metadata_tsv(rows, out_filename):
-    """Write selected genome rows to a TSV, columns in the asset's natural order."""
-    if not rows:
-        atomic_write_text(out_filename, lambda f: None)
-        return
-    # preserve a stable, readable column order: accession + ranks first, then the rest
-    first = ["ncbi_genbank_assembly_accession"] + list(RANKS)
-    seen = set(first)
-    header = [c for c in first if c in rows[0]] + [c for c in rows[0] if c not in seen]
-
-    def _write(out):
-        out.write("\t".join(header) + "\n")
-        for r in rows:
-            out.write("\t".join(str(r.get(c, "")) for c in header) + "\n")
-
-    atomic_write_text(out_filename, _write)
+    """Write selected genome rows to a TSV; GTDB's table names the accession column."""
+    write_metadata_tsv(rows, out_filename, "ncbi_genbank_assembly_accession")
 
 
 ################################################################################
@@ -477,7 +455,7 @@ def _report_rank_counts_for_taxon_or_exit(gtdb_path, taxon, representatives_sour
         report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100)
         print("")
-        sys.exit(0)
+        sys.exit(1)
 
     for rank in ranks_found_in:
         total = _count_at_rank(gtdb_path, rank, canonical, rep_filter,
@@ -533,7 +511,7 @@ def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source, args=
         report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100)
         print("")
-        sys.exit(0)
+        sys.exit(1)
 
     taxon = canonical
 
@@ -567,7 +545,7 @@ def _report_taxon_counts_or_exit(gtdb_path, taxon, representatives_source, args=
             wprint(color_text("Input taxon '" + taxon + "' doesn't seem to exist at any "
                    "rank as a representative genome :(", "yellow"))
             print("")
-            sys.exit(0)
+            sys.exit(1)
 
 
 def _all_derep_size(path, source, args, rep_filter=None, exclude_cores=None):

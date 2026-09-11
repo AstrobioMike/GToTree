@@ -14,12 +14,6 @@ import pyhmmer.easel as easel  # type: ignore
 import pyhmmer.plan7 as plan7  # type: ignore
 
 
-class MissingGatheringCutoffs(Exception):
-    """
-    A profile set has no gathering thresholds, so --cut_ga-equivalent can't be used
-    """
-
-
 def profiles_missing_gathering_cutoffs(hmm_path):
     """
     Names of profiles in `hmm_path` that carry no GA line.

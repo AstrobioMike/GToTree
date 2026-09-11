@@ -16,8 +16,8 @@ import sys
 import os
 import shutil
 import tarfile
-from gtotree.utils.misc.messaging import (wprint, color_text, report_message,
-                                     report_early_exit, spinner)
+from gtotree.utils.misc.messaging import (wprint, color_text, spinner,
+                                     report_hosted_data_dl_failure)
 from gtotree.utils.misc.general import download_with_tqdm
 
 
@@ -83,15 +83,16 @@ def _clear_partial_state(location):
         shutil.rmtree(profiles_dir_path)
 
 
+#: the closing advice, naming the flag a user can drop to run without this data
+_KOFAM_FALLBACK_ADVICE = (
+    "If this keeps failing, it may be a transient network issue and trying again "
+    "later often resolves it. You can also drop the additional target KOs (being "
+    "provided to the `-K` flag) and run GToTree without them.")
+
+
 def report_kofam_dl_failure(e):
-    report_message(f"Downloading the KOFamScan data failed with the following error:\n{e}", "red")
-    report_message("GToTree pulls this data from a GitHub-hosted release asset over HTTPS.")
-    report_message("You can check whether you can access this URL:")
-    report_message(f"    {KOFAMSCAN_TARBALL_URL}")
-    report_message("If this keeps failing, it may be a transient network issue - trying again "
-                   "later often resolves it. You can also drop the additional target KOs (being "
-                   "provided to the `-K` flag) and run GToTree without them.")
-    report_early_exit(None, copy_log=False)
+    report_hosted_data_dl_failure("KOFamScan", KOFAMSCAN_TARBALL_URL,
+                                  _KOFAM_FALLBACK_ADVICE, e)
 
 
 def download_kofamscan_data(location):

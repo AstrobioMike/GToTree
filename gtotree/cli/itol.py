@@ -287,7 +287,7 @@ def _as_number(value, flag, kind=float):
     except (TypeError, ValueError):
         what = "an integer" if kind is int else "a number"
         raise ItolError(f'The value passed to `{flag}` must be {what}, but "{value}" '
-                        "was given.")
+                        "was given.") from None
 
 
 def check_args(args):

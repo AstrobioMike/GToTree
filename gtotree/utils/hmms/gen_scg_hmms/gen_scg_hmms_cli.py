@@ -13,17 +13,15 @@ All of the actual work lives in the sibling modules:
 """
 
 import os
-import sys
-import json
 import shutil
 import argparse
 
 from tqdm import tqdm  # type: ignore
 
-from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
+from gtotree.cli.common import (CustomRichHelpFormatter, add_help, add_version_arg,
+                                run_subcommand_main)
 from gtotree.utils.misc.general import (run_pooled_stage,
                                    prepare_output_dir,
-                                   OutputDirExistsError,
                                    adopt_genome_progress,
                                    read_run_data,
                                    resolve_input_genomes,
@@ -40,12 +38,9 @@ from gtotree.utils.misc.stages import (GenomeRemovalStage,
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.misc import phase_stats
 from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
-                                     report_phase_header, report_very_early_exit,
-                                     REMOVED_GENOMES_FILENAME)
+                                     report_phase_header, REMOVED_GENOMES_FILENAME)
 from gtotree.utils.misc.data_locations import ensure_reference_data
 from gtotree.utils.taxonomy.tax_ranks import RANKS
-from gtotree.utils.taxonomy.tax_select import TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon
-from gtotree.utils.taxonomy.wanted_ref_tax import WantedRefTaxError
 from gtotree.utils.taxonomy.exclusion_list import exclusion_list_help
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
     GenSCGHMMsError,
@@ -56,7 +51,8 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
     write_filtered_pfam_hmms,
 )
 from gtotree.utils.misc.resume_state import (ResumeProfile, hash_strings,
-                                             hash_local_genomes,
+                                             hash_local_genomes, load_sidecar,
+                                             save_sidecar,
                                              hash_file_contents, STATE_VERSION)
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import (TargetGenomeError,
                                                                   build_run_data,
@@ -401,10 +397,6 @@ def _phase_counter():
 def section(title):
     phase_stats.begin(title)
     report_phase_header(title)
-
-
-def section_border():
-    print(color_text("      " + "- " * 34, "yellow"))
 
 
 ################################################################################
@@ -884,34 +876,6 @@ def _remove_quietly(path):
         pass
 
 
-def _save_json(work_dir, filename, payload):
-    """Write a stage sidecar atomically."""
-    path = os.path.join(work_dir, filename)
-    tmp_path = path + ".part"
-    try:
-        with open(tmp_path, "w") as f:
-            json.dump(payload, f)
-        os.replace(tmp_path, path)
-    except BaseException:
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
-        raise
-    return path
-
-
-def _load_json(work_dir, filename):
-    path = os.path.join(work_dir, filename)
-    if not os.path.isfile(path):
-        return None
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return None
-
-
 ################################################################################
 # driver
 ################################################################################
@@ -999,7 +963,7 @@ def gen_scg_hmms(args):  # pragma: no cover
     RESUME.save(work_dir, state)
 
     section(f"Phase {n()}: Searching genomes with Pfam profiles...")
-    cached_hits = _load_json(work_dir, SEARCH_STAGE_SIDECAR) if resuming else None
+    cached_hits = load_sidecar(work_dir, SEARCH_STAGE_SIDECAR) if resuming else None
     if resuming and RESUME.is_reusable(state, STAGE_SEARCH, work_dir) \
             and cached_hits:
         with spinner("Reusing previous search results...", "Reused previous search results"):
@@ -1007,7 +971,7 @@ def gen_scg_hmms(args):  # pragma: no cover
     else:
         hits_by_genome = phase_search(filtered_hmm_path, combined_path, len(kept_ids),
                                       args, work_dir=work_dir, resuming=resuming)
-        _save_json(work_dir, SEARCH_STAGE_SIDECAR, hits_by_genome)
+        save_sidecar(work_dir, SEARCH_STAGE_SIDECAR, hits_by_genome)
         RESUME.mark_complete(
             state, STAGE_SEARCH,
             [os.path.join(work_dir, SEARCH_STAGE_SIDECAR)],
@@ -1032,27 +996,7 @@ def gen_scg_hmms(args):  # pragma: no cover
 
 
 def main():  # pragma: no cover
-    parser = build_parser()
-
-    if len(sys.argv) == 1:
-        parser.print_help(sys.stderr)
-        sys.exit(0)
-
-    args = parser.parse_args()
-
-    try:
-        gen_scg_hmms(args)
-    except KeyboardInterrupt:
-        print()
-        report_very_early_exit("Interrupted by user.", "yellow")
-    except (TaxonNotFound, AmbiguousTaxon, CrossDomainTaxon, WantedRefTaxError) as e:
-        report_very_early_exit(str(e))
-    except OutputDirExistsError as e:
-        report_very_early_exit(str(e), "yellow", leading_newline=False)
-    except GenSCGHMMsError as e:
-        report_very_early_exit(str(e))
-    finally:
-        phase_stats.report()
+    run_subcommand_main(build_parser(), gen_scg_hmms, GenSCGHMMsError)
 
 
 if __name__ == "__main__":

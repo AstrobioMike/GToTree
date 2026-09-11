@@ -432,13 +432,3 @@ def get_alignment_length(path):
     return num_sites
 
 
-def pull_out_corresponding_nt_seqs(in_AA_fasta, in_nt_fasta, out_nt_fasta):
-
-    aa_records = SeqIO.index(in_AA_fasta, "fasta")
-    nt_records = SeqIO.index(in_nt_fasta, "fasta")
-
-    with open(out_nt_fasta, "w") as out_handle:
-        for aa_id in aa_records:
-            if aa_id in nt_records:
-                nt_record = nt_records[aa_id]
-                SeqIO.write(nt_record, out_handle, "fasta")

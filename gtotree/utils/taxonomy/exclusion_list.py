@@ -66,22 +66,6 @@ def filter_rows_by_exclusion(rows, acc_col, exclude_cores):
     return kept, len(rows) - len(kept)
 
 
-def filter_accessions_by_exclusion(accessions, exclude_cores):
-    """
-    Drop excluded accessions from a plain accession list.
-
-    Returns (kept, num_excluded), preserving order. For the surfaces that hold
-    accessions rather than metadata rows at the point the exclusion applies.
-    """
-    accessions = list(accessions or [])
-    if not exclude_cores:
-        return accessions, 0
-
-    kept = [acc for acc in accessions
-            if accession_core(acc) not in exclude_cores]
-    return kept, len(accessions) - len(kept)
-
-
 def filter_table_by_exclusion(table, acc_col, exclude_cores):
     """
     Drop excluded genomes from an Arrow table of candidates.

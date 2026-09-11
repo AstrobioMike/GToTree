@@ -1,195 +1,143 @@
 """
-Tests for the Parquet-based NCBI assembly-info setup (get_ncbi_assembly_data).
+Tests for the NCBI-specific half of the assembly-info setup.
 
-These replace the old tarball/rebuild tests: GToTree now consumes bit's hosted
-ncbi-data.parquet directly, so there is no NCBI-rebuild path to exercise -- only
-download, Parquet-footer verification, atomic date-file write, and present/absent
-routing.
+The download, verification, cleanup and present/absent routing all live in
+gtotree/utils/misc/hosted_parquet_asset.py now and are tested there, against both this
+asset and the GTDB one. What's left here is what's genuinely NCBI's: that the asset is
+configured with the right variable, filenames and URLs, that the wrappers the rest of
+the codebase imports still delegate to it, and read_date_retrieved(), which has no GTDB
+counterpart.
 """
 
-import pyarrow as pa # type: ignore
-import pyarrow.parquet as pq # type: ignore
-import pytest # type: ignore
+import pytest  # type: ignore
 from unittest.mock import patch
 
 from gtotree.utils.ncbi.get_ncbi_assembly_data import (
-    PARQUET_FILENAME,
     DATE_FILENAME,
+    NCBI_ASSET,
     NCBI_DATA_URL,
     NCBI_DATE_URL,
-    check_ncbi_assembly_info_location_var_is_set,
-    ncbi_data_table_path,
-    get_ncbi_assembly_summary_tab,
+    PARQUET_FILENAME,
     check_if_data_present,
-    get_slim_ncbi_assembly_data,
+    check_ncbi_assembly_info_location_var_is_set,
     get_ncbi_assembly_data,
+    get_ncbi_assembly_summary_tab,
+    ncbi_data_table_path,
     read_date_retrieved,
 )
 
 MODPATH = "gtotree.utils.ncbi.get_ncbi_assembly_data"
 
-
-# --- helpers ---------------------------------------------------------------
-
-def _valid_parquet(path):
-    pq.write_table(pa.table({"assembly_accession": pa.array(["GCA_1"])}), str(path))
-
-
 # the asset's date stamp shape: a single 'YYYY,MM,DD' line
 _DATE_BODY = "2026,01,05\n"
 
 
-def _fake_downloader(date_body=_DATE_BODY, break_parquet=False):
+# --- the asset spec --------------------------------------------------------
+
+class TestAssetSpec:
+
+    def test_it_points_at_the_ncbi_variable_and_files(self):
+        assert NCBI_ASSET.env_var == "NCBI_ASSEMBLY_DATA_DIR"
+        assert NCBI_ASSET.parquet_filename == PARQUET_FILENAME == "ncbi-data.parquet"
+        assert NCBI_ASSET.sidecar_filename == DATE_FILENAME == "date-retrieved.txt"
+
+    def test_the_module_urls_match_the_asset(self):
+        # these two names are imported by tests elsewhere, so they have to stay in step
+        assert NCBI_DATA_URL == NCBI_ASSET.data_url
+        assert NCBI_DATE_URL == NCBI_ASSET.sidecar_url
+
+    def test_the_asset_is_pulled_from_bits_rolling_release(self):
+        assert NCBI_DATA_URL.startswith("https://github.com/AstrobioMike/bit/releases")
+        assert NCBI_DATA_URL.endswith(PARQUET_FILENAME)
+
+
+# --- the wrappers delegate -------------------------------------------------
+
+class TestWrappersDelegateToTheAsset:
+
+    def test_location_var_returns_the_path(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
+        assert check_ncbi_assembly_info_location_var_is_set() == str(tmp_path)
+
+    def test_location_var_exits_if_missing(self, monkeypatch):
+        monkeypatch.delenv("NCBI_ASSEMBLY_DATA_DIR", raising=False)
+        with pytest.raises(SystemExit):
+            check_ncbi_assembly_info_location_var_is_set()
+
+    def test_table_path_derives_from_the_filename_constant(self, monkeypatch,
+                                                           tmp_path):
+        monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
+        assert ncbi_data_table_path() == str(tmp_path / PARQUET_FILENAME)
+        assert ncbi_data_table_path("/somewhere") == f"/somewhere/{PARQUET_FILENAME}"
+
+    def test_summary_tab_resolves_the_env_var_on_demand(self, monkeypatch, tmp_path):
+        # not at import time, so importing this module doesn't require the variable
+        monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
+        assert get_ncbi_assembly_summary_tab() == str(tmp_path / PARQUET_FILENAME)
+
+    def test_presence_check_delegates(self, tmp_path):
+        # the exhaustive present/absent/cleanup cases live in the shared module's tests
+        (tmp_path / PARQUET_FILENAME).write_text("x")
+        (tmp_path / DATE_FILENAME).write_text(_DATE_BODY)
+        assert check_if_data_present(str(tmp_path)) is True
+        assert check_if_data_present(str(tmp_path)) is NCBI_ASSET.is_present(
+            str(tmp_path))
+
+
+# --- routing ---------------------------------------------------------------
+
+class TestRouting:
     """
-    Stand-in for download_with_tqdm(url, label, filename, ...): serves the parquet URL
-    to a real (small) Parquet file and the date URL to `date_body`.
+    get_ncbi_assembly_data() returns None rather than the directory (unlike its GTDB
+    counterpart), so its routing is its own and worth pinning here.
     """
-    def _dl(url, label, filename=None, **kw):
-        if url == NCBI_DATA_URL:
-            if break_parquet:
-                with open(filename, "w") as fh:
-                    fh.write("not a parquet")
-            else:
-                _valid_parquet(filename)
-        elif url == NCBI_DATE_URL:
-            with open(filename, "w") as fh:
-                fh.write(date_body)
-        else:
-            raise AssertionError(f"unexpected download URL: {url}")
-    return _dl
 
+    def test_a_present_asset_is_not_re_downloaded(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
+        (tmp_path / PARQUET_FILENAME).write_text("x")
+        (tmp_path / DATE_FILENAME).write_text(_DATE_BODY)
 
-# --- location var ----------------------------------------------------------
+        with patch(f"{MODPATH}.get_slim_ncbi_assembly_data") as mock_dl:
+            assert get_ncbi_assembly_data(force_update=False) is None
 
-def test_location_var_returns_path(monkeypatch, tmp_path):
-    monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
-    assert check_ncbi_assembly_info_location_var_is_set() == str(tmp_path)
+        mock_dl.assert_not_called()
 
+    def test_an_absent_asset_is_downloaded(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
 
-def test_location_var_exits_if_missing(monkeypatch):
-    monkeypatch.delenv("NCBI_ASSEMBLY_DATA_DIR", raising=False)
-    with pytest.raises(SystemExit):
-        check_ncbi_assembly_info_location_var_is_set()
+        with patch(f"{MODPATH}.get_slim_ncbi_assembly_data") as mock_dl:
+            get_ncbi_assembly_data()
 
+        mock_dl.assert_called_once()
 
-def test_table_path_derives_from_filename_constant(monkeypatch, tmp_path):
-    monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
-    assert ncbi_data_table_path() == str(tmp_path / PARQUET_FILENAME)
-    assert ncbi_data_table_path("/somewhere") == f"/somewhere/{PARQUET_FILENAME}"
+    def test_force_update_downloads_even_if_present(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
+        (tmp_path / PARQUET_FILENAME).write_text("x")
+        (tmp_path / DATE_FILENAME).write_text(_DATE_BODY)
 
+        with patch(f"{MODPATH}.get_slim_ncbi_assembly_data") as mock_dl:
+            get_ncbi_assembly_data(force_update=True)
 
-def test_summary_tab_accessor_is_lazy(monkeypatch, tmp_path):
-    # get_ncbi_assembly_summary_tab() resolves via the env var on demand
-    monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
-    assert get_ncbi_assembly_summary_tab() == str(tmp_path / PARQUET_FILENAME)
-
-
-# --- check_if_data_present -------------------------------------------------
-
-def test_present_when_both_files_nonempty(tmp_path):
-    (tmp_path / PARQUET_FILENAME).write_text("x")
-    (tmp_path / DATE_FILENAME).write_text(_DATE_BODY)
-    assert check_if_data_present(str(tmp_path)) is True
-
-
-def test_absent_when_table_missing(tmp_path):
-    (tmp_path / DATE_FILENAME).write_text(_DATE_BODY)
-    assert check_if_data_present(str(tmp_path)) is False
-
-
-def test_absent_when_date_missing(tmp_path):
-    (tmp_path / PARQUET_FILENAME).write_text("x")
-    assert check_if_data_present(str(tmp_path)) is False
-
-
-def test_half_present_pair_is_cleaned_up(tmp_path):
-    (tmp_path / PARQUET_FILENAME).write_text("x")
-    assert check_if_data_present(str(tmp_path)) is False
-    assert not (tmp_path / PARQUET_FILENAME).exists()
-
-
-def test_empty_files_count_as_absent_and_are_removed(tmp_path):
-    (tmp_path / PARQUET_FILENAME).write_text("")
-    (tmp_path / DATE_FILENAME).write_text("")
-    assert check_if_data_present(str(tmp_path)) is False
-    assert not (tmp_path / PARQUET_FILENAME).exists()
-    assert not (tmp_path / DATE_FILENAME).exists()
-
-
-# --- get_slim_ncbi_assembly_data (download path) ---------------------------
-
-def test_download_writes_both_files(tmp_path):
-    with patch(f"{MODPATH}.download_with_tqdm", side_effect=_fake_downloader()):
-        get_slim_ncbi_assembly_data(str(tmp_path))
-    assert (tmp_path / PARQUET_FILENAME).exists()
-    assert (tmp_path / DATE_FILENAME).read_text().startswith("2026,01,05")
-    assert pq.ParquetFile(str(tmp_path / PARQUET_FILENAME)).metadata.num_rows == 1
-
-
-def test_download_verifies_parquet_and_bails_on_corruption(tmp_path):
-    with patch(f"{MODPATH}.download_with_tqdm",
-               side_effect=_fake_downloader(break_parquet=True)), \
-         patch(f"{MODPATH}.report_early_exit", side_effect=SystemExit(1)):
-        with pytest.raises(SystemExit):
-            get_slim_ncbi_assembly_data(str(tmp_path))
-    assert not (tmp_path / PARQUET_FILENAME).exists()
-    assert not (tmp_path / DATE_FILENAME).exists()
-
-
-def test_download_network_error_is_translated(tmp_path):
-    def _boom(*a, **k):
-        raise TimeoutError("no route")
-    with patch(f"{MODPATH}.download_with_tqdm", side_effect=_boom), \
-         patch(f"{MODPATH}.report_early_exit", side_effect=SystemExit(1)):
-        with pytest.raises(SystemExit):
-            get_slim_ncbi_assembly_data(str(tmp_path))
-    assert not (tmp_path / PARQUET_FILENAME).exists()
-
-
-def test_bad_date_file_is_rejected(tmp_path):
-    # a date file that isn't a 'YYYY,MM,DD' stamp fails validation -> cleanup + exit
-    with patch(f"{MODPATH}.download_with_tqdm",
-               side_effect=_fake_downloader(date_body="not-a-date\n")), \
-         patch(f"{MODPATH}.report_early_exit", side_effect=SystemExit(1)):
-        with pytest.raises(SystemExit):
-            get_slim_ncbi_assembly_data(str(tmp_path))
-    assert not (tmp_path / DATE_FILENAME).exists()
-
-
-# --- get_ncbi_assembly_data (routing) --------------------------------------
-
-def test_routing_skips_download_when_present(monkeypatch, tmp_path):
-    monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
-    (tmp_path / PARQUET_FILENAME).write_text("x")
-    (tmp_path / DATE_FILENAME).write_text(_DATE_BODY)
-    with patch(f"{MODPATH}.get_slim_ncbi_assembly_data") as mock_dl:
-        get_ncbi_assembly_data(force_update=False)
-    mock_dl.assert_not_called()
-
-
-def test_routing_downloads_when_absent(monkeypatch, tmp_path):
-    monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
-    with patch(f"{MODPATH}.get_slim_ncbi_assembly_data") as mock_dl:
-        get_ncbi_assembly_data()
-    mock_dl.assert_called_once()
-
-
-def test_routing_force_update_downloads_even_if_present(monkeypatch, tmp_path):
-    monkeypatch.setenv("NCBI_ASSEMBLY_DATA_DIR", str(tmp_path))
-    (tmp_path / PARQUET_FILENAME).write_text("x")
-    (tmp_path / DATE_FILENAME).write_text(_DATE_BODY)
-    with patch(f"{MODPATH}.get_slim_ncbi_assembly_data") as mock_dl:
-        get_ncbi_assembly_data(force_update=True)
-    mock_dl.assert_called_once()
+        mock_dl.assert_called_once()
 
 
 # --- read_date_retrieved ---------------------------------------------------
 
-def test_read_date_retrieved_formats_stamp(tmp_path):
-    (tmp_path / DATE_FILENAME).write_text("2026,01,05\n")
-    assert read_date_retrieved(str(tmp_path)) == "Jan 05, 2026"
+class TestReadDateRetrieved:
 
+    def test_a_stamp_is_formatted_for_humans(self, tmp_path):
+        (tmp_path / DATE_FILENAME).write_text("2026,01,05\n")
+        assert read_date_retrieved(str(tmp_path)) == "Jan 05, 2026"
 
-def test_read_date_retrieved_returns_raw_if_unparseable(tmp_path):
-    (tmp_path / DATE_FILENAME).write_text("weird-stamp\n")
-    assert read_date_retrieved(str(tmp_path)) == "weird-stamp"
+    def test_an_unparseable_stamp_comes_back_raw(self, tmp_path):
+        # better a slightly odd date in the output than a crash on a cosmetic line
+        (tmp_path / DATE_FILENAME).write_text("weird-stamp\n")
+        assert read_date_retrieved(str(tmp_path)) == "weird-stamp"
+
+    def test_an_out_of_range_date_comes_back_raw(self, tmp_path):
+        (tmp_path / DATE_FILENAME).write_text("2026,13,45\n")
+        assert read_date_retrieved(str(tmp_path)) == "2026,13,45"
+
+    def test_trailing_content_after_the_stamp_is_ignored(self, tmp_path):
+        (tmp_path / DATE_FILENAME).write_text("2026,01,05\nsomething else\n")
+        assert read_date_retrieved(str(tmp_path)) == "Jan 05, 2026"

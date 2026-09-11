@@ -269,13 +269,6 @@ def select(path, source, rank, taxon, reps_only=False, columns=None,
     return tab
 
 
-def select_accessions(path, source, rank, taxon, reps_only=False):
-    """The common case: just the accession list."""
-    spec = SOURCES[source]
-    tab = select(path, source, rank, taxon, reps_only=reps_only)
-    return [a for a in tab.column(spec.acc_col).to_pylist() if a and a != NA]
-
-
 # ---------------------------------------------------------------------------
 # diagnosing an empty candidate pool
 # ---------------------------------------------------------------------------
@@ -390,16 +383,6 @@ def diagnose_empty_pool(path, source, rank, taxon, domain=None, reps_only=False,
             accession_prefixes=active["accession_prefixes"])
 
     return n_unfiltered, culprits, present_levels
-
-
-def select_by_taxid(path, rank, taxid):
-    """
-    NCBI only: select by a lineage TAXID rather than a name
-    """
-    col = f"{rank}_taxid"
-    tab = pq.read_table(path, columns=["assembly_accession"],
-                        filters=[(col, "=", str(taxid))])
-    return tab.column("assembly_accession").to_pylist()
 
 
 # ---------------------------------------------------------------------------

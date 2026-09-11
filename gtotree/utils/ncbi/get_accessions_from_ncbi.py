@@ -5,8 +5,7 @@ from collections import namedtuple
 import pyarrow.parquet as pq # type: ignore
 from gtotree.cli.common import CustomRichHelpFormatter, add_help, add_version_arg
 from gtotree.utils.misc.messaging import report_message, wprint, color_text, spinner
-from gtotree.utils.misc.general import (write_table_tsv, write_accessions,
-                                        atomic_write_text)
+from gtotree.utils.misc.general import (write_table_tsv, write_accessions)
 from gtotree.utils.ncbi.get_ncbi_assembly_data import (get_ncbi_assembly_data,
                                                        ncbi_data_table_path,
                                                        read_date_retrieved)
@@ -16,13 +15,13 @@ from gtotree.utils.taxonomy.tax_select import (TaxonNotFound, AmbiguousTaxon,
                                                find_ranks_for_taxon as _resolve_ranks)
 from gtotree.utils.taxonomy.tax_derep import select_ref_genomes, select_all_domains
 from gtotree.utils.taxonomy.tax_counts import (representatives_filter, count_genomes,
-                                               derep_size, rank_counts, read_pool,
+                                               rank_counts, read_pool,
                                                render_rank_count_table)
 from gtotree.utils.taxonomy.tax_targets import (is_all_target,
                                                 unassigned_domain_summary)
 from gtotree.utils.taxonomy.empty_selection import empty_pull_message
 from gtotree.utils.taxonomy.get_accs_shared import (ASSEMBLY_LEVELS,
-                                                    FILTERS_APPLIED_NOTE, PoolSpec,
+                                                    PoolSpec,
                                                     add_common_get_accs_args,
                                                     apply_derep_default,
                                                     resolved_derep_rank,
@@ -32,7 +31,8 @@ from gtotree.utils.taxonomy.get_accs_shared import (ASSEMBLY_LEVELS,
                                                     pull_count_lines,
                                                     scoped_counts_note,
                                                     source_prefixes as _shared_prefixes,
-                                                    with_filters_note)
+                                                    with_filters_note,
+                                                    write_metadata_tsv)
 
 
 _COLUMNS = [
@@ -144,7 +144,7 @@ def get_accessions_from_ncbi(args):
     except ValueError as err:
         wprint(color_text(str(err), "yellow"))
         print("")
-        sys.exit(0)
+        sys.exit(1)
 
     target = str(args.wanted_ref_tax) if args.wanted_ref_tax else ""
     named_taxon = bool(target) and not is_all_target(target) and not target.isdigit()
@@ -189,7 +189,7 @@ def get_accessions_from_ncbi(args):
             reps_only_requested=bool(args.refseq_reference_genomes_only),
             emoticon=":("), "yellow"))
         print("")
-        sys.exit(0)
+        sys.exit(1)
 
     _report_pull_counts(table_path, args, assembly_levels, selection, len(rows))
     _write_outputs(rows, args, selection)
@@ -226,12 +226,12 @@ def preflight_checks(args):
         report_message("A specific taxon needs to also be provided to the `-w` flag "
                        "in order to use `--get-taxon-counts`.", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     if not args.get_rank_counts and not args.get_table and not args.wanted_ref_tax:
         report_message("A target taxon needs to be provided to `-w` (a name, a taxid, or 'all').", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     check_derep_rank_is_applicable(args)
 
@@ -262,7 +262,7 @@ def check_derep_rank_is_applicable(args):
         "`--derep-rank` can't be applied with a taxid. Pass the taxon "
         "name instead if you also want to dereplicate",
         "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
-    sys.exit(0)
+    sys.exit(1)
 
 
 def _derep_is_on(args):
@@ -290,29 +290,6 @@ def _rep_filter(reps_only):
     return representatives_filter("ncbi", "refseq" if reps_only else None)
 
 
-def _pool(args, assembly_levels=None, reps_only=None):
-    """
-    The genomes this invocation is working within, as a PoolSpec
-    """
-    if reps_only is None:
-        reps_only = getattr(args, "refseq_reference_genomes_only", False)
-    return PoolSpec(ncbi_data_table_path(), "ncbi",
-                    rep_filter=_rep_filter(reps_only),
-                    accession_prefixes=_source_prefixes(args.ncbi_section),
-                    assembly_levels=assembly_levels,
-                    label="NCBI", taxon_flag="-w")
-
-
-def _derep_count_at_rank(table_path, rank, taxon, derep_rank, prefixes=None,
-                         reps_only=False, assembly_levels=None, exclude_cores=None):
-    """How many genomes survive dereplication at `derep_rank`, under the same pool."""
-    return derep_size(table_path, "ncbi", rank, taxon, derep_rank,
-                      rep_filter=_rep_filter(reps_only),
-                      accession_prefixes=prefixes,
-                      assembly_levels=assembly_levels,
-                      exclude_cores=exclude_cores)
-
-
 def _derep_note(table_path, rank, taxon, args, prefixes, assembly_levels,
                 reps_only=False, exclude_cores=None):
     pool = PoolSpec(table_path, "ncbi", rep_filter=_rep_filter(reps_only),
@@ -335,7 +312,7 @@ def _report_rank_counts_for_taxon_or_exit(table_path, taxon, args, assembly_leve
     except TaxonNotFound:
         report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     for rank in ranks_found_in:
         total = _count_at_rank(table_path, rank, canonical, prefixes=prefixes,
@@ -374,7 +351,7 @@ def _report_taxon_counts_or_exit(table_path, taxon, args, assembly_levels, exclu
     except TaxonNotFound:
         report_message(f"Input taxon '{taxon}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     taxon = canonical
 
@@ -491,7 +468,7 @@ def _select_rows(table_path, args, assembly_levels=None):
                        "accessions. This can be done with the `-r` parameter, or you can try passing "
                        "the NCBI taxid to `-t` instead.", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
     except CrossDomainTaxon as e:
         report_message(f"The input taxon '{e.taxon}' occurs in more than one domain "
                        f"({', '.join(e.domains_found)}), so pulling on the name alone "
@@ -499,14 +476,14 @@ def _select_rows(table_path, args, assembly_levels=None):
                        "is wanted with `--target-domain` "
                        f"(e.g. `--target-domain {e.domains_found[0]}`).", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
     except TaxonNotFound:
         report_message(f"Input taxon '{target}' doesn't seem to exist at any rank :(", "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
     except ValueError as err:
         report_message(str(err), "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
-        sys.exit(0)
+        sys.exit(1)
 
     for warning in selection.warnings:
         report_message(warning, "yellow", ii="    ", si="    ", width=100, trailing_newline=True)
@@ -647,20 +624,8 @@ def _write_outputs(rows, args, selection):
 
 
 def _write_metadata_tsv(rows, out_filename):
-    """Write selected genome rows to a TSV, accession + ranks first then the rest."""
-    if not rows:
-        atomic_write_text(out_filename, lambda f: None)
-        return
-    first = ["assembly_accession"] + list(RANKS)
-    seen = set(first)
-    header = [c for c in first if c in rows[0]] + [c for c in rows[0] if c not in seen]
-
-    def _write(out):
-        out.write("\t".join(header) + "\n")
-        for r in rows:
-            out.write("\t".join(str(r.get(c, "")) for c in header) + "\n")
-
-    atomic_write_text(out_filename, _write)
+    """Write selected genome rows to a TSV; NCBI's table names the accession column."""
+    write_metadata_tsv(rows, out_filename, "assembly_accession")
 
 
 if __name__ == "__main__":

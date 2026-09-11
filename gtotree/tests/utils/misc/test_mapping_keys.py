@@ -1,4 +1,3 @@
-import os
 import pytest  # type: ignore
 from gtotree.utils.misc.general import GenomeData, RunData, apply_suffixes_to_mapping_dict
 from gtotree.utils.misc.preflight_checks import (build_mapping_key_lookup,

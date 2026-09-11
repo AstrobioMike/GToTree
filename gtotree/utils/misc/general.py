@@ -602,10 +602,6 @@ class RunData:
         wanted = frozenset(stages)
         return [scg for scg in self.SCG_targets if scg.removed_at in wanted]
 
-    def SCG_targets_alive_through(self, stage) -> List[SCGset]:
-        by_now = stages_through(stage, SCG_REMOVAL_STAGE_ORDER)
-        return [scg for scg in self.SCG_targets if scg.removed_at not in by_now]
-
     def get_all_SCG_targets(self) -> List[SCGset]:
         return list(self.SCG_targets)
 
@@ -696,9 +692,6 @@ class RunData:
 
         return self
 
-    def get_all_processed_genomes(self) -> List[GenomeData]:
-        return [gd for gd in self.all_input_genomes if gd.processing_done]
-
     def get_all_input_genomes_for_filtering(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if gd.processing_done and gd.hmm_search_done and not gd.removed]
 
@@ -747,17 +740,11 @@ class RunData:
     def get_genomes_removed_during_processing(self) -> List[GenomeData]:
         return self.genomes_removed_at(*PREPROCESSING_REMOVAL_STAGES)
 
-    def get_all_removed_input_genomes(self) -> List[str]:
-        return [gd.id for gd in self.all_input_genomes if gd.removed]
-
     def get_all_remaining_input_genomes(self) -> List[GenomeData]:
         return [gd for gd in self.all_input_genomes if not gd.removed]
 
     def get_all_remaining_input_genome_ids(self) -> List[str]:
         return [gd.id for gd in self.all_input_genomes if not gd.removed]
-
-    def get_done_ncbi_accs(self) -> List[GenomeData]:
-        return [gd for gd in self.ncbi_accs if gd.processing_done]
 
     def _failed_at(self, stage, source) -> List[GenomeData]:
         return self.genomes_removed_at(stage, source=source)

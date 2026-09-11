@@ -15,8 +15,8 @@ import os
 import shutil
 import gzip
 import tarfile
-from gtotree.utils.misc.messaging import (wprint, color_text, report_message,
-                                     report_early_exit, spinner)
+from gtotree.utils.misc.messaging import (wprint, color_text, spinner,
+                                     report_hosted_data_dl_failure)
 from gtotree.utils.misc.general import download_with_tqdm
 
 
@@ -91,16 +91,16 @@ def get_stored_pfam_version(location):
         return None
 
 
+#: the closing advice, naming the flag a user can drop to run without this data
+_PFAM_FALLBACK_ADVICE = (
+    "The problem may be a transient network issue, and trying again "
+    "later often resolves it. If you're using this in a regular GToTree run, "
+    "you can also drop the additional target Pfams (being provided "
+    "to the `-p` flag) and run GToTree without them to get around this.")
+
+
 def report_pfam_dl_failure(e):
-    report_message(f"Downloading the Pfam data failed with the following error:\n{e}", "red")
-    report_message("GToTree pulls this data from a GitHub-hosted release asset over HTTPS.")
-    report_message("You can check whether you can access this URL:")
-    report_message(f"    {PFAM_TARBALL_URL}")
-    report_message("The problem may be a transient network issue, and trying again "
-                   "later often resolves it. If you're using this in a regular GToTree run, "
-                   "you can also drop the additional target Pfams (being provided "
-                   "to the `-p` flag) and run GToTree without them to get around this.")
-    report_early_exit(None, copy_log=False)
+    report_hosted_data_dl_failure("Pfam", PFAM_TARBALL_URL, _PFAM_FALLBACK_ADVICE, e)
 
 
 def _gunzip(src_path, dest_path):
@@ -203,7 +203,6 @@ def get_pfam_data(force_update=False):
         print(color_text("\n    Re-downloading Pfam data (force-update requested)...\n", "yellow"))
         _clear_partial_state(pfam_data_dir)
         download_pfam_data(pfam_data_dir)
-        # _report_version(pfam_data_dir)
         return pfam_data_dir
 
     if check_if_data_present(pfam_data_dir):
@@ -211,13 +210,7 @@ def get_pfam_data(force_update=False):
 
     print(color_text("\n    Downloading required Pfam data (only needs to be done once)...\n", "yellow"))
     download_pfam_data(pfam_data_dir)
-    # _report_version(pfam_data_dir)
 
     return pfam_data_dir
 
-
-def _report_version(location):
-    version = get_stored_pfam_version(location)
-    if version:
-        print(color_text(f"\n    Pfam version: {version}\n", "yellow"))
 

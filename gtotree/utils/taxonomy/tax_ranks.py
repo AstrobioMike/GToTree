@@ -5,10 +5,6 @@ NA = "NA"
 
 REFERENCE_VALUE = "reference genome"
 
-LINEAGE_NAME_COLUMNS = list(RANKS)
-LINEAGE_TAXID_COLUMNS = [f"{r}_taxid" for r in RANKS]
-
-
 def accession_core(acc):
     """
     Canonical key for an assembly, shared by everything that has to match accessions

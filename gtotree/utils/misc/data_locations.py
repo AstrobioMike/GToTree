@@ -153,11 +153,28 @@ def modify_conda_activate_startup_script(paths_dict):
     conda activate script sources it if present).
     """
 
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+
+    if not conda_prefix:
+        report_message(
+            "This doesn't look like a conda environment, so there's no activation "
+            "script to store the locations in :(",
+            "yellow",
+        )
+        wprint("GToTree's managed data locations are set up by its conda package. If "
+               "you installed another way, set the variables yourself in your shell "
+               "startup file:")
+        print("        " + ", ".join(ENV_VARIABLES) + "\n")
+        sys.exit(1)
+
     path_to_startup_script = os.path.join(
-        os.environ["CONDA_PREFIX"], "etc/conda/activate.d/gtotree.sh"
+        conda_prefix, "etc/conda/activate.d/gtotree.sh"
     )
     new_one_tmp = path_to_startup_script + ".tmp"
 
+    # os.access() is False for a file that doesn't exist, which lands us in the
+    # not-writable branch below -- the right place to end up, since we can't rewrite a
+    # script that isn't there, but only if we don't then try to read it
     conda_writable = os.access(path_to_startup_script, os.W_OK)
 
     if not conda_writable:
@@ -179,8 +196,12 @@ def modify_conda_activate_startup_script(paths_dict):
 
         new_one = os.path.join(user_config_location, "gtotree.sh")
 
-    with open(path_to_startup_script) as initial_file:
-        initial_lines = [line.strip() for line in initial_file.readlines()]
+    try:
+        with open(path_to_startup_script) as initial_file:
+            initial_lines = [line.strip() for line in initial_file.readlines()]
+    except FileNotFoundError:
+        # nothing to carry forward; the exports below are the whole file
+        initial_lines = []
 
     new_lines = []
     for line in initial_lines:

@@ -2,6 +2,7 @@
 The surface `gtt get-accs-from-gtdb` and `gtt get-accs-from-ncbi` share
 """
 
+from gtotree.utils.misc.general import atomic_write_text
 from gtotree.utils.taxonomy.tax_counts import (count_distinct_taxa, count_genomes,
                                                derep_size, rank_counts, read_pool,
                                                representatives_filter)
@@ -104,13 +105,6 @@ SOURCE_OVERLAP_NOTE = (
     "assemblies. You most likely only want one of them, but you're the boss!")
 
 
-def source_overlap_note(source):
-    """The `--ncbi-section both` warning, or None for a single-section source."""
-    if str(source or "").strip().lower() != "both":
-        return None
-    return SOURCE_OVERLAP_NOTE
-
-
 class PoolSpec:
     """
     The set of genomes a helper is working within, and every question asked of it
@@ -147,14 +141,6 @@ class PoolSpec:
             "assembly_levels": self.assembly_levels,
             "exclude_cores": self.exclude_cores,
         }
-
-    def without_reps(self):
-        """The same pool minus the representatives predicate."""
-        return PoolSpec(self.table_path, self.source,
-                        accession_prefixes=self.accession_prefixes,
-                        assembly_levels=self.assembly_levels, label=self.label,
-                        taxon_flag=self.taxon_flag,
-                        exclude_cores=self.exclude_cores)
 
     def with_reps(self, kind):
         """The same pool plus a representatives predicate ('source' | 'refseq')."""
@@ -398,3 +384,32 @@ def add_common_get_accs_args(required, optional, source_label,
     )
 
     return optional
+
+
+def write_metadata_tsv(rows, out_filename, accession_column):
+    """
+    Write selected genome rows to a TSV, accession + ranks first then the rest.
+
+    Column order is fixed rather than left to dict order so the two get-accs surfaces
+    produce comparable files: the accession, then the seven ranks, then whatever else
+    the asset carries, in its own order. `accession_column` is the only thing that
+    differs between them -- NCBI's table names it "assembly_accession", GTDB's
+    "ncbi_genbank_assembly_accession".
+
+    An empty selection still writes the file (empty), so a caller that already made a
+    path can't be left pointing at something that isn't there.
+    """
+    if not rows:
+        atomic_write_text(out_filename, lambda f: None)
+        return
+
+    first = [accession_column] + list(RANKS)
+    seen = set(first)
+    header = [c for c in first if c in rows[0]] + [c for c in rows[0] if c not in seen]
+
+    def _write(out):
+        out.write("\t".join(header) + "\n")
+        for r in rows:
+            out.write("\t".join(str(r.get(c, "")) for c in header) + "\n")
+
+    atomic_write_text(out_filename, _write)
