@@ -15,6 +15,8 @@ Everything source-specific lives in a HostedParquetAsset instance:
 `gtotree/utils/ncbi/get_ncbi_assembly_data.py` and `gtotree/utils/gtdb/get_gtdb_data.py`
 are thin wrappers over an instance each. They keep their own public function names
 because a lot of call sites and tests reach for those directly.
+
+This mirrors bit/modules/hosted_parquet_asset.py
 """
 
 import os
@@ -130,16 +132,6 @@ class HostedParquetAsset:
             return False
 
         return True
-
-    def ensure(self, force_update=False):
-        """Fetch the asset if it isn't already here. Returns its directory."""
-        location = self.location()
-
-        if self.is_present(location) and not force_update:
-            return location
-
-        self.download(location)
-        return location
 
     # -- fetching it -------------------------------------------------------
 

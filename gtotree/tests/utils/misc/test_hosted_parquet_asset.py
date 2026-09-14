@@ -293,41 +293,6 @@ class TestReportUnavailable:
 
 
 # ---------------------------------------------------------------------------
-# ensure() -- the present/absent/force routing
-# ---------------------------------------------------------------------------
-
-class TestEnsure:
-
-    def test_a_present_asset_is_not_re_downloaded(self, asset, tmp_path,
-                                                  monkeypatch):
-        monkeypatch.setenv(asset.env_var, str(tmp_path))
-        _seed(tmp_path, asset)
-
-        with patch.object(type(asset), "download") as mock_dl:
-            assert asset.ensure() == str(tmp_path)
-
-        mock_dl.assert_not_called()
-
-    def test_an_absent_asset_is_downloaded(self, asset, tmp_path, monkeypatch):
-        monkeypatch.setenv(asset.env_var, str(tmp_path))
-
-        with patch.object(type(asset), "download") as mock_dl:
-            asset.ensure()
-
-        mock_dl.assert_called_once()
-
-    def test_force_update_downloads_over_a_present_asset(self, asset, tmp_path,
-                                                         monkeypatch):
-        monkeypatch.setenv(asset.env_var, str(tmp_path))
-        _seed(tmp_path, asset)
-
-        with patch.object(type(asset), "download") as mock_dl:
-            asset.ensure(force_update=True)
-
-        mock_dl.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
 # the two assets are configured distinctly
 # ---------------------------------------------------------------------------
 
