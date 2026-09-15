@@ -229,6 +229,63 @@ class TestPoolFilterStage:
         assert filtered is True
         assert "`--ncbi-section genbank`" in detail
 
+    def test_a_surface_can_name_its_own_representatives_flag(self):
+        """
+        `--representatives-only` is only `gtt dl-ncbi-assemblies`' spelling. The `-w`
+        drivers narrow with `--gtdb-section reps` and the get-accs helpers with
+        `-G`/`-R`; naming the wrong one sends people looking for a flag their
+        subcommand doesn't have.
+        """
+        selection = _selection(diagnosed=True, n_unfiltered=9,
+                               pool_culprits=["reps_only"])
+
+        detail, filtered = explain_empty_selection(
+            selection, reps_only_requested=True,
+            reps_flag="--gtdb-section reps")
+
+        assert "`--gtdb-section reps`" in detail
+        assert "`--representatives-only`" not in detail
+        assert filtered is True
+
+    def test_a_default_reps_pool_offers_the_way_back_out(self):
+        """
+        A default the user can escape should say how. Without the hint this branch
+        dead-ends at "that's just the default", which is true and useless.
+        """
+        selection = _selection(diagnosed=True, n_unfiltered=9,
+                               pool_culprits=["reps_only"])
+
+        detail, filtered = explain_empty_selection(
+            selection, reps_only_requested=False,
+            reps_widen_hint="--gtdb-section all")
+
+        assert "default" in detail
+        assert "`--gtdb-section all`" in detail
+        # still not the user's filter, so the headline must not implicate them
+        assert filtered is False
+
+    def test_the_widen_hint_is_offered_for_an_explicit_request_too(self):
+        selection = _selection(diagnosed=True, n_unfiltered=9,
+                               pool_culprits=["reps_only"])
+
+        detail, _filtered = explain_empty_selection(
+            selection, reps_only_requested=True,
+            reps_flag="--gtdb-section reps",
+            reps_widen_hint="--gtdb-section all")
+
+        assert "`--gtdb-section reps`" in detail
+        assert "`--gtdb-section all`" in detail
+
+    def test_the_multi_flag_fallback_also_uses_the_surfaces_own_flag(self):
+        selection = _selection(diagnosed=True, n_unfiltered=20, pool_culprits=[])
+
+        detail, _filtered = explain_empty_selection(
+            selection, ncbi_section="refseq", reps_only_requested=True,
+            reps_flag="-R/--refseq-ref-genomes-only")
+
+        assert "`-R/--refseq-ref-genomes-only`" in detail
+        assert "`--representatives-only`" not in detail
+
     def test_filters_that_only_empty_it_together_are_named_together(self):
         # no single filter is the culprit, so none of them gets accused alone
         selection = _selection(diagnosed=True, n_unfiltered=20, pool_culprits=[])

@@ -38,7 +38,7 @@ gtt get-accs-from-gtdb -t Staphylococcaceae --get-taxon-counts -G
 
 Which is much more manageable, while still covering the breadth of diversity within the family, just with fewer closely related genomes.
 
-`-R`/`--refseq-reference-genomes-only` does the analogous thing with [NCBI's reference genomes](https://www.ncbi.nlm.nih.gov/refseq/about/prokaryotes/#representative_genomes).
+`-R`/`--refseq-ref-genomes-only` does the analogous thing with [NCBI's reference genomes](https://www.ncbi.nlm.nih.gov/refseq/about/prokaryotes/#representative_genomes).
 
 ## Dereplicating by rank
 

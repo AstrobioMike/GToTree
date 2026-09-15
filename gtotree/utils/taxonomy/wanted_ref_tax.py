@@ -26,6 +26,20 @@ NCBI_SECTION_PREFIXES = {
 }
 
 
+GTDB_SECTIONS = {
+    "reps": True,
+    "all": False,
+}
+
+DEFAULT_GTDB_SECTION = "reps"
+
+#: how each --gtdb-section reads in the `-w` source header
+GTDB_SECTION_LABELS = {
+    "reps": "species representatives",
+    "all": "all genomes",
+}
+
+
 def section_prefixes(source, ncbi_section):
     """
     Accession prefixes for an --ncbi-section value, or None for no restriction.
@@ -33,6 +47,41 @@ def section_prefixes(source, ncbi_section):
     if str(source).strip().lower() == "gtdb":
         return None
     return NCBI_SECTION_PREFIXES.get(str(ncbi_section or "refseq").strip().lower())
+
+
+def resolved_gtdb_section(gtdb_section):
+    """
+    The effective --gtdb-section, filling the default in for an unset flag.
+
+    The flag is declared with `default=None` rather than `default="reps"` so that
+    "the user typed this" stays distinguishable from "the user got the default".
+    The empty-selection messaging needs that distinction to decide whether it may
+    blame a flag. Everything that wants the VALUE goes through here.
+    """
+    value = str(gtdb_section or DEFAULT_GTDB_SECTION).strip().lower()
+    return value if value in GTDB_SECTIONS else DEFAULT_GTDB_SECTION
+
+
+def reps_only_for(source, gtdb_section):
+    """
+    The `reps_only` a driver's --source/--gtdb-section pair asks for.
+
+    Returns None under `--source ncbi`, which defers to NCBI's own default (all
+    genomes) exactly as before. `--gtdb-section` is inert there, the same way
+    `--ncbi-section` is inert under GTDB.
+    """
+    if str(source).strip().lower() != "gtdb":
+        return None
+    return GTDB_SECTIONS[resolved_gtdb_section(gtdb_section)]
+
+
+def describe_gtdb_section(source, gtdb_section):
+    """
+    The pool half of the `-w` source header ('species representatives'), or None.
+    """
+    if str(source).strip().lower() != "gtdb":
+        return None
+    return GTDB_SECTION_LABELS[resolved_gtdb_section(gtdb_section)]
 
 
 class WantedRefTaxError(Exception):
@@ -90,7 +139,9 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
                                       max_contamination=None, target_domain=None,
                                       ncbi_section="refseq", include_rows=True,
                                       building_tree=False, exclude_cores=None,
-                                      reps_only=None, assembly_levels=None):
+                                      reps_only=None, assembly_levels=None,
+                                      reps_only_requested=None, reps_flag=None,
+                                      reps_widen_hint=None):
     """
     Resolve `-w <taxon>` to a list of assembly accessions plus the RefGenomeSelection
     it came from (for warnings / provenance the caller may want to surface).
@@ -132,6 +183,21 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
     assembly_levels : list or None
         Optional assembly_level restriction, applied to the candidate pool before
         selection.
+    reps_only_requested : bool or None
+        Whether the USER asked for a representatives-only pool, as opposed to
+        inheriting it from a source default or a flag default. Only the
+        empty-selection messaging reads it, to decide whether it may blame a flag.
+        None (the default) means "same as `reps_only`", which is right for a surface
+        whose reps-only pool only ever comes from an explicit flag. A surface whose
+        DEFAULT is reps-only (the `-w` drivers, via `--gtdb-section`) must pass this
+        explicitly, or an empty result will accuse the user of a flag they never
+        typed.
+    reps_flag : str or None
+        How this surface spells the flag that narrows to representatives, for the
+        empty-selection message. Defaults to `--representatives-only`.
+    reps_widen_hint : str or None
+        How this surface spells widening the pool back out (e.g. `--gtdb-section
+        all`), for the empty-selection message. None where there is no such flag.
     exclude_cores : set or None
         Accession cores from `--exclusion-list`. Handed to the selection core rather
         than applied to its result, so the listed genomes leave the candidate pool
@@ -180,7 +246,10 @@ def resolve_wanted_ref_tax_accessions(source, taxon, target_rank=None,
             assembly_levels=assembly_levels,
             ncbi_section=(None if str(source).strip().lower() == "gtdb"
                           else ncbi_section),
-            reps_only_requested=bool(reps_only),
+            reps_only_requested=(bool(reps_only) if reps_only_requested is None
+                                 else bool(reps_only_requested)),
+            reps_flag=reps_flag,
+            reps_widen_hint=reps_widen_hint,
             min_completeness=min_completeness,
             max_contamination=max_contamination))
 

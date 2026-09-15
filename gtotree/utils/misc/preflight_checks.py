@@ -41,6 +41,8 @@ from gtotree.utils.taxonomy.exclusion_list import load_exclusion_cores
 from gtotree.utils.taxonomy.tax_select import AmbiguousTaxon, TaxonNotFound, CrossDomainTaxon
 from gtotree.utils.taxonomy.tax_targets import is_all_target
 from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
+                                                   reps_only_for,
+                                                   resolved_gtdb_section,
                                                    expand_wanted_ref_tax,
                                                    describe_all_expansion,
                                                    WantedRefTaxError)
@@ -102,6 +104,7 @@ RESUME = ResumeProfile(
         "derep_rank": "--derep-rank",
         "source": "--source",
         "ncbi_section": "--ncbi-section",
+        "gtdb_section": "--gtdb-section",
         "add_gtdb_tax": "-D/--add-gtdb-tax",
         "add_ncbi_tax": "-t/--add-ncbi-tax",
         "lineage": "-L/--lineage-ranks",
@@ -152,6 +155,8 @@ def build_fingerprint(args):
         fingerprint[field] = getattr(args, field, None)
 
     fingerprint["wanted_ref_tax"] = sorted(wanted_ref_tax_list(args)) or None
+    fingerprint["gtdb_section"] = resolved_gtdb_section(
+        getattr(args, "gtdb_section", None))
 
     return fingerprint
 
@@ -360,6 +365,13 @@ def wanted_ref_tax_already_resolved(previous_run_data):
             and bool(previous_run_data.get_wanted_ref_tax_accs()))
 
 
+def _is_gtdb(args):
+    """
+    Whether `-w` is drawing from GTDB, and so whether `--gtdb-section` is in play.
+    """
+    return str(getattr(args, "source", "")).strip().lower() == "gtdb"
+
+
 def select_wanted_ref_tax(args, previous_run_data=None):
     """
     Resolve `-w` to reference accessions, or reuse the previous run's
@@ -403,6 +415,12 @@ def select_wanted_ref_tax(args, previous_run_data=None):
                     target_rank=args.target_rank, derep_rank=args.derep_rank,
                     target_domain=getattr(args, "target_domain", None),
                     ncbi_section=getattr(args, "ncbi_section", "refseq"),
+                    reps_only=reps_only_for(args.source,
+                                            getattr(args, "gtdb_section", None)),
+                    reps_only_requested=(_is_gtdb(args)
+                                         and getattr(args, "gtdb_section", None) == "reps"),
+                    reps_flag=("--gtdb-section reps" if _is_gtdb(args) else None),
+                    reps_widen_hint=("--gtdb-section all" if _is_gtdb(args) else None),
                     exclude_cores=exclude_cores,
                     building_tree=True)
         except AmbiguousTaxon:

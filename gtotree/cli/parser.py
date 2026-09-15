@@ -72,6 +72,11 @@ def parser():
     opt.add_argument("--ncbi-section", metavar="<str>", type=str.lower,
                      choices=["refseq", "genbank", "both"], default="both",
                      dest="ncbi_section")
+    # default=None, not "reps": resolved_gtdb_section() fills the default in, and
+    # keeping it "unset" distinct lets the empty-selection messaging make more sense
+    opt.add_argument("--gtdb-section", metavar="<str>", type=str.lower,
+                     choices=["reps", "all"], default=None,
+                     dest="gtdb_section")
     opt.add_argument("--target-rank", metavar="<str>", type=str, default=None)
     opt.add_argument("--target-domain", metavar="<str>", type=str, default=None,
                      dest="target_domain")

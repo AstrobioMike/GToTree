@@ -833,17 +833,22 @@ def adopt_genome_progress(run_data, previous):
     return carried
 
 
-def wanted_ref_tax_source_line(source):
+def wanted_ref_tax_source_line(source, gtdb_section=None):
     """
     The "Genome source being used for `-w` input: ..." line, or None
     """
     # imported here rather than at module scope: the taxonomy layer reaches back into
     # the GTDB/NCBI asset modules, and this module is imported by almost everything
-    from gtotree.utils.taxonomy.wanted_ref_tax import describe_source_version
+    from gtotree.utils.taxonomy.wanted_ref_tax import (describe_source_version,
+                                                       describe_gtdb_section)
 
     source_desc = describe_source_version(source)
     if not source_desc:
         return None
+
+    section_desc = describe_gtdb_section(source, gtdb_section)
+    if section_desc:
+        source_desc = f"{source_desc} \u2014 {section_desc}"
 
     return (f"    Genome source being used for `-w` input: "
             f"{color_text(source_desc, 'green')}")
@@ -863,7 +868,8 @@ def resolve_input_genomes(args, run_data, error_cls):
     # the GTDB/NCBI asset modules, and this module is imported by almost everything
     from gtotree.utils.taxonomy.wanted_ref_tax import (resolve_wanted_ref_tax_accessions,
                                                        expand_wanted_ref_tax,
-                                                       describe_all_expansion)
+                                                       describe_all_expansion,
+                                                       reps_only_for)
     from gtotree.utils.taxonomy.exclusion_list import load_exclusion_cores
     from gtotree.utils.misc.messaging import (input_genome_source_lines,
                                               total_input_genomes_line,
@@ -875,8 +881,11 @@ def resolve_input_genomes(args, run_data, error_cls):
     wanted, all_domains = expand_wanted_ref_tax(args.source,
                                                 wanted_ref_tax_list(args))
 
+    gtdb_section = getattr(args, "gtdb_section", None)
+    is_gtdb = str(args.source).strip().lower() == "gtdb"
+
     if wanted:
-        source_line = wanted_ref_tax_source_line(args.source)
+        source_line = wanted_ref_tax_source_line(args.source, gtdb_section)
         if source_line:
             # trailing blank: the spinner that follows prints straight onto its own line
             print(f"{source_line}\n")
@@ -897,6 +906,10 @@ def resolve_input_genomes(args, run_data, error_cls):
                     max_contamination=getattr(args, "max_contamination", None),
                     target_domain=getattr(args, "target_domain", None),
                     ncbi_section=getattr(args, "ncbi_section", "refseq"),
+                    reps_only=reps_only_for(args.source, gtdb_section),
+                    reps_only_requested=(is_gtdb and gtdb_section == "reps"),
+                    reps_flag=("--gtdb-section reps" if is_gtdb else None),
+                    reps_widen_hint=("--gtdb-section all" if is_gtdb else None),
                     exclude_cores=exclude_cores)
 
             num_excluded = getattr(selection, "num_excluded", 0)

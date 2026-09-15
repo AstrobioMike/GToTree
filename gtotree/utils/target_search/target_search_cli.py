@@ -44,6 +44,7 @@ from gtotree.utils.misc.messaging import (report_message, color_text, spinner,
 from gtotree.utils.misc.summary_info import write_removed_genomes_report
 from gtotree.utils.taxonomy.tax_ranks import RANKS
 from gtotree.utils.taxonomy.exclusion_list import exclusion_list_help
+from gtotree.utils.taxonomy.wanted_ref_tax import resolved_gtdb_section
 from gtotree.utils.misc.general import wanted_ref_tax_list
 from gtotree.utils.hmms.hmm_searching_engine import press_profiles
 from gtotree.main_stages.processing_genomes import (SearchPlan, _fused,
@@ -105,6 +106,7 @@ RESUME = ResumeProfile(
         "ko_targets_sha256": "the list of target KOs",
         "source": "--source",
         "ncbi_section": "--ncbi-section",
+        "gtdb_section": "--gtdb-section",
         "wanted_ref_tax": "--wanted-ref-tax",
         "target_rank": "--target-rank",
         "target_domain": "--target-domain",
@@ -153,6 +155,7 @@ def build_fingerprint(run_data, args, specs, data_versions=None):
         "ko_targets_sha256": hash_file_contents(ko_spec.targets_file(args)),
         "source": (args.source or "").lower(),
         "ncbi_section": (getattr(args, "ncbi_section", None) or "").lower(),
+        "gtdb_section": resolved_gtdb_section(getattr(args, "gtdb_section", None)),
         "wanted_ref_tax": (sorted(wanted_ref_tax_list(args)) or None),
         "target_rank": args.target_rank,
         "target_domain": getattr(args, "target_domain", None),
@@ -283,6 +286,18 @@ def build_parser(parent_subparsers=None):
         help=("Which section of NCBI to draw `--wanted-ref-tax` genomes from "
               "(default: both). The default of 'both' is typically fine with the "
               "default `--derep-rank auto`. Ignored with `--source gtdb`."),
+        action="store",
+    )
+
+    optional.add_argument(
+        "--gtdb-section",
+        dest="gtdb_section",
+        type=str.lower,
+        default=None,
+        choices=["reps", "all"],
+        help=("Which section of GTDB to draw `--wanted-ref-tax` genomes from: 'reps' "
+              "(GTDB species representatives) or 'all' (every genome under the "
+              "requested taxon); default: reps. Ignored with `--source ncbi`."),
         action="store",
     )
 

@@ -211,7 +211,7 @@ Where the **`-D`** flag will also swap out the input accessions for their GTDB t
 > Note that for this particular case we could skip the two-step entirely and just run `gtotree -f our-MAG-fasta-files.txt -w Nitrososphaerales -D -j 4 -o nitrososphaerales-tree`. The standalone helper is there for when you want the accession list in hand.
 
 ### Random notes on `gtt get-accs-from-gtdb`
-For other usage info, see `gtt get-accs-from-gtdb -h`. Like if we wanted all genomes, we could provide "all" to the `-t` target taxon argument. `--derep-rank` will dereplicate the pulled genomes down to one per unique value of a rank, and `-R`/`--refseq-reference-genomes-only` restricts to RefSeq reference genomes. `--get-rank-counts` on its own shows how many unique taxa there are at each rank.
+For other usage info, see `gtt get-accs-from-gtdb -h`. Like if we wanted all genomes, we could provide "all" to the `-t` target taxon argument. `--derep-rank` will dereplicate the pulled genomes down to one per unique value of a rank, and `-R`/`--refseq-ref-genomes-only` restricts to RefSeq reference genomes. `--get-rank-counts` on its own shows how many unique taxa there are at each rank.
 
 And if we wanted to just download the genomes, rather than use them with GToTree, we could get the accessions as shown above, and then use `bit-dl-ncbi-assemblies` from the [bit](https://github.com/AstrobioMike/bit) package, e.g.:
 

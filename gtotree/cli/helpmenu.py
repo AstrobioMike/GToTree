@@ -189,6 +189,15 @@ ENTRIES = [
          """,
          FULL),
 
+        ("--gtdb-section <str>",
+         "which part of GTDB to draw from; default: reps",
+         """
+         Which slice of GTDB the `-w` genomes are drawn from: "reps" (GTDB species
+         representatives) or "all" (every genome under the taxon). Only applies with
+         `--source gtdb`.
+         """,
+         FULL),
+
         ("--target-rank <str>",
          "rank of the `-w` taxon; default: auto-detected",
          """
@@ -208,14 +217,14 @@ ENTRIES = [
         ("--derep-rank <str>",
          "dereplicate to one genome per rank; default: auto",
          """
-         Keeps a single best genome per unique value of this rank within the `-w`
+         Keeps a single genome per unique value of this rank within the `-w`
          taxon's rank (to control tree size/complexity). For example, `-w Bacteria
          --derep-rank class` keeps one genome per bacterial class. The default
          `auto` uses a rank two levels finer than the wanted-ref-tax's own rank. Pass `off`
          to disable dereplication and include all genomes under the requested taxon.
 
          Note: a `--derep-rank` set equal to the `-w` taxon's rank returns a single
-         best genome (e.g., could be useful for adding an outgroup).
+         genome (could be useful for adding an outgroup).
          """,
          FULL),
 

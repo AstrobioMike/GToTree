@@ -187,6 +187,9 @@ def get_accessions_from_ncbi(args):
             assembly_levels=assembly_levels,
             ncbi_section=getattr(args, "ncbi_section", None),
             reps_only_requested=bool(args.refseq_reference_genomes_only),
+            # this subcommand's own flag; the shared default names
+            # `--representatives-only`, which lives on `gtt dl-ncbi-assemblies`
+            reps_flag="-R/--refseq-ref-genomes-only",
             emoticon=":("), "yellow"))
         print("")
         sys.exit(1)

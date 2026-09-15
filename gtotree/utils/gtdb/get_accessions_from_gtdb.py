@@ -190,7 +190,7 @@ def preflight_checks(args):
     if args.gtdb_representatives_only and args.refseq_reference_genomes_only:
         print("")
         wprint(color_text("Only one of `--gtdb-representatives-only` or "
-                          "`--refseq-reference-genomes-only` can be provided.", "yellow"))
+                          "`--refseq-ref-genomes-only` can be provided.", "yellow"))
         print("")
         sys.exit(1)
 
@@ -251,6 +251,7 @@ def _select_rows(gtdb_path, args, representatives_source):
         report_message(empty_pull_message(
                            f"No genomes were found under {label}.", selection,
                            reps_only_requested=bool(reps_only),
+                           reps_flag=_reps_flag_for(representatives_source),
                            emoticon=":("),
                        "yellow",
                        ii="    ", si="    ", width=100, trailing_newline=True)
@@ -557,6 +558,17 @@ def _all_derep_size(path, source, args, rep_filter=None, exclude_cores=None):
 
 def _rep_type_label(representatives_source):
     return "refseq reference" if representatives_source == "refseq" else "gtdb representative"
+
+
+def _reps_flag_for(representatives_source):
+    """
+    How THIS surface spells the representatives-only request, for empty-result
+    messaging. Without it the shared message names `--representatives-only`, which
+    is `gtt dl-ncbi-assemblies`' flag, not one this subcommand has.
+    """
+    if representatives_source == "refseq":
+        return "-R/--refseq-ref-genomes-only"
+    return "-G/--gtdb-representatives-only"
 
 
 def report_unique_taxa_counts_of_all_ranks(gtdb_path, representatives_source=None,
