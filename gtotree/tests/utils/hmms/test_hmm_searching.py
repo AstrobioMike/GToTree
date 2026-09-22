@@ -397,3 +397,61 @@ class TestCombinedTableAlignment:
         by_id = {s.id: s for s in rd.SCG_targets}
         assert by_id["SCG_A"].num_genomes_with_hit == 0
         assert by_id["SCG_C"].num_genomes_with_hit == 2
+
+
+class TestRebuildCombinedSCGOutputsManyTargets(TestRebuildCombinedSCGOutputs):
+    """
+    With more targets than MAX_OPEN_SCG_HANDLES, the per-SCG fastas are written in
+    batches; the fd count must stay bounded and every target must still get every genome.
+    """
+
+    def test_output_is_complete_across_batches(self, tmp_path, monkeypatch):
+        import os
+        import gtotree.utils.hmms.hmm_searching as hs
+        monkeypatch.setattr(hs, "MAX_OPEN_SCG_HANDLES", 3)
+        scg_ids = [f"SCG_{i}" for i in range(10)]
+        rd = self._setup(tmp_path, ["G1", "G2", "G3"], scg_ids=scg_ids)
+
+        rebuild_combined_SCG_outputs(rd)
+
+        for scg in scg_ids:
+            content = open(os.path.join(rd.found_SCG_seqs_dir, f"{scg}.faa")).read()
+            assert [ln for ln in content.splitlines() if ln.startswith(">")] == \
+                [">G1", ">G2", ">G3"]
+        assert all(s.num_genomes_after_copy_filtering == 3 for s in rd.SCG_targets)
+        assert list(tmp_path.rglob("*.part")) == []
+
+    def test_open_handles_never_exceed_the_cap(self, tmp_path, monkeypatch):
+        import builtins
+        import gtotree.utils.hmms.hmm_searching as hs
+        monkeypatch.setattr(hs, "MAX_OPEN_SCG_HANDLES", 4)
+        rd = self._setup(tmp_path, ["G1", "G2"], scg_ids=[f"SCG_{i}" for i in range(13)])
+
+        real_open = builtins.open
+        live, peak = set(), [0]
+
+        class _Tracked:
+            def __init__(self, fh):
+                self._fh = fh
+            def __enter__(self):
+                return self
+            def __exit__(self, *exc):
+                live.discard(id(self))
+                return self._fh.__exit__(*exc)
+            def __getattr__(self, name):
+                return getattr(self._fh, name)
+
+        def tracking_open(path, mode="r", *a, **k):
+            fh = real_open(path, mode, *a, **k)
+            if str(path).endswith(".part") and "w" in mode:
+                t = _Tracked(fh)
+                live.add(id(t))
+                peak[0] = max(peak[0], len(live))
+                return t
+            return fh
+
+        monkeypatch.setattr(builtins, "open", tracking_open)
+        rebuild_combined_SCG_outputs(rd)
+        monkeypatch.setattr(builtins, "open", real_open)
+
+        assert peak[0] <= 4

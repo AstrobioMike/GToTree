@@ -9,6 +9,8 @@ from gtotree.utils.hmms.hmm_searching_engine import search_one_genome
 from gtotree.utils.misc.stages import GenomeRemovalStage
 
 
+MAX_OPEN_SCG_HANDLES = 64
+
 def _hmm_search_worker(genome, run_data, aa_path=None, nt_path=None, pressed_base=None):
     """
     Per-genome SCG search.
@@ -282,21 +284,32 @@ def rebuild_combined_SCG_outputs(run_data):
     ext = run_data.general_ext
     out_paths = {t: f"{run_data.found_SCG_seqs_dir}/{t}{ext}" for t in target_SCG_ids}
 
-    with contextlib.ExitStack() as stack:
-        handles = {
-            target: stack.enter_context(open(f"{path}.part", "w"))
-            for target, path in out_paths.items()
-        }
-        for gd in genomes:
-            hits_path = f"{run_data.hmm_results_dir}/{gd.id}/SCG-hits{ext}"
-            if not os.path.isfile(hits_path):
-                continue
-            with open(hits_path) as infile:
-                for record in SeqIO.parse(infile, "fasta"):
-                    handle = handles.get(record.id)
-                    if handle is not None:
-                        handle.write(f">{gd.id}\n{record.seq}\n")
-                        genomes_with_usable_seq[record.id] += 1
+    hits_paths = [(gd.id, f"{run_data.hmm_results_dir}/{gd.id}/SCG-hits{ext}")
+                  for gd in genomes]
+    hits_paths = [(gid, p) for gid, p in hits_paths if os.path.isfile(p)]
+
+    try:
+        for i in range(0, len(target_SCG_ids), MAX_OPEN_SCG_HANDLES):
+            batch = target_SCG_ids[i:i + MAX_OPEN_SCG_HANDLES]
+            with contextlib.ExitStack() as stack:
+                handles = {
+                    target: stack.enter_context(open(f"{out_paths[target]}.part", "w"))
+                    for target in batch
+                }
+                for gid, hits_path in hits_paths:
+                    with open(hits_path) as infile:
+                        for record in SeqIO.parse(infile, "fasta"):
+                            handle = handles.get(record.id)
+                            if handle is not None:
+                                handle.write(f">{gid}\n{record.seq}\n")
+                                genomes_with_usable_seq[record.id] += 1
+    except BaseException:
+        for path in out_paths.values():
+            try:
+                os.remove(f"{path}.part")
+            except FileNotFoundError:
+                pass
+        raise
 
     for path in out_paths.values():
         os.replace(f"{path}.part", path)
