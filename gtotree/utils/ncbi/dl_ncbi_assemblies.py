@@ -97,7 +97,7 @@ def build_parser(parent_subparsers=None, show_detailed=False):
 
     required = parser.add_argument_group("Required Parameters (one or both)")
     selection = parser.add_argument_group("Taxon-selection Parameters (used with `-w`)")
-    optional = parser.add_argument_group("Optional Parameters")
+    optional = parser.add_argument_group("General Parameters")
 
     required.add_argument(
         "-w", "--wanted-tax",

@@ -186,7 +186,18 @@ def build_parser(parent_subparsers=None):
         )
 
     required = parser.add_argument_group("Required Parameters (at least one)")
-    optional = parser.add_argument_group("Optional Parameters")
+    selection = parser.add_argument_group("Taxon-selection Parameters (used with `-w`)")
+    optional = parser.add_argument_group("General Parameters")
+
+    required.add_argument(
+        "-w", "--wanted-ref-tax",
+        metavar="<STR>",
+        help=("A target taxon whose reference genomes should be used (e.g., "
+              "'Nitrospirota'). May be given more than once to pool several taxa into "
+              "one set (e.g. `-w Bacteria -w Archaea`); each is resolved and "
+              "dereplicated on its own, then merged."),
+        action="append",
+    )
 
     required.add_argument(
         "-a", "--ncbi-accessions",
@@ -219,50 +230,38 @@ def build_parser(parent_subparsers=None):
         action="store",
     )
 
-    required.add_argument(
-        "-w", "--wanted-ref-tax",
-        metavar="<STR>",
-        help=("A target taxon whose reference genomes should be used (e.g., "
-              "'Nitrospirota'). May be given more than once to pool several taxa into "
-              "one set (e.g. `-w Bacteria -w Archaea`); each is resolved and "
-              "dereplicated on its own, then merged."),
-        action="append",
-    )
-
-    optional.add_argument(
+    selection.add_argument(
         "--source",
         type=str.lower,
         default="gtdb",
         choices=["gtdb", "ncbi"],
-        help=("Which taxonomy source to select `--wanted-ref-tax` genomes from "
-              "(default: gtdb)"),
+        help=("Which taxonomy source to select genomes from (default: gtdb)"),
         action="store",
     )
 
-    optional.add_argument(
+    selection.add_argument(
         "--ncbi-section",
         dest="ncbi_section",
         type=str.lower,
         default="genbank",
         choices=["refseq", "genbank", "both"],
-        help=("Which section of NCBI to draw `--wanted-ref-tax` genomes from "
-              "(default: genbank). Ignored with `--source gtdb`."),
+        help=("Which section of NCBI to draw genomes from (default: genbank). Ignored with `--source gtdb`."),
         action="store",
     )
 
-    optional.add_argument(
+    selection.add_argument(
         "--gtdb-section",
         dest="gtdb_section",
         type=str.lower,
         default=None,
         choices=["reps", "all"],
-        help=("Which section of GTDB to draw `--wanted-ref-tax` genomes from: 'reps' "
+        help=("Which section of GTDB to draw genomes from: 'reps' "
               "(GTDB species representatives) or 'all' (every genome under the "
               "requested taxon); default: reps. Ignored with `--source ncbi`."),
         action="store",
     )
 
-    optional.add_argument(
+    selection.add_argument(
         "--target-rank",
         type=str.lower,
         choices=list(RANKS),
@@ -271,7 +270,7 @@ def build_parser(parent_subparsers=None):
         action="store",
     )
 
-    optional.add_argument(
+    selection.add_argument(
         "--target-domain",
         type=str,
         dest="target_domain",
@@ -281,7 +280,7 @@ def build_parser(parent_subparsers=None):
         action="store",
     )
 
-    optional.add_argument(
+    selection.add_argument(
         "--derep-rank",
         default="off",
         type=str.lower,
@@ -291,27 +290,27 @@ def build_parser(parent_subparsers=None):
         action="store",
     )
 
-    optional.add_argument(
+    selection.add_argument(
         "--min-completeness",
         metavar="<FLOAT>",
         default=None,
         type=float,
-        help=("Minimum estimated completeness for a `--wanted-ref-tax` genome to be "
+        help=("Minimum estimated completeness for a genome to be "
               "eligible, between 0 and 100 (default: None)."),
         action="store",
     )
 
-    optional.add_argument(
+    selection.add_argument(
         "--max-contamination",
         metavar="<FLOAT>",
         default=None,
         type=float,
-        help=("Maximum estimated contamination for a `--wanted-ref-tax` genome to be "
+        help=("Maximum estimated contamination for a genome to be "
               "eligible (default: None)."),
         action="store",
     )
 
-    optional.add_argument(
+    selection.add_argument(
         "--exclusion-list",
         metavar="<FILE>",
         dest="exclusion_list",
