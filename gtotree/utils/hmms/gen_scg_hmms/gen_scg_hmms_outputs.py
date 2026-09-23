@@ -10,6 +10,9 @@ Files produced in the output directory:
     SCG-targets-info.tsv            one row per retained target: acc, name, description
     Pfam-hit-counts.tsv             genome x Pfam hit-count matrix
     target-genomes.tsv              the genomes actually used, with their source
+    shared-protein-exclusions.tsv   Pfams that passed the single-copy cutoff but were
+                                    dropped for commonly hitting the same protein as a
+                                    retained one (header only if there were none)
     pfam-version-used.txt           the Pfam release the set was built from
     removed-genomes.tsv             any input genome that dropped out, and where/why
 
@@ -27,6 +30,7 @@ HMM_INFO_FILENAME = "SCG-targets-info.tsv"
 HIT_COUNTS_FILENAME = "Pfam-hit-counts.tsv"
 TARGET_GENOMES_FILENAME = "target-genomes.tsv"
 PFAM_VERSION_FILENAME = "pfam-version-used.txt"
+SHARED_PROTEIN_EXCLUSIONS_FILENAME = "shared-protein-exclusions.tsv"
 
 
 @contextlib.contextmanager
@@ -75,6 +79,29 @@ def write_hit_counts(out_dir, genome_ids, filtered_accs, per_genome_counts):
             counts = per_genome_counts.get(genome_id, {})
             row = "\t".join(str(counts.get(acc, 0)) for acc in filtered_accs)
             out.write(f"{genome_id}\t{row}\n")
+    return path
+
+
+def write_shared_protein_exclusions(out_dir, exclusions, pfam_info):
+    """
+    Write the Pfams dropped for sharing proteins with a retained Pfam, and which one
+    they lost out to. The count columns are the number (and percent) of target genomes
+    in which both Pfams hit the same single protein. Written even when empty.
+    """
+    def _name(acc):
+        info = pfam_info.get(acc)
+        return info.name if info is not None else "NA"
+
+    path = os.path.join(out_dir, SHARED_PROTEIN_EXCLUSIONS_FILENAME)
+    with _atomic_write(path) as out:
+        out.write("dropped_pfam_id\tdropped_name\tkept_pfam_id\tkept_name\t"
+                  "num_genomes_with_both_in_one_protein\tperc_genomes_with_both_in_one_protein\n")
+        for ex in exclusions:
+            out.write("\t".join([
+                ex.dropped_acc, _name(ex.dropped_acc),
+                ex.kept_acc, _name(ex.kept_acc),
+                str(ex.num_genomes_shared), f"{ex.percent_genomes_shared:g}",
+            ]) + "\n")
     return path
 
 

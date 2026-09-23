@@ -784,6 +784,20 @@ def report_ncbi_accs_not_found(num_accs, path):
     time.sleep(1)
 
 
+def report_shared_gene_hits(num_conflicts, run_files_dir_rel):
+    """
+    Some genes were the pick for more than one SCG target and were kept for only one,
+    so the same sequence doesn't go into the tree twice
+    """
+    plural = "" if num_conflicts == 1 else "s"
+    report_notice(
+        f"    {num_conflicts:,} time{plural}, one gene was the hit for more than one\n"
+        "    SCG target (e.g., maybe domains of the same fused protein). Each such gene was\n"
+        "    kept only for the target it scored best against, so no sequence goes into\n"
+        "    the alignment twice. The other target gets nothing from that genome.\n\n"
+        f"    Reported in {run_files_dir_rel}/SCG-shared-gene-hits.tsv")
+
+
 def report_ncbi_update(run_data):
     num_input = len(run_data.ncbi_accs)
     num_not_found_at_ncbi = len(run_data.get_ncbi_accs_not_found())

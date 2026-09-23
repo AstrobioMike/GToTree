@@ -1,6 +1,7 @@
 import tempfile
 
 from gtotree.utils.misc.messaging import (report_processing_stage,
+                                     report_shared_gene_hits,
                                      report_ncbi_update,
                                      report_genbank_update,
                                      report_fasta_update,
@@ -364,6 +365,10 @@ def _finalize(args, run_data, plan):
         phase_stats.checkpoint("combining: before SCG rebuild")
         run_data = rebuild_combined_SCG_outputs(run_data)
         phase_stats.checkpoint("combining: after SCG rebuild")
+
+        if run_data.num_shared_gene_hits:
+            report_shared_gene_hits(run_data.num_shared_gene_hits,
+                                    run_data.run_files_dir_rel or run_data.run_files_dir)
 
         run_data = check_target_SCGs_have_seqs(
             run_data, run_data.general_ext, SCGRemovalStage.NO_HITS,

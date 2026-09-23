@@ -41,8 +41,7 @@ my best to rapidly address anything!
 
 #### Make your own SCG-sets
 
-- `gtt gen-scg-hmms` is available to produce your own new single-copy gene HMMs for any group of input genomes,
-  that can then be passed to GToTree for treeing
+- `gtt gen-scg-hmms` is available to produce your own new single-copy gene HMMs for any group of input genomes, that can then be passed to GToTree for treeing
 
 
 #### SCG-set auto-selection

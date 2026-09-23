@@ -8,7 +8,8 @@ Core library for generating single-copy-gene (SCG) HMM sets
      (average coverage > 50%), since partial-domain models make poor SCG markers
   4. hmmsearch all target proteins against that filtered Pfam set
   5. keep the Pfams hit exactly once in >= `percent_single_copy`% of the genomes
-  6. write those profiles out as a new SCG-HMM set
+  6. of any retained Pfams that commonly sit on the *same* protein, keep only one
+  7. write those profiles out as a new SCG-HMM set
 """
 
 import os
@@ -23,6 +24,11 @@ from gtotree.utils.pfam.get_pfam_data import HMM_FILENAME, INFO_FILENAME
 # Pfam profiles whose average coverage of the underlying proteins is at or below this
 # are dropped before searching: this is to try to avoid multi-domain proteins from being used
 DEFAULT_MIN_PFAM_COVERAGE = 50.0
+
+# two retained Pfams hitting the same protein in at least this percent of the genomes
+# are treated as one gene, and only one of them is kept (see
+# `resolve_shared_protein_conflicts`)
+DEFAULT_MAX_SHARED_PROTEIN_PERCENT = 10.0
 
 # column positions (0-based) in pfamA.txt that we depend on
 #   col 0  -> pfamA_acc            e.g. "PF00001"
@@ -191,12 +197,7 @@ def count_single_copy_hits(hits_by_genome, genome_ids, filtered_accs,
     total = len(genome_ids)
     threshold = percent_single_copy / 100.0 * total
 
-    single_copy_counts = Counter()
-    for genome_id in genome_ids:
-        counts = hits_by_genome.get(genome_id, {})
-        for acc, n in counts.items():
-            if n == 1:
-                single_copy_counts[acc] += 1
+    single_copy_counts = count_single_copy_genomes(hits_by_genome, genome_ids)
 
     wanted = [acc for acc in filtered_accs if single_copy_counts.get(acc, 0) >= threshold]
 
@@ -205,6 +206,114 @@ def count_single_copy_hits(hits_by_genome, genome_ids, filtered_accs,
     }
 
     return wanted, per_genome_counts
+
+
+SHARED_PAIR_SEP = "|"
+
+
+def shared_pair_key(acc_a, acc_b):
+    """
+    Order-independent key for a pair of profile accessions
+    """
+    a, b = sorted((acc_a, acc_b))
+    return f"{a}{SHARED_PAIR_SEP}{b}"
+
+
+def split_shared_pair_key(key):
+    a, _sep, b = key.partition(SHARED_PAIR_SEP)
+    return a, b
+
+
+def count_single_copy_genomes(hits_by_genome, genome_ids):
+    """
+    Counter of acc -> number of `genome_ids` in which it was hit exactly once
+    """
+    single_copy_counts = Counter()
+    for genome_id in genome_ids:
+        counts = hits_by_genome.get(genome_id, {})
+        for acc, n in counts.items():
+            if n == 1:
+                single_copy_counts[acc] += 1
+    return single_copy_counts
+
+
+class SharedProteinExclusion:
+    """
+    One Pfam dropped for sharing proteins with a Pfam that was kept
+    """
+
+    __slots__ = ("dropped_acc", "kept_acc", "num_genomes_shared",
+                 "percent_genomes_shared")
+
+    def __init__(self, dropped_acc, kept_acc, num_genomes_shared, percent_genomes_shared):
+        self.dropped_acc = dropped_acc
+        self.kept_acc = kept_acc
+        self.num_genomes_shared = num_genomes_shared
+        self.percent_genomes_shared = percent_genomes_shared
+
+
+def resolve_shared_protein_conflicts(wanted_accs, shared_by_genome, genome_ids,
+                                     hits_by_genome,
+                                     max_shared_percent=DEFAULT_MAX_SHARED_PROTEIN_PERCENT):
+    """
+    Of the retained Pfams, keep only one of any pair that commonly hits the same protein.
+
+    Two Pfams can each be hit exactly once per genome and still be the same gene, e.g.,
+    two domains of a fused, multi-functional protein. Main GToTree extracts whole
+    proteins, so keeping both would put the same sequence into two SCG sets
+    (double-weighting that gene in the tree), and where the fusion is lineage-specific
+    the fused proteins run about twice the usual length and get dropped by the
+    length filter.
+
+    `shared_by_genome` is {genome_id: {pair_key: n proteins}} from the search.
+
+    A pair conflicts when both Pfams are in `wanted_accs` and at least one protein is
+    hit by both in >= `max_shared_percent`% of `genome_ids`. Conflicts are settled
+    most-shared first; each time, the Pfam that is single-copy in more genomes is kept
+    (ties go to the lower accession, just so it's deterministic). A Pfam already dropped
+    doesn't knock anything else out, so three domains on one protein leave one behind.
+
+    Returns (kept_accs in their original order, [SharedProteinExclusion, ...]).
+    """
+    total = len(genome_ids)
+    if not total or not wanted_accs:
+        return list(wanted_accs), []
+
+    wanted_set = set(wanted_accs)
+    threshold = max_shared_percent / 100.0 * total
+
+    genomes_sharing = Counter()
+    for genome_id in genome_ids:
+        for key, n in (shared_by_genome.get(genome_id) or {}).items():
+            if n <= 0:
+                continue
+            a, b = split_shared_pair_key(key)
+            if a in wanted_set and b in wanted_set:
+                genomes_sharing[key] += 1
+
+    conflicts = [(key, n) for key, n in genomes_sharing.items() if n >= threshold]
+    if not conflicts:
+        return list(wanted_accs), []
+
+    single_copy_counts = count_single_copy_genomes(hits_by_genome, genome_ids)
+
+    # most-shared first, then by key so the order is fully deterministic
+    conflicts.sort(key=lambda item: (-item[1], item[0]))
+
+    dropped = {}
+    exclusions = []
+    for key, n in conflicts:
+        a, b = split_shared_pair_key(key)
+        if a in dropped or b in dropped:
+            continue
+        keep, drop = sorted((a, b), key=lambda acc: (-single_copy_counts.get(acc, 0), acc))
+        dropped[drop] = keep
+        exclusions.append(SharedProteinExclusion(
+            dropped_acc=drop, kept_acc=keep, num_genomes_shared=n,
+            percent_genomes_shared=round(n / total * 100, 2)))
+
+    kept = [acc for acc in wanted_accs if acc not in dropped]
+    return kept, exclusions
 
 
 def read_hmm_accessions(hmm_path):

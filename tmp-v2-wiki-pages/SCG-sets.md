@@ -13,7 +13,7 @@ We can view which are available by running **`gtt hmms`**.
 
 ### Bacteria
 
-|SCG-set|Rank|Target genes|Genomes used|Dereplicated to|
+|SCG-set|Rank|Target genes|Genomes used|Dereplicated at|
 |----|:----:|:----:|:----:|:----:|
 |Bacteria|domain|52|5146|family|
 |Acidobacteriota|phylum|97|985|genus|
@@ -54,7 +54,7 @@ We can view which are available by running **`gtt hmms`**.
 
 ### Archaea
 
-|SCG-set|Rank|Target genes|Genomes used|Dereplicated to|
+|SCG-set|Rank|Target genes|Genomes used|Dereplicated at|
 |----|:----:|:----:|:----:|:----:|
 |Archaea|domain|51|492|family|
 |Asgardarchaeota|phylum|87|90|species|
@@ -97,6 +97,10 @@ ships with GToTree for building your own (run `gtt gen-scg-hmms -h`). In outline
 4. Only Pfams with exactly 1 hit in at least 90% of the genomes for that taxon were kept
    as that taxon's SCG-set.
 
+5. Of those, any two that hit the *same protein* in at least 10% of the genomes (e.g.,
+   two domains of a fused, multi-functional protein) were treated as one target, and only
+   the one that was single-copy in more genomes was kept. Any potential Pfam targets dropped this way are listed in the `shared-protein-exclusions.tsv` output table.
+
 Sets were built for each domain, and for taxa with enough genomes to support the above.
 
 ## Building your own
@@ -111,7 +115,7 @@ gtt gen-scg-hmms -w Nitrospirota -o my-nitrospirota-scgs
 It accepts the same genome inputs the main program does (`-a`, `-f`, `-A`, `-g`), so you
 can also build a set from your own genomes. See `gtt gen-scg-hmms -h` for the filtering
 options (`--min-completeness`, `--max-contamination`, `--percent-single-copy`,
-`--min-pfam-coverage`).
+`--min-pfam-coverage`, `--max-shared-protein-percent`).
 
 # The original (v1) SCG-sets
 

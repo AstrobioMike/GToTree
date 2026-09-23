@@ -439,6 +439,7 @@ class SCGset:
     gene_length_filtered: bool = None
     num_genomes_with_hit: int = None              # >= 1 hit, incl. multi-copy
     num_genomes_after_copy_filtering: int = None  # contributed a usable seq (see `-B`)
+    num_genomes_lost_to_shared_gene: int = None   # its gene hit went to another target
     num_genomes_after_length_filtering: int = 0
     num_genomes_after_genome_filtering: int = None
     aligned: bool = None
@@ -470,7 +471,8 @@ class RunData:
     amino_acid_files: List[GenomeData] = field(default_factory=list)
     all_input_genomes: List[GenomeData] = field(default_factory=list)
     SCG_targets: List[SCGset] = field(default_factory=list)
-
+    # genes that were the pick for >1 SCG target and were kept for only one
+    num_shared_gene_hits: int = 0
     start_time: datetime = None
     ncbi_sub_table_path: str = ""
     ncbi_processing_dir: str = ""

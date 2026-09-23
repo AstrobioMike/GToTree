@@ -63,6 +63,25 @@ def test_percent_single_copy_valid_values(percent):
     assert args.percent_single_copy == percent
 
 
+def test_max_shared_protein_percent_defaults():
+    from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
+        DEFAULT_MAX_SHARED_PROTEIN_PERCENT)
+    args = check_args(_parse("-a", "x.txt"))
+    assert args.max_shared_protein_percent == DEFAULT_MAX_SHARED_PROTEIN_PERCENT
+
+
+@pytest.mark.parametrize("percent", [-1, 100.5])
+def test_max_shared_protein_percent_bounds(percent):
+    with pytest.raises(GenSCGHMMsError, match="max-shared-protein-percent"):
+        check_args(_parse("-a", "x.txt", "--max-shared-protein-percent", str(percent)))
+
+
+@pytest.mark.parametrize("percent", [0, 5, 100])
+def test_max_shared_protein_percent_valid_values(percent):
+    args = check_args(_parse("-a", "x.txt", "--max-shared-protein-percent", str(percent)))
+    assert args.max_shared_protein_percent == percent
+
+
 def test_threads_must_be_positive():
     with pytest.raises(GenSCGHMMsError, match="num-threads"):
         check_args(_parse("-a", "x.txt", "-t", "0"))

@@ -46,6 +46,7 @@ from gtotree.utils.taxonomy.wanted_ref_tax import resolved_gtdb_section
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
     GenSCGHMMsError,
     DEFAULT_MIN_PFAM_COVERAGE,
+    DEFAULT_MAX_SHARED_PROTEIN_PERCENT,
     pfam_data_paths,
     load_coverage_filtered_pfams,
     read_hmm_accessions,
@@ -362,8 +363,22 @@ def build_parser(parent_subparsers=None):
         metavar="<FLOAT>",
         default=DEFAULT_MIN_PFAM_COVERAGE,
         type=float,
-        help=("Minimum average coverage of the underlying proteins for a Pfam profile "
-              f"to be considered (default: {DEFAULT_MIN_PFAM_COVERAGE})"),
+        help=("Minimum average coverage (%%) of the underlying proteins for a Pfam profile "
+              f"to be considered (default: {DEFAULT_MIN_PFAM_COVERAGE:g})"),
+        action="store",
+    )
+
+    optional.add_argument(
+        "--max-shared-protein-percent",
+        metavar="<FLOAT>",
+        default=DEFAULT_MAX_SHARED_PROTEIN_PERCENT,
+        type=float,
+        help=argparse.SUPPRESS,
+        # help=("If two Pfams that pass the single-copy cutoff hit the same protein in at "
+        #       "least this percent of genomes, only one of them is kept, since they'd "
+        #       "otherwise pull the same gene twice. "
+        #       "Between 0 and 100 (default: "
+        #       f"{DEFAULT_MAX_SHARED_PROTEIN_PERCENT:g})"),
         action="store",
     )
 
@@ -432,6 +447,12 @@ def check_args(args):
     if not 0 < args.percent_single_copy <= 100:
         raise GenSCGHMMsError(
             "The `--percent-single-copy` (-p) parameter needs to be between 1 and 100.")
+
+    max_shared = getattr(args, "max_shared_protein_percent",
+                         DEFAULT_MAX_SHARED_PROTEIN_PERCENT)
+    if not 0 <= max_shared <= 100:
+        raise GenSCGHMMsError(
+            "The `--max-shared-protein-percent` parameter needs to be between 0 and 100.")
 
     if args.num_threads < 1:
         raise GenSCGHMMsError("The `--num-threads` (-t) parameter needs to be at least 1.")
@@ -799,10 +820,13 @@ def phase_search(filtered_hmm_path, combined_path, num_genomes, args,
                  work_dir=None, resuming=False):
     """
     Run the hmmsearch stage with a progress bar over genomes
+
+    Returns (hits_by_genome, shared_by_genome); see `search_profiles`
     """
     checkpoint_path = (os.path.join(work_dir, SEARCH_CHECKPOINT_FILENAME)
                        if work_dir else None)
 
+    shared_by_genome = {}
     with tqdm(total=num_genomes, desc="      Progress", ncols=74,
               unit=" genome", smoothing=GTT_PROGRESS_SMOOTHING) as pbar:
         hits_by_genome = search_profiles(
@@ -810,18 +834,26 @@ def phase_search(filtered_hmm_path, combined_path, num_genomes, args,
             threads=args.num_threads,
             progress_callback=pbar.update,
             checkpoint_path=checkpoint_path,
-            resume=resuming)
-    return hits_by_genome
+            resume=resuming,
+            shared_proteins=shared_by_genome)
+    return hits_by_genome, shared_by_genome
 
 
 def phase_determine_and_write(out_dir, filtered_hmm_path, hits_by_genome, kept_ids,
-                              filtered_accs, pfam_info, pfam_version, run_data, args):
+                              filtered_accs, pfam_info, pfam_version, run_data, args,
+                              shared_by_genome=None):
     """Determine the single-copy set, extract it, and write all outputs."""
-    from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import count_single_copy_hits
+    from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
+        count_single_copy_hits, resolve_shared_protein_conflicts)
 
     with spinner("Determining single-copy genes...", "Determined single-copy genes"):
         wanted_accs, per_genome_counts = count_single_copy_hits(
             hits_by_genome, kept_ids, filtered_accs, args.percent_single_copy)
+        num_single_copy = len(wanted_accs)
+        wanted_accs, shared_exclusions = resolve_shared_protein_conflicts(
+            wanted_accs, shared_by_genome or {}, kept_ids, hits_by_genome,
+            max_shared_percent=getattr(args, "max_shared_protein_percent",
+                                       DEFAULT_MAX_SHARED_PROTEIN_PERCENT))
 
     if not wanted_accs:
         raise GenSCGHMMsError(
@@ -830,8 +862,13 @@ def phase_determine_and_write(out_dir, filtered_hmm_path, hits_by_genome, kept_i
             "lowering `-p`, or check that the target genomes are as closely related as "
             "intended.")
 
-    print(f"        {len(wanted_accs):,} Pfam(s) present in exactly one copy in >= "
+    print(f"        {num_single_copy:,} Pfam(s) present in exactly one copy in >= "
           f"{args.percent_single_copy}% of the {len(kept_ids):,} genome(s)")
+    if shared_exclusions:
+        print(f"        {len(shared_exclusions):,} of those dropped for commonly hitting "
+              "the same protein as another retained Pfam")
+        print(f"          (see {outputs.SHARED_PROTEIN_EXCLUSIONS_FILENAME})")
+        print(f"        {len(wanted_accs):,} Pfam(s) retained as SCG targets")
 
     hmm_filename = outputs.default_hmm_filename(out_dir, len(wanted_accs))
     final_hmm_path = os.path.join(out_dir, hmm_filename)
@@ -842,6 +879,7 @@ def phase_determine_and_write(out_dir, filtered_hmm_path, hits_by_genome, kept_i
 
     with spinner("Writing summary tables...", "Wrote summary tables"):
         outputs.write_scg_targets_info(out_dir, wanted_accs, pfam_info)
+        outputs.write_shared_protein_exclusions(out_dir, shared_exclusions, pfam_info)
         outputs.write_hit_counts(out_dir, kept_ids, filtered_accs, per_genome_counts)
         outputs.write_target_genomes(out_dir, kept_ids, run_data)
         outputs.write_pfam_version(out_dir, pfam_version)
@@ -880,6 +918,11 @@ def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_versio
 
 
 SEARCH_STAGE_SIDECAR = "search-hits.json"
+
+# the per-genome shared-protein pair counts from the search; kept as its own sidecar
+# so a work dir from before these were recorded is simply seen as lacking them (and
+# the search redone) rather than misread
+SEARCH_SHARED_SIDECAR = "search-shared-proteins.json"
 
 SEARCH_CHECKPOINT_FILENAME = "search-checkpoint.jsonl"
 
@@ -980,17 +1023,23 @@ def gen_scg_hmms(args):  # pragma: no cover
 
     section(f"Phase {n()}: Searching genomes with Pfam profiles...")
     cached_hits = load_sidecar(work_dir, SEARCH_STAGE_SIDECAR) if resuming else None
+    # an empty dict is a legitimate "nothing shared", so only None means missing
+    cached_shared = load_sidecar(work_dir, SEARCH_SHARED_SIDECAR) if resuming else None
     if resuming and RESUME.is_reusable(state, STAGE_SEARCH, work_dir) \
-            and cached_hits:
+            and cached_hits and cached_shared is not None:
         with spinner("Reusing previous search results...", "Reused previous search results"):
             hits_by_genome = cached_hits
+            shared_by_genome = cached_shared
     else:
-        hits_by_genome = phase_search(filtered_hmm_path, combined_path, len(kept_ids),
-                                      args, work_dir=work_dir, resuming=resuming)
+        hits_by_genome, shared_by_genome = phase_search(
+            filtered_hmm_path, combined_path, len(kept_ids),
+            args, work_dir=work_dir, resuming=resuming)
         save_sidecar(work_dir, SEARCH_STAGE_SIDECAR, hits_by_genome)
+        save_sidecar(work_dir, SEARCH_SHARED_SIDECAR, shared_by_genome)
         RESUME.mark_complete(
             state, STAGE_SEARCH,
-            [os.path.join(work_dir, SEARCH_STAGE_SIDECAR)],
+            [os.path.join(work_dir, SEARCH_STAGE_SIDECAR),
+             os.path.join(work_dir, SEARCH_SHARED_SIDECAR)],
             work_dir=work_dir)
         RESUME.save(work_dir, state)
         _remove_quietly(os.path.join(work_dir, SEARCH_CHECKPOINT_FILENAME))
@@ -998,7 +1047,7 @@ def gen_scg_hmms(args):  # pragma: no cover
     section(f"Phase {n()}: Determining single-copy genes and writing outputs...")
     final_hmm_path, num_targets = phase_determine_and_write(
         out_dir, filtered_hmm_path, hits_by_genome, kept_ids, filtered_accs, pfam_info,
-        pfam_version, run_data, args)
+        pfam_version, run_data, args, shared_by_genome=shared_by_genome)
 
     if not args.keep_working_dir:
         shutil.rmtree(work_dir, ignore_errors=True)

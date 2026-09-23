@@ -308,10 +308,38 @@ def test_phase_search_returns_hit_counts(tmp_path):
 
     # phase_search takes the genome count to size a per-genome progress bar; the caller
     # already knows it, so no pre-pass over the combined fasta is needed
-    hits = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined, len(kept), args)
+    hits, shared = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined,
+                                    len(kept), args)
 
     assert hits["g1"]["PF90001.3"] == 1
     assert hits["g1"]["PF90002.7"] == 1
+    # separate proteins, so nothing shared
+    assert shared == {}
+
+
+def test_phase_search_returns_shared_protein_pairs(tmp_path):
+    """
+    One protein carrying two domains has to come back as a shared pair, since that's
+    what the single-copy determination uses to keep only one of them.
+    """
+    from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import shared_pair_key
+
+    genome_dir = tmp_path / "genomes"
+    genome_dir.mkdir()
+    (genome_dir / "g1.faa").write_text(
+        ">p1\n" + MOTIFS["PF90001.3"] + MOTIFS["PF90002.7"] + "\n")
+
+    args = _phase_args(amino_acid_files=_listing(
+        tmp_path, "aa.txt", [genome_dir / "g1.faa"]))
+
+    work = tmp_path / "work"
+    _run, combined, kept = _amino_acids(args, tmp_path, work=str(work))
+
+    hits, shared = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined,
+                                    len(kept), args)
+
+    assert hits["g1"] == {"PF90001.3": 1, "PF90002.7": 1}
+    assert shared == {"g1": {shared_pair_key("PF90001.3", "PF90002.7"): 1}}
 
 
 def test_phase_search_checkpoints_into_the_work_dir(tmp_path):
@@ -348,7 +376,8 @@ def test_phase_search_without_a_work_dir_writes_no_checkpoint(tmp_path):
     work = tmp_path / "work"
     _run, combined, kept = _amino_acids(args, tmp_path, work=str(work))
 
-    hits = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined, len(kept), args)
+    hits, _shared = cli.phase_search(str(DATA_DIR / "mock-pfams.hmm"), combined,
+                                     len(kept), args)
     assert hits["g1"]["PF90001.3"] == 1
     assert not (work / cli.SEARCH_CHECKPOINT_FILENAME).exists()
 

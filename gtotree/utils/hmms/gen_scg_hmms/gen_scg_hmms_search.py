@@ -4,6 +4,12 @@ The hmmsearch stage of `gtt gen-scg-hmms`
 Searches all target proteins against the coverage-filtered Pfam profiles and tallies,
 per genome, how many times each profile was hit.
 
+It also records, per genome, which pairs of pfam profiles hit the same protein. Two Pfams
+that sit in one protein (e.g., domains of a fused, multi-functional protein) can each
+look perfectly single-copy. Main GToTree pulls whole proteins, so keeping both would
+put the same sequence into two SCG sets (not what i want). The pairs recorded here are what
+`resolve_shared_protein_conflicts` uses to keep only one.
+
 Gathering thresholds (`--cut_ga`) are used just like in main GToTree
 
 MEMORY SHAPE
@@ -31,7 +37,8 @@ import os
 import json
 import tempfile
 import pyhmmer  # type: ignore
-from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import GenSCGHMMsError
+from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (GenSCGHMMsError,
+                                                              shared_pair_key)
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_genomes import genome_id_from_protein_name
 from gtotree.utils.misc.general import decode_pyhmmer_text
 
@@ -169,7 +176,14 @@ def _search_one_chunk(pressed_base, seq_block, threads, hits_by_genome,
     the per-chunk cost is negligible against the search itself.)
 
     `on_profile`, if given, is called once per profile finished against this chunk
+
+    Returns this chunk's shared-protein pair counts, {genome_id: {pair_key: n}} (see
+    `shared_pair_key`). A protein never spans chunks (`read_block` doesn't split
+    sequences), so pairs can be settled per chunk.
     """
+    # protein name -> the profile accessions that hit it, within this chunk
+    accs_by_protein = {}
+
     try:
         with pyhmmer.plan7.HMMPressedFile(pressed_base) as profiles:
 
@@ -190,9 +204,11 @@ def _search_one_chunk(pressed_base, seq_block, threads, hits_by_genome,
                 for hit in top_hits:
                     if not hit.included:
                         continue
-                    genome_id = genome_id_from_protein_name(decode_pyhmmer_text(hit.name))
+                    protein_name = decode_pyhmmer_text(hit.name)
+                    genome_id = genome_id_from_protein_name(protein_name)
                     counts = hits_by_genome.setdefault(genome_id, {})
                     counts[acc] = counts.get(acc, 0) + 1
+                    accs_by_protein.setdefault(protein_name, set()).add(acc)
 
     except KeyboardInterrupt:
         raise
@@ -201,9 +217,35 @@ def _search_one_chunk(pressed_base, seq_block, threads, hits_by_genome,
     except Exception as e:
         raise HmmSearchError(f"the hmmsearch step failed: {e}") from e
 
+    return shared_pairs_from_protein_hits(accs_by_protein)
+
+
+def shared_pairs_from_protein_hits(accs_by_protein):
+    """
+    {protein name -> set of accs hitting it} -> {genome_id: {pair_key: n proteins}}
+
+    Only proteins hit by two or more profiles contribute. A protein hit by three
+    profiles contributes all three of its pairs.
+    """
+    shared = {}
+    for protein_name, accs in accs_by_protein.items():
+        if len(accs) < 2:
+            continue
+        genome_id = genome_id_from_protein_name(protein_name)
+        pairs = shared.setdefault(genome_id, {})
+        ordered = sorted(accs)
+        for i, a in enumerate(ordered):
+            for b in ordered[i + 1:]:
+                key = shared_pair_key(a, b)
+                pairs[key] = pairs.get(key, 0) + 1
+    return shared
+
 
 class CheckpointError(GenSCGHMMsError):
     """The search checkpoint exists but can't be used."""
+
+
+CHECKPOINT_FORMAT = 2
 
 
 class _SearchCheckpoint:
@@ -223,33 +265,37 @@ class _SearchCheckpoint:
             size, mtime = st.st_size, int(st.st_mtime)
         except OSError:
             size, mtime = None, None
-        return {"budget": budget, "num_profiles": num_profiles,
-                "fasta_size": size, "fasta_mtime": mtime}
+        # `format` 2 added the shared-protein pairs to each chunk record; a format-1
+        # checkpoint has none, so it's refused (and the search redone) rather than
+        # silently resumed without them
+        return {"format": CHECKPOINT_FORMAT, "budget": budget,
+                "num_profiles": num_profiles, "fasta_size": size, "fasta_mtime": mtime}
 
     def load(self):
         """
-        Replay the checkpoint, returning (hits_by_genome, chunks_done).
+        Replay the checkpoint, returning (hits_by_genome, shared_by_genome, chunks_done).
 
-        Returns ({}, 0) when there's nothing usable to resume from, no file, an
+        Returns ({}, {}, 0) when there's nothing usable to resume from, no file, an
         unreadable one, or a header describing a different run. That's a fallback to
         redoing the work, never a wrong answer, so it isn't an error.
         """
         if not self.path or not os.path.isfile(self.path):
-            return {}, 0
+            return {}, {}, 0
 
         hits = {}
+        shared = {}
         chunks_done = 0
         try:
             with open(self.path, encoding="utf-8") as f:
                 first = f.readline()
                 if not first.strip():
-                    return {}, 0
+                    return {}, {}, 0
                 try:
                     header = json.loads(first)
                 except ValueError:
-                    return {}, 0
+                    return {}, {}, 0
                 if header != self._header:
-                    return {}, 0
+                    return {}, {}, 0
 
                 for line in f:
                     line = line.strip()
@@ -264,14 +310,15 @@ class _SearchCheckpoint:
                         # out of order means the file isn't what we think it is
                         break
                     _merge_hits(hits, record.get("hits") or {})
+                    _merge_hits(shared, record.get("shared") or {})
                     chunks_done += 1
         except OSError as e:
             raise CheckpointError(
                 f"the search checkpoint at '{self.path}' couldn't be read: {e}") from e
 
-        return hits, chunks_done
+        return hits, shared, chunks_done
 
-    def record(self, chunk_index, delta_hits):
+    def record(self, chunk_index, delta_hits, delta_shared=None):
         """
         Append one finished chunk. Flushed and fsynced so a checkpoint survives the
         process being killed, which is the entire point of having one.
@@ -282,7 +329,8 @@ class _SearchCheckpoint:
             if not self._started:
                 self._begin()
             with open(self.path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"chunk": chunk_index, "hits": delta_hits},
+                f.write(json.dumps({"chunk": chunk_index, "hits": delta_hits,
+                                    "shared": delta_shared or {}},
                                    separators=(",", ":")) + "\n")
                 f.flush()
                 os.fsync(f.fileno())
@@ -310,7 +358,10 @@ class _SearchCheckpoint:
 
 
 def _merge_hits(target, delta):
-    """Fold one chunk's hit counts into an accumulator, summing where they overlap."""
+    """
+    Fold one chunk's counts into an accumulator, summing where they overlap. Works
+    for both the hit counts and the shared-protein pair counts, which share a shape.
+    """
     for genome_id, counts in delta.items():
         into = target.setdefault(genome_id, {})
         for acc, n in counts.items():
@@ -319,7 +370,7 @@ def _merge_hits(target, delta):
 
 def search_profiles(filtered_hmm_path, fasta_path, threads=1,
                     progress_callback=None, residue_budget=None,
-                    checkpoint_path=None, resume=False):
+                    checkpoint_path=None, resume=False, shared_proteins=None):
     """
     Search the filtered Pfam profiles against the combined target proteins.
 
@@ -348,6 +399,11 @@ def search_profiles(filtered_hmm_path, fasta_path, threads=1,
 
     `residue_budget` overrides the chunk policy for deterministic testing; left None it
     uses `resolve_residue_budget`.
+
+    `shared_proteins`, if given a dict, is filled in place with
+    {genome_id: {pair_key: n}}: for each pair of profiles, how many of that genome's
+    proteins were hit by both (see `shared_pair_key`). It's an out-parameter rather than
+    part of the return value so existing callers of this function are unaffected.
     """
     if residue_budget is not None:
         budget = residue_budget
@@ -373,8 +429,10 @@ def search_profiles(filtered_hmm_path, fasta_path, threads=1,
             checkpoint_path, budget, num_profiles, fasta_path)
 
         if resume:
-            hits_by_genome, chunks_done = checkpoint.load()
+            hits_by_genome, loaded_shared, chunks_done = checkpoint.load()
             checkpoint.adopt(chunks_done)
+            if shared_proteins is not None:
+                _merge_hits(shared_proteins, loaded_shared)
         else:
             chunks_done = 0
 
@@ -410,11 +468,13 @@ def search_profiles(filtered_hmm_path, fasta_path, threads=1,
                 # a fresh dict per chunk, so what this chunk found can be checkpointed
                 # on its own; it's folded into the running totals straight after
                 chunk_hits = {}
-                _search_one_chunk(pressed_base, chunk, threads, chunk_hits,
-                                  on_profile=progress.on_profile)
+                chunk_shared = _search_one_chunk(pressed_base, chunk, threads, chunk_hits,
+                                                 on_profile=progress.on_profile) or {}
                 progress.finish()
                 _merge_hits(hits_by_genome, chunk_hits)
-                checkpoint.record(chunk_index, chunk_hits)
+                if shared_proteins is not None:
+                    _merge_hits(shared_proteins, chunk_shared)
+                checkpoint.record(chunk_index, chunk_hits, chunk_shared)
 
             genomes_reported += progress.awarded
 

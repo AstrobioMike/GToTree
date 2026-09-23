@@ -4,6 +4,8 @@
 
 ### TO DO STILL ###
 
+    # remake prepackaged scg sets
+
     # test taxon selection in all functions that use it
         # dl-ncbi-assemblies seems to be working
         # gen-scg-hmms

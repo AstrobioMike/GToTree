@@ -17,13 +17,18 @@ def _run_data(targets, best_hit_mode=False):
 
 
 def _tblout(tmp_path, rows):
-    """rows: (gene_id, target_SCG) in the order hmmsearch would have emitted them."""
+    """
+    rows: (gene_id, target_SCG) or (gene_id, target_SCG, score), in the order
+    hmmsearch would have emitted them
+    """
     path = tmp_path / "SCG-hits-hmm.txt"
     with open(path, "w") as f:
         f.write("#  --- full sequence ----\n")
-        f.write("# target name  accession  query name  accession  E-value\n")
-        for gene, scg in rows:
-            f.write(f"{gene}\t-\t{scg}\tACC\t1e-20\n")
+        f.write("# target name  accession  query name  accession  E-value  score\n")
+        for row in rows:
+            gene, scg = row[0], row[1]
+            score = row[2] if len(row) > 2 else 100.0
+            f.write(f"{gene}\t-\t{scg}\tACC\t1e-20\t{score}\n")
     return str(path)
 
 
