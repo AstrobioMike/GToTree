@@ -3,6 +3,9 @@ name: build-and-test
 on:
   push:
   pull_request:
+  schedule:
+    - cron: "17 8 */3 * *"    # every 3 days at 8:17 UTC
+  workflow_dispatch:
 
 jobs:
   build-and-test:

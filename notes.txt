@@ -4,14 +4,22 @@
 
 ### TO DO STILL ###
 
-    # remake prepackaged scg sets
+    # remake prepackaged scg sets (in progress on jetstream)
+
+    # i've been thinking...
+        # gen-scg-hmms could probably use a max parameter in some form to limit the number of SCG-HMMs generated
+        # there are typically diminishing returns in generating more HMMs beyond a certain point
+        # maybe it could be as simple as capping it at like 250 by default
+            # it could be the 'best' ones, in terms of those with the most genomes with exactly 1 copy
+
+    # gen-scg-hmms should be able to be re-run on an output directory and create a new SCG-set based on
+        # adjusted parameters (like --percent-single-copy or the new --max-hmms i'm adding)
 
     # test taxon selection in all functions that use it
+        # main gtotree
         # dl-ncbi-assemblies seems to be working
         # gen-scg-hmms
         # get-accs-from-*
-        # others?
-    # keep mirroring help menus with bit where possible
 
     # resume-functionality testing
 
@@ -19,8 +27,6 @@
         # on my altermonas ~90 genomes, v2 is XX minutes, v1 is YY minutes (~40% or 1.6x faster)
         # check a larger number of genomes also
         # if i want to go crazy, i could benchmark cpu/memory/time like i did for gen-mg
-
-
 
 
 ################################################
