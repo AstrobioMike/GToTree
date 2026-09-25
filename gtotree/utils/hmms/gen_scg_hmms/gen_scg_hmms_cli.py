@@ -243,8 +243,8 @@ def build_parser(parent_subparsers=None):
         help=("The output directory of a finished `gen-scg-hmms` run in order to build "
               "a new set with different `-p` and/or `--max-hmms`, reusing its genomes and "
               "search results rather than redoing them. The new set is written to `-o`, "
-              "and the original directory isn't modified. This parameter negates the other "
-              "'required' inputs here."),
+              "and the original directory isn't modified. This is incompatible with other "
+              "required parameters here."),
         action="store",
     )
 
@@ -363,9 +363,9 @@ def build_parser(parent_subparsers=None):
         dest="max_hmms",
         default=DEFAULT_MAX_HMMS,
         type=int,
-        help=("The maximum number of SCG-HMMs to keep. If more pass `-p`, those "
-              "single-copy in the most genomes are kept (ties going to the Pfam with "
-              "higher average coverage). 0 means no cap (default: "
+        help=("The maximum number of SCG-HMMs to keep. If more than this qualify, those "
+              "with exactly 1 copy in the most genomes are kept (ties go to the Pfam with "
+              "higher average coverage). Set to 0 if you want no max limit (default: "
               f"{DEFAULT_MAX_HMMS})"),
         action="store",
     )
