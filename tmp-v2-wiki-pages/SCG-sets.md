@@ -117,6 +117,17 @@ can also build a set from your own genomes. See `gtt gen-scg-hmms -h` for the fi
 options (`--min-completeness`, `--max-contamination`, `--percent-single-copy`,
 `--min-pfam-coverage`, `--max-shared-protein-percent`).
 
+
+Once a run has finished, a new set with a different `-p` and/or `--max-hmms` can be built
+from it without redoing the genome downloads or the search:
+
+```bash
+gtt gen-scg-hmms --from-run my-nitrospirota-scgs -p 80 -o my-nitrospirota-scgs-p80
+```
+
+This writes a complete new output directory and leaves the original as it was. The
+parameters each set was selected with are recorded in its `selection-params.tsv`.
+
 # The original (v1) SCG-sets
 
 The sets packaged with GToTree v1 were built in 2018 against NCBI taxonomy and Pfam 32.0.

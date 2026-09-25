@@ -42,6 +42,7 @@ my best to rapidly address anything!
 #### Make your own SCG-sets
 
 - `gtt gen-scg-hmms` is available to produce your own new single-copy gene HMMs for any group of input genomes, that can then be passed to GToTree for treeing
+  - you can point at a previously completed run with the `--from-run` parameter in order to regenerate a SCG-set with some different parameters (like `--percent-single-copy` and `--max-hmms`) quickly without needed to do the full Pfam search on all genome again
 
 
 #### SCG-set auto-selection

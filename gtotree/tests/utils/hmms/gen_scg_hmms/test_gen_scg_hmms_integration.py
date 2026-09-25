@@ -3,6 +3,8 @@ import io
 
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
                                                                  count_single_copy_hits,
+                                                                 count_single_copy_genomes,
+                                                                 count_multi_copy_genomes,
                                                                  load_coverage_filtered_pfams,
                                                                  read_hmm_accessions,
                                                                  write_filtered_pfam_hmms,
@@ -111,7 +113,9 @@ def test_full_pipeline_from_local_amino_acid_files(tmp_path):
     write_filtered_pfam_hmms(str(filtered_hmm), wanted, str(final_hmm))
     assert sorted(read_hmm_accessions(str(final_hmm))) == sorted(wanted)
 
-    outputs.write_scg_targets_info(str(out_dir), wanted, pfam_info)
+    outputs.write_scg_targets_info(
+        str(out_dir), wanted, pfam_info, count_single_copy_genomes(hits, kept_ids),
+        count_multi_copy_genomes(hits, kept_ids), len(kept_ids))
     outputs.write_hit_counts(str(out_dir), kept_ids, filtered_accs, per_genome)
     outputs.write_target_genomes(str(out_dir), kept_ids, run_data)
     outputs.write_pfam_version(str(out_dir), "38.2-mock")

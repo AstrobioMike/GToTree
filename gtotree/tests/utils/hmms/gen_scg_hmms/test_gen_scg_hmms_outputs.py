@@ -14,23 +14,28 @@ def _read(path):
 
 def test_write_scg_targets_info(tmp_path):
     info = {"PF00001.27": PfamProfileInfo("PF00001.27", "7tm_1", "A receptor", 66.58)}
-    path = outputs.write_scg_targets_info(str(tmp_path), ["PF00001.27"], info)
+    path = outputs.write_scg_targets_info(str(tmp_path), ["PF00001.27"], info,
+                                          {"PF00001.27": 9}, {"PF00001.27": 1}, 12)
 
     rows = _read(path)
-    assert rows[0] == ["pfam_id", "name", "description", "average_coverage"]
-    assert rows[1] == ["PF00001.27", "7tm_1", "A receptor", "66.58"]
+    assert rows[0] == ["pfam_id", "name", "description", "average_coverage",
+                       "num_genomes_single_copy", "perc_genomes_single_copy",
+                       "num_genomes_multi_copy"]
+    assert rows[1] == ["PF00001.27", "7tm_1", "A receptor", "66.58", "9", "75", "1"]
 
 
 def test_write_scg_targets_info_falls_back_to_na(tmp_path):
     """A retained profile with no info row must still appear, not vanish."""
-    path = outputs.write_scg_targets_info(str(tmp_path), ["PF99999.1"], {})
+    path = outputs.write_scg_targets_info(str(tmp_path), ["PF99999.1"], {},
+                                          {"PF99999.1": 3}, {}, 3)
     rows = _read(path)
-    assert rows[1] == ["PF99999.1", "NA", "NA", "NA"]
+    assert rows[1] == ["PF99999.1", "NA", "NA", "NA", "3", "100", "0"]
 
 
 def test_write_scg_targets_info_preserves_order(tmp_path):
     info = {a: PfamProfileInfo(a, a, "d", 60.0) for a in ["PF3.1", "PF1.1", "PF2.1"]}
-    path = outputs.write_scg_targets_info(str(tmp_path), ["PF3.1", "PF1.1", "PF2.1"], info)
+    path = outputs.write_scg_targets_info(str(tmp_path), ["PF3.1", "PF1.1", "PF2.1"],
+                                          info, {}, {}, 1)
     assert [r[0] for r in _read(path)[1:]] == ["PF3.1", "PF1.1", "PF2.1"]
 
 

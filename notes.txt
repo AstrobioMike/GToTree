@@ -9,11 +9,12 @@
     # i've been thinking...
         # gen-scg-hmms could probably use a max parameter in some form to limit the number of SCG-HMMs generated
         # there are typically diminishing returns in generating more HMMs beyond a certain point
-        # maybe it could be as simple as capping it at like 250 by default
-            # it could be the 'best' ones, in terms of those with the most genomes with exactly 1 copy
+        # maybe it could be as simple as --max-hmms, and capping it at like 250 by default
+            # it could keep the 'best' ones, in terms of those with the most genomes with exactly 1 copy
 
-    # gen-scg-hmms should be able to be re-run on an output directory and create a new SCG-set based on
-        # adjusted parameters (like --percent-single-copy or the new --max-hmms i'm adding)
+    # additionally gen-scg-hmms should be able to be re-run on an output directory and create a new SCG-set based on
+        # adjusted parameters (like --percent-single-copy or the new --max-hmms i'm adding), rather than
+        # needed to rerun the whole scan again
 
     # test taxon selection in all functions that use it
         # main gtotree

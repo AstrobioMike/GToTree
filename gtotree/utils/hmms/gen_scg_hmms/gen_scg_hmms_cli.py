@@ -47,10 +47,12 @@ from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
     GenSCGHMMsError,
     DEFAULT_MIN_PFAM_COVERAGE,
     DEFAULT_MAX_SHARED_PROTEIN_PERCENT,
+    DEFAULT_MAX_HMMS,
     pfam_data_paths,
     load_coverage_filtered_pfams,
     read_hmm_accessions,
     write_filtered_pfam_hmms,
+    count_genomes_sharing,
 )
 from gtotree.utils.misc.resume_state import (ResumeProfile, hash_strings,
                                              hash_local_genomes, load_sidecar,
@@ -95,7 +97,6 @@ RESUME = ResumeProfile(
         "state_version": "the run-state format",
         "accessions_sha256": "the set of target genomes",
         "local_genomes_sha256": "the local genome files (contents, paths, or set)",
-        "percent_single_copy": "--percent-single-copy",
         "min_pfam_coverage": "--min-pfam-coverage",
         "source": "--source",
         "ncbi_section": "--ncbi-section",
@@ -117,11 +118,15 @@ RESUME = ResumeProfile(
 
 def build_fingerprint(run_data, args, pfam_version=None):
     """
-    Everything that affects the final SCG set.
+    Everything that affects the genomes and search results a resume would reuse.
 
     Deliberately does NOT include `--num-jobs`, `--num-threads`, `--keep-working-dir`,
     or the output directory name: those change how the run executes, not what it
     produces, so changing them shouldn't invalidate a resume.
+
+    Nor the selection parameters (`-p`, `--max-hmms`, `--max-shared-protein-percent`):
+    they only act on the search results, in the final phase, which a resume always
+    reruns anyway, so a resume can take new values for them.
 
     Local genomes are hashed with size and mtime as well as path, because unlike an
     NCBI accession a local file's contents can change while its path stays the same,
@@ -137,7 +142,6 @@ def build_fingerprint(run_data, args, pfam_version=None):
         "num_accessions": len(set(accessions)),
         "local_genomes_sha256": hash_local_genomes(local_genomes),
         "num_local_genomes": len(local_genomes),
-        "percent_single_copy": args.percent_single_copy,
         "min_pfam_coverage": args.min_pfam_coverage,
         "source": (args.source or "").upper(),
         "ncbi_section": (getattr(args, "ncbi_section", None) or "").lower(),
@@ -228,6 +232,19 @@ def build_parser(parent_subparsers=None):
         metavar="<FILE>",
         help=("A single-column file listing amino-acid fasta files to include; each "
               "should hold the proteins for one genome."),
+        action="store",
+    )
+
+    required.add_argument(
+        "--from-run",
+        metavar="<DIR>",
+        dest="from_run",
+        default=None,
+        help=("The output directory of a finished `gen-scg-hmms` run in order to build "
+              "a new set with different `-p` and/or `--max-hmms`, reusing its genomes and "
+              "search results rather than redoing them. The new set is written to `-o`, "
+              "and the original directory isn't modified. This parameter negates the other "
+              "'required' inputs here."),
         action="store",
     )
 
@@ -341,6 +358,19 @@ def build_parser(parent_subparsers=None):
     )
 
     optional.add_argument(
+        "--max-hmms",
+        metavar="<INT>",
+        dest="max_hmms",
+        default=DEFAULT_MAX_HMMS,
+        type=int,
+        help=("The maximum number of SCG-HMMs to keep. If more pass `-p`, those "
+              "single-copy in the most genomes are kept (ties going to the Pfam with "
+              "higher average coverage). 0 means no cap (default: "
+              f"{DEFAULT_MAX_HMMS})"),
+        action="store",
+    )
+
+    optional.add_argument(
         "-j", "--num-jobs",
         metavar="<INT>",
         default=10,
@@ -434,15 +464,76 @@ def section(title):
 # validation / setup
 ################################################################################
 
+# what `--from-run` can't be combined with, as (dest, flag): each of these decides which
+# genomes are used or what they're searched against, and a `--from-run` reuses both.
+# `-j`, `-t`, and `--keep-working-dir` aren't here: they only change how a scan runs,
+# so they're simply not used rather than refused
+INCOMPATIBLE_WITH_FROM_RUN = (
+    ("wanted_ref_tax", "-w"),
+    ("ncbi_accessions", "-a"),
+    ("genbank_files", "-g"),
+    ("fasta_files", "-f"),
+    ("amino_acid_files", "-A"),
+    ("source", "--source"),
+    ("ncbi_section", "--ncbi-section"),
+    ("gtdb_section", "--gtdb-section"),
+    ("target_rank", "--target-rank"),
+    ("target_domain", "--target-domain"),
+    ("derep_rank", "--derep-rank"),
+    ("min_completeness", "--min-completeness"),
+    ("max_contamination", "--max-contamination"),
+    ("exclusion_list", "--exclusion-list"),
+    ("min_pfam_coverage", "--min-pfam-coverage"),
+    ("resume", "-R/--resume"),
+)
+
+
+def _from_run_conflicts(args):
+    """
+    The INCOMPATIBLE_WITH_FROM_RUN flags given a non-default value, as their flag labels.
+
+    Compared against the parser's own defaults so there's one place they're defined;
+    an incompatible flag explicitly given its default value has no effect either way.
+    """
+    defaults = build_parser().parse_args([])
+    return [flag for dest, flag in INCOMPATIBLE_WITH_FROM_RUN
+            if getattr(args, dest, None) != getattr(defaults, dest, None)]
+
+
+def _check_from_run_args(args):
+    conflicts = _from_run_conflicts(args)
+    if conflicts:
+        raise GenSCGHMMsError(
+            "`--from-run` reuses the genomes and search results of the previous run, "
+            f"so it can't be combined with: {', '.join(conflicts)}. With `--from-run`, "
+            "`-p` and `--max-hmms` set how the new set is selected.")
+
+    out_dir = os.path.realpath(args.output_dir.rstrip("/"))
+    if out_dir == os.path.realpath(args.from_run.rstrip("/")):
+        raise GenSCGHMMsError(
+            "`--from-run` writes a new set to a new directory and leaves the previous "
+            "run as it is, so `-o` needs to be a different directory than the "
+            "`--from-run` one.")
+
+
 def check_args(args):
     """Validate arguments, raising GenSCGHMMsError with a friendly message."""
+    if getattr(args, "max_hmms", DEFAULT_MAX_HMMS) < 0:
+        raise GenSCGHMMsError(
+            "The `--max-hmms` parameter can't be negative (0 means no cap).")
+
+    if getattr(args, "from_run", None):
+        _check_from_run_args(args)
+
     input_flags = (args.ncbi_accessions, args.wanted_ref_tax, args.genbank_files,
-                   args.fasta_files, args.amino_acid_files)
+                   args.fasta_files, args.amino_acid_files,
+                   getattr(args, "from_run", None))
     if not any(input_flags):
         raise GenSCGHMMsError(
             "We need some target genomes to work with! Provide any combination of an "
             "accessions file (`-a`), GenBank files (`-g`), fasta files (`-f`), "
-            "amino-acid files (`-A`), and/or a target taxon (`-w`).")
+            "amino-acid files (`-A`), and/or a target taxon (`-w`). Or a previous "
+            "run to build a new set from (with `--from-run`).")
 
     if not 0 < args.percent_single_copy <= 100:
         raise GenSCGHMMsError(
@@ -508,8 +599,9 @@ def setup_output_dir(args):
     if resume and os.path.isfile(os.path.join(out_dir, outputs.HMM_INFO_FILENAME)):
         report_message(
             f"The run in '{out_dir}' already finished, so there's nothing to "
-            "resume. Use `-F` to rebuild it from scratch, or `-o` to write a "
-            "new run to a different directory.\n", "yellow")
+            "resume. To build a set from it with a different `-p` or `--max-hmms`, "
+            f"use `--from-run {out_dir}` with a new `-o`. Or use `-F` to rebuild this "
+            "from scratch.\n", "yellow")
         exit(0)
 
     return prepare_output_dir(out_dir, resume=resume,
@@ -839,56 +931,109 @@ def phase_search(filtered_hmm_path, combined_path, num_genomes, args,
     return hits_by_genome, shared_by_genome
 
 
-def phase_determine_and_write(out_dir, filtered_hmm_path, hits_by_genome, kept_ids,
-                              filtered_accs, pfam_info, pfam_version, run_data, args,
-                              shared_by_genome=None):
-    """Determine the single-copy set, extract it, and write all outputs."""
-    from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
-        count_single_copy_hits, resolve_shared_protein_conflicts)
+def phase_write_scan_record(out_dir, hits_by_genome, kept_ids, filtered_accs,
+                            genomes_sharing, pfam_info, pfam_version, run_data):
+    """
+    Write the tables recording what the scan found, which are also everything
+    `--from-run` needs to select a new set from this run later.
+    """
+    per_genome_counts = {genome_id: dict(hits_by_genome.get(genome_id, {}))
+                         for genome_id in kept_ids}
+
+    with spinner("Writing search-result tables...", "Wrote search-result tables"):
+        outputs.write_hit_counts(out_dir, kept_ids, filtered_accs, per_genome_counts)
+        outputs.write_target_genomes(out_dir, kept_ids, run_data)
+        outputs.write_shared_protein_pairs(out_dir, genomes_sharing, len(kept_ids),
+                                           pfam_info)
+        outputs.write_pfam_version(out_dir, pfam_version)
+
+
+def phase_select_and_write(out_dir, source_hmm_path, hits_by_genome, genome_ids,
+                           filtered_accs, genomes_sharing, pfam_info, args,
+                           from_run=None, source_total_profiles=None):
+    """
+    Select the SCG targets, extract their profiles, and write the selection outputs.
+    Shared by a full run and `--from-run`.
+
+    `source_hmm_path` is where the profiles are extracted from: the coverage-filtered
+    subset in a full run, or the master Pfam HMM with `--from-run` (whose working dir,
+    holding the subset, is usually long gone). `source_total_profiles`, if given, sizes
+    a progress bar for that extraction, as streaming the master file takes a while.
+
+    Returns (final_hmm_path, num_targets).
+    """
+    from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import select_scg_targets
+
+    max_shared = getattr(args, "max_shared_protein_percent",
+                         DEFAULT_MAX_SHARED_PROTEIN_PERCENT)
+    max_hmms = getattr(args, "max_hmms", DEFAULT_MAX_HMMS)
 
     with spinner("Determining single-copy genes...", "Determined single-copy genes"):
-        wanted_accs, per_genome_counts = count_single_copy_hits(
-            hits_by_genome, kept_ids, filtered_accs, args.percent_single_copy)
-        num_single_copy = len(wanted_accs)
-        wanted_accs, shared_exclusions = resolve_shared_protein_conflicts(
-            wanted_accs, shared_by_genome or {}, kept_ids, hits_by_genome,
-            max_shared_percent=getattr(args, "max_shared_protein_percent",
-                                       DEFAULT_MAX_SHARED_PROTEIN_PERCENT))
+        selection = select_scg_targets(
+            hits_by_genome, genome_ids, filtered_accs, genomes_sharing, pfam_info,
+            args.percent_single_copy, max_shared_percent=max_shared, max_hmms=max_hmms)
 
-    if not wanted_accs:
+    if not selection.targets:
         raise GenSCGHMMsError(
             f"No Pfams were found in exactly one copy in >= {args.percent_single_copy}% "
             "of the target genomes, so there's no SCG set to write. You could try "
             "lowering `-p`, or check that the target genomes are as closely related as "
             "intended.")
 
-    print(f"        {num_single_copy:,} Pfam(s) present in exactly one copy in >= "
-          f"{args.percent_single_copy}% of the {len(kept_ids):,} genome(s)")
-    if shared_exclusions:
-        print(f"        {len(shared_exclusions):,} of those dropped for commonly hitting "
-              "the same protein as another retained Pfam")
+    print(f"        {selection.num_single_copy:,} Pfam(s) present in exactly one copy in >= "
+          f"{args.percent_single_copy}% of the {len(genome_ids):,} genome(s)")
+    if selection.shared_exclusions:
+        print(f"        {len(selection.shared_exclusions):,} of those dropped for commonly "
+              "hitting the same protein as another retained Pfam")
         print(f"          (see {outputs.SHARED_PROTEIN_EXCLUSIONS_FILENAME})")
-        print(f"        {len(wanted_accs):,} Pfam(s) retained as SCG targets")
+    if selection.capped_out:
+        print(f"        {len(selection.capped_out):,} more left out by the `--max-hmms` cap "
+              f"of {max_hmms:,}, keeping those single-copy in the most genomes")
+    if selection.shared_exclusions or selection.capped_out:
+        print(f"        {len(selection.targets):,} Pfam(s) retained as SCG targets")
 
-    hmm_filename = outputs.default_hmm_filename(out_dir, len(wanted_accs))
+    hmm_filename = outputs.default_hmm_filename(out_dir, len(selection.targets))
     final_hmm_path = os.path.join(out_dir, hmm_filename)
 
-    with spinner("Writing the new SCG-HMM set...", "Wrote the new SCG-HMM set"):
-        # re-extract from the already-filtered subset rather than the 2 GB master
-        write_filtered_pfam_hmms(filtered_hmm_path, wanted_accs, final_hmm_path)
+    if source_total_profiles:
+        print("\n      Extracting target profiles:")
+        with tqdm(total=source_total_profiles,
+                  bar_format=GTT_PROGRESS_BAR_FORMAT_NO_COUNT_INDENTED,
+                  ncols=76, smoothing=GTT_PROGRESS_SMOOTHING) as pbar:
+            found = write_filtered_pfam_hmms(source_hmm_path, selection.targets,
+                                             final_hmm_path, progress_callback=pbar.update)
+    else:
+        with spinner("Writing the new SCG-HMM set...", "Wrote the new SCG-HMM set"):
+            found = write_filtered_pfam_hmms(source_hmm_path, selection.targets,
+                                             final_hmm_path)
+
+    missing = set(selection.targets) - set(found)
+    if missing:
+        _remove_quietly(final_hmm_path)
+        raise GenSCGHMMsError(
+            f"{len(missing):,} of the selected profiles weren't found in "
+            f"'{source_hmm_path}' (e.g. {sorted(missing)[0]}), so the set couldn't be "
+            "written.")
 
     with spinner("Writing summary tables...", "Wrote summary tables"):
-        outputs.write_scg_targets_info(out_dir, wanted_accs, pfam_info)
-        outputs.write_shared_protein_exclusions(out_dir, shared_exclusions, pfam_info)
-        outputs.write_hit_counts(out_dir, kept_ids, filtered_accs, per_genome_counts)
-        outputs.write_target_genomes(out_dir, kept_ids, run_data)
-        outputs.write_pfam_version(out_dir, pfam_version)
+        outputs.write_shared_protein_exclusions(out_dir, selection.shared_exclusions,
+                                                pfam_info)
+        outputs.write_selection_params(out_dir, [
+            ("percent_single_copy", args.percent_single_copy),
+            ("max_hmms", max_hmms),
+            ("max_shared_protein_percent", f"{max_shared:g}"),
+            ("from_run", os.path.abspath(from_run) if from_run else None),
+        ])
+        # last, since its presence is what marks the run as finished
+        outputs.write_scg_targets_info(
+            out_dir, selection.targets, pfam_info, selection.single_copy_counts,
+            selection.multi_copy_counts, selection.num_genomes)
 
-    return final_hmm_path, len(wanted_accs)
+    return final_hmm_path, len(selection.targets)
 
 
-def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_version,
-                  run_data, args):
+def report_finish(out_dir, final_hmm_path, num_targets, num_genomes,
+                  removed_report_path=None):
     border = color_text("  " + "-" * 78, "green")
     title = color_text("  " + "SCG-HMM set complete!".center(78), "green")
     print()
@@ -903,10 +1048,10 @@ def report_finish(out_dir, final_hmm_path, num_targets, num_genomes, pfam_versio
     print("      Supporting tables written to:")
     print(f"        {color_text(out_dir + '/', 'green')}\n")
 
-    if any(gd.removed for gd in run_data.all_input_genomes):
+    if removed_report_path:
         report_message("Any input genomes that didn't make it through are reported in:",
                        "yellow", ii="      ", si="      ", newline=False)
-        print(f"        {color_text(removed_genomes_path(run_data), 'yellow')}\n")
+        print(f"        {color_text(removed_report_path, 'yellow')}\n")
     print()
 
     # if os.environ.get("GToTree_HMM_dir"):
@@ -941,6 +1086,10 @@ def _remove_quietly(path):
 
 def gen_scg_hmms(args):  # pragma: no cover
     args = check_args(args)
+
+    if args.from_run:
+        return gen_scg_hmms_from_run(args)
+
     out_dir, work_dir = setup_output_dir(args)
 
     resuming = bool(getattr(args, "resume", False))
@@ -1045,9 +1194,12 @@ def gen_scg_hmms(args):  # pragma: no cover
         _remove_quietly(os.path.join(work_dir, SEARCH_CHECKPOINT_FILENAME))
 
     section(f"Phase {n()}: Determining single-copy genes and writing outputs...")
-    final_hmm_path, num_targets = phase_determine_and_write(
-        out_dir, filtered_hmm_path, hits_by_genome, kept_ids, filtered_accs, pfam_info,
-        pfam_version, run_data, args, shared_by_genome=shared_by_genome)
+    genomes_sharing = count_genomes_sharing(shared_by_genome, kept_ids)
+    phase_write_scan_record(out_dir, hits_by_genome, kept_ids, filtered_accs,
+                            genomes_sharing, pfam_info, pfam_version, run_data)
+    final_hmm_path, num_targets = phase_select_and_write(
+        out_dir, filtered_hmm_path, hits_by_genome, kept_ids, filtered_accs,
+        genomes_sharing, pfam_info, args)
 
     if not args.keep_working_dir:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -1056,8 +1208,80 @@ def gen_scg_hmms(args):  # pragma: no cover
     phase_stats.finish()
     phase_stats.write_tsv(out_dir)
 
-    report_finish(out_dir, final_hmm_path, num_targets, len(kept_ids), pfam_version,
-                  run_data, args)
+    removed_report = (removed_genomes_path(run_data)
+                      if any(gd.removed for gd in run_data.all_input_genomes) else None)
+    report_finish(out_dir, final_hmm_path, num_targets, len(kept_ids), removed_report)
+
+
+def gen_scg_hmms_from_run(args):  # pragma: no cover
+    """
+    Build a new SCG-HMM set from a finished run's output tables, with new selection
+    parameters, into a new output dir. Nothing is searched: the previous run's hit
+    counts and shared-protein pairs are all the selection needs, and the chosen
+    profiles are extracted from the managed master Pfam HMM.
+    """
+    from gtotree.utils.pfam.get_pfam_data import get_pfam_data, get_stored_pfam_version
+
+    from_run = args.from_run.rstrip("/")
+    outputs.check_previous_run(from_run)
+
+    # checked here rather than left to prepare_output_dir, whose message suggests `-R`
+    if os.path.exists(args.output_dir) and not args.force_overwrite:
+        raise GenSCGHMMsError(
+            f"The output directory '{args.output_dir}' already exists, and we don't "
+            "want to overwrite anything accidentally. Use `-F` to overwrite it, or "
+            "specify a different directory with `-o`.")
+
+    n = _phase_counter()
+
+    section(f"Phase {n()}: Reading the previous run...")
+    print(f"      Building a new set from: {color_text(from_run + '/', 'green')}\n")
+    with spinner("Reading search results...", "Read search results"):
+        genome_ids, filtered_accs, hits_by_genome = outputs.read_hit_counts(
+            os.path.join(from_run, outputs.HIT_COUNTS_FILENAME))
+        genomes_sharing = outputs.read_shared_protein_pairs(
+            os.path.join(from_run, outputs.SHARED_PROTEIN_PAIRS_FILENAME))
+        with open(os.path.join(from_run, outputs.PFAM_VERSION_FILENAME)) as f:
+            previous_pfam_version = f.readline().strip()
+    print(f"        {len(genome_ids):,} genome(s) searched with "
+          f"{len(filtered_accs):,} Pfam profile(s)")
+
+    section(f"Phase {n()}: Preparing Pfam profiles...")
+    pfam_data_dir = get_pfam_data()
+    master_hmm_path, info_path = pfam_data_paths(pfam_data_dir)
+    pfam_version = get_stored_pfam_version(pfam_data_dir) or "NA"
+    if pfam_version != previous_pfam_version:
+        raise GenSCGHMMsError(
+            f"The previous run was built with Pfam {previous_pfam_version}, but the "
+            f"Pfam data available now is {pfam_version}, so its profiles can't be "
+            "pulled from here to match. A new set would need a full run.")
+    print(f"      Pfam version being used: {color_text(pfam_version, 'green')}\n")
+
+    with spinner("Loading Pfam info...", "Loaded Pfam info"):
+        pfam_info, total_profiles = load_coverage_filtered_pfams(info_path,
+                                                                 min_coverage=None)
+
+    section(f"Phase {n()}: Determining single-copy genes and writing outputs...")
+
+    # only created once everything above has checked out, so a refusal leaves nothing
+    out_dir, work_dir = prepare_output_dir(args.output_dir, resume=False,
+                                           force_overwrite=args.force_overwrite)
+    # nothing here needs a working dir
+    shutil.rmtree(work_dir, ignore_errors=True)
+
+    with spinner("Copying search-result tables...", "Copied search-result tables"):
+        copied = outputs.copy_scan_record(from_run, out_dir)
+    final_hmm_path, num_targets = phase_select_and_write(
+        out_dir, master_hmm_path, hits_by_genome, genome_ids, filtered_accs,
+        genomes_sharing, pfam_info, args, from_run=from_run,
+        source_total_profiles=total_profiles)
+
+    phase_stats.finish()
+    phase_stats.write_tsv(out_dir)
+
+    removed_report = (os.path.join(args.output_dir.rstrip("/"), REMOVED_GENOMES_FILENAME)
+                      if REMOVED_GENOMES_FILENAME in copied else None)
+    report_finish(out_dir, final_hmm_path, num_targets, len(genome_ids), removed_report)
 
 
 def main():  # pragma: no cover

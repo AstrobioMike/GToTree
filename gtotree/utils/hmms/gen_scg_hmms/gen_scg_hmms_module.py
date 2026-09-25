@@ -1,15 +1,19 @@
 """
 Core library for generating single-copy-gene (SCG) HMM sets
 
-  1. resolve a set of target genomes (accessions file and/or `--wanted-ref-tax`)
-  2. get amino acids for each (download the NCBI protein file, or call genes with
+  1. Resolve a set of target genomes (accessions file and/or `--wanted-ref-tax`)
+  2. Get amino acids for each (download the NCBI protein file, or call genes with
      prodigal off the nucleotide file when no protein file exists)
-  3. take the Pfam profiles whose underlying proteins are well-covered by the model
+  3. Take the Pfam profiles whose underlying proteins are well-covered by the model
      (average coverage > 50%), since partial-domain models make poor SCG markers
-  4. hmmsearch all target proteins against that filtered Pfam set
-  5. keep the Pfams hit exactly once in >= `percent_single_copy`% of the genomes
-  6. of any retained Pfams that commonly sit on the *same* protein, keep only one
-  7. write those profiles out as a new SCG-HMM set
+  4. Hmmsearch all target proteins against that filtered Pfam set
+  5. Keep the Pfams hit exactly once in >= `percent_single_copy` of the genomes
+  6. Of any retained Pfams that commonly sit on the *same* protein, keep only one
+  7. If more than `max_hmms` remain, keep the best-ranked ones (see `cap_targets`)
+  8. Write those profiles out as a new SCG-HMM set
+
+Steps 5-7 only need the search results, which is what lets `--from-run` build a new
+set from a finished run's output tables without redoing 1-4 (see `select_scg_targets`).
 """
 
 import os
@@ -29,6 +33,8 @@ DEFAULT_MIN_PFAM_COVERAGE = 50.0
 # are treated as one gene, and only one of them is kept (see
 # `resolve_shared_protein_conflicts`)
 DEFAULT_MAX_SHARED_PROTEIN_PERCENT = 10.0
+
+DEFAULT_MAX_HMMS = 250
 
 # column positions (0-based) in pfamA.txt that we depend on
 #   col 0  -> pfamA_acc            e.g. "PF00001"
@@ -89,6 +95,9 @@ def load_coverage_filtered_pfams(info_path, min_coverage=DEFAULT_MIN_PFAM_COVERA
     of usable rows (i.e. the number of profiles in the master set, before the
     coverage filter).
 
+    `min_coverage=None` keeps every profile; `--from-run` uses that, since the
+    previous run's hit-count table already records which profiles were searched.
+
     `total_profiles` is returned so callers can size a progress bar for the
     subsequent streaming pass over the master HMM without a second pass to count.
 
@@ -115,7 +124,7 @@ def load_coverage_filtered_pfams(info_path, min_coverage=DEFAULT_MIN_PFAM_COVERA
 
             usable_rows += 1
 
-            if coverage <= min_coverage:
+            if min_coverage is not None and coverage <= min_coverage:
                 continue
 
             version = parts[_PFAM_VERSION_COL].strip()
@@ -237,6 +246,36 @@ def count_single_copy_genomes(hits_by_genome, genome_ids):
     return single_copy_counts
 
 
+def count_multi_copy_genomes(hits_by_genome, genome_ids):
+    """
+    Counter of acc -> number of `genome_ids` in which it was hit more than once
+    """
+    multi_copy_counts = Counter()
+    for genome_id in genome_ids:
+        counts = hits_by_genome.get(genome_id, {})
+        for acc, n in counts.items():
+            if n > 1:
+                multi_copy_counts[acc] += 1
+    return multi_copy_counts
+
+
+def count_genomes_sharing(shared_by_genome, genome_ids):
+    """
+    Collapse the per-genome shared-protein record into {pair_key: number of
+    `genome_ids` in which at least one protein was hit by both Pfams of the pair}.
+
+    `shared_by_genome` is {genome_id: {pair_key: n proteins}} from the search. This
+    aggregate is all the conflict resolution needs, and it's what gets written to
+    `shared-protein-pairs.tsv`, so a finished run carries it for `--from-run`.
+    """
+    genomes_sharing = Counter()
+    for genome_id in genome_ids:
+        for key, n in (shared_by_genome.get(genome_id) or {}).items():
+            if n > 0:
+                genomes_sharing[key] += 1
+    return genomes_sharing
+
+
 class SharedProteinExclusion:
     """
     One Pfam dropped for sharing proteins with a Pfam that was kept
@@ -252,7 +291,7 @@ class SharedProteinExclusion:
         self.percent_genomes_shared = percent_genomes_shared
 
 
-def resolve_shared_protein_conflicts(wanted_accs, shared_by_genome, genome_ids,
+def resolve_shared_protein_conflicts(wanted_accs, genomes_sharing, genome_ids,
                                      hits_by_genome,
                                      max_shared_percent=DEFAULT_MAX_SHARED_PROTEIN_PERCENT):
     """
@@ -265,7 +304,8 @@ def resolve_shared_protein_conflicts(wanted_accs, shared_by_genome, genome_ids,
     the fused proteins run about twice the usual length and get dropped by the
     length filter.
 
-    `shared_by_genome` is {genome_id: {pair_key: n proteins}} from the search.
+    `genomes_sharing` is {pair_key: number of genomes with a protein hit by both}, as
+    built by `count_genomes_sharing` over `genome_ids`.
 
     A pair conflicts when both Pfams are in `wanted_accs` and at least one protein is
     hit by both in >= `max_shared_percent`% of `genome_ids`. Conflicts are settled
@@ -282,16 +322,14 @@ def resolve_shared_protein_conflicts(wanted_accs, shared_by_genome, genome_ids,
     wanted_set = set(wanted_accs)
     threshold = max_shared_percent / 100.0 * total
 
-    genomes_sharing = Counter()
-    for genome_id in genome_ids:
-        for key, n in (shared_by_genome.get(genome_id) or {}).items():
-            if n <= 0:
-                continue
-            a, b = split_shared_pair_key(key)
-            if a in wanted_set and b in wanted_set:
-                genomes_sharing[key] += 1
+    conflicts = []
+    for key, n in genomes_sharing.items():
+        if n <= 0 or n < threshold:
+            continue
+        a, b = split_shared_pair_key(key)
+        if a in wanted_set and b in wanted_set:
+            conflicts.append((key, n))
 
-    conflicts = [(key, n) for key, n in genomes_sharing.items() if n >= threshold]
     if not conflicts:
         return list(wanted_accs), []
 
@@ -314,6 +352,89 @@ def resolve_shared_protein_conflicts(wanted_accs, shared_by_genome, genome_ids,
 
     kept = [acc for acc in wanted_accs if acc not in dropped]
     return kept, exclusions
+
+
+def cap_targets(wanted_accs, single_copy_counts, pfam_info, max_hmms):
+    """
+    Keep at most `max_hmms` of `wanted_accs`, the best-ranked ones.
+
+    Ranked by the number of genomes the Pfam is single-copy in (most first), then by
+    its average coverage of the underlying proteins (highest first, since a model
+    spanning more of the protein is closer to a whole-gene marker), then by
+    accession so the result is deterministic. A Pfam with no info entry ranks as
+    zero coverage.
+
+    `max_hmms` of 0 or None means no cap.
+
+    Returns (kept in their original order, capped-out in rank order).
+    """
+    if not max_hmms or len(wanted_accs) <= max_hmms:
+        return list(wanted_accs), []
+
+    def _coverage(acc):
+        info = pfam_info.get(acc)
+        return info.coverage if info is not None else 0.0
+
+    ranked = sorted(wanted_accs,
+                    key=lambda acc: (-single_copy_counts.get(acc, 0), -_coverage(acc), acc))
+    keep = set(ranked[:max_hmms])
+
+    return [acc for acc in wanted_accs if acc in keep], ranked[max_hmms:]
+
+
+class SCGSelection:
+    """
+    The outcome of `select_scg_targets`, with what was dropped at each step
+    """
+
+    __slots__ = ("targets", "num_single_copy", "shared_exclusions", "capped_out",
+                 "single_copy_counts", "multi_copy_counts", "num_genomes")
+
+    def __init__(self, targets, num_single_copy, shared_exclusions, capped_out,
+                 single_copy_counts, multi_copy_counts, num_genomes):
+        self.targets = targets
+        self.num_single_copy = num_single_copy
+        self.shared_exclusions = shared_exclusions
+        self.capped_out = capped_out
+        self.single_copy_counts = single_copy_counts
+        self.multi_copy_counts = multi_copy_counts
+        self.num_genomes = num_genomes
+
+
+def select_scg_targets(hits_by_genome, genome_ids, filtered_accs, genomes_sharing,
+                       pfam_info, percent_single_copy,
+                       max_shared_percent=DEFAULT_MAX_SHARED_PROTEIN_PERCENT,
+                       max_hmms=DEFAULT_MAX_HMMS):
+    """
+    Everything from the search results to the final target list: the single-copy
+    cutoff, then shared-protein conflicts, then the `max_hmms` cap.
+
+    The cap comes last so that Pfams dropped for sharing a protein don't leave the
+    set short of the cap. Used by both a full run and `--from-run`, so the two can't
+    drift apart in how they select.
+
+    Returns an SCGSelection; `targets` may be empty, which the caller reports.
+    """
+    wanted, _per_genome = count_single_copy_hits(
+        hits_by_genome, genome_ids, filtered_accs, percent_single_copy)
+    num_single_copy = len(wanted)
+
+    wanted, shared_exclusions = resolve_shared_protein_conflicts(
+        wanted, genomes_sharing, genome_ids, hits_by_genome,
+        max_shared_percent=max_shared_percent)
+
+    single_copy_counts = count_single_copy_genomes(hits_by_genome, genome_ids)
+    targets, capped_out = cap_targets(wanted, single_copy_counts, pfam_info, max_hmms)
+
+    return SCGSelection(
+        targets=targets,
+        num_single_copy=num_single_copy,
+        shared_exclusions=shared_exclusions,
+        capped_out=capped_out,
+        single_copy_counts=single_copy_counts,
+        multi_copy_counts=count_multi_copy_genomes(hits_by_genome, genome_ids),
+        num_genomes=len(genome_ids),
+    )
 
 
 def read_hmm_accessions(hmm_path):

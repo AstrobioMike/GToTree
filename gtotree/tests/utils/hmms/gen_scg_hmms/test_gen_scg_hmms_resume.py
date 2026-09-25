@@ -71,7 +71,6 @@ def test_fingerprint_detects_added_genome():
 ################################################################################
 
 @pytest.mark.parametrize("kwargs,expected", [
-    (dict(percent_single_copy=95), "--percent-single-copy"),
     (dict(min_pfam_coverage=60.0), "--min-pfam-coverage"),
     (dict(source="NCBI"), "--source"),
     (dict(wanted_ref_tax="Bacteroidota"), "--wanted-ref-tax"),
@@ -83,6 +82,22 @@ def test_result_affecting_params_invalidate(kwargs, expected):
     changed = _fp(["A"], _args(**kwargs), "38.2")
     diffs = RESUME.compare(base, changed)
     assert any(expected in d for d in diffs), diffs
+
+
+@pytest.mark.parametrize("kwargs", [
+    dict(percent_single_copy=50),
+    dict(max_hmms=10),
+    dict(max_shared_protein_percent=50.0),
+])
+def test_selection_params_do_not_invalidate(kwargs):
+    """
+    -p, --max-hmms, and --max-shared-protein-percent only act on the search results in
+    the final phase, which a resume reruns anyway, so a resume can take new values
+    for them (e.g. after a run found nothing at the first -p).
+    """
+    base = _fp(["A"], _args(), "38.2")
+    changed = _fp(["A"], _args(**kwargs), "38.2")
+    assert RESUME.compare(base, changed) == []
 
 
 def test_pfam_version_change_invalidates():

@@ -10,6 +10,7 @@ import json
 
 from gtotree.tests.paths import DATA_DIR
 from gtotree.utils.hmms.gen_scg_hmms.gen_scg_hmms_module import (
+    count_genomes_sharing,
     count_single_copy_hits,
     resolve_shared_protein_conflicts,
     shared_pair_key,
@@ -158,6 +159,13 @@ def test_old_format_checkpoint_is_not_resumed_from(tmp_path):
 # resolving conflicts
 ################################################################################
 
+def _resolve(wanted, shared_by_genome, genome_ids, hits, **kw):
+    """The per-genome search record goes through the same aggregation a run does."""
+    return resolve_shared_protein_conflicts(
+        wanted, count_genomes_sharing(shared_by_genome, genome_ids), genome_ids, hits,
+        **kw)
+
+
 def _hits(genome_ids, accs):
     return {g: {a: 1 for a in accs} for g in genome_ids}
 
@@ -167,7 +175,7 @@ def test_pair_always_fused_keeps_only_one():
     hits = _hits(genomes, [A, B, C])
     shared = {g: {shared_pair_key(A, B): 1} for g in genomes}
 
-    kept, exclusions = resolve_shared_protein_conflicts([A, B, C], shared, genomes, hits)
+    kept, exclusions = _resolve([A, B, C], shared, genomes, hits)
 
     assert kept == [A, C]           # tie on single-copy count -> lower acc kept
     assert len(exclusions) == 1
@@ -183,7 +191,7 @@ def test_the_more_widely_single_copy_pfam_is_kept():
     hits["g0"][A] = 2               # A is single-copy in 9, B in 10
     shared = {g: {shared_pair_key(A, B): 1} for g in genomes}
 
-    kept, exclusions = resolve_shared_protein_conflicts([A, B], shared, genomes, hits)
+    kept, exclusions = _resolve([A, B], shared, genomes, hits)
     assert kept == [B]
     assert exclusions[0].dropped_acc == A
 
@@ -193,12 +201,12 @@ def test_rare_sharing_below_the_cutoff_is_left_alone():
     hits = _hits(genomes, [A, B])
     shared = {"g0": {shared_pair_key(A, B): 1}}     # 5% of genomes
 
-    kept, exclusions = resolve_shared_protein_conflicts(
+    kept, exclusions = _resolve(
         [A, B], shared, genomes, hits, max_shared_percent=10)
     assert kept == [A, B]
     assert exclusions == []
 
-    kept, exclusions = resolve_shared_protein_conflicts(
+    kept, exclusions = _resolve(
         [A, B], shared, genomes, hits, max_shared_percent=5)
     assert len(kept) == 1 and len(exclusions) == 1
 
@@ -209,7 +217,7 @@ def test_three_domains_on_one_protein_leave_one():
     shared = {g: {shared_pair_key(A, B): 1, shared_pair_key(A, C): 1,
                   shared_pair_key(B, C): 1} for g in genomes}
 
-    kept, exclusions = resolve_shared_protein_conflicts([A, B, C, D], shared, genomes, hits)
+    kept, exclusions = _resolve([A, B, C, D], shared, genomes, hits)
     assert kept == [A, D]
     assert {ex.dropped_acc for ex in exclusions} == {B, C}
 
@@ -219,7 +227,7 @@ def test_pairs_involving_a_non_retained_pfam_are_ignored():
     hits = _hits(genomes, [A, B])
     shared = {g: {shared_pair_key(A, D): 1} for g in genomes}   # D wasn't retained
 
-    kept, exclusions = resolve_shared_protein_conflicts([A, B], shared, genomes, hits)
+    kept, exclusions = _resolve([A, B], shared, genomes, hits)
     assert kept == [A, B]
     assert exclusions == []
 
@@ -229,17 +237,33 @@ def test_genomes_outside_the_kept_set_do_not_count():
     hits = _hits(genomes + ["dropped"], [A, B])
     shared = {"dropped": {shared_pair_key(A, B): 1}}
 
-    kept, exclusions = resolve_shared_protein_conflicts(
+    kept, exclusions = _resolve(
         [A, B], shared, genomes, hits, max_shared_percent=0)
     assert kept == [A, B]
     assert exclusions == []
+
+
+def test_count_genomes_sharing_counts_genomes_not_proteins():
+    genomes = ["g1", "g2", "g3"]
+    shared = {
+        "g1": {shared_pair_key(A, B): 3},       # three fused proteins, one genome
+        "g2": {shared_pair_key(A, B): 1, shared_pair_key(C, D): 1},
+        "g3": {shared_pair_key(C, D): 0},       # recorded but empty
+    }
+    assert count_genomes_sharing(shared, genomes) == {
+        shared_pair_key(A, B): 2, shared_pair_key(C, D): 1}
+
+
+def test_count_genomes_sharing_ignores_genomes_outside_the_set():
+    shared = {"g1": {shared_pair_key(A, B): 1}, "dropped": {shared_pair_key(A, B): 1}}
+    assert count_genomes_sharing(shared, ["g1", "g2"]) == {shared_pair_key(A, B): 1}
 
 
 def test_resolution_is_deterministic_and_preserves_order():
     genomes = [f"g{i}" for i in range(4)]
     hits = _hits(genomes, [D, C, B, A])
     shared = {g: {shared_pair_key(C, D): 1} for g in genomes}
-    kept, _ = resolve_shared_protein_conflicts([D, C, B, A], shared, genomes, hits)
+    kept, _ = _resolve([D, C, B, A], shared, genomes, hits)
     assert kept == [C, B, A]
 
 
@@ -257,7 +281,7 @@ def test_end_to_end_fused_pair_yields_one_target(tmp_path):
     wanted, _ = count_single_copy_hits(hits, ids, [A, B, C, D], 90)
     assert wanted == [A, B, C, D]
 
-    kept, exclusions = resolve_shared_protein_conflicts(wanted, shared, ids, hits)
+    kept, exclusions = _resolve(wanted, shared, ids, hits)
     assert kept == [A, C, D]
     assert [(e.dropped_acc, e.kept_acc) for e in exclusions] == [(B, A)]
 
@@ -270,7 +294,7 @@ def test_exclusions_table_is_written_with_names(tmp_path):
     genomes = [f"g{i}" for i in range(4)]
     hits = _hits(genomes, [A, B])
     shared = {g: {shared_pair_key(A, B): 1} for g in genomes[:3]}
-    _, exclusions = resolve_shared_protein_conflicts([A, B], shared, genomes, hits)
+    _, exclusions = _resolve([A, B], shared, genomes, hits)
 
     info = {A: PfamProfileInfo(A, "MockA", "desc", 90.0),
             B: PfamProfileInfo(B, "MockB", "desc", 90.0)}
